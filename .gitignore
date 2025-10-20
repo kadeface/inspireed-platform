@@ -23,6 +23,7 @@ MANIFEST
 venv/
 ENV/
 env/
+*.pyc
 
 # Node
 node_modules/
@@ -42,11 +43,16 @@ dist-ssr/
 *.swo
 *~
 .DS_Store
+.cursor/
 
-# Environment
+# Environment Variables
 .env
 .env.local
 .env.*.local
+.env.backup
+.env.bak
+*.env.backup
+*.env.bak
 
 # Database
 *.db
@@ -56,12 +62,39 @@ dist-ssr/
 # Logs
 logs/
 *.log
+*.pid
 
 # Testing
 .coverage
 .pytest_cache/
 htmlcov/
+.tox/
+.hypothesis/
 
-# Build
-*.pyc
+# Storage & Uploads
+backend/storage/resources/
+backend/storage/thumbnails/
+storage/
+uploads/
+
+# Temporary Files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Documentation Build
+docs/_build/
+site/
+
+# Cache
+.cache/
+*.cache
+.parcel-cache/
 
