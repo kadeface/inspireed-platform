@@ -1,0 +1,17 @@
+name,code,display_order,description,parent_code,is_active
+"日新月异"的农业,chapter-1,1,介绍智能农业的重要性和发展趋势,,True
+温控系统,lesson-1-1,1,学习温控系统的基本原理和应用,chapter-1,True
+通风系统,lesson-1-2,2,掌握通风系统的设计和使用方法,chapter-1,True
+光照系统,lesson-1-3,3,了解光照系统对植物生长的影响,chapter-1,True
+预防灾害,lesson-1-4,4,学习如何预防和应对农业灾害,chapter-1,True
+机械臂,chapter-2,2,机械臂技术基础,,True
+机械臂&语音控制,lesson-2-1,1,学习机械臂的语音控制技术,chapter-2,True
+机械臂&颜色识别,lesson-2-2,2,掌握机械臂的颜色识别功能,chapter-2,True
+传送带,chapter-3,3,传送带系统技术,,True
+传送带与机械臂联动,lesson-3-1,1,学习传送带与机械臂的协同工作,chapter-3,True
+智能小车,chapter-4,4,智能小车技术,,True
+智能小车与机械臂&传送带联动,lesson-4-1,1,掌握智能小车与机械臂、传送带的联动技术,chapter-4,True
+RFID 技术与溯源系统,chapter-5,5,RFID技术在农业溯源中的应用,,True
+二维码与溯源系统,chapter-6,6,二维码技术在农业溯源中的应用,,True
+我的智能农业系统 (1),chapter-7,7,智能农业系统综合应用第一部分,,True
+我的智能农业系统 (2),chapter-8,8,智能农业系统综合应用第二部分,,True
