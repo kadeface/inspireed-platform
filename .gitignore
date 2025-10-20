@@ -72,8 +72,10 @@ htmlcov/
 .hypothesis/
 
 # Storage & Uploads
-backend/storage/resources/
-backend/storage/thumbnails/
+backend/storage/resources/*
+!backend/storage/resources/.gitkeep
+backend/storage/thumbnails/*
+!backend/storage/thumbnails/.gitkeep
 storage/
 uploads/
 
