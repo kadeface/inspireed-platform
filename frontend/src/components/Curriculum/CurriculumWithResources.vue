@@ -114,7 +114,7 @@
           <Transition name="expand">
             <div v-if="chapter.is_expanded" class="chapter-content">
               <!-- 主章节资源（优先显示） -->
-              <div v-if="chapterResources[chapter.id]?.length > 0" class="main-chapter-resources">
+              <div v-if="chapterResources[chapter.id]?.length" class="main-chapter-resources">
                 <div class="section-title">
                   <svg class="section-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -130,12 +130,29 @@
 
                 <!-- 资源列表 -->
                 <div v-else class="resources-list">
+                  <!-- 官方资源 -->
                   <PDFResourceItem
                     v-for="resource in chapterResources[chapter.id]"
-                    :key="resource.id"
+                    :key="`resource-${resource.id}`"
                     :resource="resource"
                     @preview="handlePreviewPDF"
                     @create-lesson="handleCreateLesson"
+                  />
+                  
+                  <!-- 加载教案状态 -->
+                  <div v-if="loadingLessonsChapterId === chapter.id" class="loading-lessons">
+                    <div class="spinner-small"></div>
+                    <span>加载个人教案中...</span>
+                  </div>
+                  
+                  <!-- 教师个人教案 -->
+                  <LessonResourceItem
+                    v-for="lesson in chapterLessons[chapter.id]"
+                    :key="`lesson-${lesson.id}`"
+                    :lesson="lesson"
+                    @edit="handleEditLesson"
+                    @view="handleViewLesson"
+                    @publish="handlePublishLesson"
                   />
                 </div>
               </div>
@@ -180,13 +197,30 @@
                       </div>
 
                       <!-- 资源列表 -->
-                      <div v-else-if="chapterResources[subChapter.id]?.length > 0" class="resources-list">
+                      <div v-else-if="chapterResources[subChapter.id]?.length || chapterLessons[subChapter.id]?.length" class="resources-list">
+                        <!-- 官方资源 -->
                         <PDFResourceItem
                           v-for="resource in chapterResources[subChapter.id]"
-                          :key="resource.id"
+                          :key="`resource-${resource.id}`"
                           :resource="resource"
                           @preview="handlePreviewPDF"
                           @create-lesson="handleCreateLesson"
+                        />
+                        
+                        <!-- 加载教案状态 -->
+                        <div v-if="loadingLessonsChapterId === subChapter.id" class="loading-lessons">
+                          <div class="spinner-small"></div>
+                          <span>加载个人教案中...</span>
+                        </div>
+                        
+                        <!-- 教师个人教案 -->
+                        <LessonResourceItem
+                          v-for="lesson in chapterLessons[subChapter.id]"
+                          :key="`lesson-${lesson.id}`"
+                          :lesson="lesson"
+                          @edit="handleEditLesson"
+                          @view="handleViewLesson"
+                          @publish="handlePublishLesson"
                         />
                       </div>
 
@@ -203,7 +237,7 @@
               </div>
 
               <!-- 空状态（当既没有资源也没有子章节时） -->
-              <div v-if="(!chapterResources[chapter.id] || chapterResources[chapter.id].length === 0) && (!chapter.children || chapter.children.length === 0)" class="empty-resources">
+              <div v-if="!chapterResources[chapter.id]?.length && !chapterLessons[chapter.id]?.length && !chapter.children?.length" class="empty-resources">
                 <svg class="empty-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
@@ -223,8 +257,8 @@
       </div>
     </div>
 
-    <!-- PDF 预览模态框 -->
-    <PDFViewerModal
+    <!-- 资源预览模态框 -->
+    <ResourcePreviewModal
       v-model="showPDFViewer"
       :resource-id="selectedPDFId"
       @create-lesson="handleCreateLesson"
@@ -240,32 +274,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import type { Subject, Grade, Course } from '../../types/curriculum'
+import { ref, onMounted } from 'vue'
+import type { Grade, Course, SubjectTreeNode } from '../../types/curriculum'
 import type { Resource, ChapterWithChildren } from '../../types/resource'
+import type { Lesson } from '../../types/lesson'
 import curriculumService from '../../services/curriculum'
 import { chapterService, resourceService } from '../../services/resource'
+import { lessonService } from '../../services/lesson'
 import PDFResourceItem from '../Resource/PDFResourceItem.vue'
-import PDFViewerModal from '../Resource/PDFViewerModal.vue'
+import ResourcePreviewModal from '../Resource/ResourcePreviewModal.vue'
 import CreateLessonFromResourceModal from '../Resource/CreateLessonFromResourceModal.vue'
+import LessonResourceItem from '../Resource/LessonResourceItem.vue'
 
 const emit = defineEmits<{
   'lesson-created': [lessonId: number]
 }>()
 
 // 基础数据
-const subjects = ref<Subject[]>([])
+const subjects = ref<SubjectTreeNode[]>([])
 const grades = ref<Grade[]>([])
 const selectedSubjectId = ref<number | string>('')
 const selectedGradeId = ref<number | string>('')
 const availableCourse = ref<Course | null>(null)
 const selectedCourse = ref<Course | null>(null)
 
+// 扩展类型以包含 is_expanded 属性
+interface ChapterWithExpanded extends Omit<ChapterWithChildren, 'children'> {
+  is_expanded?: boolean
+  children?: ChapterWithExpanded[]
+}
+
 // 章节和资源
-const chapters = ref<(ChapterWithChildren & { is_expanded?: boolean })[]>([])
+const chapters = ref<ChapterWithExpanded[]>([])
 const chapterResources = ref<Record<number, Resource[]>>({})
+const chapterLessons = ref<Record<number, Lesson[]>>({})  // 章节教案
 const isLoadingChapters = ref(false)
 const loadingChapterId = ref<number | null>(null)
+const loadingLessonsChapterId = ref<number | null>(null)  // 正在加载教案的章节ID
 
 // 模态框状态
 const showPDFViewer = ref(false)
@@ -286,10 +331,19 @@ onMounted(async () => {
     const allGrades: Grade[] = []
     curriculumData.subjects?.forEach(subject => {
       if (subject.grades) {
-        subject.grades.forEach(grade => {
+        subject.grades.forEach(gradeNode => {
           // 避免重复添加年级
-          if (!allGrades.find(g => g.id === grade.id)) {
-            allGrades.push(grade)
+          if (!allGrades.find((g: Grade) => g.id === gradeNode.id)) {
+            // 将 GradeTreeNode 转换为 Grade
+            allGrades.push({
+              id: gradeNode.id,
+              name: gradeNode.name,
+              level: gradeNode.level,
+              stage_id: gradeNode.stage_id,
+              is_active: gradeNode.is_active,
+              created_at: '',
+              updated_at: ''
+            })
           }
         })
       }
@@ -313,7 +367,43 @@ async function loadCourses() {
     if (subject && subject.grades) {
       const grade = subject.grades.find(g => g.id === Number(selectedGradeId.value))
       if (grade && grade.courses && grade.courses.length > 0) {
-        availableCourse.value = grade.courses[0] // 取第一个课程
+        const courseNode = grade.courses[0]
+        if (courseNode) {
+          // 将 CourseTreeNode 转换为 Course
+          availableCourse.value = {
+            id: courseNode.id,
+            subject_id: subject.id,
+            grade_id: grade.id,
+            name: courseNode.name,
+            code: courseNode.code,
+            description: courseNode.description,
+            is_active: courseNode.is_active,
+            display_order: 0,
+            created_at: '',
+            updated_at: '',
+            subject: {
+              id: subject.id,
+              name: subject.name,
+              code: subject.code,
+              description: subject.description,
+              is_active: subject.is_active,
+              display_order: 0,
+              created_at: '',
+              updated_at: ''
+            },
+            grade: {
+              id: grade.id,
+              name: grade.name,
+              level: grade.level,
+              stage_id: grade.stage_id,
+              is_active: grade.is_active,
+              created_at: '',
+              updated_at: ''
+            }
+          }
+        } else {
+          availableCourse.value = null
+        }
       } else {
         availableCourse.value = null
       }
@@ -361,22 +451,32 @@ async function loadChapters(courseId: number) {
 }
 
 // 切换章节展开/折叠
-async function toggleChapter(chapter: ChapterWithChildren & { is_expanded?: boolean }) {
+async function toggleChapter(chapter: ChapterWithExpanded) {
   chapter.is_expanded = !chapter.is_expanded
   
   // 如果展开且还没有加载资源，则加载
-  if (chapter.is_expanded && !chapterResources.value[chapter.id]) {
-    await loadChapterResources(chapter.id)
+  if (chapter.is_expanded) {
+    if (!chapterResources.value[chapter.id]) {
+      await loadChapterResources(chapter.id)
+    }
+    if (!chapterLessons.value[chapter.id]) {
+      await loadChapterLessons(chapter.id)
+    }
   }
 }
 
 // 切换子章节展开/折叠
-async function toggleSubChapter(subChapter: ChapterWithChildren & { is_expanded?: boolean }) {
+async function toggleSubChapter(subChapter: ChapterWithExpanded) {
   subChapter.is_expanded = !subChapter.is_expanded
   
   // 如果展开且还没有加载资源，则加载
-  if (subChapter.is_expanded && !chapterResources.value[subChapter.id]) {
-    await loadChapterResources(subChapter.id)
+  if (subChapter.is_expanded) {
+    if (!chapterResources.value[subChapter.id]) {
+      await loadChapterResources(subChapter.id)
+    }
+    if (!chapterLessons.value[subChapter.id]) {
+      await loadChapterLessons(subChapter.id)
+    }
   }
 }
 
@@ -395,6 +495,21 @@ async function loadChapterResources(chapterId: number) {
   }
 }
 
+// 加载章节教案
+async function loadChapterLessons(chapterId: number) {
+  loadingLessonsChapterId.value = chapterId
+  
+  try {
+    const response = await lessonService.fetchChapterLessons(chapterId)
+    chapterLessons.value[chapterId] = response.items
+  } catch (error) {
+    console.error('Failed to load chapter lessons:', error)
+    chapterLessons.value[chapterId] = []
+  } finally {
+    loadingLessonsChapterId.value = null
+  }
+}
+
 // 预览 PDF
 function handlePreviewPDF(resourceId: number) {
   selectedPDFId.value = resourceId
@@ -410,6 +525,23 @@ function handleCreateLesson(resourceId: number) {
 // 教案创建成功
 function handleLessonCreated(lessonId: number) {
   emit('lesson-created', lessonId)
+}
+
+// 教案操作处理
+function handleEditLesson(lessonId: number) {
+  // 跳转到教案编辑器
+  window.open(`/teacher/lesson/${lessonId}`, '_blank')
+}
+
+function handleViewLesson(lessonId: number) {
+  // 跳转到教案查看页面
+  window.open(`/teacher/lesson/${lessonId}?mode=preview`, '_blank')
+}
+
+function handlePublishLesson(lessonId: number) {
+  // 发布教案逻辑（可以在这里添加确认对话框）
+  console.log('Publishing lesson:', lessonId)
+  // TODO: 实现发布教案的API调用
 }
 </script>
 
@@ -748,7 +880,8 @@ function handleLessonCreated(lessonId: number) {
   border-top: 1px solid #e5e7eb;
 }
 
-.loading-resources {
+.loading-resources,
+.loading-lessons {
   display: flex;
   align-items: center;
   justify-content: center;

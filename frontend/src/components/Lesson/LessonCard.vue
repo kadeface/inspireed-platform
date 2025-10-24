@@ -64,6 +64,16 @@
         </span>
       </div>
 
+      <!-- 课程和章节信息 -->
+      <div v-if="lesson.course || lesson.chapter" class="mb-3">
+        <div v-if="lesson.course" class="text-xs text-blue-600 mb-1">
+          📚 {{ lesson.course.name }}
+        </div>
+        <div v-if="lesson.chapter" class="text-xs text-purple-600">
+          📖 {{ lesson.chapter.name }}
+        </div>
+      </div>
+
       <!-- 底部信息 -->
       <div class="flex items-center justify-between text-xs text-gray-500 mb-3">
         <span>更新于 {{ formattedDate }}</span>

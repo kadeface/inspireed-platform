@@ -31,6 +31,10 @@ class LessonService {
           page_size: params?.page_size || 20,
           status: params?.status,
           search: params?.search,
+          course_id: params?.course_id,
+          chapter_id: params?.chapter_id,
+          subject_id: params?.subject_id,
+          grade_id: params?.grade_id,
         },
       })
       return response
@@ -184,6 +188,29 @@ class LessonService {
     } catch (error: any) {
       console.error(`Failed to update reference notes for lesson ${id}:`, error)
       throw new Error(error.response?.data?.detail || '更新参考笔记失败')
+    }
+  }
+
+  /**
+   * 获取指定章节下的教案列表
+   * @param chapterId 章节ID
+   * @param params 查询参数
+   * @returns 教案列表响应
+   */
+  async fetchChapterLessons(chapterId: number, params?: LessonListParams): Promise<LessonListResponse> {
+    try {
+      const response = await api.get<LessonListResponse>(`${this.basePath}/chapter/${chapterId}`, {
+        params: {
+          page: params?.page || 1,
+          page_size: params?.page_size || 20,
+          status: params?.status,
+          search: params?.search,
+        },
+      })
+      return response
+    } catch (error: any) {
+      console.error(`Failed to fetch lessons for chapter ${chapterId}:`, error)
+      throw new Error(error.response?.data?.detail || '获取章节教案列表失败')
     }
   }
 }

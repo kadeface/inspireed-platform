@@ -181,6 +181,25 @@ export const resourceService = {
    */
   getPDFPreviewUrl(resourceId: number): string {
     return `${api.defaults.baseURL}/resources/${resourceId}`
+  },
+
+  /**
+   * 获取资源预览信息（包括Office文档转换）
+   */
+  async getResourcePreview(resourceId: number): Promise<{
+    resource_id: number
+    title: string
+    file_url: string
+    file_type: string
+    file_size: number
+    page_count: number
+    can_preview_directly: boolean
+    preview_url: string
+    converted_to_pdf?: boolean
+    conversion_error?: string
+  }> {
+    const response = await api.get(`/resources/${resourceId}/preview`)
+    return response
   }
 }
 

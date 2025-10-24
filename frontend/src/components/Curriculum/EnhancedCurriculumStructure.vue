@@ -59,8 +59,8 @@
                   >
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                   </svg>
-                  <span class="text-sm text-gray-900">{{ chapter.title }}</span>
-                  <span v-if="chapter.lesson_count > 0" class="text-xs text-gray-500">({{ chapter.lesson_count }})</span>
+                  <span class="text-sm text-gray-900">{{ chapter.name }}</span>
+                  <span v-if="chapter.lesson_count && chapter.lesson_count > 0" class="text-xs text-gray-500">({{ chapter.lesson_count }})</span>
                 </div>
               </div>
               
@@ -73,8 +73,8 @@
                   @click="selectChapter(child.id)"
                 >
                   <div class="w-1 h-1 bg-gray-400 rounded-full mr-3"></div>
-                  <span class="text-sm text-gray-700">{{ child.title }}</span>
-                  <span v-if="child.lesson_count > 0" class="text-xs text-gray-500 ml-2">({{ child.lesson_count }})</span>
+                  <span class="text-sm text-gray-700">{{ child.name }}</span>
+                  <span v-if="child.lesson_count && child.lesson_count > 0" class="text-xs text-gray-500 ml-2">({{ child.lesson_count }})</span>
                 </div>
               </div>
             </div>
@@ -264,6 +264,13 @@ import type {
   TextbookVersion 
 } from '@/types/curriculum'
 
+// 扩展 Chapter 类型以包含 UI 状态
+interface ChapterWithUI extends Omit<Chapter, 'children'> {
+  is_expanded?: boolean
+  lesson_count?: number // 别名 resources_count
+  children?: ChapterWithUI[]
+}
+
 const emit = defineEmits<{
   'resource-selected': [resourceId: number]
   'chapter-selected': [chapterId: number]
@@ -304,68 +311,96 @@ const mockTextbook: Textbook = {
   version: { id: 1, name: '统编版', code: 'unified', publisher: '人民教育出版社', is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01' }
 }
 
-const mockChapters: Chapter[] = [
+const mockChapters: ChapterWithUI[] = [
   {
     id: 1,
-    textbook_id: 1,
-    title: '我上学了',
-    order: 1,
+    course_id: 1,
+    name: '我上学了',
+    display_order: 1,
+    is_active: true,
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
     is_expanded: true,
     lesson_count: 4,
+    resources_count: 4,
     children: [
-      { id: 11, textbook_id: 1, parent_id: 1, title: '我是中国人', order: 1, is_expanded: false, lesson_count: 1 },
-      { id: 12, textbook_id: 1, parent_id: 1, title: '我爱我们的祖国', order: 2, is_expanded: false, lesson_count: 1 },
-      { id: 13, textbook_id: 1, parent_id: 1, title: '我是小学生', order: 3, is_expanded: false, lesson_count: 1 },
-      { id: 14, textbook_id: 1, parent_id: 1, title: '我爱学语文', order: 4, is_expanded: false, lesson_count: 1 }
+      { id: 11, course_id: 1, parent_id: 1, name: '我是中国人', display_order: 1, is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01', is_expanded: false, lesson_count: 1, resources_count: 1 },
+      { id: 12, course_id: 1, parent_id: 1, name: '我爱我们的祖国', display_order: 2, is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01', is_expanded: false, lesson_count: 1, resources_count: 1 },
+      { id: 13, course_id: 1, parent_id: 1, name: '我是小学生', display_order: 3, is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01', is_expanded: false, lesson_count: 1, resources_count: 1 },
+      { id: 14, course_id: 1, parent_id: 1, name: '我爱学语文', display_order: 4, is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01', is_expanded: false, lesson_count: 1, resources_count: 1 }
     ]
   },
   {
     id: 2,
-    textbook_id: 1,
-    title: '第一单元·识字',
-    order: 2,
+    course_id: 1,
+    name: '第一单元·识字',
+    display_order: 2,
+    is_active: true,
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
     is_expanded: false,
-    lesson_count: 8
+    lesson_count: 8,
+    resources_count: 8
   },
   {
     id: 3,
-    textbook_id: 1,
-    title: '第二单元·汉语拼音',
-    order: 3,
+    course_id: 1,
+    name: '第二单元·汉语拼音',
+    display_order: 3,
+    is_active: true,
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
     is_expanded: false,
-    lesson_count: 12
+    lesson_count: 12,
+    resources_count: 12
   },
   {
     id: 4,
-    textbook_id: 1,
-    title: '第三单元·汉语拼音',
-    order: 4,
+    course_id: 1,
+    name: '第三单元·汉语拼音',
+    display_order: 4,
+    is_active: true,
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
     is_expanded: false,
-    lesson_count: 10
+    lesson_count: 10,
+    resources_count: 10
   },
   {
     id: 5,
-    textbook_id: 1,
-    title: '第四单元·汉语拼音',
-    order: 5,
+    course_id: 1,
+    name: '第四单元·汉语拼音',
+    display_order: 5,
+    is_active: true,
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
     is_expanded: false,
-    lesson_count: 8
+    lesson_count: 8,
+    resources_count: 8
   },
   {
     id: 6,
-    textbook_id: 1,
-    title: '第五单元·阅读',
-    order: 6,
+    course_id: 1,
+    name: '第五单元·阅读',
+    display_order: 6,
+    is_active: true,
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
     is_expanded: false,
-    lesson_count: 6
+    lesson_count: 6,
+    resources_count: 6
   },
   {
     id: 7,
-    textbook_id: 1,
-    title: '第六单元·识字',
-    order: 7,
+    course_id: 1,
+    name: '第六单元·识字',
+    display_order: 7,
+    is_active: true,
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
     is_expanded: false,
-    lesson_count: 8
+    lesson_count: 8,
+    resources_count: 8
   }
 ]
 
@@ -424,7 +459,7 @@ const mockResources: CourseResource[] = [
 ]
 
 // 计算属性
-const courseOutline = ref<Chapter[]>(mockChapters)
+const courseOutline = ref<ChapterWithUI[]>(mockChapters)
 const availableGrades = ref<Grade[]>([
   { id: 1, name: '一年级', level: 1, stage_id: 1, is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01' },
   { id: 2, name: '二年级', level: 2, stage_id: 1, is_active: true, created_at: '2024-01-01', updated_at: '2024-01-01' },

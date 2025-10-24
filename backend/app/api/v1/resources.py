@@ -13,6 +13,7 @@ from app.schemas.resource import (
     ResourceDetail, ResourceListResponse
 )
 from app.services.upload import upload_service
+from app.services.office_converter import office_converter_service
 from app.api.deps import get_current_user, get_current_admin
 
 router = APIRouter()
@@ -235,4 +236,50 @@ async def download_resource(
         "download_url": resource.file_url,
         "filename": full_filename
     }
+
+
+@router.get("/{resource_id}/preview")
+async def get_resource_preview(
+    resource_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取资源预览信息，包括Office文档的PDF转换版本"""
+    
+    resource = await db.get(Resource, resource_id)
+    if not resource:
+        raise HTTPException(404, "Resource not found")
+    
+    # 检查文件类型
+    file_ext = resource.file_url.split('.')[-1].lower() if resource.file_url else ''
+    
+    preview_info = {
+        "resource_id": resource.id,
+        "title": resource.title,
+        "file_url": resource.file_url,
+        "file_type": file_ext,
+        "file_size": resource.file_size,
+        "page_count": resource.page_count,
+        "can_preview_directly": file_ext in ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
+        "preview_url": resource.file_url,
+        "converted_to_pdf": False,
+        "conversion_error": None
+    }
+    
+    # 如果是Office文档，尝试获取转换后的PDF
+    if file_ext in ['docx', 'doc', 'pptx', 'ppt']:
+        try:
+            converted_pdf_url = await office_converter_service.get_converted_pdf_url(resource.file_url)
+            if converted_pdf_url:
+                preview_info["preview_url"] = converted_pdf_url
+                preview_info["converted_to_pdf"] = True
+                preview_info["conversion_method"] = "auto_conversion"
+            else:
+                preview_info["converted_to_pdf"] = False
+                preview_info["conversion_error"] = "无法转换文档为PDF格式，请使用其他预览方式"
+        except Exception as e:
+            preview_info["converted_to_pdf"] = False
+            preview_info["conversion_error"] = f"转换过程中出现错误: {str(e)}"
+    
+    return preview_info
 

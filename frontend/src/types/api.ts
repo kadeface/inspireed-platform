@@ -30,6 +30,10 @@ export interface LessonListParams {
   page_size?: number
   status?: LessonStatus
   search?: string
+  course_id?: number
+  chapter_id?: number
+  subject_id?: number
+  grade_id?: number
 }
 
 /**

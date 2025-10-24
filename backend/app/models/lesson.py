@@ -33,6 +33,9 @@ class Lesson(Base):
     # 所属课程
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)
     
+    # 所属章节（可选，用于将教案关联到具体章节）
+    chapter_id = Column(Integer, ForeignKey("chapters.id"), nullable=True, index=True)
+    
     # 状态
     status = Column(SQLEnum(LessonStatus), default=LessonStatus.DRAFT, nullable=False)
     
@@ -69,6 +72,7 @@ class Lesson(Base):
     # 关联关系
     creator = relationship("User", foreign_keys=[creator_id])
     course = relationship("Course", back_populates="lessons")
+    chapter = relationship("Chapter", foreign_keys=[chapter_id])
     reference_resource = relationship("Resource", foreign_keys=[reference_resource_id])
     # cells = relationship("Cell", back_populates="lesson", cascade="all, delete-orphan")
     # execution_logs = relationship("ExecutionLog", back_populates="lesson")

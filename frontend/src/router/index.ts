@@ -37,6 +37,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'student' },
   },
   {
+    path: '/student/profile',
+    name: 'StudentProfile',
+    component: () => import('../pages/Student/Profile.vue'),
+    meta: { requiresAuth: true, role: 'student' },
+  },
+  {
     path: '/researcher',
     name: 'Researcher',
     component: () => import('../pages/Researcher/Dashboard.vue'),

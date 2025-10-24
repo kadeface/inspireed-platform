@@ -35,11 +35,27 @@ async def create_lesson(
     if not course.is_active:
         raise HTTPException(status_code=400, detail="该课程已被禁用")
     
+    # 验证章节存在（如果提供了章节ID）
+    if lesson_in.chapter_id:
+        chapter_result = await db.execute(
+            select(Chapter).where(Chapter.id == lesson_in.chapter_id)
+        )
+        chapter = chapter_result.scalar_one_or_none()
+        if not chapter:
+            raise HTTPException(status_code=404, detail="章节不存在")
+        
+        if chapter.course_id != lesson_in.course_id:
+            raise HTTPException(status_code=400, detail="章节不属于指定课程")
+        
+        if not chapter.is_active:
+            raise HTTPException(status_code=400, detail="该章节已被禁用")
+    
     lesson = Lesson(
         title=lesson_in.title,
         description=lesson_in.description,
         creator_id=current_user.id,
         course_id=lesson_in.course_id,
+        chapter_id=lesson_in.chapter_id,
         content=lesson_in.content,
         tags=lesson_in.tags or [],
         national_resource_id=lesson_in.national_resource_id,
@@ -67,6 +83,7 @@ async def list_lessons(
     status: Optional[LessonStatus] = None,
     search: Optional[str] = None,
     course_id: Optional[int] = Query(None, description="按课程ID筛选"),
+    chapter_id: Optional[int] = Query(None, description="按章节ID筛选"),
     subject_id: Optional[int] = Query(None, description="按学科ID筛选"),
     grade_id: Optional[int] = Query(None, description="按年级ID筛选"),
     db: AsyncSession = Depends(get_db),
@@ -87,6 +104,9 @@ async def list_lessons(
     
     if course_id:
         query = query.where(Lesson.course_id == course_id)
+    
+    if chapter_id:
+        query = query.where(Lesson.chapter_id == chapter_id)
     
     # 如果按学科或年级筛选，需要join课程表
     if subject_id or grade_id:
@@ -211,7 +231,12 @@ async def publish_lesson(
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """发布教案"""
-    result = await db.execute(select(Lesson).where(Lesson.id == lesson_id))
+    result = await db.execute(
+        select(Lesson).options(
+            selectinload(Lesson.course).selectinload(Course.subject),
+            selectinload(Lesson.course).selectinload(Course.grade)
+        ).where(Lesson.id == lesson_id)
+    )
     lesson = result.scalar_one_or_none()
     
     if not lesson:
@@ -225,6 +250,16 @@ async def publish_lesson(
     
     await db.commit()
     await db.refresh(lesson)
+    
+    # 重新加载以确保关联信息完整
+    result = await db.execute(
+        select(Lesson).options(
+            selectinload(Lesson.course).selectinload(Course.subject),
+            selectinload(Lesson.course).selectinload(Course.grade)
+        ).where(Lesson.id == lesson.id)
+    )
+    lesson = result.scalar_one()
+    
     return lesson
 
 
@@ -306,12 +341,13 @@ async def create_lesson_from_resource(
     if not course.is_active:
         raise HTTPException(status_code=400, detail="该课程已被禁用")
     
-    # 3. 创建教案
+    # 3. 创建教案，自动关联到章节
     lesson = Lesson(
         title=data.title,
         description=data.description,
         creator_id=current_user.id,
         course_id=course.id,
+        chapter_id=chapter.id,  # 自动关联到章节
         reference_resource_id=data.reference_resource_id,
         reference_notes=data.reference_notes,
         tags=data.tags or [],
@@ -408,3 +444,62 @@ async def update_reference_notes(
     await db.refresh(lesson)
     
     return lesson
+
+
+@router.get("/chapter/{chapter_id}", response_model=LessonListResponse)
+async def get_chapter_lessons(
+    chapter_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: Optional[LessonStatus] = None,
+    search: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """获取指定章节下的教案列表"""
+    
+    # 验证章节存在
+    chapter_result = await db.execute(
+        select(Chapter).where(Chapter.id == chapter_id)
+    )
+    chapter = chapter_result.scalar_one_or_none()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+    
+    if not chapter.is_active:
+        raise HTTPException(status_code=400, detail="该章节已被禁用")
+    
+    # 构建查询
+    query = select(Lesson).options(
+        selectinload(Lesson.course).selectinload(Course.subject),
+        selectinload(Lesson.course).selectinload(Course.grade),
+        selectinload(Lesson.chapter)
+    ).where(
+        Lesson.creator_id == current_user.id,
+        Lesson.chapter_id == chapter_id
+    )
+    
+    if status:
+        query = query.where(Lesson.status == status)
+    
+    if search:
+        query = query.where(Lesson.title.ilike(f"%{search}%"))
+    
+    # 获取总数
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+    
+    # 分页查询
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    query = query.order_by(Lesson.updated_at.desc())
+    
+    result = await db.execute(query)
+    lessons = result.scalars().all()
+    
+    return LessonListResponse(
+        items=lessons,
+        total=total,
+        page=page,
+        page_size=page_size
+    )

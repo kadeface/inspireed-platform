@@ -1,5 +1,5 @@
 import type { Cell } from './cell'
-import type { Course } from './curriculum'
+import type { Course, Chapter } from './curriculum'
 import type { Resource } from './resource'
 
 export const LessonStatus = {
@@ -16,6 +16,7 @@ export interface Lesson {
   description?: string
   creator_id: number
   course_id: number
+  chapter_id?: number  // 所属章节ID
   status: LessonStatus
   content: Cell[]
   version: number
@@ -27,6 +28,7 @@ export interface Lesson {
   updated_at: string
   published_at?: string
   course?: Course
+  chapter?: Chapter  // 章节信息
   
   // MVP: 参考资源相关字段
   reference_resource_id?: number
@@ -41,6 +43,7 @@ export interface LessonCreate {
   title: string
   description?: string
   course_id: number
+  chapter_id?: number  // 所属章节ID
   content?: Cell[]
   tags?: string[]
 }

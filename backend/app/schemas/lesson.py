@@ -19,6 +19,7 @@ class LessonBase(BaseModel):
 class LessonCreate(LessonBase):
     """教案创建Schema"""
     course_id: int = Field(..., description="所属课程ID")
+    chapter_id: Optional[int] = Field(None, description="所属章节ID")
     content: List[dict] = Field(default_factory=list)
     national_resource_id: Optional[str] = None
 
@@ -28,6 +29,7 @@ class LessonUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
     course_id: Optional[int] = Field(None, description="所属课程ID")
+    chapter_id: Optional[int] = Field(None, description="所属章节ID")
     content: Optional[List[dict]] = None
     tags: Optional[List[str]] = None
     status: Optional[LessonStatus] = None
@@ -38,6 +40,7 @@ class LessonResponse(LessonBase):
     id: int
     creator_id: int
     course_id: int
+    chapter_id: Optional[int] = None
     status: LessonStatus
     content: List[dict]
     version: int

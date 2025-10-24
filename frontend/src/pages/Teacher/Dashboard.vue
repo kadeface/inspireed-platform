@@ -89,6 +89,20 @@
               {{ filter.label }}
             </button>
           </div>
+
+          <!-- 章节筛选器 -->
+          <div class="flex gap-2">
+            <select
+              v-model="selectedChapterId"
+              @change="handleChapterSelected"
+              class="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">所有章节</option>
+              <option v-for="chapter in availableChapters" :key="chapter.id" :value="chapter.id">
+                {{ chapter.name }}
+              </option>
+            </select>
+          </div>
         </div>
 
         <!-- 错误提示 -->
@@ -334,6 +348,8 @@ const searchQuery = ref('')
 const currentStatus = ref<LessonStatus | null>(null)
 const selectedGrade = ref<number | null>(null)
 const selectedGradeName = ref<string>('')
+const selectedChapterId = ref<number | null>(null)
+const availableChapters = ref<any[]>([])
 
 // Toast 提示
 const toast = ref({
@@ -364,6 +380,7 @@ async function loadLessons() {
       status: currentStatus.value || undefined,
       search: searchQuery.value || undefined,
       grade_id: selectedGrade.value || undefined,
+      chapter_id: selectedChapterId.value || undefined,
     })
   } catch (error: any) {
     showToast('error', error.message || '加载教案列表失败')
@@ -374,6 +391,12 @@ async function loadLessons() {
 function handleGradeSelected(gradeId: number | null) {
   selectedGrade.value = gradeId
   selectedGradeName.value = gradeId ? getGradeName(gradeId) : ''
+  lessonStore.currentPage = 1 // 重置到第一页
+  loadLessons()
+}
+
+// 处理章节选择
+function handleChapterSelected() {
   lessonStore.currentPage = 1 // 重置到第一页
   loadLessons()
 }
@@ -525,9 +548,23 @@ watch(currentStatus, () => {
   loadLessons()
 })
 
+// 加载可用章节列表
+async function loadAvailableChapters() {
+  try {
+    // 这里应该从lessonStore中获取所有教案的章节信息
+    // 或者调用专门的API获取章节列表
+    // 暂时使用空数组，后续可以根据实际需求实现
+    availableChapters.value = []
+  } catch (error) {
+    console.error('Failed to load chapters:', error)
+    availableChapters.value = []
+  }
+}
+
 // 页面加载时获取数据
 onMounted(() => {
   loadLessons()
+  loadAvailableChapters()
 })
 </script>
 

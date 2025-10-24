@@ -112,6 +112,7 @@ class Chapter(Base):
     course = relationship("Course", back_populates="chapters")
     parent = relationship("Chapter", remote_side=[id], backref="children")
     resources = relationship("Resource", back_populates="chapter", cascade="all, delete-orphan")
+    lessons = relationship("Lesson", back_populates="chapter", cascade="all, delete-orphan")
     
     def __repr__(self) -> str:
         return f"<Chapter(id={self.id}, name={self.name})>"
