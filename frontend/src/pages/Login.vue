@@ -103,26 +103,43 @@ async function handleSubmit() {
 
   try {
     if (isLogin.value) {
+      // 步骤1: 登录获取token
+      console.log('🔐 开始登录...')
       const tokenResponse = await authService.login({
         username: form.value.username,
         password: form.value.password,
       })
+      console.log('✅ Token获取成功:', tokenResponse)
       
       userStore.setToken(tokenResponse.access_token)
       
+      // 步骤2: 获取用户信息
+      console.log('👤 获取用户信息...')
       const user = await authService.getCurrentUser()
+      console.log('✅ 用户信息:', user)
+      console.log('👤 用户角色:', user.role)
+      
       userStore.setUser(user)
       
-      // 根据角色跳转
+      // 步骤3: 根据角色跳转
+      let targetPath = ''
       if (user.role === UserRole.ADMIN) {
-        router.push('/admin/curriculum') // 管理员跳转到课程体系管理
+        targetPath = '/admin'
       } else if (user.role === UserRole.TEACHER) {
-        router.push('/teacher')
+        targetPath = '/teacher'
       } else if (user.role === UserRole.STUDENT) {
-        router.push('/student')
+        targetPath = '/student'
       } else if (user.role === UserRole.RESEARCHER) {
-        router.push('/researcher')
+        targetPath = '/researcher'
+      } else {
+        console.error('❌ 未知角色:', user.role)
+        error.value = '用户角色配置错误，请联系管理员'
+        return
       }
+      
+      console.log('🚀 准备跳转到:', targetPath)
+      await router.push(targetPath)
+      console.log('✅ 跳转完成')
     } else {
       await authService.register({
         email: form.value.email,
@@ -135,6 +152,7 @@ async function handleSubmit() {
       isLogin.value = true
     }
   } catch (err: any) {
+    console.error('❌ 登录失败:', err)
     error.value = err.response?.data?.detail || '操作失败，请重试'
   } finally {
     loading.value = false

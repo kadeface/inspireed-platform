@@ -4,7 +4,7 @@
 from datetime import datetime
 from enum import Enum
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean, DateTime, 
+    Column, Integer, String, Text, Boolean, DateTime, Float,
     ForeignKey, Enum as SQLEnum, JSON
 )
 from sqlalchemy.orm import relationship
@@ -17,6 +17,13 @@ class LessonStatus(str, Enum):
     DRAFT = "draft"           # 草稿
     PUBLISHED = "published"   # 已发布
     ARCHIVED = "archived"     # 已归档
+
+
+class DifficultyLevel(str, Enum):
+    """难度等级枚举"""
+    BEGINNER = "beginner"      # 基础
+    INTERMEDIATE = "intermediate"  # 中级
+    ADVANCED = "advanced"       # 高级
 
 
 class Lesson(Base):
@@ -64,6 +71,11 @@ class Lesson(Base):
     estimated_duration = Column(Integer, nullable=True)  # 预计时长（分钟）
     view_count = Column(Integer, default=0, nullable=False)  # 查看次数
     
+    # 难度和评分（学生端增强）
+    difficulty_level = Column(SQLEnum(DifficultyLevel), default=DifficultyLevel.BEGINNER, nullable=True, comment="难度等级")
+    average_rating = Column(Float, default=0.0, nullable=False, comment="平均评分")
+    review_count = Column(Integer, default=0, nullable=False, comment="评论数量")
+    
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -76,6 +88,7 @@ class Lesson(Base):
     reference_resource = relationship("Resource", foreign_keys=[reference_resource_id])
     # cells = relationship("Cell", back_populates="lesson", cascade="all, delete-orphan")
     # execution_logs = relationship("ExecutionLog", back_populates="lesson")
+    questions = relationship("Question", back_populates="lesson", cascade="all, delete-orphan")
     
     def __repr__(self) -> str:
         return f"<Lesson(id={self.id}, title={self.title}, status={self.status})>"

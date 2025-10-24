@@ -3,7 +3,7 @@
 """
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Enum as SQLEnum
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Enum as SQLEnum, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -34,14 +34,20 @@ class User(Base):
     # 头像URL
     avatar_url = Column(String(500), nullable=True)
     
+    # 组织关联
+    school_id = Column(Integer, ForeignKey("schools.id"), nullable=True, comment="所属学校ID")
+    
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # 关联关系
+    school = relationship("School", back_populates="users")
     # lessons = relationship("Lesson", back_populates="creator", cascade="all, delete-orphan")
     # execution_logs = relationship("ExecutionLog", back_populates="user")
     # qa_records = relationship("QARecord", back_populates="user")
+    questions_asked = relationship("Question", foreign_keys="Question.student_id", back_populates="student")
+    answers_given = relationship("Answer", foreign_keys="Answer.answerer_id", back_populates="answerer")
     
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

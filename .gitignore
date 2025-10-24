@@ -95,6 +95,40 @@ Desktop.ini
 docs/_build/
 site/
 
+# Documentation Files (exclude from git)
+docs/
+*_SUMMARY.md
+*_GUIDE.md
+*_REPORT.md
+*_COMPLETE.md
+*_DESIGN.md
+*_QUICKSTART.md
+*_PROGRESS.md
+*_TEST*.md
+*_IMPLEMENTATION*.md
+*_FEATURES*.md
+*_ANALYSIS*.md
+*_FIX.md
+*_SUCCESS.md
+*_STATUS.md
+ADMIN_*.md
+QA_SYSTEM*.md
+TEACHER_*.md
+STUDENT_*.md
+RESEARCHER_*.md
+CURRICULUM_*.md
+COURSE_*.md
+ISSUE_*.md
+ENHANCEMENT_*.md
+TODAY_*.md
+WEEK*.md
+MVP_*.md
+PROJECT_*.md
+GIT_*.md
+# Keep important README files
+!README.md
+!*/README.md
+
 # Cache
 .cache/
 *.cache

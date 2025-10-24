@@ -109,7 +109,7 @@
               <!-- 渲染不同类型的 Cell -->
               <component
                 :is="getCellComponent(cell.type)"
-                :cell="cell"
+                :cell="cell as any"
                 :editable="false"
               />
             </div>
@@ -121,6 +121,41 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <p class="mt-4 text-lg text-gray-600">该课程暂无内容</p>
+          </div>
+
+          <!-- 评分评论区域 -->
+          <div class="mt-12 mb-8">
+            <ReviewSection :lesson-id="lessonId" @updated="handleReviewUpdated" />
+          </div>
+
+          <!-- 课程问答区域 -->
+          <div class="mt-8 mb-8 border-t border-gray-200 pt-8">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                课程问答
+              </h2>
+              <button
+                @click="showQuestionForm = true"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                我要提问
+              </button>
+            </div>
+
+            <!-- 问题列表 -->
+            <QuestionList
+              :questions="questions"
+              :loading="questionsLoading"
+              :has-more="hasMoreQuestions"
+              @question-click="handleQuestionClick"
+              @load-more="loadMoreQuestions"
+            />
           </div>
         </div>
       </div>
@@ -158,6 +193,15 @@
         </div>
       </div>
     </div>
+
+    <!-- 提问表单弹窗 -->
+    <QuestionForm
+      :show="showQuestionForm"
+      :lesson-id="lessonId"
+      :cells="lesson?.content"
+      @close="showQuestionForm = false"
+      @success="handleQuestionSuccess"
+    />
   </div>
 </template>
 
@@ -166,7 +210,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { lessonService } from '@/services/lesson'
 import type { Lesson } from '@/types/lesson'
-import type { Cell, CellType } from '@/types/cell'
+import type { CellType } from '@/types/cell'
 
 // 导入所有 Cell 组件
 import TextCell from '@/components/Cell/TextCell.vue'
@@ -176,6 +220,11 @@ import SimCell from '@/components/Cell/SimCell.vue'
 import QACell from '@/components/Cell/QACell.vue'
 import ChartCell from '@/components/Cell/ChartCell.vue'
 import ContestCell from '@/components/Cell/ContestCell.vue'
+import ReviewSection from '@/components/Resource/ReviewSection.vue'
+import QuestionForm from '@/components/Question/QuestionForm.vue'
+import QuestionList from '@/components/Question/QuestionList.vue'
+import questionService from '@/services/question'
+import type { QuestionListItem } from '@/types/question'
 
 const route = useRoute()
 const router = useRouter()
@@ -188,6 +237,13 @@ const completedCells = ref<Set<string>>(new Set())
 const notes = ref('')
 const notesSaving = ref(false)
 const notesSaved = ref(false)
+
+// 问答相关状态
+const showQuestionForm = ref(false)
+const questions = ref<QuestionListItem[]>([])
+const questionsLoading = ref(false)
+const hasMoreQuestions = ref(false)
+const questionsPage = ref(1)
 
 // 自动保存定时器
 let notesAutoSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -326,9 +382,70 @@ const autoSaveNotes = () => {
   }, 1000)
 }
 
+const handleReviewUpdated = () => {
+  // 评论更新后，可以选择刷新课程数据以更新评分
+  // 目前不需要特别处理，因为评分组件自己管理状态
+  console.log('Review updated')
+}
+
+// 问答相关方法
+const loadQuestions = async () => {
+  if (questionsLoading.value) return
+  
+  try {
+    questionsLoading.value = true
+    const response = await questionService.getLessonQuestions(lessonId.value, {
+      sort: 'recent',
+      page: questionsPage.value,
+      page_size: 10
+    })
+    
+    questions.value = response.items
+    hasMoreQuestions.value = response.has_more
+  } catch (err: any) {
+    console.error('Failed to load questions:', err)
+  } finally {
+    questionsLoading.value = false
+  }
+}
+
+const loadMoreQuestions = async () => {
+  if (!hasMoreQuestions.value || questionsLoading.value) return
+  
+  questionsPage.value++
+  try {
+    questionsLoading.value = true
+    const response = await questionService.getLessonQuestions(lessonId.value, {
+      sort: 'recent',
+      page: questionsPage.value,
+      page_size: 10
+    })
+    
+    questions.value = [...questions.value, ...response.items]
+    hasMoreQuestions.value = response.has_more
+  } catch (err: any) {
+    console.error('Failed to load more questions:', err)
+  } finally {
+    questionsLoading.value = false
+  }
+}
+
+const handleQuestionClick = (questionId: number) => {
+  router.push(`/student/question/${questionId}`)
+}
+
+const handleQuestionSuccess = (_questionId: number) => {
+  // 提问成功后重新加载问题列表
+  questionsPage.value = 1
+  loadQuestions()
+  // 可选：跳转到问题详情页
+  // router.push(`/student/question/${_questionId}`)
+}
+
 // 生命周期
 onMounted(() => {
   loadLesson()
+  loadQuestions()
 })
 
 onUnmounted(() => {
@@ -345,6 +462,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* stylelint-disable-next-line */
 .cell-wrapper {
   @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6 transition-all;
 }

@@ -51,6 +51,10 @@ class LessonResponse(LessonBase):
     updated_at: datetime
     published_at: Optional[datetime] = None
     
+    # 教师信息
+    creator_name: Optional[str] = None
+    creator_avatar: Optional[str] = None
+    
     # 嵌套课程信息
     course: Optional[CourseResponse] = None
     

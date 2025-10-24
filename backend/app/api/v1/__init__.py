@@ -3,7 +3,11 @@ API v1 路由包
 """
 from fastapi import APIRouter
 
-from app.api.v1 import auth, lessons, cells, qa, users, curriculum, chapters, resources
+from app.api.v1 import (
+    auth, lessons, cells, questions, users, curriculum, chapters, resources, 
+    researcher_curriculum, admin_dashboard, admin_users, admin_organization,
+    favorites, reviews, learning_paths
+)
 
 api_router = APIRouter()
 
@@ -15,5 +19,16 @@ api_router.include_router(chapters.router, prefix="/chapters", tags=["章节"])
 api_router.include_router(resources.router, prefix="/resources", tags=["资源"])
 api_router.include_router(lessons.router, prefix="/lessons", tags=["教案"])
 api_router.include_router(cells.router, prefix="/cells", tags=["单元"])
-api_router.include_router(qa.router, prefix="/qa", tags=["问答"])
+api_router.include_router(questions.router, prefix="/questions", tags=["问答系统"])
+
+# 学生端增强功能路由
+api_router.include_router(favorites.router, prefix="/favorites", tags=["收藏"])
+api_router.include_router(reviews.router, prefix="/reviews", tags=["评分评论"])
+api_router.include_router(learning_paths.router, prefix="/learning-paths", tags=["学习路径"])
+
+# 角色专用路由
+api_router.include_router(researcher_curriculum.router, prefix="/researcher/curriculum", tags=["教研员-课程体系"])
+api_router.include_router(admin_dashboard.router, prefix="/admin/dashboard", tags=["管理员-数据看板"])
+api_router.include_router(admin_users.router, prefix="/admin/users", tags=["管理员-用户管理"])
+api_router.include_router(admin_organization.router, prefix="/admin/organization", tags=["管理员-组织架构"])
 

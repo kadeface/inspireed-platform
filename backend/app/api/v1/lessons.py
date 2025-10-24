@@ -93,11 +93,20 @@ async def list_lessons(
     # 构建查询
     query = select(Lesson).options(
         selectinload(Lesson.course).selectinload(Course.subject),
-        selectinload(Lesson.course).selectinload(Course.grade)
-    ).where(Lesson.creator_id == current_user.id)
+        selectinload(Lesson.course).selectinload(Course.grade),
+        selectinload(Lesson.creator)  # 加载教师信息
+    )
     
-    if status:
-        query = query.where(Lesson.status == status)
+    # 根据用户角色应用不同的过滤条件
+    if current_user.role == "student":
+        # 学生：只能看到已发布的课程
+        query = query.where(Lesson.status == LessonStatus.PUBLISHED)
+    else:
+        # 教师/管理员/教研员：只能看到自己创建的课程
+        query = query.where(Lesson.creator_id == current_user.id)
+        # 对于非学生用户，可以通过status参数进一步筛选
+        if status:
+            query = query.where(Lesson.status == status)
     
     if search:
         query = query.where(Lesson.title.ilike(f"%{search}%"))
@@ -128,8 +137,18 @@ async def list_lessons(
     result = await db.execute(query)
     lessons = result.scalars().all()
     
+    # 为每个lesson添加教师信息
+    lessons_with_creator = []
+    for lesson in lessons:
+        lesson_dict = {
+            **{k: v for k, v in lesson.__dict__.items() if not k.startswith('_')},
+            'creator_name': lesson.creator.full_name if lesson.creator else None,
+            'creator_avatar': lesson.creator.avatar_url if lesson.creator else None,
+        }
+        lessons_with_creator.append(lesson_dict)
+    
     return LessonListResponse(
-        items=lessons,
+        items=lessons_with_creator,
         total=total,
         page=page,
         page_size=page_size,
@@ -146,7 +165,8 @@ async def get_lesson(
     result = await db.execute(
         select(Lesson).options(
             selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade)
+            selectinload(Lesson.course).selectinload(Course.grade),
+            selectinload(Lesson.creator)  # 加载教师信息
         ).where(Lesson.id == lesson_id)
     )
     lesson = result.scalar_one_or_none()
@@ -158,7 +178,14 @@ async def get_lesson(
     if lesson.creator_id != current_user.id and lesson.status != LessonStatus.PUBLISHED:
         raise HTTPException(status_code=403, detail="无权访问该教案")
     
-    return lesson
+    # 添加教师信息
+    lesson_dict = {
+        **{k: v for k, v in lesson.__dict__.items() if not k.startswith('_')},
+        'creator_name': lesson.creator.full_name if lesson.creator else None,
+        'creator_avatar': lesson.creator.avatar_url if lesson.creator else None,
+    }
+    
+    return lesson_dict
 
 
 @router.put("/{lesson_id}", response_model=LessonResponse)
@@ -502,4 +529,49 @@ async def get_chapter_lessons(
         total=total,
         page=page,
         page_size=page_size
+    )
+
+
+@router.get("/recommended", response_model=LessonListResponse)
+async def get_recommended_lessons(
+    limit: int = Query(10, ge=1, le=50, description="推荐课程数量"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    获取推荐课程
+    基于以下因素推荐：
+    1. 热门课程（评分高、查看多）
+    2. 新发布的课程
+    """
+    # 获取已发布的课程，按评分和发布时间排序
+    query = select(Lesson).options(
+        selectinload(Lesson.course).selectinload(Course.subject),
+        selectinload(Lesson.course).selectinload(Course.grade),
+        selectinload(Lesson.creator)  # 加载教师信息
+    ).where(
+        Lesson.status == LessonStatus.PUBLISHED
+    ).order_by(
+        Lesson.average_rating.desc(),
+        Lesson.published_at.desc()
+    ).limit(limit)
+    
+    result = await db.execute(query)
+    lessons = result.scalars().all()
+    
+    # 为每个lesson添加教师信息
+    lessons_with_creator = []
+    for lesson in lessons:
+        lesson_dict = {
+            **{k: v for k, v in lesson.__dict__.items() if not k.startswith('_')},
+            'creator_name': lesson.creator.full_name if lesson.creator else None,
+            'creator_avatar': lesson.creator.avatar_url if lesson.creator else None,
+        }
+        lessons_with_creator.append(lesson_dict)
+    
+    return LessonListResponse(
+        items=lessons_with_creator,
+        total=len(lessons),
+        page=1,
+        page_size=limit
     )

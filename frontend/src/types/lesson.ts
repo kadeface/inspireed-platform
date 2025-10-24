@@ -37,6 +37,15 @@ export interface Lesson {
   cell_count: number
   estimated_duration?: number  // 预计时长（分钟）
   view_count: number
+  
+  // 教师信息
+  creator_name?: string
+  creator_avatar?: string
+  
+  // 难度和评分（学生端增强）
+  difficulty_level?: string
+  average_rating?: number
+  review_count?: number
 }
 
 export interface LessonCreate {

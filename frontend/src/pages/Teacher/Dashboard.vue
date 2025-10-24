@@ -1,33 +1,83 @@
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- 顶部导航栏 -->
-    <nav class="bg-white shadow-sm">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-          <div class="flex items-center">
-            <h1 class="text-xl font-bold text-gray-900">教师工作台</h1>
-          </div>
-          <div class="flex items-center space-x-4">
-            <span class="text-gray-700">{{ userStore.user?.full_name || userStore.user?.username }}</span>
-            <button
-              @click="handleLogout"
-              class="px-4 py-2 text-sm text-red-600 hover:text-red-700"
-            >
-              退出登录
-            </button>
-          </div>
-        </div>
-      </div>
-    </nav>
+    <!-- 统一头部 -->
+    <DashboardHeader
+      title="教师工作台"
+      subtitle="管理您的教案和课程资源"
+      :user-name="userName"
+      @logout="handleLogout"
+    />
 
     <!-- 主内容区 -->
-    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      <div class="px-4 py-6 sm:px-0">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
         <!-- MVP: 课程和资源浏览（新组件） -->
         <div class="mb-8">
           <CurriculumWithResources 
             @lesson-created="handleLessonCreated"
           />
+        </div>
+
+        <!-- 问答统计卡片 -->
+        <div class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- 问答总览卡片 -->
+          <router-link
+            to="/teacher/questions"
+            class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white hover:shadow-xl transition-shadow cursor-pointer"
+          >
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold">💬 学生问答</h3>
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+            <div v-if="questionStats" class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-blue-100">待回答</span>
+                <span class="text-2xl font-bold">{{ questionStats.pending || 0 }}</span>
+              </div>
+              <div class="text-sm text-blue-100 opacity-80">
+                总问题: {{ questionStats.total || 0 }} | 已解决: {{ questionStats.resolved || 0 }}
+              </div>
+            </div>
+            <div v-else class="text-blue-100 text-sm">
+              加载中...
+            </div>
+          </router-link>
+
+          <!-- 快捷操作卡片 -->
+          <div class="bg-white rounded-lg shadow-md p-6 border-2 border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">📋 快捷操作</h3>
+            <div class="space-y-3">
+              <router-link
+                to="/teacher/questions"
+                class="block px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+              >
+                → 查看所有问题
+              </router-link>
+              <button
+                @click="showCreateModal = true"
+                class="w-full px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium text-left"
+              >
+                → 创建新教案
+              </button>
+            </div>
+          </div>
+
+          <!-- 提示卡片 -->
+          <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-md p-6 text-white">
+            <div class="flex items-start gap-3 mb-3">
+              <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <h3 class="text-lg font-semibold mb-2">💡 新功能</h3>
+                <p class="text-sm text-purple-100">
+                  回答学生问题时，可以使用教案编辑器的所有功能，包括代码示例、图表等！
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 页面标题和操作栏 -->
@@ -335,10 +385,19 @@ import LessonCard from '../../components/Lesson/LessonCard.vue'
 import CreateLessonModal from '../../components/Lesson/CreateLessonModal.vue'
 import ConfirmDialog from '../../components/Common/ConfirmDialog.vue'
 import CurriculumWithResources from '../../components/Curriculum/CurriculumWithResources.vue'
+import DashboardHeader from '@/components/Common/DashboardHeader.vue'
+import questionService from '@/services/question'
+import type { QuestionStats } from '@/types/question'
 
 const router = useRouter()
 const userStore = useUserStore()
 const lessonStore = useLessonStore()
+
+// 问答统计
+const questionStats = ref<QuestionStats | null>(null)
+
+// 用户名
+const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '教师')
 
 // 本地状态
 const showCreateModal = ref(false)
@@ -384,6 +443,16 @@ async function loadLessons() {
     })
   } catch (error: any) {
     showToast('error', error.message || '加载教案列表失败')
+  }
+}
+
+// 加载问答统计
+async function loadQuestionStats() {
+  try {
+    questionStats.value = await questionService.getQuestionStats()
+  } catch (error: any) {
+    console.error('Failed to load question stats:', error)
+    // 不显示错误，静默失败
   }
 }
 
@@ -565,6 +634,7 @@ async function loadAvailableChapters() {
 onMounted(() => {
   loadLessons()
   loadAvailableChapters()
+  loadQuestionStats()
 })
 </script>
 

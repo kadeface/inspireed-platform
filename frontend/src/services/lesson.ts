@@ -213,6 +213,23 @@ class LessonService {
       throw new Error(error.response?.data?.detail || '获取章节教案列表失败')
     }
   }
+
+  /**
+   * 获取推荐课程
+   * @param limit 推荐数量，默认10
+   * @returns 推荐的课程列表
+   */
+  async fetchRecommendedLessons(limit: number = 10): Promise<LessonListResponse> {
+    try {
+      const response = await api.get<LessonListResponse>(`${this.basePath}/recommended`, {
+        params: { limit }
+      })
+      return response
+    } catch (error: any) {
+      console.error('Failed to fetch recommended lessons:', error)
+      throw new Error(error.response?.data?.detail || '获取推荐课程失败')
+    }
+  }
 }
 
 // 导出单例实例
