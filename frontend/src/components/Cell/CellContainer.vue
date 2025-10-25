@@ -1,5 +1,5 @@
 <template>
-  <div class="cell-wrapper" :data-cell-id="cell.id">
+  <div class="cell-wrapper" :data-cell-id="cell.id" :data-cell-index="props.index">
     <div class="cell-header" v-if="showHeader">
       <div class="flex items-center gap-2">
         <!-- 拖拽手柄 -->
@@ -50,7 +50,7 @@
 
     <component
       :is="cellComponent"
-      :cell="cell"
+      :cell="cell as any"
       :editable="editable"
       @update="handleUpdate"
     />
@@ -68,6 +68,7 @@ import SimCell from './SimCell.vue'
 import QACell from './QACell.vue'
 import ChartCell from './ChartCell.vue'
 import ContestCell from './ContestCell.vue'
+import VideoCell from './VideoCell.vue'
 
 interface Props {
   cell: Cell
@@ -75,6 +76,7 @@ interface Props {
   showHeader?: boolean
   draggable?: boolean
   showMoveButtons?: boolean
+  index?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -82,6 +84,7 @@ const props = withDefaults(defineProps<Props>(), {
   showHeader: true,
   draggable: false,
   showMoveButtons: false,
+  index: 0,
 })
 
 const emit = defineEmits<{
@@ -100,6 +103,7 @@ const cellComponent = computed(() => {
     [CellType.QA]: QACell,
     [CellType.CHART]: ChartCell,
     [CellType.CONTEST]: ContestCell,
+    [CellType.VIDEO]: VideoCell,
   }
   return componentMap[props.cell.type]
 })
@@ -113,6 +117,7 @@ const cellTypeLabel = computed(() => {
     [CellType.QA]: '问答',
     [CellType.CHART]: '图表',
     [CellType.CONTEST]: '竞赛',
+    [CellType.VIDEO]: '视频',
   }
   return labelMap[props.cell.type]
 })

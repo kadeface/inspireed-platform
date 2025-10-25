@@ -1,12 +1,15 @@
-export enum CellType {
-  TEXT = 'text',
-  CODE = 'code',
-  PARAM = 'param',
-  SIM = 'sim',
-  QA = 'qa',
-  CHART = 'chart',
-  CONTEST = 'contest',
-}
+export const CellType = {
+  TEXT: 'text',
+  VIDEO: 'video',
+  CODE: 'code',
+  SIM: 'sim',
+  QA: 'qa',
+  CHART: 'chart',
+  CONTEST: 'contest',
+  PARAM: 'param',
+} as const
+
+export type CellType = typeof CellType[keyof typeof CellType]
 
 export interface CellBase {
   id: string
@@ -22,7 +25,7 @@ export interface TextCellContent {
 }
 
 export interface TextCell extends CellBase {
-  type: CellType.TEXT
+  type: typeof CellType.TEXT
   content: TextCellContent
 }
 
@@ -33,7 +36,7 @@ export interface CodeCellContent {
 }
 
 export interface CodeCell extends CellBase {
-  type: CellType.CODE
+  type: typeof CellType.CODE
   content: CodeCellContent
   config: {
     timeout?: number
@@ -48,7 +51,7 @@ export interface ParamCellContent {
 }
 
 export interface ParamCell extends CellBase {
-  type: CellType.PARAM
+  type: typeof CellType.PARAM
   content: ParamCellContent
 }
 
@@ -59,7 +62,7 @@ export interface SimCellContent {
 }
 
 export interface SimCell extends CellBase {
-  type: CellType.SIM
+  type: typeof CellType.SIM
   content: SimCellContent
 }
 
@@ -70,7 +73,7 @@ export interface QACellContent {
 }
 
 export interface QACell extends CellBase {
-  type: CellType.QA
+  type: typeof CellType.QA
   content: QACellContent
 }
 
@@ -81,7 +84,7 @@ export interface ChartCellContent {
 }
 
 export interface ChartCell extends CellBase {
-  type: CellType.CHART
+  type: typeof CellType.CHART
   content: ChartCellContent
 }
 
@@ -93,8 +96,39 @@ export interface ContestCellContent {
 }
 
 export interface ContestCell extends CellBase {
-  type: CellType.CONTEST
+  type: typeof CellType.CONTEST
   content: ContestCellContent
+}
+
+export interface VideoCellContent {
+  videoUrl: string
+  title?: string
+  description?: string
+  duration?: number  // 视频时长（秒）
+  thumbnail?: string  // 缩略图URL
+  subtitles?: Array<{
+    language: string
+    url: string
+  }>
+  chapters?: Array<{
+    title: string
+    startTime: number  // 开始时间（秒）
+    endTime: number    // 结束时间（秒）
+  }>
+}
+
+export interface VideoCell extends CellBase {
+  type: typeof CellType.VIDEO
+  content: VideoCellContent
+  config: {
+    autoplay?: boolean
+    controls?: boolean
+    loop?: boolean
+    muted?: boolean
+    startTime?: number  // 开始播放时间
+    endTime?: number    // 结束播放时间
+    playbackRate?: number  // 播放速度
+  }
 }
 
 export type Cell =
@@ -105,4 +139,4 @@ export type Cell =
   | QACell
   | ChartCell
   | ContestCell
-
+  | VideoCell

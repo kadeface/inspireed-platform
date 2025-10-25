@@ -160,6 +160,7 @@
                 <!-- Cell 容器 -->
                 <CellContainer
                   :cell="cell"
+                  :index="index"
                   :editable="!isPreviewMode"
                   :draggable="!isPreviewMode"
                   :show-move-buttons="!isPreviewMode"
@@ -183,48 +184,65 @@
     </div>
 
     <!-- Toast 提示 -->
-    <Transition name="toast">
+    <Transition name="toast-slide">
       <div
         v-if="toast.show"
-        class="fixed bottom-4 right-4 z-50 max-w-sm"
+        class="fixed top-4 right-4 z-50 max-w-sm"
       >
         <div
           :class="[
-            'rounded-lg shadow-lg p-4',
-            toast.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200',
+            'rounded-lg shadow-xl p-4 border-l-4 transform transition-all duration-300',
+            toast.type === 'success' 
+              ? 'bg-green-50 border-green-400 border-l-green-500' 
+              : 'bg-red-50 border-red-400 border-l-red-500',
           ]"
         >
           <div class="flex items-start">
             <div class="flex-shrink-0">
-              <svg
-                v-if="toast.type === 'success'"
-                class="h-5 w-5 text-green-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+              <div
+                :class="[
+                  'rounded-full p-1',
+                  toast.type === 'success' ? 'bg-green-100' : 'bg-red-100'
+                ]"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-              </svg>
-              <svg
-                v-else
-                class="h-5 w-5 text-red-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+                <svg
+                  v-if="toast.type === 'success'"
+                  class="h-4 w-4 text-green-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <svg
+                  v-else
+                  class="h-4 w-4 text-red-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
             </div>
             <div class="ml-3 flex-1">
               <p
                 :class="[
-                  'text-sm font-medium',
+                  'text-sm font-semibold',
                   toast.type === 'success' ? 'text-green-800' : 'text-red-800',
                 ]"
               >
                 {{ toast.message }}
               </p>
             </div>
+            <button
+              @click="toast.show = false"
+              class="ml-2 flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -239,7 +257,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLessonStore } from '../../store/lesson'
 import { useAutoSave } from '../../composables/useAutoSave'
@@ -403,6 +421,23 @@ function getDefaultCell(cellType: CellType, order: number): Cell {
         },
       } as Cell
 
+    case CellType.VIDEO:
+      return {
+        ...baseCell,
+        type: CellType.VIDEO,
+        content: {
+          videoUrl: '',
+          title: '',
+          description: '',
+        },
+        config: {
+          autoplay: false,
+          controls: true,
+          loop: false,
+          muted: false,
+        },
+      } as Cell
+
     default:
       throw new Error(`Unknown cell type: ${cellType}`)
   }
@@ -430,6 +465,11 @@ function handleAddCellAt(cellType: CellType, index: number) {
   }
   
   showToast('success', `已添加${getCellTypeName(cellType)}`)
+  
+  // 滚动到新添加的单元
+  nextTick(() => {
+    scrollToNewCell(index)
+  })
 }
 
 // 更新 Cell
@@ -494,6 +534,28 @@ function showToast(type: 'success' | 'error', message: string) {
   }, 3000)
 }
 
+// 滚动到新添加的单元
+function scrollToNewCell(index: number) {
+  if (!cellListRef.value) return
+  
+  const cellElements = cellListRef.value.querySelectorAll('[data-cell-index]')
+  const targetElement = cellElements[index]
+  
+  if (targetElement) {
+    targetElement.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'nearest'
+    })
+    
+    // 添加高亮效果
+    targetElement.classList.add('ring-2', 'ring-blue-400', 'ring-opacity-75')
+    setTimeout(() => {
+      targetElement.classList.remove('ring-2', 'ring-blue-400', 'ring-opacity-75')
+    }, 2000)
+  }
+}
+
 // 获取 Cell 类型名称
 function getCellTypeName(cellType: CellType): string {
   const nameMap = {
@@ -504,6 +566,7 @@ function getCellTypeName(cellType: CellType): string {
     [CellType.QA]: '问答单元',
     [CellType.CHART]: '图表单元',
     [CellType.CONTEST]: '竞赛单元',
+    [CellType.VIDEO]: '视频单元',
   }
   return nameMap[cellType]
 }
@@ -596,14 +659,32 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.toast-enter-active,
-.toast-leave-active {
-  transition: all 0.3s ease;
+.toast-slide-enter-active {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.toast-enter-from,
-.toast-leave-to {
+.toast-slide-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.toast-slide-enter-from {
   opacity: 0;
-  transform: translateY(1rem);
+  transform: translateX(100%) scale(0.8);
+}
+
+.toast-slide-leave-to {
+  opacity: 0;
+  transform: translateX(100%) scale(0.8);
+}
+
+/* 添加脉冲动画效果 */
+@keyframes pulse-success {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+.toast-slide-enter-active .rounded-lg {
+  animation: pulse-success 0.6s ease-out;
 }
 </style>

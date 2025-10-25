@@ -23,11 +23,30 @@
             v-for="cellType in cellTypes"
             :key="cellType.type"
             @click="handleAddCell(cellType.type)"
-            class="w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-blue-50 transition-colors"
+            :disabled="isAdding"
+            :class="[
+              'w-full flex items-center gap-3 px-3 py-2 text-left rounded-md transition-all duration-200',
+              isAdding && addingCellType === cellType.type
+                ? 'bg-green-50 border border-green-200 text-green-700'
+                : 'hover:bg-blue-50 hover:scale-[1.02] active:scale-[0.98]',
+              isAdding ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+            ]"
           >
-            <span class="text-xl">{{ cellType.icon }}</span>
+            <div class="relative">
+              <span class="text-xl">{{ cellType.icon }}</span>
+              <!-- 加载动画 -->
+              <div
+                v-if="isAdding && addingCellType === cellType.type"
+                class="absolute inset-0 flex items-center justify-center"
+              >
+                <div class="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            </div>
             <div class="flex-1">
-              <div class="text-sm font-medium text-gray-900">{{ cellType.name }}</div>
+              <div class="text-sm font-medium">
+                {{ cellType.name }}
+                <span v-if="isAdding && addingCellType === cellType.type" class="text-green-600 ml-1">✓</span>
+              </div>
               <div class="text-xs text-gray-500">{{ cellType.description }}</div>
             </div>
           </button>
@@ -52,6 +71,8 @@ const emit = defineEmits<{
 }>()
 
 const showMenu = ref(false)
+const isAdding = ref(false)
+const addingCellType = ref<CellType | null>(null)
 
 // Cell 类型定义
 const cellTypes = [
@@ -62,16 +83,16 @@ const cellTypes = [
     description: '富文本编辑器',
   },
   {
+    type: CellType.VIDEO,
+    name: '视频单元',
+    icon: '🎥',
+    description: '视频教学内容',
+  },
+  {
     type: CellType.CODE,
     name: '代码单元',
     icon: '💻',
     description: 'Python/JavaScript/HTML',
-  },
-  {
-    type: CellType.PARAM,
-    name: '参数单元',
-    icon: '⚙️',
-    description: '参数配置',
   },
   {
     type: CellType.SIM,
@@ -97,11 +118,33 @@ const cellTypes = [
     icon: '🏆',
     description: '竞技排行',
   },
+  {
+    type: CellType.PARAM,
+    name: '参数单元',
+    icon: '⚙️',
+    description: '参数配置',
+  },
 ]
 
-function handleAddCell(cellType: CellType) {
-  emit('add', cellType, props.insertIndex)
-  showMenu.value = false
+async function handleAddCell(cellType: CellType) {
+  if (isAdding.value) return
+  
+  isAdding.value = true
+  addingCellType.value = cellType
+  
+  try {
+    // 添加短暂延迟以显示加载状态
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    emit('add', cellType, props.insertIndex)
+    showMenu.value = false
+  } finally {
+    // 延迟重置状态以显示成功反馈
+    setTimeout(() => {
+      isAdding.value = false
+      addingCellType.value = null
+    }, 500)
+  }
 }
 
 // 自定义指令：点击外部关闭

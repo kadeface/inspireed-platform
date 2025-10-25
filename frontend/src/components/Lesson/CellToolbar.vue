@@ -38,17 +38,33 @@
         v-for="cellType in cellTypes"
         :key="cellType.type"
         @click="handleAddCell(cellType.type)"
+        :disabled="isAdding"
         :class="[
-          'w-full text-left rounded-lg transition-colors',
+          'w-full text-left rounded-lg transition-all duration-200',
           collapsed ? 'p-2' : 'p-3',
-          'hover:bg-blue-50 border-2 border-transparent hover:border-blue-200',
+          isAdding && addingCellType === cellType.type
+            ? 'bg-green-50 border-2 border-green-200 text-green-700'
+            : 'hover:bg-blue-50 border-2 border-transparent hover:border-blue-200 hover:scale-[1.02] active:scale-[0.98]',
+          isAdding ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
         ]"
         :title="collapsed ? cellType.name : ''"
       >
         <div :class="['flex items-center', collapsed ? 'justify-center' : 'gap-3']">
-          <span class="text-2xl">{{ cellType.icon }}</span>
+          <div class="relative">
+            <span class="text-2xl">{{ cellType.icon }}</span>
+            <!-- 加载动画 -->
+            <div
+              v-if="isAdding && addingCellType === cellType.type"
+              class="absolute inset-0 flex items-center justify-center"
+            >
+              <div class="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          </div>
           <div v-if="!collapsed" class="flex-1">
-            <div class="text-sm font-medium text-gray-900">{{ cellType.name }}</div>
+            <div class="text-sm font-medium">
+              {{ cellType.name }}
+              <span v-if="isAdding && addingCellType === cellType.type" class="text-green-600 ml-1">✓</span>
+            </div>
             <div class="text-xs text-gray-500">{{ cellType.description }}</div>
           </div>
         </div>
@@ -58,6 +74,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { CellType } from '../../types/cell'
 
 interface Props {
@@ -73,6 +90,9 @@ const emit = defineEmits<{
   'toggle-collapsed': []
 }>()
 
+const isAdding = ref(false)
+const addingCellType = ref<CellType | null>(null)
+
 // Cell 类型定义
 const cellTypes = [
   {
@@ -82,16 +102,16 @@ const cellTypes = [
     description: '富文本编辑器',
   },
   {
+    type: CellType.VIDEO,
+    name: '视频单元',
+    icon: '🎥',
+    description: '视频教学内容',
+  },
+  {
     type: CellType.CODE,
     name: '代码单元',
     icon: '💻',
     description: 'Python/JavaScript/HTML',
-  },
-  {
-    type: CellType.PARAM,
-    name: '参数单元',
-    icon: '⚙️',
-    description: '参数配置表单',
   },
   {
     type: CellType.SIM,
@@ -117,10 +137,32 @@ const cellTypes = [
     icon: '🏆',
     description: '竞技排行榜',
   },
+  {
+    type: CellType.PARAM,
+    name: '参数单元',
+    icon: '⚙️',
+    description: '参数配置表单',
+  },
 ]
 
-function handleAddCell(cellType: CellType) {
-  emit('addCell', cellType)
+async function handleAddCell(cellType: CellType) {
+  if (isAdding.value) return
+  
+  isAdding.value = true
+  addingCellType.value = cellType
+  
+  try {
+    // 添加短暂延迟以显示加载状态
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    emit('addCell', cellType)
+  } finally {
+    // 延迟重置状态以显示成功反馈
+    setTimeout(() => {
+      isAdding.value = false
+      addingCellType.value = null
+    }, 500)
+  }
 }
 </script>
 

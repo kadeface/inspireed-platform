@@ -15,12 +15,13 @@ from app.core.database import Base
 class CellType(str, Enum):
     """Cell类型枚举"""
     TEXT = "text"           # 教学内容单元
-    PARAM = "param"         # 参数设置单元
+    VIDEO = "video"         # 视频教学单元
     CODE = "code"           # 可执行代码单元
     SIM = "sim"             # 仿真单元
     QA = "qa"               # 问答交互单元
     CHART = "chart"         # 数据可视化单元
     CONTEST = "contest"     # 竞技任务单元
+    PARAM = "param"         # 参数设置单元
 
 
 class Cell(Base):
