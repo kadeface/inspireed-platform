@@ -65,7 +65,6 @@ import TextCell from './TextCell.vue'
 import CodeCell from './CodeCell.vue'
 import ParamCell from './ParamCell.vue'
 import SimCell from './SimCell.vue'
-import QACell from './QACell.vue'
 import ChartCell from './ChartCell.vue'
 import ContestCell from './ContestCell.vue'
 import VideoCell from './VideoCell.vue'
@@ -100,7 +99,6 @@ const cellComponent = computed(() => {
     [CellType.CODE]: CodeCell,
     [CellType.PARAM]: ParamCell,
     [CellType.SIM]: SimCell,
-    [CellType.QA]: QACell,
     [CellType.CHART]: ChartCell,
     [CellType.CONTEST]: ContestCell,
     [CellType.VIDEO]: VideoCell,
@@ -114,7 +112,6 @@ const cellTypeLabel = computed(() => {
     [CellType.CODE]: '代码',
     [CellType.PARAM]: '参数',
     [CellType.SIM]: '仿真',
-    [CellType.QA]: '问答',
     [CellType.CHART]: '图表',
     [CellType.CONTEST]: '竞赛',
     [CellType.VIDEO]: '视频',

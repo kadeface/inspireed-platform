@@ -101,12 +101,6 @@ const cellTypes = [
     description: '3D仿真',
   },
   {
-    type: CellType.QA,
-    name: '问答单元',
-    icon: '💬',
-    description: 'AI问答',
-  },
-  {
     type: CellType.CHART,
     name: '图表单元',
     icon: '📊',

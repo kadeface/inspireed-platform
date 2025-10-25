@@ -401,17 +401,6 @@ function getDefaultCell(cellType: CellType, order: number): Cell {
         },
       } as Cell
 
-    case CellType.QA:
-      return {
-        ...baseCell,
-        type: CellType.QA,
-        content: {
-          question: '',
-          answer: '',
-          isAIAnswer: false,
-        },
-      } as Cell
-
     case CellType.CHART:
       return {
         ...baseCell,
@@ -576,7 +565,6 @@ function getCellTypeName(cellType: CellType): string {
     [CellType.CODE]: '代码单元',
     [CellType.PARAM]: '参数单元',
     [CellType.SIM]: '仿真单元',
-    [CellType.QA]: '问答单元',
     [CellType.CHART]: '图表单元',
     [CellType.CONTEST]: '竞赛单元',
     [CellType.VIDEO]: '视频单元',

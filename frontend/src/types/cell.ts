@@ -3,7 +3,7 @@ export const CellType = {
   VIDEO: 'video',
   CODE: 'code',
   SIM: 'sim',
-  QA: 'qa',
+  // QA: 'qa', // 已移除教师端问答功能
   CHART: 'chart',
   CONTEST: 'contest',
   PARAM: 'param',
@@ -12,7 +12,7 @@ export const CellType = {
 export type CellType = typeof CellType[keyof typeof CellType]
 
 export interface CellBase {
-  id: string
+  id: number
   type: CellType
   order: number
   title?: string
@@ -64,17 +64,6 @@ export interface SimCellContent {
 export interface SimCell extends CellBase {
   type: typeof CellType.SIM
   content: SimCellContent
-}
-
-export interface QACellContent {
-  question?: string
-  answer?: string
-  isAIAnswer: boolean
-}
-
-export interface QACell extends CellBase {
-  type: typeof CellType.QA
-  content: QACellContent
 }
 
 export interface ChartCellContent {
@@ -136,7 +125,6 @@ export type Cell =
   | CodeCell
   | ParamCell
   | SimCell
-  | QACell
   | ChartCell
   | ContestCell
   | VideoCell
