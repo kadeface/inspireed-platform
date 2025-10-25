@@ -102,7 +102,11 @@ class Settings(BaseSettings):
     
     # OpenAI配置
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4"
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    OPENAI_MODEL: str = "gpt-3.5-turbo"
+    DEFAULT_AI_MODEL: str = "gpt-3.5-turbo"
+    AI_MAX_TOKENS: int = 1000
+    AI_TEMPERATURE: float = 0.7
     
     # 邮件配置（可选）
     SMTP_TLS: bool = True

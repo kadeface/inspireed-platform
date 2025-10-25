@@ -52,13 +52,26 @@
               </span>
             </div>
 
+            <!-- 教案状态提示 -->
+            <div v-if="currentLesson?.status === 'published'" class="flex items-center gap-2 px-3 py-1.5 text-sm text-orange-600 bg-orange-50 rounded-md">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              已发布教案
+            </div>
+
             <!-- 手动保存按钮 -->
             <button
               @click="handleManualSave"
               :disabled="saveStatus === 'saving'"
-              class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              :class="[
+                'px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-50',
+                currentLesson?.status === 'published' 
+                  ? 'text-orange-700 bg-orange-100 border border-orange-300 hover:bg-orange-200' 
+                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+              ]"
             >
-              保存
+              {{ currentLesson?.status === 'published' ? '保存修改*' : '保存' }}
             </button>
 
             <!-- 发布按钮 -->

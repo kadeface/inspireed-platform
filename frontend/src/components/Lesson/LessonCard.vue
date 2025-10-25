@@ -84,9 +84,15 @@
       <div v-if="showActions" class="flex gap-2 pt-3 border-t border-gray-100" @click.stop>
         <button
           @click="handleEdit"
-          class="flex-1 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+          :class="[
+            'flex-1 px-3 py-1.5 text-sm font-medium rounded transition-colors',
+            lesson.status === 'published' 
+              ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' 
+              : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+          ]"
+          :title="lesson.status === 'published' ? '编辑已发布教案' : '编辑教案'"
         >
-          编辑
+          {{ lesson.status === 'published' ? '编辑*' : '编辑' }}
         </button>
         <button
           @click="handleDuplicate"
@@ -182,7 +188,14 @@ const formattedDate = computed(() => {
 })
 
 function handleEdit() {
-  emit('edit', props.lesson.id)
+  if (props.lesson.status === 'published') {
+    // 编辑已发布教案时显示确认对话框
+    if (confirm('此教案已发布，确定要继续编辑吗？\n\n注意：编辑已发布教案可能会影响学生的学习体验。')) {
+      emit('edit', props.lesson.id)
+    }
+  } else {
+    emit('edit', props.lesson.id)
+  }
 }
 
 function handleDuplicate() {
