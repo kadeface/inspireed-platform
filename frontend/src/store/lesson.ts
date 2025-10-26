@@ -223,6 +223,36 @@ export const useLessonStore = defineStore('lesson', () => {
   }
 
   /**
+   * 取消发布当前教案（切换回草稿状态）
+   */
+  async function unpublishCurrentLesson() {
+    if (!currentLesson.value?.id) {
+      throw new Error('没有要取消发布的教案')
+    }
+
+    isSaving.value = true
+    error.value = null
+
+    try {
+      const unpublishedLesson = await lessonService.unpublishLesson(currentLesson.value.id)
+      currentLesson.value = unpublishedLesson
+
+      // 更新列表中的教案
+      const index = lessons.value.findIndex((l) => l.id === unpublishedLesson.id)
+      if (index !== -1) {
+        lessons.value[index] = unpublishedLesson
+      }
+
+      return unpublishedLesson
+    } catch (err: any) {
+      error.value = err.message || '取消发布教案失败'
+      throw err
+    } finally {
+      isSaving.value = false
+    }
+  }
+
+  /**
    * 删除指定教案
    */
   async function deleteLessonById(id: number) {
@@ -291,6 +321,7 @@ export const useLessonStore = defineStore('lesson', () => {
     deleteCell,
     reorderCells,
     clear,
+    unpublishCurrentLesson,
     
     // 异步操作方法
     loadLessons,

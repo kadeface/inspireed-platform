@@ -56,9 +56,21 @@ export interface ParamCell extends CellBase {
 }
 
 export interface SimCellContent {
-  type: 'threejs' | 'matterjs' | 'iframe'
+  type: 'phet' | 'threejs' | 'matterjs' | 'iframe' | 'custom'
+  // PhET simulation
+  phetSim?: string // PhET simulation name/ID
+  phetCategory?: 'physics' | 'chemistry' | 'biology' | 'earth' | 'math'
+  // Generic iframe/URL
   url?: string
-  config: any
+  // Simulation configuration
+  config: {
+    width?: number
+    height?: number
+    locale?: string
+    autoplay?: boolean
+    fullScreen?: boolean
+    [key: string]: any
+  }
 }
 
 export interface SimCell extends CellBase {

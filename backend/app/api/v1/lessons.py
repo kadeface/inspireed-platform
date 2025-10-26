@@ -290,6 +290,48 @@ async def publish_lesson(
     return lesson
 
 
+@router.post("/{lesson_id}/unpublish", response_model=LessonResponse)
+async def unpublish_lesson(
+    lesson_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """将已发布的教案切换回草稿状态"""
+    result = await db.execute(
+        select(Lesson).options(
+            selectinload(Lesson.course).selectinload(Course.subject),
+            selectinload(Lesson.course).selectinload(Course.grade)
+        ).where(Lesson.id == lesson_id)
+    )
+    lesson = result.scalar_one_or_none()
+    
+    if not lesson:
+        raise HTTPException(status_code=404, detail="教案不存在")
+    
+    if lesson.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权修改该教案")
+    
+    if lesson.status != LessonStatus.PUBLISHED:
+        raise HTTPException(status_code=400, detail="该教案不是已发布状态，无需取消发布")
+    
+    lesson.status = LessonStatus.DRAFT
+    lesson.published_at = None
+    
+    await db.commit()
+    await db.refresh(lesson)
+    
+    # 重新加载以确保关联信息完整
+    result = await db.execute(
+        select(Lesson).options(
+            selectinload(Lesson.course).selectinload(Course.subject),
+            selectinload(Lesson.course).selectinload(Course.grade)
+        ).where(Lesson.id == lesson.id)
+    )
+    lesson = result.scalar_one()
+    
+    return lesson
+
+
 @router.post("/{lesson_id}/duplicate", response_model=LessonResponse)
 async def duplicate_lesson(
     lesson_id: int,

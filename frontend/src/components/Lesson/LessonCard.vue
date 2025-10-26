@@ -159,9 +159,11 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   edit: [lessonId: number]
+  'edit-published': [lessonId: number]
   duplicate: [lessonId: number]
   delete: [lessonId: number]
   publish: [lessonId: number]
+  unpublish: [lessonId: number]
   view: [lessonId: number]
 }>()
 
@@ -190,8 +192,9 @@ const formattedDate = computed(() => {
 function handleEdit() {
   if (props.lesson.status === 'published') {
     // 编辑已发布教案时显示确认对话框
-    if (confirm('此教案已发布，确定要继续编辑吗？\n\n注意：编辑已发布教案可能会影响学生的学习体验。')) {
-      emit('edit', props.lesson.id)
+    if (confirm('此教案已发布，点击确定后教案将切换为草稿状态进行编辑。编辑完成后可重新发布。\n\n确定要继续吗？')) {
+      // 发送一个特殊的编辑事件，标记需要先取消发布
+      emit('edit-published', props.lesson.id)
     }
   } else {
     emit('edit', props.lesson.id)

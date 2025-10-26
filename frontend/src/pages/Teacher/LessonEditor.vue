@@ -53,25 +53,20 @@
             </div>
 
             <!-- 教案状态提示 -->
-            <div v-if="currentLesson?.status === 'published'" class="flex items-center gap-2 px-3 py-1.5 text-sm text-orange-600 bg-orange-50 rounded-md">
+            <div v-if="isRecentlyUnpublished" class="flex items-center gap-2 px-3 py-1.5 text-sm text-amber-600 bg-amber-50 rounded-md">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              已发布教案
+              已从已发布状态切换为草稿
             </div>
 
             <!-- 手动保存按钮 -->
             <button
               @click="handleManualSave"
               :disabled="saveStatus === 'saving'"
-              :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-50',
-                currentLesson?.status === 'published' 
-                  ? 'text-orange-700 bg-orange-100 border border-orange-300 hover:bg-orange-200' 
-                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-              ]"
+              class="px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-50 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
             >
-              {{ currentLesson?.status === 'published' ? '保存修改*' : '保存' }}
+              保存
             </button>
 
             <!-- 发布按钮 -->
@@ -320,6 +315,9 @@ const currentLesson = computed(() => lessonStore.currentLesson)
 const cells = computed(() => lessonStore.cells)
 const isSaving = computed(() => lessonStore.isSaving)
 
+// 标记是否最近从未发布状态切换的
+const isRecentlyUnpublished = ref(false)
+
 // 自动保存
 const { saveStatus, lastSavedAt, manualSave } = useAutoSave({
   data: computed(() => lessonStore.currentLesson),
@@ -396,8 +394,13 @@ function getDefaultCell(cellType: CellType, order: number): Cell {
         ...baseCell,
         type: CellType.SIM,
         content: {
-          type: 'threejs' as const,
-          config: {},
+          type: 'phet' as const,
+          config: {
+            width: 800,
+            height: 600,
+            autoplay: false,
+            locale: 'zh_CN'
+          },
         },
       } as Cell
 
@@ -631,8 +634,21 @@ onMounted(async () => {
   }
 
   try {
+    // 检查是否存在已发布教案的状态标记
+    const wasPublished = sessionStorage.getItem(`lesson_${lessonId}_was_published`)
+    
     await lessonStore.loadLesson(lessonId)
     lessonTitle.value = currentLesson.value?.title || ''
+    
+    // 如果这个教案刚刚从未发布状态切换，显示提示
+    if (wasPublished && currentLesson.value?.status === 'draft') {
+      isRecentlyUnpublished.value = true
+      sessionStorage.removeItem(`lesson_${lessonId}_was_published`)
+      // 5秒后隐藏提示
+      setTimeout(() => {
+        isRecentlyUnpublished.value = false
+      }, 5000)
+    }
     
     // MVP: 加载参考资源
     if (currentLesson.value?.reference_resource_id) {

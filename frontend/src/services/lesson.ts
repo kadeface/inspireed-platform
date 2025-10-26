@@ -119,6 +119,21 @@ class LessonService {
   }
 
   /**
+   * 取消发布教案（切换回草稿状态）
+   * @param id 教案 ID
+   * @returns 取消发布后的教案
+   */
+  async unpublishLesson(id: number): Promise<Lesson> {
+    try {
+      const response = await api.post<Lesson>(`${this.basePath}/${id}/unpublish`)
+      return response
+    } catch (error: any) {
+      console.error(`Failed to unpublish lesson ${id}:`, error)
+      throw new Error(error.response?.data?.detail || '取消发布教案失败')
+    }
+  }
+
+  /**
    * 复制教案
    * @param id 教案 ID
    * @returns 复制的新教案

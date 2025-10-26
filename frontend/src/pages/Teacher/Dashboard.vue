@@ -234,9 +234,11 @@
             :key="lesson.id"
             :lesson="lesson"
             @edit="handleEdit"
+            @edit-published="handleEditPublished"
             @duplicate="handleDuplicate"
             @delete="handleDeleteClick"
             @publish="handlePublish"
+            @unpublish="handleUnpublish"
             @view="handleView"
           />
         </div>
@@ -515,6 +517,29 @@ function handleEdit(lessonId: number) {
   router.push(`/teacher/lesson/${lessonId}`)
 }
 
+// 编辑已发布教案（先取消发布再跳转）
+async function handleEditPublished(lessonId: number) {
+  try {
+    // 先取消发布
+    await lessonStore.loadLesson(lessonId)
+    const wasPublished = lessonStore.currentLesson?.status === 'published'
+    await lessonStore.unpublishCurrentLesson()
+    
+    // 标记这个教案曾经是已发布的
+    if (wasPublished) {
+      sessionStorage.setItem(`lesson_${lessonId}_was_published`, 'true')
+    }
+    
+    // 刷新列表
+    loadLessons()
+    
+    // 跳转到编辑页面
+    router.push(`/teacher/lesson/${lessonId}`)
+  } catch (error: any) {
+    showToast('error', error.message || '取消发布失败')
+  }
+}
+
 // 查看教案
 function handleView(lessonId: number) {
   router.push(`/teacher/lesson/${lessonId}`)
@@ -554,6 +579,26 @@ async function handleDeleteConfirm() {
     showToast('error', error.message || '删除教案失败')
   } finally {
     deleteTargetId.value = null
+  }
+}
+
+// 取消发布教案（切换回草稿）
+async function handleUnpublish(lessonId: number) {
+  try {
+    // 加载教案并取消发布
+    await lessonStore.loadLesson(lessonId)
+    const wasPublished = lessonStore.currentLesson?.status === 'published'
+    await lessonStore.unpublishCurrentLesson()
+    showToast('success', '教案已切换为草稿状态')
+    
+    // 标记这个教案曾经是已发布的
+    if (wasPublished) {
+      sessionStorage.setItem(`lesson_${lessonId}_was_published`, 'true')
+    }
+    
+    loadLessons() // 刷新列表
+  } catch (error: any) {
+    showToast('error', error.message || '取消发布失败')
   }
 }
 
