@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     auth, lessons, cells, questions, users, curriculum, chapters, resources, 
     researcher_curriculum, admin_dashboard, admin_users, admin_organization,
-    favorites, reviews, learning_paths
+    favorites, reviews, learning_paths, course_export
 )
 
 api_router = APIRouter()
@@ -31,4 +31,7 @@ api_router.include_router(researcher_curriculum.router, prefix="/researcher/curr
 api_router.include_router(admin_dashboard.router, prefix="/admin/dashboard", tags=["管理员-数据看板"])
 api_router.include_router(admin_users.router, prefix="/admin/users", tags=["管理员-用户管理"])
 api_router.include_router(admin_organization.router, prefix="/admin/organization", tags=["管理员-组织架构"])
+
+# 课程导出导入路由
+api_router.include_router(course_export.router, prefix="/course-export", tags=["课程导出导入"])
 

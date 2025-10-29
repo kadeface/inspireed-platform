@@ -54,6 +54,12 @@
             📥 导入章节
           </button>
           <button
+            @click="openExportImportModal"
+            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            📋 导出导入
+          </button>
+          <button
             @click="openCourseModal"
             class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             :disabled="!dataLoaded"
@@ -352,6 +358,26 @@
       @success="handleImportSuccess"
     />
 
+    <!-- Course Export Import Modal -->
+    <div v-if="showExportImportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">课程导出导入</h3>
+            <button
+              @click="closeExportImportModal"
+              class="text-gray-400 hover:text-gray-600"
+            >
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+          <CourseExportImport />
+        </div>
+      </div>
+    </div>
+
     <!-- Chapter Edit Modal -->
     <ChapterEditModal
       :is-open="showChapterEditModal"
@@ -378,6 +404,7 @@ import type { CurriculumTree, Subject, Grade, Course, CourseCreate, CourseUpdate
 import CourseFormModal from './CourseFormModal.vue'
 import UploadResourceModal from '@/components/Admin/UploadResourceModal.vue'
 import ImportChaptersModal from '@/components/Curriculum/ImportChaptersModal.vue'
+import CourseExportImport from '@/components/Admin/CourseExportImport.vue'
 import ChapterEditModal from '../../components/Curriculum/ChapterEditModal.vue'
 import ChapterResourceUploadModal from '../../components/Curriculum/ChapterResourceUploadModal.vue'
 import ChapterResourceList from '../../components/Curriculum/ChapterResourceList.vue'
@@ -407,6 +434,7 @@ const editingCourse = ref<{
 
 const showUploadModal = ref(false)
 const showImportChaptersModal = ref(false)
+const showExportImportModal = ref(false)
 const showChapterEditModal = ref(false)
 const editingChapter = ref<any>(null)
 const showChapterResourceUploadModal = ref(false)
@@ -623,6 +651,14 @@ function openImportChaptersModal() {
 
 function closeImportChaptersModal() {
   showImportChaptersModal.value = false
+}
+
+function openExportImportModal() {
+  showExportImportModal.value = true
+}
+
+function closeExportImportModal() {
+  showExportImportModal.value = false
 }
 
 function handleImportSuccess() {
