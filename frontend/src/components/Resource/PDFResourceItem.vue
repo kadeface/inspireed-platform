@@ -101,7 +101,7 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   preview: [resourceId: number]
-  createLesson: [resourceId: number]
+  'create-lesson': [resourceId: number]
 }>()
 
 const toast = useToast()
@@ -148,7 +148,7 @@ async function handleDownload() {
 
 // 创建教案
 function handleCreateLesson() {
-  emit('createLesson', props.resource.id)
+  emit('create-lesson', props.resource.id)
 }
 </script>
 

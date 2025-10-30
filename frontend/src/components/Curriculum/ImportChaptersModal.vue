@@ -61,11 +61,19 @@
 
         <!-- 内容区 -->
         <div class="bg-white px-6 pb-6">
-          <!-- 课程选择 -->
+          <!-- 课程选择（带搜索过滤） -->
           <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               选择课程 <span class="text-red-500">*</span>
             </label>
+            <!-- 搜索框 -->
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="搜索 学科/年级/课程名 或 课程编码..."
+              class="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              :disabled="loading"
+            />
             <select
               v-model="selectedCourseId"
               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -73,11 +81,11 @@
             >
               <option :value="null">请选择课程</option>
               <option
-                v-for="course in courses"
+                v-for="course in filteredCourses"
                 :key="course.id"
                 :value="course.id"
               >
-                {{ course.name }}
+                {{ formatCourseLabel(course) }}
               </option>
             </select>
           </div>
@@ -272,9 +280,12 @@ import { ref, computed } from 'vue'
 import curriculumService from '@/services/curriculum'
 import type { Course } from '@/types/curriculum'
 
+// 供下拉使用的课程类型，允许携带学科/年级名称
+type CourseOption = Course & { subject_name?: string; grade_name?: string }
+
 interface Props {
   isOpen: boolean
-  courses: Course[]
+  courses: CourseOption[]
 }
 
 interface ImportResult {
@@ -290,6 +301,7 @@ const emit = defineEmits<{
 }>()
 
 const selectedCourseId = ref<number | null>(null)
+const searchQuery = ref('')
 const selectedFile = ref<File | null>(null)
 const isDragging = ref(false)
 const loading = ref(false)
@@ -301,6 +313,31 @@ const fileInput = ref<HTMLInputElement>()
 const canImport = computed(() => {
   return selectedCourseId.value !== null && selectedFile.value !== null
 })
+
+// 过滤后的课程列表
+const filteredCourses = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return props.courses
+  return props.courses.filter(c => {
+    const parts = [
+      c.name ?? '',
+      c.code ?? '',
+      (c as any).subject_name ?? '',
+      (c as any).grade_name ?? ''
+    ]
+    return parts.some(p => String(p).toLowerCase().includes(q))
+  })
+})
+
+function formatCourseLabel(course: CourseOption) {
+  const subject = (course as any).subject_name
+  const grade = (course as any).grade_name
+  const code = course.code ? `（${course.code}）` : ''
+  if (subject || grade) {
+    return `${subject ?? ''} · ${grade ?? ''} / ${course.name}${code}`.replace(' ·  / ', ' / ')
+  }
+  return `${course.name}${code}`
+}
 
 function handleClose() {
   if (!loading.value) {

@@ -99,9 +99,12 @@ async def create_resource(
     is_downloadable: bool = Form(True),
     file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin)
+    current_user: User = Depends(get_current_user)
 ):
-    """创建资源（管理员）"""
+    """创建资源（管理员或教研员）"""
+    # 权限：管理员或教研员可创建资源
+    if current_user.role not in [UserRole.ADMIN, UserRole.RESEARCHER]:
+        raise HTTPException(403, "需要管理员或教研员权限")
     
     # 验证章节是否存在
     chapter = await db.get(Chapter, chapter_id)
@@ -114,7 +117,8 @@ async def create_resource(
         title=title,
         description=description,
         resource_type=resource_type,
-        is_official=is_official,
+        # 教研员上传的资源不标记为官方
+        is_official=is_official if current_user.role == UserRole.ADMIN else False,
         is_downloadable=is_downloadable,
         created_by=current_user.id
     )

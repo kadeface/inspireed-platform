@@ -440,7 +440,7 @@ const editingChapter = ref<any>(null)
 const showChapterResourceUploadModal = ref(false)
 const uploadingToChapter = ref<any>(null)
 
-// 计算所有课程的扁平列表
+// 计算所有课程的扁平列表（附带学科/年级名称，便于下拉展示与搜索）
 const allCourses = computed(() => {
   if (!curriculumTree.value || !curriculumTree.value.subjects) return []
   const courses: any[] = []
@@ -449,7 +449,12 @@ const allCourses = computed(() => {
       subject.grades.forEach(grade => {
         if (grade.courses) {
           grade.courses.forEach(course => {
-            courses.push(course)
+            // 增强课程对象，附加学科/年级名称，供选择器展示和过滤
+            courses.push({
+              ...course,
+              subject_name: subject.name,
+              grade_name: grade.name
+            })
           })
         }
       })

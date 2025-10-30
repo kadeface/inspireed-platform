@@ -16,7 +16,7 @@ from app.schemas.chapter import (
     ChapterWithChildren, ChapterListResponse
 )
 from app.schemas.resource import ResourceListResponse
-from app.api.deps import get_current_user, get_current_admin
+from app.api.deps import get_current_user, get_current_admin, get_current_researcher
 
 router = APIRouter()
 
@@ -91,9 +91,9 @@ async def batch_import_chapters(
     course_id: int = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin)
+    current_user: User = Depends(get_current_researcher)
 ):
-    """批量导入章节（管理员）"""
+    """批量导入章节（仅教研员）"""
     
     # 验证课程是否存在
     course = await db.get(Course, course_id)

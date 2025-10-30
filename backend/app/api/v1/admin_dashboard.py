@@ -72,22 +72,22 @@ async def get_dashboard_overview(
     total_users = total_users_result.scalar() or 0
     
     admin_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.ADMIN)
+        select(func.count()).select_from(User).where(User.role == "ADMIN")
     )
     admin_count = admin_count_result.scalar() or 0
     
     researcher_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.RESEARCHER)
+        select(func.count()).select_from(User).where(User.role == "RESEARCHER")
     )
     researcher_count = researcher_count_result.scalar() or 0
     
     teacher_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.TEACHER)
+        select(func.count()).select_from(User).where(User.role == "TEACHER")
     )
     teacher_count = teacher_count_result.scalar() or 0
     
     student_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.STUDENT)
+        select(func.count()).select_from(User).where(User.role == "STUDENT")
     )
     student_count = student_count_result.scalar() or 0
     
@@ -205,22 +205,22 @@ async def get_user_stats(
     total_users = total_users_result.scalar() or 0
     
     admin_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.ADMIN)
+        select(func.count()).select_from(User).where(User.role == "ADMIN")
     )
     admin_count = admin_count_result.scalar() or 0
     
     researcher_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.RESEARCHER)
+        select(func.count()).select_from(User).where(User.role == "RESEARCHER")
     )
     researcher_count = researcher_count_result.scalar() or 0
     
     teacher_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.TEACHER)
+        select(func.count()).select_from(User).where(User.role == "TEACHER")
     )
     teacher_count = teacher_count_result.scalar() or 0
     
     student_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.STUDENT)
+        select(func.count()).select_from(User).where(User.role == "STUDENT")
     )
     student_count = student_count_result.scalar() or 0
     

@@ -1,0 +1,4 @@
+name,code,description,display_order,parent_code,is_active
+第一章：示例,chapter-1,示例父章节,1,,True
+1.1 小节,section-1-1,示例子章节A,1,chapter-1,True
+1.2 小节,section-1-2,示例子章节B,2,chapter-1,True
