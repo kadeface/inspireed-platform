@@ -383,7 +383,7 @@ async def get_course_with_chapters(
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """获取课程详情及其章节树形结构（包含每个章节的教案数量）"""
-    
+
     # 获取课程
     course_result = await db.execute(
         select(Course)
@@ -391,10 +391,10 @@ async def get_course_with_chapters(
         .where(Course.id == course_id)
     )
     course = course_result.scalar_one_or_none()
-    
+
     if not course:
         raise HTTPException(status_code=404, detail="课程不存在")
-    
+
     # 获取所有章节
     chapters_result = await db.execute(
         select(Chapter)
@@ -403,18 +403,17 @@ async def get_course_with_chapters(
         .order_by(Chapter.display_order, Chapter.id)
     )
     chapters = chapters_result.scalars().all()
-    
+
     # 获取每个章节的教案数量
-    lesson_count_query = select(
-        Lesson.chapter_id, 
-        func.count(Lesson.id).label("count")
-    ).where(
-        Lesson.course_id == course_id
-    ).group_by(Lesson.chapter_id)
-    
+    lesson_count_query = (
+        select(Lesson.chapter_id, func.count(Lesson.id).label("count"))
+        .where(Lesson.course_id == course_id)
+        .group_by(Lesson.chapter_id)
+    )
+
     lesson_count_result = await db.execute(lesson_count_query)
     lesson_counts = {row.chapter_id: row.count for row in lesson_count_result}
-    
+
     # 构建章节树形结构
     chapter_map = {}  # {id: chapter_node}
     for chapter in chapters:
@@ -428,7 +427,7 @@ async def get_course_with_chapters(
             lesson_count=lesson_counts.get(chapter.id, 0),
             children=[],
         )
-    
+
     # 构建父子关系
     root_chapters = []
     for chapter_node in chapter_map.values():
@@ -438,14 +437,13 @@ async def get_course_with_chapters(
                 parent.children.append(chapter_node)
         else:
             root_chapters.append(chapter_node)
-    
+
     # 计算总教案数（包括没有关联章节的）
     total_lessons_result = await db.execute(
-        select(func.count(Lesson.id))
-        .where(Lesson.course_id == course_id)
+        select(func.count(Lesson.id)).where(Lesson.course_id == course_id)
     )
     total_lessons = total_lessons_result.scalar() or 0
-    
+
     return CourseWithChaptersResponse(
         id=course.id,
         name=course.name,

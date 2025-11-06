@@ -162,7 +162,7 @@ class ChapterTreeNode(BaseModel):
     display_order: int
     parent_id: Optional[int]
     lesson_count: int = 0
-    children: List['ChapterTreeNode'] = []
+    children: List["ChapterTreeNode"] = []
 
 
 class CourseWithChaptersResponse(BaseModel):
