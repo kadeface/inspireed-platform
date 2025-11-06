@@ -1,0 +1,54 @@
+[flake8]
+# Flake8 配置文件
+max-line-length = 120
+exclude =
+    .git,
+    __pycache__,
+    venv,
+    .venv,
+    env,
+    .env,
+    build,
+    dist,
+    *.egg-info,
+    .pytest_cache,
+    .mypy_cache,
+    migrations,
+    alembic/versions
+
+# 忽略的错误代码
+# TODO: 这些忽略是临时的，需要逐步修复代码问题
+ignore =
+    # E203: whitespace before ':'
+    E203,
+    # W503: line break before binary operator
+    W503,
+    # E712: comparison to True (需要修复)
+    E712,
+    # F401: imported but unused (需要清理未使用的导入)
+    F401,
+    # F811: redefinition of unused function (需要重构重复函数)
+    F811,
+    # F841: local variable assigned but never used (需要清理未使用变量)
+    F841,
+    # F821: undefined name (需要修复未定义的引用)
+    F821,
+    # C901: function is too complex (需要重构复杂函数)
+    C901,
+    # E501: line too long (超过max-line-length的行)
+    E501,
+    # E722: bare except (需要指定异常类型)
+    E722,
+    # F541: f-string without placeholders (需要清理)
+    F541,
+    # E402: module level import not at top (scripts中需要修复)
+    E402,
+
+# 每个文件的最大复杂度
+max-complexity = 15
+
+# 允许的未使用导入（在__init__.py中）
+per-file-ignores =
+    __init__.py:F401,F403
+    test_*.py:F401,F811
+

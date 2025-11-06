@@ -1,6 +1,7 @@
 """
 数据库连接管理
 """
+
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
@@ -58,4 +59,3 @@ async def close_db() -> None:
     关闭数据库连接
     """
     await engine.dispose()
-

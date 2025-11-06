@@ -1,6 +1,7 @@
 """
 问答API路由
 """
+
 from fastapi import APIRouter
 
 router = APIRouter()
@@ -9,4 +10,3 @@ router = APIRouter()
 # - POST /qa - 提交问题
 # - GET /qa - 获取问答列表
 # - GET /qa/{id} - 获取问答详情
-

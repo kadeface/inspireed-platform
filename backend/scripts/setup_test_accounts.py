@@ -1,12 +1,13 @@
 """
 设置所有测试账号（管理员、教师、学生、研究员）
 """
+
 import asyncio
 import sys
 import os
 
 # 添加项目根目录到路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
@@ -18,7 +19,7 @@ async def setup_test_accounts():
     """创建或检查所有测试账号"""
     async with AsyncSessionLocal() as db:
         print("🔧 开始设置测试账号...\n")
-        
+
         # 测试账号配置
         test_accounts = [
             {
@@ -50,14 +51,12 @@ async def setup_test_accounts():
                 "role": UserRole.RESEARCHER,
             },
         ]
-        
+
         for account_config in test_accounts:
             # 通过邮箱检查账号是否存在
-            result = await db.execute(
-                select(User).where(User.email == account_config["email"])
-            )
+            result = await db.execute(select(User).where(User.email == account_config["email"]))
             user = result.scalar_one_or_none()
-            
+
             if user:
                 # 如果存在，更新密码确保正确
                 user.hashed_password = get_password_hash(account_config["password"])
@@ -82,17 +81,18 @@ async def setup_test_accounts():
                 print(f"✅ 创建 {account_config['role'].value} 账号")
                 print(f"   邮箱: {user.email}")
                 print(f"   密码: {account_config['password']}")
-            
+
             print()
-        
+
         print("=" * 50)
         print("📋 测试账号列表:")
         print("=" * 50)
         for account_config in test_accounts:
-            print(f"{account_config['role'].value.upper():12} - {account_config['email']:25} / {account_config['password']}")
+            print(
+                f"{account_config['role'].value.upper():12} - {account_config['email']:25} / {account_config['password']}"
+            )
         print("=" * 50)
 
 
 if __name__ == "__main__":
     asyncio.run(setup_test_accounts())
-

@@ -1,6 +1,7 @@
 """
 Cell单元Schemas
 """
+
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
@@ -9,6 +10,7 @@ from app.models.cell import CellType
 
 class CellBase(BaseModel):
     """Cell基础Schema"""
+
     cell_type: CellType = Field(..., description="Cell类型")
     title: Optional[str] = Field(None, max_length=200, description="Cell标题")
     content: Dict[str, Any] = Field(default_factory=dict, description="Cell内容")
@@ -19,11 +21,13 @@ class CellBase(BaseModel):
 
 class CellCreate(CellBase):
     """创建Cell Schema"""
+
     lesson_id: int = Field(..., description="所属教案ID")
 
 
 class CellUpdate(BaseModel):
     """更新Cell Schema"""
+
     title: Optional[str] = Field(None, max_length=200, description="Cell标题")
     content: Optional[Dict[str, Any]] = Field(None, description="Cell内容")
     config: Optional[Dict[str, Any]] = Field(None, description="Cell配置")
@@ -33,6 +37,7 @@ class CellUpdate(BaseModel):
 
 class CellResponse(CellBase):
     """Cell响应Schema"""
+
     id: int
     lesson_id: int
     created_at: datetime
@@ -44,6 +49,7 @@ class CellResponse(CellBase):
 
 class CellListResponse(BaseModel):
     """Cell列表响应Schema"""
+
     items: List[CellResponse]
     total: int
     page: int
@@ -52,8 +58,10 @@ class CellListResponse(BaseModel):
 
 # ==================== Cell执行相关Schemas ====================
 
+
 class CodeExecutionRequest(BaseModel):
     """代码执行请求Schema"""
+
     code: str = Field(..., description="代码内容")
     language: str = Field(..., description="编程语言")
     timeout: Optional[int] = Field(30, description="执行超时时间（秒）")
@@ -62,6 +70,7 @@ class CodeExecutionRequest(BaseModel):
 
 class CodeExecutionResponse(BaseModel):
     """代码执行响应Schema"""
+
     output: str = Field(..., description="执行输出")
     error: Optional[str] = Field(None, description="错误信息")
     execution_time: float = Field(..., description="执行时间（毫秒）")
@@ -70,12 +79,14 @@ class CodeExecutionResponse(BaseModel):
 
 class CellExecutionRequest(BaseModel):
     """Cell执行请求Schema"""
+
     cell_id: int = Field(..., description="Cell ID")
     parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="执行参数")
 
 
 class CellExecutionResponse(BaseModel):
     """Cell执行响应Schema"""
+
     success: bool = Field(..., description="执行是否成功")
     output: Optional[str] = Field(None, description="执行输出")
     error: Optional[str] = Field(None, description="错误信息")
@@ -85,14 +96,17 @@ class CellExecutionResponse(BaseModel):
 
 # ==================== QA Cell相关Schemas ====================
 
+
 class QAQuestionRequest(BaseModel):
     """QA问题请求Schema"""
+
     question: str = Field(..., min_length=1, max_length=1000, description="问题内容")
     ask_ai: bool = Field(True, description="是否向AI提问")
 
 
 class QAAnswerResponse(BaseModel):
     """QA回答响应Schema"""
+
     answer: str = Field(..., description="回答内容")
     is_ai_answer: bool = Field(..., description="是否为AI回答")
     confidence: Optional[float] = Field(None, description="AI回答置信度")
@@ -101,6 +115,7 @@ class QAAnswerResponse(BaseModel):
 
 class QACellUpdate(BaseModel):
     """QA Cell更新Schema"""
+
     question: Optional[str] = Field(None, description="问题内容")
     answer: Optional[str] = Field(None, description="回答内容")
     is_ai_answer: Optional[bool] = Field(None, description="是否为AI回答")
@@ -108,8 +123,10 @@ class QACellUpdate(BaseModel):
 
 # ==================== 其他Cell类型Schemas ====================
 
+
 class ChartDataRequest(BaseModel):
     """图表数据请求Schema"""
+
     chart_type: str = Field(..., description="图表类型")
     data: Dict[str, Any] = Field(..., description="图表数据")
     options: Optional[Dict[str, Any]] = Field(default_factory=dict, description="图表选项")
@@ -117,6 +134,7 @@ class ChartDataRequest(BaseModel):
 
 class SimConfigRequest(BaseModel):
     """仿真配置请求Schema"""
+
     sim_type: str = Field(..., description="仿真类型")
     config: Dict[str, Any] = Field(..., description="仿真配置")
     parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="仿真参数")
@@ -124,12 +142,14 @@ class SimConfigRequest(BaseModel):
 
 class ContestSubmissionRequest(BaseModel):
     """竞赛提交请求Schema"""
+
     submission_data: Dict[str, Any] = Field(..., description="提交数据")
     user_id: int = Field(..., description="用户ID")
 
 
 class ContestSubmissionResponse(BaseModel):
     """竞赛提交响应Schema"""
+
     score: float = Field(..., description="得分")
     rank: int = Field(..., description="排名")
     feedback: Optional[str] = Field(None, description="反馈信息")

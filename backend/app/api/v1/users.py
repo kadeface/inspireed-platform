@@ -1,6 +1,7 @@
 """
 用户管理API路由
 """
+
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -36,9 +37,8 @@ async def get_user(
     """获取用户详情"""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
-    return user
 
+    return user
