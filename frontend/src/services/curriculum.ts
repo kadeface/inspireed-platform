@@ -11,7 +11,8 @@ import type {
   CurriculumTree,
   Chapter,
   ChapterCreate,
-  ChapterUpdate
+  ChapterUpdate,
+  CourseWithChapters
 } from '@/types/curriculum'
 
 export const curriculumService = {
@@ -176,6 +177,13 @@ export const curriculumService = {
    */
   async downloadChapterTemplate(): Promise<Blob> {
     return await api.downloadFile('/chapters/export-template')
+  },
+
+  /**
+   * 获取课程及其章节树形结构（包含每个章节的教案数量）
+   */
+  async getCourseWithChapters(courseId: number): Promise<CourseWithChapters> {
+    return await api.get(`/curriculum/courses/${courseId}/with-chapters`)
   }
 }
 

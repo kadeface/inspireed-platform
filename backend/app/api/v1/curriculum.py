@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import User, Subject, Grade, Course, Lesson, UserRole
+from app.models import User, Subject, Grade, Course, Lesson, UserRole, Chapter
 from app.schemas.curriculum import (
     SubjectResponse,
     SubjectToggle,
@@ -22,6 +22,8 @@ from app.schemas.curriculum import (
     SubjectTreeNode,
     GradeTreeNode,
     CourseTreeNode,
+    CourseWithChaptersResponse,
+    ChapterTreeNode,
 )
 from app.api.v1.auth import get_current_active_user
 
@@ -370,5 +372,88 @@ async def get_curriculum_tree(
         total_subjects=len(subjects),
         total_grades=len(grades),
         total_courses=total_courses,
+        total_lessons=total_lessons,
+    )
+
+
+@router.get("/courses/{course_id}/with-chapters", response_model=CourseWithChaptersResponse)
+async def get_course_with_chapters(
+    course_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """获取课程详情及其章节树形结构（包含每个章节的教案数量）"""
+    
+    # 获取课程
+    course_result = await db.execute(
+        select(Course)
+        .options(selectinload(Course.subject), selectinload(Course.grade))
+        .where(Course.id == course_id)
+    )
+    course = course_result.scalar_one_or_none()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    
+    # 获取所有章节
+    chapters_result = await db.execute(
+        select(Chapter)
+        .where(Chapter.course_id == course_id)
+        .where(Chapter.is_active == True)
+        .order_by(Chapter.display_order, Chapter.id)
+    )
+    chapters = chapters_result.scalars().all()
+    
+    # 获取每个章节的教案数量
+    lesson_count_query = select(
+        Lesson.chapter_id, 
+        func.count(Lesson.id).label("count")
+    ).where(
+        Lesson.course_id == course_id
+    ).group_by(Lesson.chapter_id)
+    
+    lesson_count_result = await db.execute(lesson_count_query)
+    lesson_counts = {row.chapter_id: row.count for row in lesson_count_result}
+    
+    # 构建章节树形结构
+    chapter_map = {}  # {id: chapter_node}
+    for chapter in chapters:
+        chapter_map[chapter.id] = ChapterTreeNode(
+            id=chapter.id,
+            name=chapter.name,
+            code=chapter.code,
+            description=chapter.description,
+            display_order=chapter.display_order,
+            parent_id=chapter.parent_id,
+            lesson_count=lesson_counts.get(chapter.id, 0),
+            children=[],
+        )
+    
+    # 构建父子关系
+    root_chapters = []
+    for chapter_node in chapter_map.values():
+        if chapter_node.parent_id:
+            parent = chapter_map.get(chapter_node.parent_id)
+            if parent:
+                parent.children.append(chapter_node)
+        else:
+            root_chapters.append(chapter_node)
+    
+    # 计算总教案数（包括没有关联章节的）
+    total_lessons_result = await db.execute(
+        select(func.count(Lesson.id))
+        .where(Lesson.course_id == course_id)
+    )
+    total_lessons = total_lessons_result.scalar() or 0
+    
+    return CourseWithChaptersResponse(
+        id=course.id,
+        name=course.name,
+        code=course.code,
+        description=course.description,
+        subject=SubjectResponse.model_validate(course.subject) if course.subject else None,
+        grade=GradeResponse.model_validate(course.grade) if course.grade else None,
+        chapters=root_chapters,
+        total_chapters=len(chapters),
         total_lessons=total_lessons,
     )

@@ -90,22 +90,68 @@
                 <span v-if="selectedGrade" class="ml-2 text-blue-600">
                   - 已筛选: {{ selectedGradeName }}
                 </span>
+                <span v-if="selectedChapterId && selectedChapterName" class="ml-2 text-green-600">
+                  - 章节: {{ selectedChapterName }}
+                  <button 
+                    @click="clearChapterFilter"
+                    class="ml-1 text-xs hover:underline"
+                  >
+                    ✕ 清除
+                  </button>
+                </span>
               </p>
             </div>
-            <button
-              @click="showCreateModal = true"
-              class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            >
-              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-              创建新教案
-            </button>
+            <div class="flex items-center gap-3">
+              <!-- 视图切换按钮 -->
+              <div class="inline-flex rounded-md shadow-sm" role="group">
+                <button
+                  @click="viewMode = 'list'"
+                  :class="[
+                    'px-4 py-2 text-sm font-medium border transition-colors',
+                    'rounded-l-md',
+                    viewMode === 'list'
+                      ? 'bg-blue-600 text-white border-blue-600 z-10'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  ]"
+                  title="列表视图"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                </button>
+                <button
+                  @click="viewMode = 'tree'"
+                  :class="[
+                    'px-4 py-2 text-sm font-medium border transition-colors',
+                    'rounded-r-md',
+                    viewMode === 'tree'
+                      ? 'bg-blue-600 text-white border-blue-600 z-10'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  ]"
+                  title="课程体系视图"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                </button>
+              </div>
+              
+              <!-- 创建教案按钮 -->
+              <button
+                @click="showCreateModal = true"
+                class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              >
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                创建新教案
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- 搜索和筛选栏 -->
-        <div class="mb-6 flex flex-col sm:flex-row gap-4">
+        <!-- 搜索和筛选栏（仅在列表视图显示） -->
+        <div v-if="viewMode === 'list'" class="mb-6 flex flex-col sm:flex-row gap-4">
           <!-- 搜索框 -->
           <div class="flex-1">
             <div class="relative">
@@ -155,25 +201,27 @@
           </div>
         </div>
 
-        <!-- 错误提示 -->
-        <div
-          v-if="lessonStore.error"
-          class="mb-6 bg-red-50 border border-red-200 rounded-md p-4"
-        >
-          <div class="flex">
-            <div class="flex-shrink-0">
-              <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div class="ml-3">
-              <p class="text-sm text-red-800">{{ lessonStore.error }}</p>
+        <!-- 列表视图 -->
+        <div v-if="viewMode === 'list'">
+          <!-- 错误提示 -->
+          <div
+            v-if="lessonStore.error"
+            class="mb-6 bg-red-50 border border-red-200 rounded-md p-4"
+          >
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <p class="text-sm text-red-800">{{ lessonStore.error }}</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- 加载状态 -->
-        <div v-if="lessonStore.isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- 加载状态 -->
+          <div v-if="lessonStore.isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div
             v-for="i in 6"
             :key="i"
@@ -185,14 +233,14 @@
               <div class="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
               <div class="h-4 bg-gray-200 rounded w-1/2"></div>
             </div>
+            </div>
           </div>
-        </div>
 
-        <!-- 空状态 -->
-        <div
-          v-else-if="!lessonStore.isLoading && lessonStore.lessons.length === 0"
-          class="bg-white rounded-lg border border-gray-200 p-12 text-center"
-        >
+          <!-- 空状态 -->
+          <div
+            v-else-if="!lessonStore.isLoading && lessonStore.lessons.length === 0"
+            class="bg-white rounded-lg border border-gray-200 p-12 text-center"
+          >
           <svg
             class="mx-auto h-12 w-12 text-gray-400"
             fill="none"
@@ -220,34 +268,34 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
               </svg>
               创建新教案
-            </button>
+              </button>
+            </div>
           </div>
-        </div>
 
-        <!-- 教案列表 -->
-        <div
-          v-else
-          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        >
-          <LessonCard
-            v-for="lesson in lessonStore.lessons"
-            :key="lesson.id"
-            :lesson="lesson"
-            @edit="handleEdit"
-            @edit-published="handleEditPublished"
-            @duplicate="handleDuplicate"
-            @delete="handleDeleteClick"
-            @publish="handlePublish"
-            @unpublish="handleUnpublish"
-            @view="handleView"
-          />
-        </div>
+          <!-- 教案列表 -->
+          <div
+            v-else
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            <LessonCard
+              v-for="lesson in lessonStore.lessons"
+              :key="lesson.id"
+              :lesson="lesson"
+              @edit="handleEdit"
+              @edit-published="handleEditPublished"
+              @duplicate="handleDuplicate"
+              @delete="handleDeleteClick"
+              @publish="handlePublish"
+              @unpublish="handleUnpublish"
+              @view="handleView"
+            />
+          </div>
 
-        <!-- 分页控件 -->
-        <div
-          v-if="!lessonStore.isLoading && lessonStore.lessons.length > 0 && lessonStore.totalLessons > lessonStore.pageSize"
-          class="mt-6 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg"
-        >
+          <!-- 分页控件 -->
+          <div
+            v-if="!lessonStore.isLoading && lessonStore.lessons.length > 0 && lessonStore.totalLessons > lessonStore.pageSize"
+            class="mt-6 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg"
+          >
           <div class="flex flex-1 justify-between sm:hidden">
             <button
               @click="handlePrevPage"
@@ -304,6 +352,15 @@
               </nav>
             </div>
           </div>
+          </div>
+        </div>
+
+        <!-- 课程体系视图 -->
+        <div v-else-if="viewMode === 'tree'">
+          <CurriculumTreeView
+            @create-lesson="handleCreateLessonFromChapter"
+            @view-lessons="handleViewChapterLessons"
+          />
         </div>
       </div>
     </main>
@@ -311,6 +368,8 @@
     <!-- 创建教案对话框 -->
     <CreateLessonModal
       v-model="showCreateModal"
+      :initial-chapter-id="pendingChapterId"
+      :initial-course-id="pendingCourseId"
       @create="handleCreate"
     />
 
@@ -387,8 +446,10 @@ import LessonCard from '../../components/Lesson/LessonCard.vue'
 import CreateLessonModal from '../../components/Lesson/CreateLessonModal.vue'
 import ConfirmDialog from '../../components/Common/ConfirmDialog.vue'
 import CurriculumWithResources from '../../components/Curriculum/CurriculumWithResources.vue'
+import CurriculumTreeView from '../../components/Curriculum/CurriculumTreeView.vue'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import questionService from '@/services/question'
+import curriculumService from '@/services/curriculum'
 import type { QuestionStats } from '@/types/question'
 
 const router = useRouter()
@@ -410,7 +471,11 @@ const currentStatus = ref<LessonStatus | null>(null)
 const selectedGrade = ref<number | null>(null)
 const selectedGradeName = ref<string>('')
 const selectedChapterId = ref<number | null>(null)
+const selectedChapterName = ref<string>('')
 const availableChapters = ref<any[]>([])
+const viewMode = ref<'list' | 'tree'>('list') // 视图模式：列表视图或课程体系视图
+const pendingChapterId = ref<number | null>(null) // 从课程体系视图创建教案时的章节ID
+const pendingCourseId = ref<number | null>(null) // 从课程体系视图创建教案时的课程ID
 
 // Toast 提示
 const toast = ref({
@@ -503,6 +568,9 @@ async function handleCreate(lessonData: LessonCreate) {
   try {
     const newLesson = await lessonStore.createNewLesson(lessonData)
     showCreateModal.value = false
+    // 清除pending状态
+    pendingChapterId.value = null
+    pendingCourseId.value = null
     showToast('success', '教案创建成功')
     
     // 跳转到编辑页面
@@ -635,6 +703,38 @@ function handleNextPage() {
     lessonStore.currentPage += 1
     loadLessons()
   }
+}
+
+// 从课程体系视图创建教案
+function handleCreateLessonFromChapter(chapterId: number, courseId: number) {
+  pendingChapterId.value = chapterId
+  pendingCourseId.value = courseId
+  showCreateModal.value = true
+}
+
+// 查看章节的教案列表
+async function handleViewChapterLessons(chapterId: number) {
+  // 切换到列表视图并筛选指定章节的教案
+  viewMode.value = 'list'
+  selectedChapterId.value = chapterId
+  
+  // 获取章节名称用于显示
+  try {
+    const chapter = await curriculumService.getChapter(chapterId)
+    selectedChapterName.value = chapter.name
+  } catch (error) {
+    console.error('Failed to load chapter name:', error)
+    selectedChapterName.value = `章节 #${chapterId}`
+  }
+  
+  loadLessons()
+}
+
+// 清除章节筛选
+function clearChapterFilter() {
+  selectedChapterId.value = null
+  selectedChapterName.value = ''
+  loadLessons()
 }
 
 // 退出登录

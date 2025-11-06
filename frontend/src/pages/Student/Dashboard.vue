@@ -159,8 +159,56 @@
         </div>
       </div>
 
-      <!-- 高级筛选和搜索 -->
-      <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <!-- 视图切换和筛选 -->
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold text-gray-900">
+            {{ viewMode === 'list' ? '课程列表' : '课程体系' }}
+            <span v-if="selectedChapterName" class="text-sm font-normal text-green-600 ml-2">
+              - {{ selectedChapterName }}
+              <button 
+                @click="clearChapterFilter"
+                class="ml-1 text-xs hover:underline"
+              >
+                ✕ 清除
+              </button>
+            </span>
+          </h2>
+          <div class="inline-flex rounded-md shadow-sm" role="group">
+            <button
+              @click="viewMode = 'list'"
+              :class="[
+                'px-4 py-2 text-sm font-medium border transition-colors rounded-l-md',
+                viewMode === 'list'
+                  ? 'bg-green-600 text-white border-green-600 z-10'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              ]"
+              title="列表视图"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+            </button>
+            <button
+              @click="viewMode = 'tree'"
+              :class="[
+                'px-4 py-2 text-sm font-medium border transition-colors rounded-r-md',
+                viewMode === 'tree'
+                  ? 'bg-green-600 text-white border-green-600 z-10'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              ]"
+              title="课程体系视图"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 高级筛选和搜索（仅列表视图显示） -->
+      <div v-if="viewMode === 'list'" class="bg-white rounded-lg shadow p-6 mb-6">
         <div class="flex flex-col gap-4">
           <!-- 第一行：搜索和基础筛选 -->
           <div class="flex flex-col md:flex-row gap-4">
@@ -231,31 +279,33 @@
         </div>
       </div>
 
-      <!-- 课程列表 -->
-      <div v-if="loading" class="text-center py-12">
+      <!-- 列表视图 -->
+      <div v-if="viewMode === 'list'">
+        <!-- 课程列表 -->
+        <div v-if="loading" class="text-center py-12">
         <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         <p class="mt-4 text-gray-600">加载中...</p>
       </div>
 
-      <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+        <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
         <p class="text-red-600">{{ error }}</p>
         <button
           @click="fetchData"
           class="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
         >
           重试
-        </button>
-      </div>
+          </button>
+        </div>
 
-      <div v-else-if="filteredLessons.length === 0" class="bg-white rounded-lg shadow p-12 text-center">
+        <div v-else-if="filteredLessons.length === 0" class="bg-white rounded-lg shadow p-12 text-center">
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <p class="mt-4 text-lg text-gray-600">暂无课程</p>
-        <p class="mt-2 text-sm text-gray-500">请等待老师发布课程或调整筛选条件</p>
-      </div>
+          <p class="mt-4 text-lg text-gray-600">暂无课程</p>
+          <p class="mt-2 text-sm text-gray-500">请等待老师发布课程或调整筛选条件</p>
+        </div>
 
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div
           v-for="lesson in filteredLessons"
           :key="lesson.id"
@@ -358,9 +408,17 @@
               @click="viewLesson(lesson.id)"
             >
               {{ getLessonProgress(lesson.id) === 0 ? '开始学习' : '继续学习' }}
-            </button>
+              </button>
+            </div>
           </div>
         </div>
+      </div>
+
+      <!-- 课程体系视图 -->
+      <div v-else-if="viewMode === 'tree'">
+        <CurriculumTreeViewStudent
+          @view-lessons="handleViewChapterLessons"
+        />
       </div>
     </main>
   </div>
@@ -376,6 +434,7 @@ import { favoriteService } from '@/services/favorite'
 import type { Lesson } from '@/types/lesson'
 import type { Subject } from '@/types/curriculum'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
+import CurriculumTreeViewStudent from '@/components/Student/CurriculumTreeViewStudent.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -395,6 +454,9 @@ const showRecommended = ref(true)
 const loadingRecommended = ref(false)
 const recommendedLessons = ref<Lesson[]>([])
 const favoritedLessonIds = ref<Set<number>>(new Set())
+const viewMode = ref<'list' | 'tree'>('list') // 视图模式
+const selectedChapterId = ref<number | null>(null) // 选中的章节ID
+const selectedChapterName = ref<string>('') // 选中的章节名称
 
 // 学习进度数据（从localStorage获取）
 const progressData = ref<Record<number, number>>({})
@@ -405,6 +467,11 @@ const userName = computed(() => userStore.user?.full_name || userStore.user?.use
 
 const filteredLessons = computed(() => {
   let result = [...availableLessons.value]
+
+  // 按章节过滤（优先级最高）
+  if (selectedChapterId.value) {
+    result = result.filter(lesson => lesson.chapter_id === selectedChapterId.value)
+  }
 
   // 按搜索词过滤
   if (searchQuery.value) {
@@ -580,6 +647,32 @@ const resetFilters = () => {
 
 const viewLesson = (lessonId: number) => {
   router.push(`/student/lesson/${lessonId}`)
+}
+
+// 查看章节的课程列表
+async function handleViewChapterLessons(chapterId: number) {
+  // 切换到列表视图并筛选指定章节的课程
+  viewMode.value = 'list'
+  selectedChapterId.value = chapterId
+  
+  // 获取章节名称用于显示
+  try {
+    const chapter = await curriculumService.getChapter(chapterId)
+    selectedChapterName.value = chapter.name
+  } catch (error) {
+    console.error('Failed to load chapter name:', error)
+    selectedChapterName.value = `章节 #${chapterId}`
+  }
+  
+  // 重新筛选课程列表
+  fetchData()
+}
+
+// 清除章节筛选
+function clearChapterFilter() {
+  selectedChapterId.value = null
+  selectedChapterName.value = ''
+  fetchData()
 }
 
 const handleLogout = () => {

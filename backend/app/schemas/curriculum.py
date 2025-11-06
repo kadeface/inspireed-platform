@@ -149,3 +149,35 @@ class CurriculumTreeResponse(BaseModel):
     total_grades: int
     total_courses: int
     total_lessons: int
+
+
+# Chapter Tree Schemas
+class ChapterTreeNode(BaseModel):
+    """章节树节点"""
+
+    id: int
+    name: str
+    code: Optional[str]
+    description: Optional[str]
+    display_order: int
+    parent_id: Optional[int]
+    lesson_count: int = 0
+    children: List['ChapterTreeNode'] = []
+
+
+class CourseWithChaptersResponse(BaseModel):
+    """课程及其章节树形响应"""
+
+    id: int
+    name: str
+    code: Optional[str]
+    description: Optional[str]
+    subject: Optional[SubjectResponse]
+    grade: Optional[GradeResponse]
+    chapters: List[ChapterTreeNode]
+    total_chapters: int
+    total_lessons: int
+
+
+# 支持递归引用
+ChapterTreeNode.model_rebuild()

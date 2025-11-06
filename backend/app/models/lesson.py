@@ -56,7 +56,7 @@ class Lesson(Base):
     chapter_id = Column(Integer, ForeignKey("chapters.id"), nullable=True, index=True)
 
     # 状态
-    status = Column(String(20), default=LessonStatus.DRAFT.value, nullable=False)
+    status = Column(SQLEnum(LessonStatus, name='lessonstatus'), default=LessonStatus.DRAFT, nullable=False)
 
     # 教案内容（JSON格式存储Cell配置）
     content = Column(JSON, nullable=False, default=list)

@@ -83,6 +83,9 @@ export const useLessonStore = defineStore('lesson', () => {
         page_size: params?.page_size || pageSize.value,
         status: params?.status,
         search: params?.search,
+        chapter_id: params?.chapter_id,
+        grade_id: params?.grade_id,
+        course_id: params?.course_id,
       })
       
       lessons.value = response.items

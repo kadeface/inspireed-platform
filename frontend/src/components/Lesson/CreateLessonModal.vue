@@ -76,6 +76,43 @@
               </div>
             </div>
 
+            <!-- 章节选择（可选但推荐） -->
+            <div v-if="selectedCourse" class="mb-4 p-4 bg-green-50 rounded-md">
+              <label class="block text-sm font-medium text-gray-700 mb-3">
+                选择章节 <span class="text-gray-500">(推荐)</span>
+              </label>
+              <p class="text-xs text-gray-600 mb-3">
+                💡 选择章节后，教案将与课程体系关联，便于组织和查找
+              </p>
+              
+              <select
+                v-model="formData.chapter_id"
+                :disabled="loadingChapters"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+              >
+                <option :value="null">不关联章节（稍后可以补充）</option>
+                <optgroup 
+                  v-for="chapter in chapters" 
+                  :key="chapter.id" 
+                  :label="chapter.name"
+                >
+                  <option :value="chapter.id">{{ chapter.name }}</option>
+                  <option 
+                    v-for="subChapter in chapter.children" 
+                    :key="subChapter.id" 
+                    :value="subChapter.id"
+                    class="pl-4"
+                  >
+                    &nbsp;&nbsp;&nbsp;&nbsp;{{ subChapter.name }}
+                  </option>
+                </optgroup>
+              </select>
+
+              <div v-if="loadingChapters" class="mt-2 text-sm text-gray-500">
+                加载章节列表...
+              </div>
+            </div>
+
             <!-- 教案标题 -->
             <div class="mb-4">
               <label for="title" class="block text-sm font-medium text-gray-700 mb-2">
@@ -174,14 +211,19 @@ import { v4 as uuidv4 } from 'uuid'
 import type { LessonCreate } from '../../types/lesson'
 import type { Cell } from '../../types/cell'
 import { CellType } from '../../types/cell'
-import type { Subject, Grade, Course } from '../../types/curriculum'
+import type { Subject, Grade, Course, Chapter } from '../../types/curriculum'
 import curriculumService from '../../services/curriculum'
 
 interface Props {
   modelValue: boolean
+  initialChapterId?: number | null
+  initialCourseId?: number | null
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  initialChapterId: null,
+  initialCourseId: null
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
@@ -196,10 +238,15 @@ const selectedGradeId = ref<number | string>('')
 const selectedCourse = ref<Course | null>(null)
 const loadingCourse = ref(false)
 
+// 章节数据
+const chapters = ref<Chapter[]>([])
+const loadingChapters = ref(false)
+
 // 表单数据
 const formData = ref({
   title: '',
   description: '',
+  chapter_id: null as number | null,
 })
 
 const tagsInput = ref('')
@@ -231,6 +278,7 @@ async function handleSubjectChange() {
 async function handleGradeChange() {
   if (!selectedSubjectId.value || !selectedGradeId.value) {
     selectedCourse.value = null
+    chapters.value = []
     return
   }
 
@@ -241,11 +289,34 @@ async function handleGradeChange() {
       Number(selectedGradeId.value)
     )
     selectedCourse.value = course
+    
+    // 如果找到课程，加载章节
+    if (course) {
+      await loadChapters(course.id)
+    } else {
+      chapters.value = []
+    }
   } catch (error) {
     console.error('Failed to load course:', error)
     selectedCourse.value = null
+    chapters.value = []
   } finally {
     loadingCourse.value = false
+  }
+}
+
+// 加载章节列表
+async function loadChapters(courseId: number) {
+  loadingChapters.value = true
+  try {
+    const chaptersData = await curriculumService.getCourseChapters(courseId, true)
+    // 只显示顶层章节和第一级子章节
+    chapters.value = chaptersData.filter(ch => !ch.parent_id)
+  } catch (error) {
+    console.error('Failed to load chapters:', error)
+    chapters.value = []
+  } finally {
+    loadingChapters.value = false
   }
 }
 
@@ -357,6 +428,7 @@ function handleSubmit() {
     title: formData.value.title.trim(),
     description: formData.value.description.trim() || undefined,
     course_id: selectedCourse.value!.id,
+    chapter_id: formData.value.chapter_id || undefined,
     tags: parsedTags.value.length > 0 ? parsedTags.value : undefined,
     content: generateTemplateContent(selectedTemplate.value),
   }
@@ -372,6 +444,8 @@ function handleSubmit() {
 // 关闭对话框
 function handleClose() {
   emit('update:modelValue', false)
+  // 重置表单
+  resetForm()
 }
 
 // 重置表单
@@ -379,20 +453,40 @@ function resetForm() {
   formData.value = {
     title: '',
     description: '',
+    chapter_id: null,
   }
   tagsInput.value = ''
   selectedTemplate.value = 'blank'
   selectedSubjectId.value = ''
   selectedGradeId.value = ''
   selectedCourse.value = null
+  chapters.value = []
   errors.value = {}
-  isSubmitting.value = false
 }
 
-// 监听对话框关闭，重置表单
-watch(() => props.modelValue, (newValue) => {
-  if (!newValue) {
-    setTimeout(resetForm, 300) // 等待动画完成
+// 监听initialCourseId和initialChapterId的变化，自动填充表单
+watch(() => [props.modelValue, props.initialCourseId, props.initialChapterId], async ([isOpen, courseId, chapterId]) => {
+  if (isOpen && courseId) {
+    // 从courseId反推subject和grade
+    try {
+      const courses = await curriculumService.getCourses({})
+      const course = courses.find(c => c.id === courseId)
+      if (course) {
+        selectedSubjectId.value = course.subject_id
+        selectedGradeId.value = course.grade_id
+        selectedCourse.value = course
+        
+        // 加载章节
+        await loadChapters(courseId)
+        
+        // 设置初始章节
+        if (chapterId) {
+          formData.value.chapter_id = chapterId as number
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load initial course:', error)
+    }
   }
 })
 </script>

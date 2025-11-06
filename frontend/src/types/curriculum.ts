@@ -209,3 +209,27 @@ export interface CurriculumTree {
   total_lessons: number
 }
 
+// 章节树形结构
+export interface ChapterTreeNode {
+  id: number
+  name: string
+  code?: string
+  description?: string
+  display_order: number
+  parent_id?: number
+  lesson_count: number
+  children: ChapterTreeNode[]
+}
+
+export interface CourseWithChapters {
+  id: number
+  name: string
+  code?: string
+  description?: string
+  subject?: Subject
+  grade?: Grade
+  chapters: ChapterTreeNode[]
+  total_chapters: number
+  total_lessons: number
+}
+
