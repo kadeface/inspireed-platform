@@ -132,7 +132,7 @@
         </h2>
 
         <div
-          v-for="(answer, index) in question.answers"
+          v-for="answer in question.answers"
           :key="answer.id"
           class="bg-white rounded-lg shadow-sm overflow-hidden"
         >

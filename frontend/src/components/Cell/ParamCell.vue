@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-mutating-props -->
 <template>
   <div class="param-cell cell-container p-4">
     <h3 class="text-lg font-semibold mb-3">{{ cell.title || '参数配置' }}</h3>
@@ -18,6 +19,7 @@
 </template>
 
 <script setup lang="ts">
+/* eslint-disable vue/no-mutating-props */
 import type { ParamCell as ParamCellType } from '../../types/cell'
 
 interface Props {

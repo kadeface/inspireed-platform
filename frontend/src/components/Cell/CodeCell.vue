@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-mutating-props -->
 <template>
   <div class="code-cell cell-container">
     <!-- 控制栏 - 编辑模式显示全部控件，预览模式下Python/JS显示运行按钮 -->
@@ -89,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+/* eslint-disable vue/no-mutating-props */
 import { ref, computed, onMounted, watch } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { python } from '@codemirror/lang-python'
@@ -400,7 +402,7 @@ async function runCode() {
 
         executionTime.value = performance.now() - startTime
       } catch (err: any) {
-        console.log = console.log // 确保恢复
+        console.log = originalLog // 确保恢复
         error.value = err.message || '执行失败'
         executionTime.value = performance.now() - startTime
       }

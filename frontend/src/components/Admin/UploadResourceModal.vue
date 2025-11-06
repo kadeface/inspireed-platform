@@ -78,7 +78,7 @@
                       :key="child.id"
                       :value="child.id"
                     >
-                      　└─ {{ child.name }}
+                      └─ {{ child.name }}
                     </option>
                   </optgroup>
                 </select>

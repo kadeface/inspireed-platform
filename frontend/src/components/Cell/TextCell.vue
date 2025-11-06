@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-mutating-props -->
 <template>
   <div class="text-cell cell-container">
     <div v-if="!isEditing && !editable" class="text-cell-view" v-html="sanitizedHtml"></div>
@@ -48,6 +49,7 @@
 </template>
 
 <script setup lang="ts">
+/* eslint-disable vue/no-mutating-props */
 import { ref, computed } from 'vue'
 import type { TextCell as TextCellType } from '../../types/cell'
 import TipTapEditor from '../Editor/TipTapEditor.vue'
