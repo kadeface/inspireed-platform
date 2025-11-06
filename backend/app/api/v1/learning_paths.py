@@ -32,9 +32,7 @@ def create_learning_path(
     创建学习路径（仅教师和研究员）
     """
     if current_user.role not in [UserRole.TEACHER, UserRole.RESEARCHER, UserRole.ADMIN]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="只有教师和研究员可以创建学习路径"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="只有教师和研究员可以创建学习路径")
 
     # 创建学习路径
     learning_path = LearningPath(

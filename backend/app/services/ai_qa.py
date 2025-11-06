@@ -98,9 +98,7 @@ class AIQAService:
         prompt_parts = []
 
         # 系统角色设定
-        prompt_parts.append(
-            "你是一个专业的教学助手，擅长回答教育相关的问题。请用简洁、准确、易懂的语言回答问题。"
-        )
+        prompt_parts.append("你是一个专业的教学助手，擅长回答教育相关的问题。请用简洁、准确、易懂的语言回答问题。")
 
         # 上下文信息
         if lesson_title:

@@ -305,9 +305,7 @@ async def create_test_data():
                         },
                         "config": {
                             "environment": "jupyterlite",
-                            "test_cases": [
-                                {"input": "", "expected_output": "共同学生: {'李四', '王五'}"}
-                            ],
+                            "test_cases": [{"input": "", "expected_output": "共同学生: {'李四', '王五'}"}],
                         },
                     },
                 ],

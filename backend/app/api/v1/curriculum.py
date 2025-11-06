@@ -267,9 +267,7 @@ async def delete_course(
         select(func.count()).select_from(Lesson).where(Lesson.course_id == course_id)
     )
     if lesson_count.scalar() > 0:
-        raise HTTPException(
-            status_code=400, detail="该课程下有教案，无法删除。请先删除或移动相关教案。"
-        )
+        raise HTTPException(status_code=400, detail="该课程下有教案，无法删除。请先删除或移动相关教案。")
 
     await db.delete(course)
     await db.commit()

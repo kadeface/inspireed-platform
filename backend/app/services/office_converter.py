@@ -270,12 +270,8 @@ class OfficeConverterService:
 
                 # 如果没有找到文本内容，添加提示
                 if not content_found:
-                    page.insert_text(
-                        (50, 100), "此幻灯片无文本内容", fontsize=12, color=(100, 100, 100)
-                    )
-                    page.insert_text(
-                        (50, 130), "可能包含图片或其他媒体内容", fontsize=10, color=(100, 100, 100)
-                    )
+                    page.insert_text((50, 100), "此幻灯片无文本内容", fontsize=12, color=(100, 100, 100))
+                    page.insert_text((50, 130), "可能包含图片或其他媒体内容", fontsize=10, color=(100, 100, 100))
 
             # 如果没有幻灯片，添加提示信息
             if len(pdf_doc) == 0:

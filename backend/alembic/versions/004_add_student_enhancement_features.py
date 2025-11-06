@@ -134,9 +134,7 @@ def upgrade():
     )
     op.add_column(
         "lessons",
-        sa.Column(
-            "review_count", sa.Integer(), nullable=False, server_default="0", comment="评论数量"
-        ),
+        sa.Column("review_count", sa.Integer(), nullable=False, server_default="0", comment="评论数量"),
     )
 
 

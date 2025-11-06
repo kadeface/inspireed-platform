@@ -86,9 +86,7 @@ class Lesson(Base):
     # 难度和评分（学生端增强）
     # 注意：数据库中的 difficultylevel 枚举值为小写（migration 004），
     # 为避免大小写不一致导致的插入错误，这里不设置 Python 端默认值，保持为 NULL。
-    difficulty_level = Column(
-        SQLEnum(DifficultyLevel), default=None, nullable=True, comment="难度等级"
-    )
+    difficulty_level = Column(SQLEnum(DifficultyLevel), default=None, nullable=True, comment="难度等级")
     average_rating = Column(Float, default=0.0, nullable=False, comment="平均评分")
     review_count = Column(Integer, default=0, nullable=False, comment="评论数量")
 

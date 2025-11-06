@@ -43,9 +43,7 @@ def create_review(
     )
 
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="已经评论过该课程，请使用更新接口"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="已经评论过该课程，请使用更新接口")
 
     # 创建评论
     review = Review(

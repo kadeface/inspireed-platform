@@ -44,9 +44,9 @@ cors_config = {
 # 如果启用局域网访问，使用正则表达式匹配所有局域网IP
 if settings.ALLOW_LAN_ACCESS:
     # 匹配 localhost 和常见的局域网IP段
-    cors_config["allow_origin_regex"] = (
-        r"https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?"
-    )
+    cors_config[
+        "allow_origin_regex"
+    ] = r"https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?"
 else:
     # 只允许配置的源
     cors_config["allow_origins"] = [str(origin) for origin in settings.BACKEND_CORS_ORIGINS]
