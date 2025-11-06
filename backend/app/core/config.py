@@ -48,11 +48,23 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
-    # CORS
+    # CORS - 允许局域网访问
+    # 在生产环境中，应该设置具体的域名而不是使用通配符
+    # 可以通过环境变量 BACKEND_CORS_ORIGINS 覆盖
+    # 支持格式：逗号分隔 或 JSON数组
+    # 例如：BACKEND_CORS_ORIGINS=http://localhost:5173,http://192.168.1.100:5173
+    # 或：BACKEND_CORS_ORIGINS=["http://localhost:5173","http://192.168.1.100:5173"]
     BACKEND_CORS_ORIGINS: Annotated[List[str], BeforeValidator(parse_cors)] = [
         "http://localhost:5173",
         "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        # 支持常见的局域网IP段 (192.168.x.x)
+        # 如需添加更多IP，请通过环境变量配置
     ]
+    
+    # 是否允许局域网访问（开发模式）
+    # 生产环境应设置为 False
+    ALLOW_LAN_ACCESS: bool = True
     
     # 数据库配置
     POSTGRES_SERVER: str = "localhost"

@@ -3,7 +3,7 @@
 """
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.lesson import LessonStatus
 from app.schemas.curriculum import CourseResponse
@@ -57,6 +57,14 @@ class LessonResponse(LessonBase):
     
     # 嵌套课程信息
     course: Optional[CourseResponse] = None
+    
+    @field_validator('status', mode='before')
+    @classmethod
+    def convert_status(cls, v):
+        """Convert uppercase status values to lowercase"""
+        if isinstance(v, str):
+            return v.lower()
+        return v
     
     class Config:
         from_attributes = True

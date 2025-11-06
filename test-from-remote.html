@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InspireEd 远程连接测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #2196F3;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #2196F3;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        input {
+            padding: 8px;
+            width: 300px;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .code {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 InspireEd 远程连接测试</h1>
+        
+        <div class="test-section">
+            <h3>1. 设置服务器地址</h3>
+            <p>请输入服务器的IP地址（从启动日志中获取，通常是 192.168.x.x）:</p>
+            <input type="text" id="serverIp" placeholder="例如: 192.168.1.106" value="192.168.1.106">
+            <button onclick="setServerIp()">设置</button>
+            <div id="ipResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. 测试后端连通性</h3>
+            <p>测试是否能访问后端API (端口 8000)</p>
+            <button onclick="testBackend()">测试后端连接</button>
+            <div id="backendResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 测试CORS配置</h3>
+            <p>测试跨域请求是否被允许</p>
+            <button onclick="testCORS()">测试CORS</button>
+            <div id="corsResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. 测试登录和保存</h3>
+            <p>测试完整的登录和数据保存流程</p>
+            <div>
+                <input type="text" id="username" placeholder="用户名" value="teacher@test.com" style="width: 200px;">
+                <input type="password" id="password" placeholder="密码" value="teacher123" style="width: 200px;">
+            </div>
+            <button onclick="testLogin()" style="margin-top: 10px;">测试登录</button>
+            <button onclick="testSaveLesson()" id="saveBtn" disabled>测试保存教学设计</button>
+            <div id="loginResult" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. 诊断信息</h3>
+            <button onclick="showDiagnostics()">显示诊断信息</button>
+            <div id="diagnostics" class="result info" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 修复建议</h3>
+            <div id="suggestions" style="display:none;">
+                <div class="warning">
+                    <h4>如果测试失败，请尝试以下步骤：</h4>
+                    <ol>
+                        <li><strong>检查网络连接</strong>: 确保两台电脑在同一WiFi网络</li>
+                        <li><strong>检查防火墙</strong>: 
+                            <ul>
+                                <li>macOS: 系统偏好设置 → 安全性与隐私 → 防火墙 → 允许Python</li>
+                                <li>Windows: 控制面板 → 防火墙 → 允许应用通过防火墙</li>
+                            </ul>
+                        </li>
+                        <li><strong>确认服务器IP</strong>: 在服务器上运行 <code>./diagnose-network.sh</code></li>
+                        <li><strong>重启服务</strong>: 在服务器上运行 <code>./restart.sh</code></li>
+                        <li><strong>查看详细文档</strong>: docs/network/TEACHER_STORAGE_ISSUE.md</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let serverIp = '192.168.1.106';
+        let authToken = null;
+
+        function setServerIp() {
+            const input = document.getElementById('serverIp').value.trim();
+            if (!input) {
+                showResult('ipResult', 'error', '请输入有效的IP地址');
+                return;
+            }
+            serverIp = input;
+            showResult('ipResult', 'success', `服务器地址已设置为: ${serverIp}`);
+            document.getElementById('suggestions').style.display = 'block';
+        }
+
+        function showResult(elementId, type, message) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${type}`;
+            element.innerHTML = message;
+            element.style.display = 'block';
+        }
+
+        async function testBackend() {
+            showResult('backendResult', 'info', '正在测试后端连接...');
+            
+            try {
+                const response = await fetch(`http://${serverIp}:8000/health`, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('backendResult', 'success', 
+                        `✅ 后端连接成功！<br>响应: ${JSON.stringify(data)}<br>URL: http://${serverIp}:8000/health`);
+                } else {
+                    showResult('backendResult', 'error', 
+                        `❌ 后端返回错误: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                showResult('backendResult', 'error', 
+                    `❌ 无法连接到后端<br>错误: ${error.message}<br><br>
+                    可能原因:<br>
+                    1. 服务器IP地址不正确<br>
+                    2. 后端服务未运行<br>
+                    3. 防火墙阻止了连接<br>
+                    4. 不在同一局域网`);
+            }
+        }
+
+        async function testCORS() {
+            showResult('corsResult', 'info', '正在测试CORS配置...');
+            
+            try {
+                const response = await fetch(`http://${serverIp}:8000/api/v1/health`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    showResult('corsResult', 'success', 
+                        `✅ CORS配置正确！跨域请求被允许<br>
+                        这意味着从其他电脑访问时，浏览器不会阻止API请求`);
+                } else {
+                    showResult('corsResult', 'warning', 
+                        `⚠️ 请求成功但返回: ${response.status}<br>
+                        这可能是正常的，具体取决于端点实现`);
+                }
+            } catch (error) {
+                if (error.message.includes('CORS')) {
+                    showResult('corsResult', 'error', 
+                        `❌ CORS错误！<br>
+                        错误: ${error.message}<br><br>
+                        解决方法:<br>
+                        1. 确保后端 ALLOW_LAN_ACCESS=true<br>
+                        2. 检查 backend/app/core/config.py 中的 CORS 配置<br>
+                        3. 重启后端服务: ./restart.sh`);
+                } else {
+                    showResult('corsResult', 'error', `❌ 测试失败: ${error.message}`);
+                }
+            }
+        }
+
+        async function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                showResult('loginResult', 'error', '请输入用户名和密码');
+                return;
+            }
+
+            showResult('loginResult', 'info', '正在测试登录...');
+            
+            try {
+                const formData = new URLSearchParams();
+                formData.append('username', username);
+                formData.append('password', password);
+                
+                const response = await fetch(`http://${serverIp}:8000/api/v1/auth/login`, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.access_token;
+                    document.getElementById('saveBtn').disabled = false;
+                    showResult('loginResult', 'success', 
+                        `✅ 登录成功！<br>
+                        用户: ${username}<br>
+                        Token已保存，现在可以测试保存教学设计`);
+                } else {
+                    const errorData = await response.json();
+                    showResult('loginResult', 'error', 
+                        `❌ 登录失败: ${errorData.detail || response.statusText}<br>
+                        状态码: ${response.status}`);
+                }
+            } catch (error) {
+                showResult('loginResult', 'error', 
+                    `❌ 登录请求失败<br>错误: ${error.message}`);
+            }
+        }
+
+        async function testSaveLesson() {
+            if (!authToken) {
+                showResult('loginResult', 'error', '请先登录');
+                return;
+            }
+
+            showResult('loginResult', 'info', '正在测试保存教学设计...');
+            
+            try {
+                // 测试获取课程列表（需要认证的请求）
+                const response = await fetch(`http://${serverIp}:8000/api/v1/lessons/?page=1&page_size=1`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('loginResult', 'success', 
+                        `✅ 保存功能正常！<br>
+                        成功获取教学设计列表<br>
+                        总数: ${data.total}<br>
+                        这意味着从其他电脑可以正常保存教学设计`);
+                } else {
+                    const errorData = await response.json();
+                    showResult('loginResult', 'error', 
+                        `❌ 保存测试失败: ${errorData.detail || response.statusText}<br>
+                        状态码: ${response.status}`);
+                }
+            } catch (error) {
+                showResult('loginResult', 'error', 
+                    `❌ 保存请求失败<br>错误: ${error.message}<br><br>
+                    这可能是网络问题或CORS配置问题`);
+            }
+        }
+
+        function showDiagnostics() {
+            const info = `
+                <h4>诊断信息</h4>
+                <div class="code">
+                当前页面URL: ${window.location.href}<br>
+                服务器IP: ${serverIp}<br>
+                后端API地址: http://${serverIp}:8000/api/v1<br>
+                前端访问地址: http://${serverIp}:5173<br>
+                认证状态: ${authToken ? '已登录' : '未登录'}<br>
+                浏览器: ${navigator.userAgent}
+                </div>
+                
+                <h4>推荐的访问地址</h4>
+                <div class="code">
+                <strong>从其他电脑访问前端:</strong><br>
+                <a href="http://${serverIp}:5173" target="_blank">http://${serverIp}:5173</a><br><br>
+                
+                <strong>后端API文档:</strong><br>
+                <a href="http://${serverIp}:8000/docs" target="_blank">http://${serverIp}:8000/docs</a><br><br>
+                
+                <strong>健康检查:</strong><br>
+                <a href="http://${serverIp}:8000/health" target="_blank">http://${serverIp}:8000/health</a>
+                </div>
+            `;
+            
+            showResult('diagnostics', 'info', info);
+        }
+
+        // 页面加载时自动设置IP
+        window.onload = function() {
+            const currentHost = window.location.hostname;
+            if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+                document.getElementById('serverIp').value = currentHost;
+                serverIp = currentHost;
+                showResult('ipResult', 'info', `自动检测到服务器IP: ${serverIp}`);
+            }
+            document.getElementById('suggestions').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
+

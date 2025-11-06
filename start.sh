@@ -97,13 +97,45 @@ sleep 5
 # 创建日志目录
 mkdir -p logs
 
+# 获取本机 IP 地址
+get_local_ip() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux
+        hostname -I | awk '{print $1}'
+    else
+        # 其他系统
+        echo ""
+    fi
+}
+
+LOCAL_IP=$(get_local_ip)
+
 echo ""
 echo "🎉 服务启动完成！"
 echo ""
 echo "📱 访问地址："
+echo ""
+echo "   【本机访问】"
 echo "   前端应用: http://localhost:5173"
 echo "   后端API: http://localhost:8000"
 echo "   API文档: http://localhost:8000/docs"
+
+if [ ! -z "$LOCAL_IP" ]; then
+    echo ""
+    echo "   【局域网访问】（其他设备使用这些地址）"
+    echo "   前端应用: http://$LOCAL_IP:5173"
+    echo "   后端API: http://$LOCAL_IP:8000"
+    echo "   API文档: http://$LOCAL_IP:8000/docs"
+    echo ""
+    echo "   💡 提示："
+    echo "   - 确保设备连接到同一局域网"
+    echo "   - 防火墙需允许 5173 和 8000 端口"
+    echo "   - 移动设备可访问: http://$LOCAL_IP:5173"
+fi
+
 echo ""
 echo "🔐 测试账号："
 echo "   管理员: admin@inspireed.com / admin123"
@@ -115,5 +147,10 @@ echo "📋 管理命令："
 echo "   查看日志: tail -f logs/backend.log 或 tail -f logs/frontend.log"
 echo "   停止服务: ./stop.sh"
 echo "   重启服务: ./restart.sh"
+echo "   网络配置: ./get-network-info.sh"
+echo ""
+echo "🌐 局域网配置："
+echo "   查看配置指南: cat 局域网访问配置说明.md"
+echo "   详细文档: NETWORK_ACCESS_GUIDE.md"
 echo ""
 echo "✨ 开始使用 InspireEd 吧！"

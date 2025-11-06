@@ -1,7 +1,26 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+/**
+ * 动态获取API基础URL
+ * 根据当前访问的主机名自动适配后端地址
+ */
+function getApiBaseUrl(): string {
+  // 如果环境变量中配置了API地址，优先使用
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL
+  }
+  
+  // 动态获取当前主机名
+  const hostname = window.location.hostname
+  const protocol = window.location.protocol
+  
+  // 根据主机名构建API地址
+  // 前端端口5173 -> 后端端口8000
+  return `${protocol}//${hostname}:8000/api/v1`
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 class ApiService {
   private axiosInstance: AxiosInstance
@@ -9,7 +28,7 @@ class ApiService {
   constructor() {
     this.axiosInstance = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 30000,
+      timeout: 120000, // 增加到120秒，适应文档转换等长时间操作
       headers: {
         'Content-Type': 'application/json',
       },

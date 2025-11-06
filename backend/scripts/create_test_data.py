@@ -231,26 +231,100 @@ async def create_test_data():
                         "id": "cell-1",
                         "type": "text",
                         "order": 0,
+                        "title": "课程导入",
                         "editable": True,
+                        "cognitive_level": "remember",
+                        "prerequisite_cells": [],
+                        "mastery_criteria": {
+                            "min_attempts": 1,
+                            "min_accuracy": 0.6,
+                            "max_time_seconds": 180
+                        },
                         "content": {
-                            "html": "<h2>一、课程导入</h2><p>通过日常生活中的例子引入集合的概念...</p>"
+                            "html": "<h2>一、课程导入</h2><p>通过日常生活中的例子引入集合的概念...</p><p>🎯 学习目标：了解集合的基本概念</p>"
                         }
                     },
                     {
                         "id": "cell-2",
-                        "type": "code",
+                        "type": "text",
                         "order": 1,
-                        "editable": True,
+                        "title": "集合的定义",
+                        "editable": False,
+                        "cognitive_level": "understand",
+                        "prerequisite_cells": ["cell-1"],
+                        "mastery_criteria": {
+                            "min_attempts": 1,
+                            "min_accuracy": 0.7,
+                            "max_time_seconds": 300
+                        },
                         "content": {
-                            "code": "# Python 集合演示\nstudents = {'张三', '李四', '王五'}\nprint(f'班级人数: {len(students)}')",
+                            "html": "<h3>二、集合的定义</h3><p>集合是由确定的不同的对象组成的整体。</p><p>📚 关键概念：确定性、互异性、无序性</p>"
+                        }
+                    },
+                    {
+                        "id": "cell-3",
+                        "type": "code",
+                        "order": 2,
+                        "title": "Python集合演示",
+                        "editable": True,
+                        "cognitive_level": "apply",
+                        "prerequisite_cells": ["cell-1", "cell-2"],
+                        "mastery_criteria": {
+                            "min_attempts": 2,
+                            "min_accuracy": 0.8,
+                            "max_time_seconds": 600
+                        },
+                        "content": {
+                            "code": "# Python 集合演示\nstudents = {'张三', '李四', '王五'}\nprint(f'班级人数: {len(students)}')\n\n# 添加新成员\nstudents.add('赵六')\nprint(f'添加后: {students}')",
                             "language": "python"
                         },
                         "config": {
                             "environment": "jupyterlite"
                         }
+                    },
+                    {
+                        "id": "cell-4",
+                        "type": "text",
+                        "order": 3,
+                        "title": "集合的应用",
+                        "editable": False,
+                        "cognitive_level": "analyze",
+                        "prerequisite_cells": ["cell-2", "cell-3"],
+                        "mastery_criteria": {
+                            "min_attempts": 1,
+                            "min_accuracy": 0.75,
+                            "max_time_seconds": 420
+                        },
+                        "content": {
+                            "html": "<h3>三、集合的实际应用</h3><p>分析集合在数据去重、成员检查等场景中的应用。</p><p>💡 思考：为什么使用集合而不是列表？</p>"
+                        }
+                    },
+                    {
+                        "id": "cell-5",
+                        "type": "code",
+                        "order": 4,
+                        "title": "集合操作练习",
+                        "editable": True,
+                        "cognitive_level": "create",
+                        "prerequisite_cells": ["cell-3", "cell-4"],
+                        "mastery_criteria": {
+                            "min_attempts": 3,
+                            "min_accuracy": 0.85,
+                            "max_time_seconds": 900
+                        },
+                        "content": {
+                            "code": "# 创建性练习：设计一个使用集合解决实际问题的程序\n# 任务：编写代码找出两个班级的共同学生\n\nclass_a = {'张三', '李四', '王五', '赵六'}\nclass_b = {'李四', '王五', '钱七', '孙八'}\n\n# 请完成以下代码\ncommon_students = # 你的代码\nprint(f'共同学生: {common_students}')",
+                            "language": "python"
+                        },
+                        "config": {
+                            "environment": "jupyterlite",
+                            "test_cases": [
+                                {"input": "", "expected_output": "共同学生: {'李四', '王五'}"}
+                            ]
+                        }
                     }
                 ],
-                cell_count=2,
+                cell_count=5,
                 status=LessonStatus.DRAFT
             )
             db.add(sample_lesson)

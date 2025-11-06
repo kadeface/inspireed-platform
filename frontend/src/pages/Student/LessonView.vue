@@ -80,39 +80,23 @@
         <!-- Cell 内容 -->
         <div class="px-6 py-8 max-w-5xl">
           <div v-if="lesson.content && lesson.content.length > 0" class="space-y-6">
-            <div
+            <!-- 🎓 学习科学优化：使用 CellWrapper 组件实现认知脚手架 -->
+            <CellWrapper
               v-for="(cell, index) in lesson.content"
               :key="cell.id"
-              :class="['cell-wrapper', { 'completed': completedCells.has(cell.id) }]"
+              :cell="cell"
+              :cellIndex="index"
+              :allCells="lesson.content"
+              :completedCellIds="completedCells"
+              @complete="markCellAsCompleted"
             >
-              <!-- Cell 头部：显示序号和完成状态 -->
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium text-gray-500">单元 {{ index + 1 }}</span>
-                  <span v-if="cell.title" class="text-sm text-gray-600">- {{ cell.title }}</span>
-                </div>
-                <button
-                  v-if="!completedCells.has(cell.id)"
-                  @click="markCellAsCompleted(cell.id)"
-                  class="text-xs px-3 py-1 text-green-600 border border-green-600 rounded hover:bg-green-50"
-                >
-                  标记完成
-                </button>
-                <div v-else class="flex items-center gap-1 text-green-600 text-xs">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                  已完成
-                </div>
-              </div>
-
               <!-- 渲染不同类型的 Cell -->
               <component
                 :is="getCellComponent(cell.type)"
                 :cell="cell as any"
                 :editable="false"
               />
-            </div>
+            </CellWrapper>
           </div>
 
           <!-- 空状态 -->
@@ -225,6 +209,8 @@ import QuestionForm from '@/components/Question/QuestionForm.vue'
 import QuestionList from '@/components/Question/QuestionList.vue'
 import questionService from '@/services/question'
 import type { QuestionListItem } from '@/types/question'
+// 🎓 学习科学优化：导入认知脚手架组件
+import CellWrapper from '@/components/Cell/CellWrapper.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -324,7 +310,7 @@ const markAsCompleted = () => {
   
   // 标记所有 Cell 为完成
   lesson.value.content.forEach(cell => {
-    completedCells.value.add(cell.id)
+    completedCells.value.add(String(cell.id))
   })
   
   saveCompletedCells()
@@ -462,16 +448,5 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* stylelint-disable-next-line */
-.cell-wrapper {
-  @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6 transition-all;
-}
-
-.cell-wrapper:hover {
-  @apply shadow-md border-blue-200;
-}
-
-.cell-wrapper.completed {
-  @apply border-green-200 bg-green-50;
-}
+/* 🎓 学习科学优化：样式已移至 CellWrapper.vue 组件中 */
 </style>

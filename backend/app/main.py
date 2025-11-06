@@ -34,14 +34,21 @@ app = FastAPI(
 )
 
 # 配置CORS
-if settings.BACKEND_CORS_ORIGINS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+cors_config = {
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+
+# 如果启用局域网访问，使用正则表达式匹配所有局域网IP
+if settings.ALLOW_LAN_ACCESS:
+    # 匹配 localhost 和常见的局域网IP段
+    cors_config["allow_origin_regex"] = r"https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?"
+else:
+    # 只允许配置的源
+    cors_config["allow_origins"] = [str(origin) for origin in settings.BACKEND_CORS_ORIGINS]
+
+app.add_middleware(CORSMiddleware, **cors_config)
 
 # 配置静态文件服务
 app.mount("/uploads/resources", StaticFiles(directory="storage/resources"), name="uploads_resources")

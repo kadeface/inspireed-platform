@@ -10,6 +10,7 @@ InspireEd 是一个融合富文本、可执行代码单元（Cell）、仿真预
 
 - 🎨 **可执行教案**：支持7种Cell类型（Text/Code/Param/Sim/QA/Chart/Contest）
 - 🔬 **浏览器端执行**：JupyterLite + Pyodide 零后端执行
+- 🎬 **沉浸式预览**：教师端全屏预览功能，提供最佳内容展示效果
 - 🤖 **AI 辅助**：教师助手、学生答疑、教研分析
 - 📊 **数据驱动**：完整的教学行为数据采集与可视化
 - 🏫 **多角色支持**：教师、学生、教研员统一平台
@@ -182,9 +183,111 @@ pnpm dev --host
 - 创建虚拟环境和安装依赖
 - 运行数据库迁移
 - 启动后端和前端服务
-- 显示访问地址和测试账号信息
+- **自动检测并显示局域网访问地址** ✨
+- 显示本机和局域网访问地址
+- 显示测试账号信息
+
+## 🌐 局域网访问配置
+
+### ⚡ 自动适配（零配置）
+
+**系统已实现IP地址自动适配，无需手动修改配置！**
+
+- ✅ **前端自动检测**: 根据访问地址自动匹配后端API
+- ✅ **后端智能CORS**: 自动允许所有局域网IP段访问
+- ✅ **即开即用**: 启动服务后直接使用任意局域网IP访问
+
+**使用方法**:
+```bash
+# 1. 启动服务
+./start.sh
+
+# 2. 查看访问地址（会自动显示）
+# 本机: http://localhost:5173
+# 局域网: http://你的IP:5173
+
+# 3. 从任意设备访问（无需配置）
+# 手机/平板/其他电脑直接访问局域网地址即可
+```
+
+**技术原理**:
+- 前端使用 `window.location.hostname` 动态检测访问IP
+- 后端使用正则表达式匹配 `192.168.x.x` 和 `10.x.x.x` IP段
+- 详细说明: [自动适配指南](docs/AUTO_ADAPT_GUIDE.md)
+
+---
+
+### 快速配置（可选）
+
+运行自动配置脚本：
+
+```bash
+./get-network-info.sh
+```
+
+脚本会：
+- 自动检测服务器 IP 地址
+- 显示所有访问地址
+- 提供配置建议
+- 可选自动更新配置文件
+
+### 手动配置
+
+1. **获取服务器 IP 地址**
+   ```bash
+   # macOS/Linux
+   ifconfig | grep "inet " | grep -v 127.0.0.1
+   
+   # Windows
+   ipconfig
+   ```
+
+2. **配置后端 CORS** (`backend/.env`)
+   ```bash
+   BACKEND_CORS_ORIGINS=http://localhost:5173,http://192.168.1.100:5173
+   ```
+   （将 `192.168.1.100` 替换为你的实际 IP）
+
+3. **配置前端 API 地址** (`frontend/.env.local`)
+   ```bash
+   VITE_API_BASE_URL=http://192.168.1.100:8000/api/v1
+   ```
+
+4. **重启服务**
+   ```bash
+   ./restart.sh
+   ```
+
+5. **从其他设备访问**
+   ```
+   http://192.168.1.100:5173
+   ```
+
+### 移动设备访问
+
+确保移动设备连接到同一 WiFi 网络，然后使用服务器 IP 地址访问。
+
+**详细配置指南**: 查看 [网络访问指南](docs/network/NETWORK_ACCESS_GUIDE.md)
 
 ## 常见问题
+
+### 🔥 教师端无法在其他电脑上保存教学设计
+
+**快速修复**:
+```bash
+# 运行一键修复脚本
+./fix-network-issue.sh
+
+# 或运行诊断
+./diagnose-network.sh
+```
+
+**详细文档**: 
+- 快速指南: [README_NETWORK_FIX.md](README_NETWORK_FIX.md)
+- 完整排查: [docs/network/TEACHER_STORAGE_ISSUE.md](docs/network/TEACHER_STORAGE_ISSUE.md)
+- 远程测试工具: [test-from-remote.html](test-from-remote.html)
+
+---
 
 ### 后端启动问题
 
@@ -281,13 +384,42 @@ cd frontend
 pnpm dev
 ```
 
-## 开发指南
+## 最新功能
 
-详见 [docs/development.md](docs/development.md)
+### 🎬 教师端全屏预览功能（2025-11-05）
 
-## 架构设计
+教师在设计教学案例后，现在可以使用全屏预览功能，以沉浸式的方式查看教学内容。
 
-详见 [docs/architecture.md](docs/architecture.md)
+**主要特性：**
+- 一键进入全屏预览模式
+- 以学生视角完整查看教学内容
+- 支持键盘快捷键（Esc）快速退出
+- 流畅的过渡动画和优化的滚动体验
+- 浮动"返回顶部"按钮，方便长内容导航
+
+**使用方法：**
+1. 在教案编辑页面，点击顶部工具栏的"全屏预览"按钮（紫色按钮）
+2. 查看教学内容的完整展示效果
+3. 点击"退出预览"按钮或按 `Esc` 键退出
+
+**详细文档：**
+- [全屏预览功能使用指南](docs/features/FULLSCREEN_PREVIEW_GUIDE.md)
+- [全屏预览快速开始](docs/guides/QUICK_START_FULLSCREEN_PREVIEW.md)
+- [全屏预览功能测试指南](docs/testing/TEST_FULLSCREEN_PREVIEW.md)
+
+## 📚 完整文档
+
+查看 [docs/README.md](docs/README.md) 获取完整的文档目录和分类索引。
+
+### 快速链接
+
+- **[快速开始指南](docs/guides/)** - 各项功能快速上手
+- **[网络配置文档](docs/network/)** - 网络访问和配置
+- **[设计文档](docs/design/)** - 系统架构和设计理念
+- **[学习科学文档](docs/learning-science/)** - 学习科学理论与实践
+- **[功能文档](docs/features/)** - 各项功能详细说明
+- **[测试文档](docs/testing/)** - 功能测试指南
+- **[变更日志](docs/CHANGELOG.md)** - 版本变更历史
 
 ## 许可证
 

@@ -669,3 +669,121 @@ async def evaluate_qa_answer(
         "answer": answer
     }
 
+
+
+# ==================== 学习科学 API ====================
+
+@router.get("/{cell_id}/dependencies")
+async def get_cell_dependencies(
+    cell_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    获取Cell的依赖树
+    返回当前Cell的所有前置依赖关系
+    """
+    cell = await get_cell_or_404(cell_id, db, current_user)
+    
+    # 获取当前lesson的所有cells
+    query = select(Cell).where(Cell.lesson_id == cell.lesson_id).order_by(Cell.order)
+    result = await db.execute(query)
+    all_cells = result.scalars().all()
+    
+    # 构建Cell ID到Cell对象的映射
+    cell_map = {str(c.id): c for c in all_cells}
+    
+    # 递归获取依赖树
+    def get_dependencies_recursive(current_cell_id: str, visited=None):
+        if visited is None:
+            visited = set()
+        
+        if current_cell_id in visited:
+            return []
+        
+        visited.add(current_cell_id)
+        
+        current_cell = cell_map.get(current_cell_id)
+        if not current_cell:
+            return []
+        
+        prereqs = current_cell.prerequisite_cells or []
+        dependencies = []
+        
+        for prereq_id in prereqs:
+            prereq_cell = cell_map.get(str(prereq_id))
+            if prereq_cell:
+                dep_info = {
+                    "id": prereq_cell.id,
+                    "title": prereq_cell.title,
+                    "cognitive_level": prereq_cell.cognitive_level,
+                    "order": prereq_cell.order,
+                    "dependencies": get_dependencies_recursive(str(prereq_id), visited)
+                }
+                dependencies.append(dep_info)
+        
+        return dependencies
+    
+    dependencies = get_dependencies_recursive(str(cell.id))
+    
+    return {
+        "cell_id": cell.id,
+        "title": cell.title,
+        "dependencies": dependencies,
+        "total_prerequisites": len(dependencies)
+    }
+
+
+@router.get("/{cell_id}/unlock-status")
+async def check_cell_unlock_status(
+    cell_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    检查Cell的解锁状态
+    基于前置依赖关系判断当前Cell是否可以访问
+    """
+    cell = await get_cell_or_404(cell_id, db, current_user)
+    
+    # 如果没有前置依赖，则默认解锁
+    prereqs = cell.prerequisite_cells or []
+    if not prereqs:
+        return {
+            "cell_id": cell.id,
+            "is_locked": False,
+            "reason": None,
+            "missing_prerequisites": []
+        }
+    
+    # TODO: 这里应该查询学生的学习进度数据
+    # 暂时模拟：假设学生已完成部分cells
+    # 在实际实现中，需要查询 student_cell_progress 表
+    completed_cell_ids = []  # 应该从数据库查询
+    
+    # 检查所有前置依赖是否都已完成
+    missing_prereqs = []
+    for prereq_id in prereqs:
+        if str(prereq_id) not in [str(cid) for cid in completed_cell_ids]:
+            # 获取前置Cell的信息
+            prereq_query = select(Cell).where(Cell.id == int(prereq_id))
+            prereq_result = await db.execute(prereq_query)
+            prereq_cell = prereq_result.scalar_one_or_none()
+            
+            if prereq_cell:
+                missing_prereqs.append({
+                    "id": prereq_cell.id,
+                    "title": prereq_cell.title,
+                    "cognitive_level": prereq_cell.cognitive_level
+                })
+    
+    is_locked = len(missing_prereqs) > 0
+    
+    return {
+        "cell_id": cell.id,
+        "is_locked": is_locked,
+        "reason": "需要完成前置单元" if is_locked else None,
+        "missing_prerequisites": missing_prereqs,
+        "total_prerequisites": len(prereqs),
+        "completed_prerequisites": len(prereqs) - len(missing_prereqs)
+    }

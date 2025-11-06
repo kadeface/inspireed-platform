@@ -91,6 +91,19 @@
             >
               {{ isPreviewMode ? '编辑模式' : '预览模式' }}
             </button>
+
+            <!-- 全屏预览按钮 -->
+            <button
+              @click="toggleFullscreenPreview"
+              class="px-3 py-1.5 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-2"
+              title="全屏预览"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              全屏预览
+            </button>
           </div>
         </div>
       </div>
@@ -261,6 +274,82 @@
       v-model="showPDFViewer"
       :resource-id="referenceResource?.id || null"
     />
+
+    <!-- 全屏预览模式 -->
+    <Teleport to="body">
+      <Transition name="fullscreen-fade">
+        <div
+          v-if="isFullscreenPreview"
+          class="fixed inset-0 z-50 bg-gray-50 overflow-hidden"
+        >
+          <!-- 全屏预览顶部栏 -->
+          <header class="bg-white shadow-sm sticky top-0 z-10">
+            <div class="px-6 py-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                  <div>
+                    <h1 class="text-xl font-bold text-gray-900">{{ lessonTitle }}</h1>
+                    <p class="text-sm text-gray-500 mt-1">沉浸式预览</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-4">
+                  <!-- 退出全屏按钮 -->
+                  <button
+                    @click="toggleFullscreenPreview"
+                    class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    退出预览
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <!-- 全屏预览内容 -->
+          <div class="h-[calc(100vh-73px)] overflow-y-auto">
+            <div class="max-w-5xl mx-auto px-6 py-8">
+              <!-- Cell 列表 -->
+              <div v-if="cells.length > 0" class="space-y-6">
+                <CellContainer
+                  v-for="(cell, index) in cells"
+                  :key="cell.id"
+                  :cell="cell"
+                  :index="index"
+                  :editable="false"
+                  :draggable="false"
+                  :show-move-buttons="false"
+                />
+              </div>
+
+              <!-- 空状态 -->
+              <div v-else class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p class="mt-4 text-lg text-gray-600">该教案暂无内容</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 浮动操作按钮 -->
+          <div class="fixed bottom-8 right-8 flex flex-col gap-3">
+            <!-- 返回顶部 -->
+            <button
+              @click="scrollToTop"
+              class="p-3 bg-white rounded-full shadow-lg hover:shadow-xl transition-shadow border border-gray-200"
+              title="返回顶部"
+            >
+              <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -295,6 +384,7 @@ const isLoading = ref(true)
 const loadError = ref<string | null>(null)
 const toolbarCollapsed = ref(false)
 const isPreviewMode = ref(false)
+const isFullscreenPreview = ref(false)
 const cellListRef = ref<HTMLElement>()
 const lessonTitle = ref('')
 
@@ -531,6 +621,29 @@ function handleBack() {
   router.push('/teacher')
 }
 
+// 切换全屏预览
+function toggleFullscreenPreview() {
+  isFullscreenPreview.value = !isFullscreenPreview.value
+  
+  // 进入全屏时，禁止body滚动
+  if (isFullscreenPreview.value) {
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = ''
+  }
+}
+
+// 滚动到顶部
+function scrollToTop() {
+  const container = document.querySelector('.fixed.inset-0 .overflow-y-auto')
+  if (container) {
+    container.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    })
+  }
+}
+
 // 显示 Toast
 function showToast(type: 'success' | 'error', message: string) {
   toast.value = { show: true, type, message }
@@ -609,6 +722,24 @@ watch(isPreviewMode, (newValue) => {
   }
 })
 
+// 监听全屏预览模式，添加键盘快捷键
+watch(isFullscreenPreview, (newValue) => {
+  if (newValue) {
+    // 添加键盘事件监听
+    document.addEventListener('keydown', handleFullscreenKeydown)
+  } else {
+    // 移除键盘事件监听
+    document.removeEventListener('keydown', handleFullscreenKeydown)
+  }
+})
+
+// 处理全屏预览的键盘事件
+function handleFullscreenKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    toggleFullscreenPreview()
+  }
+}
+
 // 监听标题变化
 watch(() => currentLesson.value?.title, (newTitle) => {
   if (newTitle !== undefined) {
@@ -672,6 +803,10 @@ onMounted(async () => {
 // 组件卸载
 onUnmounted(() => {
   destroySortable()
+  // 确保恢复body滚动
+  document.body.style.overflow = ''
+  // 移除键盘事件监听
+  document.removeEventListener('keydown', handleFullscreenKeydown)
 })
 </script>
 
@@ -703,5 +838,39 @@ onUnmounted(() => {
 
 .toast-slide-enter-active .rounded-lg {
   animation: pulse-success 0.6s ease-out;
+}
+
+/* 全屏预览动画 */
+.fullscreen-fade-enter-active,
+.fullscreen-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.fullscreen-fade-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.fullscreen-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+/* 滚动条样式优化 */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 </style>

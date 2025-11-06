@@ -12,6 +12,32 @@
 
     <!-- 主要内容区域 -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- PhET 模拟实验横幅 -->
+      <div class="mb-8 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 rounded-2xl shadow-2xl overflow-hidden">
+        <div class="p-8 md:p-10 text-white">
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <div class="flex items-center mb-3">
+                <span class="text-4xl mr-3">🔬</span>
+                <h2 class="text-3xl font-bold">探索 PhET 互动模拟实验</h2>
+              </div>
+              <p class="text-lg text-white opacity-90 mb-6 max-w-2xl">
+                来自科罗拉多大学的优质教育资源，涵盖物理、化学、生物、数学等多学科的互动学习体验
+              </p>
+              <button
+                @click="router.push('/student/browse')"
+                class="px-8 py-3 bg-white text-orange-600 rounded-xl font-bold hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                立即探索 →
+              </button>
+            </div>
+            <div class="hidden lg:block">
+              <div class="text-8xl opacity-20">⚛️🧪📐</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 快捷入口 -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <button

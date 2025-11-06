@@ -108,7 +108,7 @@ class OfficeConverterService:
                 input_path
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)  # 增加到90秒，适应大文件转换
             
             if result.returncode == 0:
                 # 获取生成的PDF文件名

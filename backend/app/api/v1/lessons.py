@@ -80,7 +80,7 @@ async def create_lesson(
 async def list_lessons(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[LessonStatus] = None,
+    status: Optional[str] = Query(None, description="状态筛选: draft, published, archived"),
     search: Optional[str] = None,
     course_id: Optional[int] = Query(None, description="按课程ID筛选"),
     chapter_id: Optional[int] = Query(None, description="按章节ID筛选"),
@@ -90,6 +90,14 @@ async def list_lessons(
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """获取教案列表"""
+    # 转换 status 字符串为枚举类型
+    status_enum = None
+    if status:
+        try:
+            status_enum = LessonStatus(status.lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的状态值: {status}")
+    
     # 构建查询
     query = select(Lesson).options(
         selectinload(Lesson.course).selectinload(Course.subject),
@@ -105,8 +113,8 @@ async def list_lessons(
         # 教师/管理员/教研员：只能看到自己创建的课程
         query = query.where(Lesson.creator_id == current_user.id)
         # 对于非学生用户，可以通过status参数进一步筛选
-        if status:
-            query = query.where(Lesson.status == status)
+        if status_enum:
+            query = query.where(Lesson.status == status_enum)
     
     if search:
         query = query.where(Lesson.title.ilike(f"%{search}%"))
@@ -520,12 +528,20 @@ async def get_chapter_lessons(
     chapter_id: int,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[LessonStatus] = None,
+    status: Optional[str] = Query(None, description="状态筛选: draft, published, archived"),
     search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """获取指定章节下的教案列表"""
+    
+    # 转换 status 字符串为枚举类型
+    status_enum = None
+    if status:
+        try:
+            status_enum = LessonStatus(status.lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的状态值: {status}")
     
     # 验证章节存在
     chapter_result = await db.execute(
@@ -548,8 +564,8 @@ async def get_chapter_lessons(
         Lesson.chapter_id == chapter_id
     )
     
-    if status:
-        query = query.where(Lesson.status == status)
+    if status_enum:
+        query = query.where(Lesson.status == status_enum)
     
     if search:
         query = query.where(Lesson.title.ilike(f"%{search}%"))

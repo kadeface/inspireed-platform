@@ -12,11 +12,20 @@ export const CellType = {
 export type CellType = typeof CellType[keyof typeof CellType]
 
 export interface CellBase {
-  id: number
+  id: number | string  // 支持字符串ID（如"cell-1"）
   type: CellType
   order: number
   title?: string
   editable: boolean
+  
+  // 🎓 学习科学字段
+  cognitive_level?: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create'
+  prerequisite_cells?: (string | number)[]  // 前置单元ID列表
+  mastery_criteria?: {
+    min_attempts?: number
+    min_accuracy?: number
+    max_time_seconds?: number
+  }
 }
 
 export interface TextCellContent {

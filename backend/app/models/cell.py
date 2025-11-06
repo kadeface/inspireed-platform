@@ -24,6 +24,16 @@ class CellType(str, Enum):
     PARAM = "param"         # 参数设置单元
 
 
+class CognitiveLevel(str, Enum):
+    """认知层级（基于Bloom分类学）"""
+    REMEMBER = "remember"      # 记忆：识别、回忆事实和基本概念
+    UNDERSTAND = "understand"  # 理解：解释思想或概念，用自己的话表述
+    APPLY = "apply"           # 应用：在新情境中使用信息
+    ANALYZE = "analyze"       # 分析：将信息分解为组成部分，找出关系
+    EVALUATE = "evaluate"     # 评价：根据标准进行判断和批判
+    CREATE = "create"         # 创造：将元素组合成新的整体，产生新事物
+
+
 class Cell(Base):
     """Cell单元模型"""
     __tablename__ = "cells"
@@ -50,6 +60,28 @@ class Cell(Base):
     
     # 是否可编辑（对学生）
     editable = Column(Boolean, default=False, nullable=False)
+    
+    # 【学习科学优化】认知层级（基于Bloom分类学）
+    cognitive_level = Column(
+        SQLEnum(CognitiveLevel), 
+        nullable=True,
+        comment="认知层级：remember/understand/apply/analyze/evaluate/create"
+    )
+    
+    # 【学习科学优化】前置Cell依赖（必须先完成才能解锁）
+    prerequisite_cells = Column(
+        JSON, 
+        nullable=True, 
+        default=list,
+        comment="前置依赖的Cell ID列表，例如: [1, 2, 3]"
+    )
+    
+    # 【学习科学优化】掌握标准（自动评估配置）
+    mastery_criteria = Column(
+        JSON,
+        nullable=True,
+        comment="掌握标准配置，例如: {\"min_attempts\": 1, \"min_accuracy\": 0.8, \"max_time_seconds\": 300}"
+    )
     
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

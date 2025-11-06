@@ -56,6 +56,7 @@
           <div v-if="isLoading" class="loading-container">
             <div class="spinner"></div>
             <p class="loading-text">加载资源中...</p>
+            <p class="loading-hint">如果是Office文档，首次预览可能需要较长时间进行格式转换，请耐心等待</p>
           </div>
 
           <div v-else-if="error" class="error-container">
@@ -625,6 +626,15 @@ function close() {
 .loading-text {
   color: #6b7280;
   font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.loading-hint {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  max-width: 400px;
+  text-align: center;
+  line-height: 1.5;
 }
 
 .error-icon {
