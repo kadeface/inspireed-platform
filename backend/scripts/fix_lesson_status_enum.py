@@ -38,14 +38,14 @@ async def fix_enum():
         result = await db.execute(
             text(
                 """
-            SELECT 
-                e.enumlabel 
-            FROM 
+            SELECT
+                e.enumlabel
+            FROM
                 pg_enum e
                 JOIN pg_type t ON e.enumtypid = t.oid
-            WHERE 
+            WHERE
                 t.typname = 'lessonstatus'
-            ORDER BY 
+            ORDER BY
                 e.enumsortorder;
         """
             )
@@ -81,7 +81,7 @@ async def fix_enum():
                     await db.execute(
                         text(
                             f"""
-                        ALTER TABLE lessons 
+                        ALTER TABLE lessons
                         ALTER COLUMN status TYPE VARCHAR;
                     """
                         )
@@ -89,8 +89,8 @@ async def fix_enum():
                     await db.execute(
                         text(
                             f"""
-                        UPDATE lessons 
-                        SET status = '{new_val}' 
+                        UPDATE lessons
+                        SET status = '{new_val}'
                         WHERE status = '{old_val}';
                     """
                         )
@@ -101,7 +101,7 @@ async def fix_enum():
             await db.execute(
                 text(
                     """
-                ALTER TABLE lessons 
+                ALTER TABLE lessons
                 ALTER COLUMN status DROP DEFAULT;
             """
                 )
@@ -132,8 +132,8 @@ async def fix_enum():
             await db.execute(
                 text(
                     """
-                ALTER TABLE lessons 
-                ALTER COLUMN status TYPE lessonstatus 
+                ALTER TABLE lessons
+                ALTER COLUMN status TYPE lessonstatus
                 USING status::text::lessonstatus;
             """
                 )
@@ -144,7 +144,7 @@ async def fix_enum():
             await db.execute(
                 text(
                     """
-                ALTER TABLE lessons 
+                ALTER TABLE lessons
                 ALTER COLUMN status SET DEFAULT 'draft'::lessonstatus;
             """
                 )

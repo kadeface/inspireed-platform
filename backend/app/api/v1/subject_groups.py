@@ -665,7 +665,7 @@ async def list_shared_lessons(
     lessons = {}
     if lesson_ids:
         lesson_result = await db.execute(select(Lesson).where(Lesson.id.in_(lesson_ids)))
-        lessons = {l.id: l for l in lesson_result.scalars()}
+        lessons = {lesson.id: lesson for lesson in lesson_result.scalars()}
 
     sharer_ids = [sl.sharer_id for sl in shared_lessons]
     sharers = {}
