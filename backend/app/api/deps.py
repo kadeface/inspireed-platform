@@ -15,7 +15,9 @@ from app.models import User, UserRole
 from typing import Optional
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
-oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False
+)
 
 
 async def get_current_user(
@@ -49,13 +51,12 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
-    token: Optional[str] = Depends(oauth2_scheme_optional), 
-    db: AsyncSession = Depends(get_db)
+    token: Optional[str] = Depends(oauth2_scheme_optional), db: AsyncSession = Depends(get_db)
 ) -> Optional[User]:
     """获取当前用户（可选，不强制认证）"""
     if token is None:
         return None
-    
+
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id: str = payload.get("sub")

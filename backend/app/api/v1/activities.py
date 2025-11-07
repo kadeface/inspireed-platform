@@ -44,6 +44,7 @@ router = APIRouter()
 
 # ========== 活动提交相关 API ==========
 
+
 @router.post("/submissions", response_model=ActivitySubmissionResponse, status_code=201)
 async def create_submission(
     data: ActivitySubmissionCreate,
@@ -255,6 +256,7 @@ async def get_my_lesson_submissions(
 
 # ========== 评分相关 API ==========
 
+
 @router.post("/submissions/{submission_id}/grade", response_model=ActivitySubmissionResponse)
 async def grade_submission(
     submission_id: int,
@@ -326,6 +328,7 @@ async def bulk_grade_submissions(
 
 # ========== 互评相关 API ==========
 
+
 @router.post("/peer-reviews/assign", response_model=dict)
 async def assign_peer_reviews(
     data: PeerReviewAssignment,
@@ -393,7 +396,9 @@ async def assign_peer_reviews(
     return {"assigned_count": assigned_count}
 
 
-@router.get("/submissions/{submission_id}/peer-reviews", response_model=List[PeerReviewWithReviewer])
+@router.get(
+    "/submissions/{submission_id}/peer-reviews", response_model=List[PeerReviewWithReviewer]
+)
 async def get_submission_peer_reviews(
     submission_id: int,
     db: AsyncSession = Depends(deps.get_db),
@@ -477,6 +482,7 @@ async def submit_peer_review(
 
 # ========== 统计相关 API ==========
 
+
 @router.get("/cells/{cell_id}/statistics", response_model=ActivityStatisticsResponse)
 async def get_cell_statistics(
     cell_id: int,
@@ -520,6 +526,7 @@ async def get_cell_statistics(
 
 
 # ========== 离线同步 API ==========
+
 
 @router.post("/submissions/sync", response_model=OfflineSyncResponse)
 async def sync_offline_submissions(
@@ -593,6 +600,7 @@ async def sync_offline_submissions(
 
 # ========== 辅助函数 ==========
 
+
 async def _update_statistics(db: AsyncSession, cell_id: int, lesson_id: int):
     """更新活动统计数据"""
 
@@ -648,4 +656,3 @@ async def _update_statistics(db: AsyncSession, cell_id: int, lesson_id: int):
     statistics.avg_peer_review_score = float(peer_stats[1]) if peer_stats[1] else None
 
     await db.commit()
-

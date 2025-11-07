@@ -209,4 +209,3 @@ class SubjectGroupStatistics(BaseModel):
     total_shared_lessons: int = Field(..., description="总共享教案数")
     my_groups: int = Field(..., description="我的教研组数")
     my_shared_lessons: int = Field(..., description="我的共享教案数")
-

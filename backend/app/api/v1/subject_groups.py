@@ -82,9 +82,7 @@ async def create_subject_group(
     await db.flush()
 
     # 创建创建者的成员关系（作为组长）
-    membership = GroupMembership(
-        group_id=group.id, user_id=current_user.id, role=MemberRole.OWNER
-    )
+    membership = GroupMembership(group_id=group.id, user_id=current_user.id, role=MemberRole.OWNER)
     db.add(membership)
 
     await db.commit()
@@ -182,17 +180,13 @@ async def list_subject_groups(
     subject_ids = list(set(g.subject_id for g in groups))
     subjects = {}
     if subject_ids:
-        subject_result = await db.execute(
-            select(Subject).where(Subject.id.in_(subject_ids))
-        )
+        subject_result = await db.execute(select(Subject).where(Subject.id.in_(subject_ids)))
         subjects = {s.id: s for s in subject_result.scalars()}
 
     grade_ids = list(set(g.grade_id for g in groups if g.grade_id))
     grades = {}
     if grade_ids:
-        grade_result = await db.execute(
-            select(Grade).where(Grade.id.in_(grade_ids))
-        )
+        grade_result = await db.execute(select(Grade).where(Grade.id.in_(grade_ids)))
         grades = {g.id: g for g in grade_result.scalars()}
 
     # 构建响应
@@ -259,9 +253,7 @@ async def get_subject_group(
     response = SubjectGroupResponse.model_validate(group)
     response.subject_name = subject.name if subject else None
     response.grade_name = grade.name if grade else None
-    response.creator_name = (
-        creator.full_name or creator.username if creator else None
-    )
+    response.creator_name = creator.full_name or creator.username if creator else None
     response.user_role = user_role
 
     if group.school_id:
@@ -383,9 +375,7 @@ async def list_group_members(
 
     # 查询成员
     query = select(GroupMembership).where(
-        and_(
-            GroupMembership.group_id == group_id, GroupMembership.is_active == True
-        )
+        and_(GroupMembership.group_id == group_id, GroupMembership.is_active == True)
     )
 
     # 计算总数
@@ -418,9 +408,7 @@ async def list_group_members(
             response.user_avatar_url = user.avatar_url
         items.append(response)
 
-    return GroupMembershipListResponse(
-        items=items, total=total, page=page, page_size=page_size
-    )
+    return GroupMembershipListResponse(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.post("/{group_id}/members", response_model=GroupMembershipResponse)
@@ -676,9 +664,7 @@ async def list_shared_lessons(
     lesson_ids = [sl.lesson_id for sl in shared_lessons]
     lessons = {}
     if lesson_ids:
-        lesson_result = await db.execute(
-            select(Lesson).where(Lesson.id.in_(lesson_ids))
-        )
+        lesson_result = await db.execute(select(Lesson).where(Lesson.id.in_(lesson_ids)))
         lessons = {l.id: l for l in lesson_result.scalars()}
 
     sharer_ids = [sl.sharer_id for sl in shared_lessons]
@@ -691,7 +677,7 @@ async def list_shared_lessons(
     items = []
     for shared_lesson in shared_lessons:
         response = SharedLessonResponse.model_validate(shared_lesson)
-        
+
         lesson = lessons.get(shared_lesson.lesson_id)
         if lesson:
             response.lesson_title = lesson.title
@@ -708,9 +694,7 @@ async def list_shared_lessons(
         response.group_name = group.name
         items.append(response)
 
-    return SharedLessonListResponse(
-        items=items, total=total, page=page, page_size=page_size
-    )
+    return SharedLessonListResponse(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.post("/{group_id}/lessons", response_model=SharedLessonResponse)
@@ -979,9 +963,7 @@ async def get_statistics(
 
     # 总成员数
     total_members = await db.scalar(
-        select(func.count(GroupMembership.id)).where(
-            GroupMembership.is_active == True
-        )
+        select(func.count(GroupMembership.id)).where(GroupMembership.is_active == True)
     )
 
     # 总共享教案数
@@ -1016,4 +998,3 @@ async def get_statistics(
         my_groups=my_groups or 0,
         my_shared_lessons=my_shared_lessons or 0,
     )
-

@@ -30,12 +30,14 @@ from app.core.database import AsyncSessionLocal
 
 async def fix_enum():
     """Fix the lesson status enum mismatch"""
-    
+
     async with AsyncSessionLocal() as db:
         print("🔍 Checking current enum values...")
-        
+
         # Check if the enum type exists and what values it has
-        result = await db.execute(text("""
+        result = await db.execute(
+            text(
+                """
             SELECT 
                 e.enumlabel 
             FROM 
@@ -45,75 +47,109 @@ async def fix_enum():
                 t.typname = 'lessonstatus'
             ORDER BY 
                 e.enumsortorder;
-        """))
-        
+        """
+            )
+        )
+
         current_values = [row[0] for row in result.fetchall()]
         print(f"Current enum values: {current_values}")
-        
+
         # Check what values are actually in the lessons table
-        result = await db.execute(text("""
+        result = await db.execute(
+            text(
+                """
             SELECT DISTINCT status FROM lessons;
-        """))
-        
+        """
+            )
+        )
+
         used_values = [row[0] for row in result.fetchall()]
         print(f"Values used in lessons table: {used_values}")
-        
+
         # Expected values (lowercase, matching Python enum)
-        expected_values = ['draft', 'published', 'archived']
-        
+        expected_values = ["draft", "published", "archived"]
+
         # If current enum has uppercase values but data has lowercase, we need to fix it
         if current_values != expected_values:
             print("\n⚠️  Enum mismatch detected. Fixing...")
-            
+
             # Update existing data to use lowercase if needed
             for old_val in used_values:
                 new_val = old_val.lower()
                 if old_val != new_val:
                     print(f"   Converting '{old_val}' to '{new_val}'...")
-                    await db.execute(text(f"""
+                    await db.execute(
+                        text(
+                            f"""
                         ALTER TABLE lessons 
                         ALTER COLUMN status TYPE VARCHAR;
-                    """))
-                    await db.execute(text(f"""
+                    """
+                        )
+                    )
+                    await db.execute(
+                        text(
+                            f"""
                         UPDATE lessons 
                         SET status = '{new_val}' 
                         WHERE status = '{old_val}';
-                    """))
-            
+                    """
+                        )
+                    )
+
             # Drop the default value first
             print("   Dropping default value...")
-            await db.execute(text("""
+            await db.execute(
+                text(
+                    """
                 ALTER TABLE lessons 
                 ALTER COLUMN status DROP DEFAULT;
-            """))
-            
+            """
+                )
+            )
+
             # Drop the old enum type
             print("   Dropping old enum type...")
-            await db.execute(text("""
+            await db.execute(
+                text(
+                    """
                 DROP TYPE IF EXISTS lessonstatus CASCADE;
-            """))
-            
+            """
+                )
+            )
+
             # Create new enum type with lowercase values
             print("   Creating new enum type with correct values...")
-            await db.execute(text("""
+            await db.execute(
+                text(
+                    """
                 CREATE TYPE lessonstatus AS ENUM ('draft', 'published', 'archived');
-            """))
-            
+            """
+                )
+            )
+
             # Convert the column back to enum
             print("   Converting column to use new enum...")
-            await db.execute(text("""
+            await db.execute(
+                text(
+                    """
                 ALTER TABLE lessons 
                 ALTER COLUMN status TYPE lessonstatus 
                 USING status::text::lessonstatus;
-            """))
-            
+            """
+                )
+            )
+
             # Re-add the default value
             print("   Re-adding default value...")
-            await db.execute(text("""
+            await db.execute(
+                text(
+                    """
                 ALTER TABLE lessons 
                 ALTER COLUMN status SET DEFAULT 'draft'::lessonstatus;
-            """))
-            
+            """
+                )
+            )
+
             await db.commit()
             print("✅ Enum fixed successfully!")
         else:
@@ -127,10 +163,10 @@ async def main():
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-

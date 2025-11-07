@@ -11,6 +11,7 @@ from app.models.activity import ActivitySubmissionStatus, PeerReviewStatus
 
 # ========== 活动提交 Schemas ==========
 
+
 class ActivitySubmissionBase(BaseModel):
     """活动提交基础Schema"""
 
@@ -83,6 +84,7 @@ class ActivitySubmissionWithStudent(ActivitySubmissionResponse):
 
 # ========== 互评 Schemas ==========
 
+
 class PeerReviewBase(BaseModel):
     """互评基础Schema"""
 
@@ -134,6 +136,7 @@ class PeerReviewWithReviewer(PeerReviewResponse):
 
 # ========== 互评分配请求 ==========
 
+
 class PeerReviewAssignment(BaseModel):
     """互评分配请求"""
 
@@ -144,6 +147,7 @@ class PeerReviewAssignment(BaseModel):
 
 
 # ========== 活动统计 Schemas ==========
+
 
 class ActivityStatisticsResponse(BaseModel):
     """活动统计响应"""
@@ -171,6 +175,7 @@ class ActivityStatisticsResponse(BaseModel):
 
 # ========== 批量操作 ==========
 
+
 class BulkGradeRequest(BaseModel):
     """批量评分请求"""
 
@@ -188,6 +193,7 @@ class BulkReturnRequest(BaseModel):
 
 # ========== 导出数据 ==========
 
+
 class ExportSubmissionsRequest(BaseModel):
     """导出提交数据请求"""
 
@@ -197,6 +203,7 @@ class ExportSubmissionsRequest(BaseModel):
 
 
 # ========== 离线同步 ==========
+
 
 class OfflineSyncRequest(BaseModel):
     """离线数据同步请求"""
@@ -210,4 +217,3 @@ class OfflineSyncResponse(BaseModel):
     synced_count: int
     failed_count: int
     conflicts: List[Dict[str, Any]] = Field(default_factory=list)  # 冲突的记录
-

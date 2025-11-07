@@ -33,8 +33,7 @@ async def create_favorite(
     # 检查是否已经收藏
     result = await db.execute(
         select(Favorite).where(
-            Favorite.user_id == current_user.id, 
-            Favorite.lesson_id == favorite_in.lesson_id
+            Favorite.user_id == current_user.id, Favorite.lesson_id == favorite_in.lesson_id
         )
     )
     existing = result.scalar_one_or_none()
@@ -62,10 +61,7 @@ async def delete_favorite(
     取消收藏
     """
     result = await db.execute(
-        select(Favorite).where(
-            Favorite.user_id == current_user.id, 
-            Favorite.lesson_id == lesson_id
-        )
+        select(Favorite).where(Favorite.user_id == current_user.id, Favorite.lesson_id == lesson_id)
     )
     favorite = result.scalar_one_or_none()
 
@@ -134,10 +130,7 @@ async def check_favorite(
     检查是否已收藏某课程
     """
     result = await db.execute(
-        select(Favorite).where(
-            Favorite.user_id == current_user.id, 
-            Favorite.lesson_id == lesson_id
-        )
+        select(Favorite).where(Favorite.user_id == current_user.id, Favorite.lesson_id == lesson_id)
     )
     favorite = result.scalar_one_or_none()
 
