@@ -154,12 +154,6 @@ const canSubmit = computed(() => {
   }
 })
 
-// 格式化时间
-function formatDateTime(dateStr: string | null): string {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
-
 // 提交互评
 async function handleSubmitReview() {
   if (!canSubmit.value) {

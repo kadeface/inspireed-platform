@@ -99,7 +99,7 @@
               <div class="bar-value">{{ getScoreCount('pass') }}</div>
             </div>
             <div class="distribution-bar">
-              <div class="bar-label">不及格(<60)</div>
+              <div class="bar-label">不及格(&lt;60)</div>
               <div class="bar-container">
                 <div class="bar-fill bg-red-500" :style="{ width: `${getScoreDistribution('fail')}%` }"></div>
               </div>

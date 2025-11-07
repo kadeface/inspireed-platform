@@ -331,7 +331,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import type { ActivityItem, ActivityType } from '../../types/activity'
 

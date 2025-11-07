@@ -89,7 +89,7 @@ interface Props {
   isAnonymous?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   isAnonymous: true,
 })
 

@@ -65,7 +65,7 @@
               <span v-if="submitting">
                 <i class="fas fa-spinner fa-spin mr-2"></i>添加中...
               </span>
-              <span v-else">
+              <span v-else>
                 <i class="fas fa-user-plus mr-2"></i>添加
               </span>
             </button>

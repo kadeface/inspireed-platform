@@ -226,7 +226,6 @@ const currentStudentId = ref(1) // TODO: 从用户 store 获取真实 ID
 const {
   isOnline,
   isSyncing,
-  lastSyncTime,
   hasUnsyncedChanges,
   loadFromIndexedDB,
   syncToServer,
