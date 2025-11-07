@@ -113,7 +113,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/store/auth'
+import { useUserStore } from '@/store/user'
 import {
   getSharedLessons,
   unshareLesson,
@@ -128,7 +128,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
-const authStore = useAuthStore()
+const userStore = useUserStore()
 
 // 数据
 const lessons = ref<SharedLesson[]>([])
@@ -192,7 +192,7 @@ async function copyLesson(lessonId: number, groupId: number) {
 
 function canRemove(lesson: SharedLesson): boolean {
   // 分享者或组长/管理员可以移除
-  const currentUserId = authStore.user?.id
+  const currentUserId = userStore.user?.id
   if (!currentUserId) return false
 
   if (lesson.sharer_id === currentUserId) return true
