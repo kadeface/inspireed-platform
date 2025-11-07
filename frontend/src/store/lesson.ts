@@ -154,12 +154,21 @@ export const useLessonStore = defineStore('lesson', () => {
         })
       }
 
+      const wasPublished = currentLesson.value.status === 'published'
+      const oldVersion = currentLesson.value.version || 1
+      
       currentLesson.value = savedLesson
 
       // 更新列表中的教案
       const index = lessons.value.findIndex((l) => l.id === savedLesson.id)
       if (index !== -1) {
         lessons.value[index] = savedLesson
+      }
+
+      // 如果教案已发布且版本号增加，说明内容已更新，学生可以看到最新版本
+      if (wasPublished && savedLesson.status === 'published' && savedLesson.version > oldVersion) {
+        // 版本已更新，后端会自动更新 published_at 时间戳
+        // 学生端会通过版本号检测到更新
       }
 
       return savedLesson

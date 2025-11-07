@@ -103,9 +103,6 @@ class ActivitySubmission(Base):
     peer_reviews_received = relationship(
         "PeerReview", foreign_keys="PeerReview.submission_id", back_populates="submission"
     )
-    peer_reviews_given = relationship(
-        "PeerReview", foreign_keys="PeerReview.reviewer_id", back_populates="reviewer"
-    )
 
     def __repr__(self) -> str:
         return f"<ActivitySubmission(id={self.id}, student_id={self.student_id}, status={self.status})>"

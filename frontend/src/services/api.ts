@@ -63,6 +63,11 @@ class ApiService {
         if (error.response?.status === 401) {
           localStorage.removeItem('access_token')
           window.location.href = '/login'
+        } else if (error.response?.status === 403) {
+          // 403 权限错误，但不自动重定向，让调用方处理
+          const errorMessage = error.response?.data?.detail || '需要相应权限'
+          console.warn('权限不足:', errorMessage)
+          // 可以在这里添加全局错误提示
         }
         return Promise.reject(error)
       }
@@ -70,7 +75,17 @@ class ApiService {
   }
 
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.axiosInstance.get<T>(url, config)
+    // 确保不使用缓存，特别是对于教案数据
+    const noCacheConfig = {
+      ...config,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        ...config?.headers,
+      },
+    }
+    const response = await this.axiosInstance.get<T>(url, noCacheConfig)
     return response.data
   }
 

@@ -219,6 +219,7 @@ const sortBy = ref<'created_at' | 'upvotes'>('created_at')
 const questions = ref<QuestionListItem[]>([])
 const stats = ref<QuestionStats | null>(null)
 const loading = ref(false)
+const permissionError = ref(false)
 const pagination = ref({
   page: 1,
   page_size: 20,
@@ -251,8 +252,14 @@ const emptyHint = computed(() => {
 const loadStats = async () => {
   try {
     stats.value = await questionService.getQuestionStats(filterLessonId.value)
-  } catch (err) {
+  } catch (err: any) {
     console.error('Failed to load stats:', err)
+    // 如果是权限错误，设置权限错误标志
+    if (err.response?.status === 403) {
+      permissionError.value = true
+      return
+    }
+    // 其他错误可以显示提示
   }
 }
 
@@ -283,6 +290,14 @@ const loadQuestions = async (append = false) => {
 
   } catch (err: any) {
     console.error('Failed to load questions:', err)
+    // 如果是权限错误，显示友好提示
+    if (err.response?.status === 403) {
+      // 清空问题列表，显示权限提示
+      questions.value = []
+      permissionError.value = true
+      return
+    }
+    // 其他错误显示alert
     alert('❌ 加载失败：' + err.message)
   } finally {
     loading.value = false

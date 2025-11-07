@@ -234,9 +234,25 @@ async def update_lesson(
         if not course.is_active:
             raise HTTPException(status_code=400, detail="该课程已被禁用")
 
+    # 检查是否更新了内容（content字段）
+    content_updated = False
+    if "content" in update_data:
+        old_content = lesson.content
+        new_content = update_data["content"]
+        # 比较内容是否真正发生变化（简单比较长度和结构）
+        if old_content != new_content:
+            content_updated = True
+
     # 更新字段
     for field, value in update_data.items():
         setattr(lesson, field, value)
+
+    # 如果更新了已发布教案的内容，自动更新版本号
+    # 这样学生端可以通过版本号判断是否有新内容
+    if content_updated and lesson.status == LessonStatus.PUBLISHED:
+        lesson.version = (lesson.version or 1) + 1
+        # 更新 published_at 时间戳，表示内容已更新
+        lesson.published_at = datetime.utcnow()
 
     await db.commit()
     await db.refresh(lesson)
@@ -626,23 +642,21 @@ async def get_recommended_lessons(
             selectinload(Lesson.creator),  # 加载教师信息
         )
         .where(Lesson.status == LessonStatus.PUBLISHED)
-        .order_by(Lesson.average_rating.desc(), Lesson.published_at.desc())
+        .order_by(
+            func.coalesce(Lesson.average_rating, 0).desc(),
+            func.coalesce(Lesson.published_at, Lesson.created_at).desc()
+        )
         .limit(limit)
     )
 
     result = await db.execute(query)
     lessons = result.scalars().all()
 
-    # 为每个lesson添加教师信息
-    lessons_with_creator = []
+    # 为每个lesson添加教师信息（使用setattr确保属性被正确设置）
     for lesson in lessons:
-        lesson_dict = {
-            **{k: v for k, v in lesson.__dict__.items() if not k.startswith("_")},
-            "creator_name": lesson.creator.full_name if lesson.creator else None,
-            "creator_avatar": lesson.creator.avatar_url if lesson.creator else None,
-        }
-        lessons_with_creator.append(lesson_dict)
+        setattr(lesson, 'creator_name', lesson.creator.full_name if lesson.creator else None)
+        setattr(lesson, 'creator_avatar', lesson.creator.avatar_url if lesson.creator else None)
 
     return LessonListResponse(
-        items=lessons_with_creator, total=len(lessons), page=1, page_size=limit
+        items=lessons, total=len(lessons), page=1, page_size=limit
     )

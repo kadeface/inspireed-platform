@@ -265,7 +265,11 @@ const loadLesson = async () => {
   error.value = null
 
   try {
+    // 从服务器获取最新教案数据（不使用缓存）
     lesson.value = await lessonService.fetchLessonById(lessonId.value)
+    
+    // 检查教案版本是否更新
+    checkLessonVersionUpdate()
     
     // 加载该课程的完成状态
     loadCompletedCells()
@@ -276,6 +280,30 @@ const loadLesson = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 检查教案版本是否更新
+const checkLessonVersionUpdate = () => {
+  if (!lesson.value) return
+  
+  const versionKey = `lesson_${lessonId.value}_version`
+  const lastKnownVersion = localStorage.getItem(versionKey)
+  
+  if (lastKnownVersion) {
+    const lastVersion = parseInt(lastKnownVersion, 10)
+    if (lesson.value.version > lastVersion) {
+      // 教案已更新，清除旧的完成状态，让学生重新学习新内容
+      const completedCellsKey = `lesson_${lessonId.value}_completed_cells`
+      localStorage.removeItem(completedCellsKey)
+      completedCells.value = new Set()
+      
+      // 显示更新提示（可选）
+      console.log('教案内容已更新，版本号:', lesson.value.version)
+    }
+  }
+  
+  // 保存当前版本号
+  localStorage.setItem(versionKey, String(lesson.value.version))
 }
 
 const loadCompletedCells = () => {

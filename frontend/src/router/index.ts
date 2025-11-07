@@ -146,11 +146,44 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('access_token')
   
+  // 检查是否需要认证
   if (to.meta.requiresAuth && !token) {
     next('/login')
-  } else {
-    next()
+    return
   }
+  
+  // 检查角色权限（如果路由定义了角色要求）
+  if (to.meta.role && token) {
+    try {
+      // 从localStorage获取用户信息（如果存在）
+      const userStr = localStorage.getItem('user')
+      if (userStr) {
+        const user = JSON.parse(userStr)
+        const requiredRole = to.meta.role as string
+        const userRole = user.role?.toLowerCase()
+        
+        // 检查角色是否匹配（管理员可以访问所有页面）
+        if (userRole !== requiredRole && userRole !== 'admin') {
+          // 角色不匹配，根据用户角色重定向到相应首页
+          if (userRole === 'student') {
+            next('/student')
+          } else if (userRole === 'teacher') {
+            next('/teacher')
+          } else if (userRole === 'researcher') {
+            next('/researcher')
+          } else {
+            next('/login')
+          }
+          return
+        }
+      }
+    } catch (e) {
+      // 解析失败，继续路由，让API来处理权限检查
+      console.warn('Failed to parse user info from localStorage:', e)
+    }
+  }
+  
+  next()
 })
 
 export default router
