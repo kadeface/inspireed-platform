@@ -114,15 +114,27 @@ const cellTypes = [
     description: 'Python/JavaScript/HTML',
   },
   {
+    type: CellType.ACTIVITY,
+    name: '活动单元',
+    icon: '✅',
+    description: '测验/问卷/作业/评价',
+  },
+  {
     type: CellType.SIM,
     name: '仿真单元',
     icon: '🎮',
     description: '3D仿真/物理引擎',
   },
   {
+    type: CellType.FLOWCHART,
+    name: '流程图单元',
+    icon: '📊',
+    description: '流程图/思维导图',
+  },
+  {
     type: CellType.CHART,
     name: '图表单元',
-    icon: '📊',
+    icon: '📈',
     description: '数据可视化',
   },
   {

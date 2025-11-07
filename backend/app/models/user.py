@@ -55,6 +55,9 @@ class User(Base):
     answers_given = relationship(
         "Answer", foreign_keys="Answer.answerer_id", back_populates="answerer"
     )
+    peer_reviews_given = relationship(
+        "PeerReview", foreign_keys="PeerReview.reviewer_id", back_populates="reviewer"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

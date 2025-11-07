@@ -533,6 +533,54 @@ function getDefaultCell(cellType: CellType, order: number): Cell {
         },
       } as Cell
 
+    case CellType.ACTIVITY:
+      return {
+        ...baseCell,
+        type: CellType.ACTIVITY,
+        content: {
+          title: '新活动',
+          description: '',
+          activityType: 'quiz' as const,
+          timing: {
+            phase: 'in-class' as const,
+          },
+          items: [],
+          grading: {
+            enabled: true,
+            totalPoints: 100,
+            autoGrade: false,
+          },
+          submission: {
+            allowMultiple: false,
+            showFeedback: 'immediate' as const,
+          },
+          display: {
+            showProgress: true,
+          },
+        },
+        config: {
+          allowOffline: true,
+        },
+      } as Cell
+
+    case CellType.FLOWCHART:
+      return {
+        ...baseCell,
+        type: CellType.FLOWCHART,
+        content: {
+          nodes: [],
+          edges: [],
+          style: {
+            theme: 'light' as const,
+            layoutDirection: 'TB' as const,
+          },
+        },
+        config: {
+          editable: true,
+          showMinimap: false,
+        },
+      } as Cell
+
     default:
       throw new Error(`Unknown cell type: ${cellType}`)
   }
@@ -684,6 +732,8 @@ function getCellTypeName(cellType: CellType): string {
     [CellType.CHART]: '图表单元',
     [CellType.CONTEST]: '竞赛单元',
     [CellType.VIDEO]: '视频单元',
+    [CellType.ACTIVITY]: '活动单元',
+    [CellType.FLOWCHART]: '流程图单元',
   }
   return nameMap[cellType]
 }

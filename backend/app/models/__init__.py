@@ -4,7 +4,7 @@
 
 from app.models.user import User, UserRole
 from app.models.lesson import Lesson, LessonStatus, DifficultyLevel
-from app.models.cell import Cell, CellType
+from app.models.cell import Cell, CellType, CognitiveLevel
 from app.models.logs import ExecutionLog, QARecord, ExecutionStatus
 from app.models.curriculum import Subject, Grade, Course, Chapter, Resource
 from app.models.organization import Region, School
@@ -19,6 +19,20 @@ from app.models.question import (
     AskType,
     AnswererType,
 )
+from app.models.activity import (
+    ActivitySubmission,
+    ActivitySubmissionStatus,
+    PeerReview,
+    PeerReviewStatus,
+    ActivityStatistics,
+)
+from app.models.subject_group import (
+    SubjectGroup,
+    GroupMembership,
+    SharedLesson,
+    GroupScope,
+    MemberRole,
+)
 
 __all__ = [
     "User",
@@ -28,6 +42,7 @@ __all__ = [
     "DifficultyLevel",
     "Cell",
     "CellType",
+    "CognitiveLevel",
     "ExecutionLog",
     "QARecord",
     "ExecutionStatus",
@@ -48,4 +63,14 @@ __all__ = [
     "QuestionStatus",
     "AskType",
     "AnswererType",
+    "ActivitySubmission",
+    "ActivitySubmissionStatus",
+    "PeerReview",
+    "PeerReviewStatus",
+    "ActivityStatistics",
+    "SubjectGroup",
+    "GroupMembership",
+    "SharedLesson",
+    "GroupScope",
+    "MemberRole",
 ]

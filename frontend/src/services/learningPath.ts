@@ -1,9 +1,7 @@
 /**
  * 学习路径服务
  */
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+import { api } from './api'
 
 export interface LearningPathLesson {
   id: number
@@ -67,72 +65,41 @@ export interface LearningPathUpdate {
 }
 
 class LearningPathService {
-  private getAuthHeader() {
-    const token = localStorage.getItem('token')
-    return {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    }
-  }
-
   /**
    * 创建学习路径（教师/研究员）
    */
   async createLearningPath(data: LearningPathCreate): Promise<LearningPath> {
-    const response = await axios.post(
-      `${API_BASE_URL}/api/v1/learning-paths/`,
-      data,
-      this.getAuthHeader()
-    )
-    return response.data
+    return await api.post<LearningPath>('/learning-paths/', data)
   }
 
   /**
    * 更新学习路径
    */
   async updateLearningPath(pathId: number, data: LearningPathUpdate): Promise<LearningPath> {
-    const response = await axios.put(
-      `${API_BASE_URL}/api/v1/learning-paths/${pathId}`,
-      data,
-      this.getAuthHeader()
-    )
-    return response.data
+    return await api.put<LearningPath>(`/learning-paths/${pathId}`, data)
   }
 
   /**
    * 删除学习路径
    */
   async deleteLearningPath(pathId: number): Promise<void> {
-    await axios.delete(
-      `${API_BASE_URL}/api/v1/learning-paths/${pathId}`,
-      this.getAuthHeader()
-    )
+    await api.delete(`/learning-paths/${pathId}`)
   }
 
   /**
    * 获取学习路径列表
    */
   async getLearningPaths(publishedOnly: boolean = true): Promise<LearningPathListItem[]> {
-    const response = await axios.get(
-      `${API_BASE_URL}/api/v1/learning-paths/`,
-      {
-        ...this.getAuthHeader(),
-        params: { published_only: publishedOnly }
-      }
-    )
-    return response.data
+    return await api.get<LearningPathListItem[]>('/learning-paths/', {
+      params: { published_only: publishedOnly }
+    })
   }
 
   /**
    * 获取学习路径详情
    */
   async getLearningPath(pathId: number): Promise<LearningPathWithLessons> {
-    const response = await axios.get(
-      `${API_BASE_URL}/api/v1/learning-paths/${pathId}`,
-      this.getAuthHeader()
-    )
-    return response.data
+    return await api.get<LearningPathWithLessons>(`/learning-paths/${pathId}`)
   }
 
   /**
@@ -144,26 +111,18 @@ class LearningPathService {
     orderIndex: number,
     isRequired: boolean = true
   ): Promise<LearningPathLesson> {
-    const response = await axios.post(
-      `${API_BASE_URL}/api/v1/learning-paths/${pathId}/lessons`,
-      {
-        lesson_id: lessonId,
-        order_index: orderIndex,
-        is_required: isRequired
-      },
-      this.getAuthHeader()
-    )
-    return response.data
+    return await api.post<LearningPathLesson>(`/learning-paths/${pathId}/lessons`, {
+      lesson_id: lessonId,
+      order_index: orderIndex,
+      is_required: isRequired
+    })
   }
 
   /**
    * 从学习路径移除课程
    */
   async removeLessonFromPath(pathId: number, lessonId: number): Promise<void> {
-    await axios.delete(
-      `${API_BASE_URL}/api/v1/learning-paths/${pathId}/lessons/${lessonId}`,
-      this.getAuthHeader()
-    )
+    await api.delete(`/learning-paths/${pathId}/lessons/${lessonId}`)
   }
 }
 

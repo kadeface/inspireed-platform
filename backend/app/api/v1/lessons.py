@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.models import User, Lesson, LessonStatus, Course, Resource, Chapter, DifficultyLevel
 from app.schemas.lesson import LessonCreate, LessonUpdate, LessonResponse, LessonListResponse
 from app.api.v1.auth import get_current_active_user
+from app.api.deps import get_current_user_optional
 from pydantic import BaseModel, Field
 
 router = APIRouter()
@@ -608,10 +609,10 @@ async def get_chapter_lessons(
 async def get_recommended_lessons(
     limit: int = Query(10, ge=1, le=50, description="推荐课程数量"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ) -> Any:
     """
-    获取推荐课程
+    获取推荐课程（公开接口，无需登录）
     基于以下因素推荐：
     1. 热门课程（评分高、查看多）
     2. 新发布的课程

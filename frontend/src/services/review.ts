@@ -1,9 +1,7 @@
 /**
  * 评分评论服务
  */
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+import { api } from './api'
 
 export interface Review {
   id: number
@@ -39,80 +37,46 @@ export interface LessonRatingStats {
 }
 
 class ReviewService {
-  private getAuthHeader() {
-    const token = localStorage.getItem('token')
-    return {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    }
-  }
-
   /**
    * 创建评论
    */
   async createReview(data: ReviewCreate): Promise<Review> {
-    const response = await axios.post(
-      `${API_BASE_URL}/api/v1/reviews/`,
-      data,
-      this.getAuthHeader()
-    )
-    return response.data
+    return await api.post<Review>('/reviews/', data)
   }
 
   /**
    * 更新评论
    */
   async updateReview(reviewId: number, data: ReviewUpdate): Promise<Review> {
-    const response = await axios.put(
-      `${API_BASE_URL}/api/v1/reviews/${reviewId}`,
-      data,
-      this.getAuthHeader()
-    )
-    return response.data
+    return await api.put<Review>(`/reviews/${reviewId}`, data)
   }
 
   /**
    * 删除评论
    */
   async deleteReview(reviewId: number): Promise<void> {
-    await axios.delete(
-      `${API_BASE_URL}/api/v1/reviews/${reviewId}`,
-      this.getAuthHeader()
-    )
+    await api.delete(`/reviews/${reviewId}`)
   }
 
   /**
    * 获取课程的所有评论
    */
   async getLessonReviews(lessonId: number): Promise<ReviewWithUser[]> {
-    const response = await axios.get(
-      `${API_BASE_URL}/api/v1/reviews/lesson/${lessonId}`,
-      this.getAuthHeader()
-    )
-    return response.data
+    return await api.get<ReviewWithUser[]>(`/reviews/lesson/${lessonId}`)
   }
 
   /**
    * 获取课程的评分统计
    */
   async getLessonRatingStats(lessonId: number): Promise<LessonRatingStats> {
-    const response = await axios.get(
-      `${API_BASE_URL}/api/v1/reviews/lesson/${lessonId}/stats`,
-      this.getAuthHeader()
-    )
-    return response.data
+    return await api.get<LessonRatingStats>(`/reviews/lesson/${lessonId}/stats`)
   }
 
   /**
    * 获取我对某课程的评论
    */
   async getMyReview(lessonId: number): Promise<Review | null> {
-    const response = await axios.get(
-      `${API_BASE_URL}/api/v1/reviews/my/${lessonId}`,
-      this.getAuthHeader()
-    )
-    return response.data
+    return await api.get<Review | null>(`/reviews/my/${lessonId}`)
   }
 }
 

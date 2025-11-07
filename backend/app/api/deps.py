@@ -12,7 +12,10 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models import User, UserRole
 
+from typing import Optional
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 
 async def get_current_user(
@@ -41,6 +44,31 @@ async def get_current_user(
 
     if not user.is_active:
         raise HTTPException(status_code=400, detail="用户未激活")
+
+    return user
+
+
+async def get_current_user_optional(
+    token: Optional[str] = Depends(oauth2_scheme_optional), 
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """获取当前用户（可选，不强制认证）"""
+    if token is None:
+        return None
+    
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            return None
+    except JWTError:
+        return None
+
+    result = await db.execute(select(User).where(User.id == int(user_id)))
+    user = result.scalar_one_or_none()
+
+    if user is None or not user.is_active:
+        return None
 
     return user
 

@@ -1,3 +1,5 @@
+import type { ActivityCellContent } from './activity'
+
 export const CellType = {
   TEXT: 'text',
   VIDEO: 'video',
@@ -7,6 +9,8 @@ export const CellType = {
   CHART: 'chart',
   CONTEST: 'contest',
   PARAM: 'param',
+  ACTIVITY: 'activity',  // 教学活动（测验、问卷、作业、评价）
+  FLOWCHART: 'flowchart',  // 流程图
 } as const
 
 export type CellType = typeof CellType[keyof typeof CellType]
@@ -141,6 +145,49 @@ export interface VideoCell extends CellBase {
   }
 }
 
+// Activity Cell
+export interface ActivityCell extends CellBase {
+  type: typeof CellType.ACTIVITY
+  content: ActivityCellContent
+  config?: {
+    allowOffline?: boolean  // 允许离线答题
+  }
+}
+
+// Flowchart Cell
+export interface FlowchartNode {
+  id: string
+  type: 'start' | 'process' | 'decision' | 'end' | 'custom'
+  label: string
+  position: { x: number; y: number }
+  data?: any
+}
+
+export interface FlowchartEdge {
+  id: string
+  source: string  // 源节点ID
+  target: string  // 目标节点ID
+  label?: string
+}
+
+export interface FlowchartCellContent {
+  nodes: FlowchartNode[]
+  edges: FlowchartEdge[]
+  style?: {
+    theme?: 'light' | 'dark'
+    layoutDirection?: 'TB' | 'LR' | 'BT' | 'RL'  // Top-Bottom, Left-Right
+  }
+}
+
+export interface FlowchartCell extends CellBase {
+  type: typeof CellType.FLOWCHART
+  content: FlowchartCellContent
+  config?: {
+    editable?: boolean  // 学生是否可编辑
+    showMinimap?: boolean  // 显示缩略图
+  }
+}
+
 export type Cell =
   | TextCell
   | CodeCell
@@ -149,3 +196,5 @@ export type Cell =
   | ChartCell
   | ContestCell
   | VideoCell
+  | ActivityCell
+  | FlowchartCell

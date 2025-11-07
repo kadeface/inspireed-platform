@@ -19,7 +19,7 @@
         </div>
 
         <!-- 问答统计卡片 -->
-        <div class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="mb-8 grid grid-cols-1 md:grid-cols-4 gap-6">
           <!-- 问答总览卡片 -->
           <router-link
             to="/teacher/questions"
@@ -45,6 +45,31 @@
             </div>
           </router-link>
 
+          <!-- 学科教研组卡片 -->
+          <router-link
+            to="/teacher/subject-groups"
+            class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white hover:shadow-xl transition-shadow cursor-pointer"
+          >
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold">👥 学科教研组</h3>
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+            <div v-if="subjectGroupStats" class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-green-100">我的教研组</span>
+                <span class="text-2xl font-bold">{{ subjectGroupStats.my_groups || 0 }}</span>
+              </div>
+              <div class="text-sm text-green-100 opacity-80">
+                全部: {{ subjectGroupStats.total_groups || 0 }} | 共享教案: {{ subjectGroupStats.total_shared_lessons || 0 }}
+              </div>
+            </div>
+            <div v-else class="text-green-100 text-sm">
+              加载中...
+            </div>
+          </router-link>
+
           <!-- 快捷操作卡片 -->
           <div class="bg-white rounded-lg shadow-md p-6 border-2 border-gray-200">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">📋 快捷操作</h3>
@@ -54,6 +79,12 @@
                 class="block px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
               >
                 → 查看所有问题
+              </router-link>
+              <router-link
+                to="/teacher/subject-groups"
+                class="block px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
+              >
+                → 学科教研组
               </router-link>
               <button
                 @click="showCreateModal = true"
@@ -450,7 +481,9 @@ import CurriculumTreeView from '../../components/Curriculum/CurriculumTreeView.v
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import questionService from '@/services/question'
 import curriculumService from '@/services/curriculum'
+import { getSubjectGroupStatistics } from '@/services/subjectGroup'
 import type { QuestionStats } from '@/types/question'
+import type { SubjectGroupStatistics } from '@/types/subjectGroup'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -458,6 +491,9 @@ const lessonStore = useLessonStore()
 
 // 问答统计
 const questionStats = ref<QuestionStats | null>(null)
+
+// 学科教研组统计
+const subjectGroupStats = ref<SubjectGroupStatistics | null>(null)
 
 // 用户名
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '教师')
@@ -519,6 +555,16 @@ async function loadQuestionStats() {
     questionStats.value = await questionService.getQuestionStats()
   } catch (error: any) {
     console.error('Failed to load question stats:', error)
+    // 不显示错误，静默失败
+  }
+}
+
+// 加载学科教研组统计
+async function loadSubjectGroupStats() {
+  try {
+    subjectGroupStats.value = await getSubjectGroupStatistics()
+  } catch (error: any) {
+    console.error('Failed to load subject group stats:', error)
     // 不显示错误，静默失败
   }
 }
@@ -780,6 +826,7 @@ onMounted(() => {
   loadLessons()
   loadAvailableChapters()
   loadQuestionStats()
+  loadSubjectGroupStats()
 })
 </script>
 

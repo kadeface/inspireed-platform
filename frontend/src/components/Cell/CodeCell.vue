@@ -120,7 +120,7 @@ const error = ref('')
 const isRunning = ref(false)
 const pyodideStatus = ref<'unloaded' | 'loading' | 'ready' | 'error'>('unloaded')
 const executionTime = ref(0)
-const iframeHeight = ref('400px')
+const iframeHeight = ref('800px')
 
 let editorView: EditorView | null = null
 
@@ -263,50 +263,60 @@ function handleIframeLoad() {
         const style = iframeDoc.createElement('style')
         style.textContent = `
           html, body {
-            overflow: hidden !important;
+            overflow: auto !important;
             margin: 0;
             padding: 0;
           }
         `
         iframeDoc.head.appendChild(style)
         
-        // 等待内容完全渲染（包括Chart.js等动态内容）
-        setTimeout(() => {
+        // 计算高度的函数
+        const calculateHeight = () => {
           const body = iframeDoc.body
           const html = iframeDoc.documentElement
           
           // 获取内容的实际高度
-          const height = Math.max(
+          return Math.max(
             body?.scrollHeight || 0,
             body?.offsetHeight || 0,
             html?.clientHeight || 0,
             html?.scrollHeight || 0,
             html?.offsetHeight || 0
           )
+        }
+        
+        // 第一次计算（初始加载）
+        setTimeout(() => {
+          const height = calculateHeight()
           
           // 设置iframe高度，加上一些内边距
           if (height > 0) {
-            iframeHeight.value = `${height + 40}px`
+            iframeHeight.value = `${height + 60}px`
           } else {
-            iframeHeight.value = '600px' // 默认高度
+            iframeHeight.value = '800px' // 默认高度
           }
-          
-          // 为了确保Chart.js等动态内容完全加载，再次检查
-          setTimeout(() => {
-            const finalHeight = Math.max(
-              body?.scrollHeight || 0,
-              html?.scrollHeight || 0
-            )
-            if (finalHeight > height) {
-              iframeHeight.value = `${finalHeight + 40}px`
-            }
-          }, 500)
         }, 200)
+        
+        // 第二次计算（等待动态内容）
+        setTimeout(() => {
+          const height = calculateHeight()
+          if (height > 0) {
+            iframeHeight.value = `${height + 60}px`
+          }
+        }, 800)
+        
+        // 第三次计算（确保完全加载）
+        setTimeout(() => {
+          const height = calculateHeight()
+          if (height > 0) {
+            iframeHeight.value = `${height + 60}px`
+          }
+        }, 1500)
       }
     } catch (e) {
       // 如果访问iframe内容失败（跨域问题），使用默认高度
       console.warn('Failed to access iframe content for height calculation', e)
-      iframeHeight.value = '700px'
+      iframeHeight.value = '800px'
     }
   }
 }

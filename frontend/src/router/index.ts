@@ -43,6 +43,19 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/Teacher/AnswerEditor.vue'),
     meta: { requiresAuth: true, role: 'teacher' },
   },
+  // 教师端 - 学科教研组
+  {
+    path: '/teacher/subject-groups',
+    name: 'TeacherSubjectGroups',
+    component: () => import('../pages/Teacher/SubjectGroups.vue'),
+    meta: { requiresAuth: true, role: 'teacher' },
+  },
+  {
+    path: '/teacher/subject-groups/:id',
+    name: 'TeacherSubjectGroupDetail',
+    component: () => import('../pages/Teacher/SubjectGroupDetail.vue'),
+    meta: { requiresAuth: true, role: 'teacher' },
+  },
   {
     path: '/student',
     name: 'Student',

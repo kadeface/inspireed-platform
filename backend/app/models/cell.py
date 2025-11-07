@@ -31,6 +31,8 @@ class CellType(str, Enum):
     CHART = "chart"  # 数据可视化单元
     CONTEST = "contest"  # 竞技任务单元
     PARAM = "param"  # 参数设置单元
+    ACTIVITY = "activity"  # 教学活动单元（测验、问卷、作业、评价）
+    FLOWCHART = "flowchart"  # 流程图单元
 
 
 class CognitiveLevel(str, Enum):

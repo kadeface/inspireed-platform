@@ -57,7 +57,9 @@ class Lesson(Base):
 
     # 状态
     status = Column(
-        SQLEnum(LessonStatus, name="lessonstatus"), default=LessonStatus.DRAFT, nullable=False
+        SQLEnum(LessonStatus, name="lessonstatus", native_enum=True, create_constraint=False, values_callable=lambda x: [e.value for e in x]), 
+        default=LessonStatus.DRAFT, 
+        nullable=False
     )
 
     # 教案内容（JSON格式存储Cell配置）

@@ -3,10 +3,11 @@
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import desc, select
+from typing import Any
 
-from app.api import deps
+from app.api.deps import get_db, get_current_active_user
 from app.models import User, Favorite, Lesson
 from app.schemas.favorite import FavoriteCreate, FavoriteResponse, FavoriteWithLesson
 
@@ -14,26 +15,29 @@ router = APIRouter()
 
 
 @router.post("/", response_model=FavoriteResponse, status_code=status.HTTP_201_CREATED)
-def create_favorite(
+async def create_favorite(
     *,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
     favorite_in: FavoriteCreate,
-):
+) -> Any:
     """
     创建收藏
     """
     # 检查课程是否存在
-    lesson = db.query(Lesson).filter(Lesson.id == favorite_in.lesson_id).first()
+    result = await db.execute(select(Lesson).where(Lesson.id == favorite_in.lesson_id))
+    lesson = result.scalar_one_or_none()
     if not lesson:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="课程不存在")
 
     # 检查是否已经收藏
-    existing = (
-        db.query(Favorite)
-        .filter(Favorite.user_id == current_user.id, Favorite.lesson_id == favorite_in.lesson_id)
-        .first()
+    result = await db.execute(
+        select(Favorite).where(
+            Favorite.user_id == current_user.id, 
+            Favorite.lesson_id == favorite_in.lesson_id
+        )
     )
+    existing = result.scalar_one_or_none()
 
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="已经收藏过该课程")
@@ -41,61 +45,64 @@ def create_favorite(
     # 创建收藏
     favorite = Favorite(user_id=current_user.id, lesson_id=favorite_in.lesson_id)
     db.add(favorite)
-    db.commit()
-    db.refresh(favorite)
+    await db.commit()
+    await db.refresh(favorite)
 
     return favorite
 
 
 @router.delete("/{lesson_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_favorite(
+async def delete_favorite(
     *,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
     lesson_id: int,
-):
+) -> None:
     """
     取消收藏
     """
-    favorite = (
-        db.query(Favorite)
-        .filter(Favorite.user_id == current_user.id, Favorite.lesson_id == lesson_id)
-        .first()
+    result = await db.execute(
+        select(Favorite).where(
+            Favorite.user_id == current_user.id, 
+            Favorite.lesson_id == lesson_id
+        )
     )
+    favorite = result.scalar_one_or_none()
 
     if not favorite:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未收藏该课程")
 
-    db.delete(favorite)
-    db.commit()
+    await db.delete(favorite)
+    await db.commit()
 
     return None
 
 
 @router.get("/", response_model=list[FavoriteWithLesson])
-def get_my_favorites(
+async def get_my_favorites(
     *,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
     skip: int = 0,
     limit: int = 100,
-):
+) -> Any:
     """
     获取我的收藏列表
     """
-    favorites = (
-        db.query(Favorite)
-        .filter(Favorite.user_id == current_user.id)
+    result_query = await db.execute(
+        select(Favorite)
+        .where(Favorite.user_id == current_user.id)
         .order_by(desc(Favorite.created_at))
         .offset(skip)
         .limit(limit)
-        .all()
     )
+    favorites = result_query.scalars().all()
 
     # 组装返回数据
     result = []
     for fav in favorites:
-        lesson = db.query(Lesson).filter(Lesson.id == fav.lesson_id).first()
+        lesson_result = await db.execute(select(Lesson).where(Lesson.id == fav.lesson_id))
+        lesson = lesson_result.scalar_one_or_none()
         if lesson:
             result.append(
                 FavoriteWithLesson(
@@ -117,19 +124,21 @@ def get_my_favorites(
 
 
 @router.get("/check/{lesson_id}", response_model=bool)
-def check_favorite(
+async def check_favorite(
     *,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
     lesson_id: int,
-):
+) -> bool:
     """
     检查是否已收藏某课程
     """
-    favorite = (
-        db.query(Favorite)
-        .filter(Favorite.user_id == current_user.id, Favorite.lesson_id == lesson_id)
-        .first()
+    result = await db.execute(
+        select(Favorite).where(
+            Favorite.user_id == current_user.id, 
+            Favorite.lesson_id == lesson_id
+        )
     )
+    favorite = result.scalar_one_or_none()
 
     return favorite is not None
