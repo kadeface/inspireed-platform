@@ -212,7 +212,7 @@ import questionService from '@/services/question'
 import type { QuestionListItem } from '@/types/question'
 // 🎓 学习科学优化：导入认知脚手架组件
 import CellWrapper from '@/components/Cell/CellWrapper.vue'
-import FlowchartViewerCell from '@/components/Cell/FlowchartViewerCell.vue'
+import FlowchartStudentCell from '@/components/Cell/FlowchartStudentCell.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -259,7 +259,7 @@ const getCellComponent = (type: CellType) => {
     contest: ContestCell,
     video: VideoCell,
     activity: ActivityCell,
-    flowchart: FlowchartViewerCell,
+    flowchart: FlowchartStudentCell,
   }
   return components[type] || TextCell
 }

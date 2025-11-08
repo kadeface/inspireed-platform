@@ -25,9 +25,6 @@
         />
 
         <!-- 控制按钮（只读模式） -->
-        <Controls :show-interactive="false" />
-
-        <!-- 缩略图 -->
         <MiniMap v-if="showMinimap" />
 
         <!-- 自定义节点（只读） -->
@@ -47,6 +44,7 @@
           <EndNode v-bind="nodeProps" />
         </template>
       </VueFlow>
+      <FlowchartZoomControls position="top-right" />
 
       <!-- 只读提示 -->
       <div class="absolute top-4 left-4 bg-blue-100 text-blue-800 px-4 py-2 rounded-lg shadow-sm text-sm">
@@ -60,10 +58,10 @@
 import { ref, watch } from 'vue'
 import { VueFlow, useVueFlow, MarkerType } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
-import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
 import type { Node, Edge } from '@vue-flow/core'
 
+import FlowchartZoomControls from './FlowchartZoomControls.vue'
 import StartNode from './nodes/StartNode.vue'
 import ProcessNode from './nodes/ProcessNode.vue'
 import DecisionNode from './nodes/DecisionNode.vue'

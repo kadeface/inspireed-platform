@@ -44,9 +44,6 @@
         />
 
         <!-- 控制按钮 -->
-        <Controls />
-
-        <!-- 缩略图 -->
         <MiniMap v-if="showMinimap" />
 
         <!-- 自定义节点 -->
@@ -66,6 +63,7 @@
           <EndNode v-bind="nodeProps" />
         </template>
       </VueFlow>
+      <FlowchartZoomControls position="top-right" />
     </div>
 
     <!-- 节点编辑对话框 -->
@@ -82,13 +80,13 @@
 import { ref, watch, provide, nextTick, onBeforeUnmount } from 'vue'
 import { VueFlow, useVueFlow, MarkerType } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
-import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
 import type { Node, Edge, Connection } from '@vue-flow/core'
 import { v4 as uuidv4 } from 'uuid'
 import dagre from 'dagre'
 
 import FlowchartToolbar from './FlowchartToolbar.vue'
+import FlowchartZoomControls from './FlowchartZoomControls.vue'
 import StartNode from './nodes/StartNode.vue'
 import ProcessNode from './nodes/ProcessNode.vue'
 import DecisionNode from './nodes/DecisionNode.vue'
