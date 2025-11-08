@@ -204,6 +204,7 @@ import SimCell from '@/components/Cell/SimCell.vue'
 import ChartCell from '@/components/Cell/ChartCell.vue'
 import ContestCell from '@/components/Cell/ContestCell.vue'
 import VideoCell from '@/components/Cell/VideoCell.vue'
+import ActivityCell from '@/components/Cell/ActivityCell.vue'
 import ReviewSection from '@/components/Resource/ReviewSection.vue'
 import QuestionForm from '@/components/Question/QuestionForm.vue'
 import QuestionList from '@/components/Question/QuestionList.vue'
@@ -256,6 +257,7 @@ const getCellComponent = (type: CellType) => {
     chart: ChartCell,
     contest: ContestCell,
     video: VideoCell,
+    activity: ActivityCell,
   }
   return components[type] || TextCell
 }
