@@ -57,6 +57,7 @@ class Grade(Base):
 
     # 关联关系
     courses = relationship("Course", back_populates="grade", cascade="all, delete-orphan")
+    classrooms = relationship("Classroom", back_populates="grade")
 
     def __repr__(self) -> str:
         return f"<Grade(id={self.id}, name={self.name}, level={self.level})>"

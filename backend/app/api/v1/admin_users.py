@@ -7,11 +7,12 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from datetime import datetime
 
 from app.core.database import get_db
-from app.models import User, UserRole
+from app.core.validators import normalize_user_role
+from app.models import User, UserRole, Region, School, Grade, Classroom
 from app.api.deps import get_current_admin
 from app.core.security import get_password_hash
 from app.core.config import settings
@@ -33,6 +34,18 @@ class UserCreate(BaseModel):
     password: str
     role: UserRole
     is_active: bool = True
+    region_id: Optional[int] = None
+    school_id: Optional[int] = None
+    grade_id: Optional[int] = None
+    classroom_id: Optional[int] = None
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, value: object) -> UserRole:
+        normalized = normalize_user_role(value)
+        if normalized is None:
+            raise ValueError("用户角色不能为空")
+        return normalized
 
 
 class UserUpdate(BaseModel):
@@ -42,6 +55,16 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
+    region_id: Optional[int] = None
+    school_id: Optional[int] = None
+    grade_id: Optional[int] = None
+    classroom_id: Optional[int] = None
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, value: object) -> Optional[UserRole]:
+        normalized = normalize_user_role(value, allow_none=True)
+        return normalized
 
 
 class UserResponse(BaseModel):
@@ -54,6 +77,10 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     last_login: Optional[datetime] = None
+    region_id: Optional[int] = None
+    school_id: Optional[int] = None
+    grade_id: Optional[int] = None
+    classroom_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -81,13 +108,68 @@ class BatchImportRequest(BaseModel):
     users: List[UserCreate]
 
 
+async def _validate_scope_ids(
+    db: AsyncSession,
+    *,
+    region_id: Optional[int] = None,
+    school_id: Optional[int] = None,
+    grade_id: Optional[int] = None,
+    classroom_id: Optional[int] = None,
+) -> dict:
+    """验证并整理区域/学校/年级/班级信息"""
+
+    resolved: dict[str, Optional[int]] = {
+        "region_id": region_id,
+        "school_id": school_id,
+        "grade_id": grade_id,
+        "classroom_id": classroom_id,
+    }
+
+    school_obj: Optional[School] = None
+
+    if classroom_id is not None:
+        classroom = await db.scalar(select(Classroom).where(Classroom.id == classroom_id))
+        if not classroom:
+            raise HTTPException(status_code=404, detail="班级不存在")
+
+        resolved["classroom_id"] = classroom.id
+        resolved["grade_id"] = classroom.grade_id
+        resolved["school_id"] = classroom.school_id
+        school_obj = await db.scalar(select(School).where(School.id == classroom.school_id))
+
+    if resolved["grade_id"] is not None:
+        grade = await db.scalar(select(Grade).where(Grade.id == resolved["grade_id"]))
+        if not grade:
+            raise HTTPException(status_code=404, detail="年级不存在")
+
+    if resolved["school_id"] is not None:
+        school_obj = school_obj or await db.scalar(
+            select(School).where(School.id == resolved["school_id"])
+        )
+        if not school_obj:
+            raise HTTPException(status_code=404, detail="学校不存在")
+        resolved["school_id"] = school_obj.id
+
+        if resolved["region_id"] is None:
+            resolved["region_id"] = school_obj.region_id
+        elif resolved["region_id"] != school_obj.region_id:
+            raise HTTPException(status_code=400, detail="学校与区域不匹配")
+
+    if resolved["region_id"] is not None:
+        region = await db.scalar(select(Region).where(Region.id == resolved["region_id"]))
+        if not region:
+            raise HTTPException(status_code=404, detail="区域不存在")
+
+    return resolved
+
+
 # ==================== Endpoints ====================
 
 
 @router.get("/", response_model=UserListResponse)
 async def get_users(
     page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    size: int = Query(10, ge=1, le=1000, description="每页数量"),
     role: Optional[UserRole] = Query(None, description="角色筛选"),
     search: Optional[str] = Query(None, description="搜索关键词"),
     db: AsyncSession = Depends(get_db),
@@ -167,12 +249,20 @@ async def create_user(
 
     # 创建用户
     hashed_password = get_password_hash(user_data.password)
+    scope_ids = await _validate_scope_ids(
+        db,
+        region_id=user_data.region_id,
+        school_id=user_data.school_id,
+        grade_id=user_data.grade_id,
+        classroom_id=user_data.classroom_id,
+    )
     user = User(
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed_password,
         role=user_data.role,
         is_active=user_data.is_active,
+        **scope_ids,
     )
 
     db.add(user)
@@ -215,6 +305,18 @@ async def update_user(
 
     # 更新用户信息
     update_data = user_data.model_dump(exclude_unset=True)
+    scope_fields = {"region_id", "school_id", "grade_id", "classroom_id"}
+
+    if any(field in update_data for field in scope_fields):
+        scope_kwargs = {
+            field: update_data.get(field, getattr(user, field)) for field in scope_fields
+        }
+        resolved_scope = await _validate_scope_ids(db, **scope_kwargs)
+        for field, value in resolved_scope.items():
+            setattr(user, field, value)
+        for field in scope_fields:
+            update_data.pop(field, None)
+
     for field, value in update_data.items():
         setattr(user, field, value)
 
@@ -332,18 +434,28 @@ async def batch_import_users(
 
             # 创建用户
             hashed_password = get_password_hash(user_data.password)
+            scope_ids = await _validate_scope_ids(
+                db,
+                region_id=user_data.region_id,
+                school_id=user_data.school_id,
+                grade_id=user_data.grade_id,
+                classroom_id=user_data.classroom_id,
+            )
             user = User(
                 username=user_data.username,
                 email=user_data.email,
                 hashed_password=hashed_password,
                 role=user_data.role,
                 is_active=user_data.is_active,
+                **scope_ids,
             )
 
             db.add(user)
             await db.flush()  # 获取ID但不提交
             created_users.append(UserResponse.model_validate(user))
 
+        except HTTPException as exc:
+            errors.append(f"第{i+1}行：{exc.detail}")
         except Exception as e:
             errors.append(f"第{i+1}行：{str(e)}")
 

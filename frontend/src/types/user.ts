@@ -14,6 +14,10 @@ export interface User {
   is_active: boolean
   is_superuser: boolean
   avatar_url?: string
+  region_id?: number | null
+  school_id?: number | null
+  grade_id?: number | null
+  classroom_id?: number | null
   created_at: string
   updated_at: string
 }

@@ -9,7 +9,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models import User, UserRole, Course, Lesson, Resource
+from app.models import User, UserRole, Course, Lesson, Resource, LessonStatus
 from app.api.deps import get_current_admin
 from pydantic import BaseModel
 from datetime import datetime, timedelta
@@ -79,22 +79,22 @@ async def get_dashboard_overview(
     total_users = total_users_result.scalar() or 0
 
     admin_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == "ADMIN")
+        select(func.count()).select_from(User).where(User.role == UserRole.ADMIN)
     )
     admin_count = admin_count_result.scalar() or 0
 
     researcher_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == "RESEARCHER")
+        select(func.count()).select_from(User).where(User.role == UserRole.RESEARCHER)
     )
     researcher_count = researcher_count_result.scalar() or 0
 
     teacher_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == "TEACHER")
+        select(func.count()).select_from(User).where(User.role == UserRole.TEACHER)
     )
     teacher_count = teacher_count_result.scalar() or 0
 
     student_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == "STUDENT")
+        select(func.count()).select_from(User).where(User.role == UserRole.STUDENT)
     )
     student_count = student_count_result.scalar() or 0
 
@@ -128,12 +128,12 @@ async def get_dashboard_overview(
     total_lessons = total_lessons_result.scalar() or 0
 
     published_lessons_result = await db.execute(
-        select(func.count()).select_from(Lesson).where(Lesson.status == "published")
+        select(func.count()).select_from(Lesson).where(Lesson.status == LessonStatus.PUBLISHED)
     )
     published_lessons = published_lessons_result.scalar() or 0
 
     draft_lessons_result = await db.execute(
-        select(func.count()).select_from(Lesson).where(Lesson.status == "draft")
+        select(func.count()).select_from(Lesson).where(Lesson.status == LessonStatus.DRAFT)
     )
     draft_lessons = draft_lessons_result.scalar() or 0
 
@@ -212,22 +212,22 @@ async def get_user_stats(
     total_users = total_users_result.scalar() or 0
 
     admin_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == "ADMIN")
+        select(func.count()).select_from(User).where(User.role == UserRole.ADMIN)
     )
     admin_count = admin_count_result.scalar() or 0
 
     researcher_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == "RESEARCHER")
+        select(func.count()).select_from(User).where(User.role == UserRole.RESEARCHER)
     )
     researcher_count = researcher_count_result.scalar() or 0
 
     teacher_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == "TEACHER")
+        select(func.count()).select_from(User).where(User.role == UserRole.TEACHER)
     )
     teacher_count = teacher_count_result.scalar() or 0
 
     student_count_result = await db.execute(
-        select(func.count()).select_from(User).where(User.role == "STUDENT")
+        select(func.count()).select_from(User).where(User.role == UserRole.STUDENT)
     )
     student_count = student_count_result.scalar() or 0
 

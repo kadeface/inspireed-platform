@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.core.database import get_db
-from app.models import User, Region, School
+from app.models import User, Region, School, Grade, Classroom
 from app.api.deps import get_current_admin
 
 
@@ -133,13 +133,68 @@ class SchoolListResponse(BaseModel):
     total_pages: int
 
 
+class ClassroomCreate(BaseModel):
+    """创建班级请求"""
+
+    name: str
+    school_id: int
+    grade_id: int
+    code: Optional[str] = None
+    enrollment_year: Optional[int] = None
+    head_teacher_id: Optional[int] = None
+    description: Optional[str] = None
+    is_active: bool = True
+
+
+class ClassroomUpdate(BaseModel):
+    """更新班级请求"""
+
+    name: Optional[str] = None
+    school_id: Optional[int] = None
+    grade_id: Optional[int] = None
+    code: Optional[str] = None
+    enrollment_year: Optional[int] = None
+    head_teacher_id: Optional[int] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class ClassroomResponse(BaseModel):
+    """班级响应"""
+
+    id: int
+    name: str
+    school_id: int
+    grade_id: int
+    code: Optional[str] = None
+    enrollment_year: Optional[int] = None
+    head_teacher_id: Optional[int] = None
+    is_active: bool
+    description: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ClassroomListResponse(BaseModel):
+    """班级列表响应"""
+
+    classrooms: List[ClassroomResponse]
+    total: int
+    page: int
+    size: int
+    total_pages: int
+
+
 # ==================== Region Endpoints ====================
 
 
 @router.get("/regions", response_model=RegionListResponse)
 async def get_regions(
     page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    size: int = Query(10, ge=1, le=1000, description="每页数量"),
     level: Optional[int] = Query(None, description="区域级别筛选"),
     parent_id: Optional[int] = Query(None, description="父级区域筛选"),
     search: Optional[str] = Query(None, description="搜索关键词"),
@@ -313,7 +368,7 @@ async def delete_region(
 @router.get("/schools", response_model=SchoolListResponse)
 async def get_schools(
     page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    size: int = Query(10, ge=1, le=1000, description="每页数量"),
     region_id: Optional[int] = Query(None, description="区域筛选"),
     school_type: Optional[str] = Query(None, description="学校类型筛选"),
     search: Optional[str] = Query(None, description="搜索关键词"),
@@ -495,6 +550,164 @@ async def delete_school(
     await db.commit()
 
     return {"message": "学校删除成功"}
+
+
+# ==================== Classroom Endpoints ====================
+
+
+@router.get("/classrooms", response_model=ClassroomListResponse)
+async def get_classrooms(
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    school_id: Optional[int] = Query(None, description="学校筛选"),
+    grade_id: Optional[int] = Query(None, description="年级筛选"),
+    is_active: Optional[bool] = Query(None, description="激活状态筛选"),
+    search: Optional[str] = Query(None, description="搜索关键词"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """获取班级列表"""
+
+    query = select(Classroom)
+
+    if school_id is not None:
+        query = query.where(Classroom.school_id == school_id)
+    if grade_id is not None:
+        query = query.where(Classroom.grade_id == grade_id)
+    if is_active is not None:
+        query = query.where(Classroom.is_active == is_active)
+    if search:
+        search_filter = or_(
+            Classroom.name.ilike(f"%{search}%"),
+            Classroom.code.ilike(f"%{search}%"),
+            Classroom.description.ilike(f"%{search}%"),
+        )
+        query = query.where(search_filter)
+    else:
+        search_filter = None
+
+    count_query = select(func.count()).select_from(Classroom)
+    if school_id is not None:
+        count_query = count_query.where(Classroom.school_id == school_id)
+    if grade_id is not None:
+        count_query = count_query.where(Classroom.grade_id == grade_id)
+    if is_active is not None:
+        count_query = count_query.where(Classroom.is_active == is_active)
+    if search_filter is not None:
+        count_query = count_query.where(search_filter)
+
+    total = (await db.execute(count_query)).scalar() or 0
+
+    offset = (page - 1) * size
+    query = query.offset(offset).limit(size).order_by(Classroom.name)
+
+    classrooms = (await db.execute(query)).scalars().all()
+
+    total_pages = (total + size - 1) // size
+
+    return ClassroomListResponse(
+        classrooms=[ClassroomResponse.model_validate(classroom) for classroom in classrooms],
+        total=total,
+        page=page,
+        size=size,
+        total_pages=total_pages,
+    )
+
+
+@router.post("/classrooms", response_model=ClassroomResponse)
+async def create_classroom(
+    classroom_data: ClassroomCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """创建班级"""
+
+    school = await db.scalar(select(School).where(School.id == classroom_data.school_id))
+    if not school:
+        raise HTTPException(status_code=404, detail="学校不存在")
+
+    grade = await db.scalar(select(Grade).where(Grade.id == classroom_data.grade_id))
+    if not grade:
+        raise HTTPException(status_code=404, detail="年级不存在")
+
+    if classroom_data.head_teacher_id is not None:
+        head_teacher = await db.scalar(
+            select(User).where(User.id == classroom_data.head_teacher_id)
+        )
+        if not head_teacher:
+            raise HTTPException(status_code=404, detail="班主任用户不存在")
+
+    classroom = Classroom(**classroom_data.model_dump())
+
+    db.add(classroom)
+    await db.commit()
+    await db.refresh(classroom)
+
+    return ClassroomResponse.model_validate(classroom)
+
+
+@router.put("/classrooms/{classroom_id}", response_model=ClassroomResponse)
+async def update_classroom(
+    classroom_id: int,
+    classroom_data: ClassroomUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """更新班级"""
+
+    classroom = await db.scalar(select(Classroom).where(Classroom.id == classroom_id))
+    if not classroom:
+        raise HTTPException(status_code=404, detail="班级不存在")
+
+    if classroom_data.school_id is not None and classroom_data.school_id != classroom.school_id:
+        school = await db.scalar(select(School).where(School.id == classroom_data.school_id))
+        if not school:
+            raise HTTPException(status_code=404, detail="学校不存在")
+
+    if classroom_data.grade_id is not None and classroom_data.grade_id != classroom.grade_id:
+        grade = await db.scalar(select(Grade).where(Grade.id == classroom_data.grade_id))
+        if not grade:
+            raise HTTPException(status_code=404, detail="年级不存在")
+
+    if classroom_data.head_teacher_id is not None:
+        head_teacher = await db.scalar(
+            select(User).where(User.id == classroom_data.head_teacher_id)
+        )
+        if not head_teacher:
+            raise HTTPException(status_code=404, detail="班主任用户不存在")
+
+    update_data = classroom_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(classroom, field, value)
+
+    await db.commit()
+    await db.refresh(classroom)
+
+    return ClassroomResponse.model_validate(classroom)
+
+
+@router.delete("/classrooms/{classroom_id}")
+async def delete_classroom(
+    classroom_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """删除班级"""
+
+    classroom = await db.scalar(select(Classroom).where(Classroom.id == classroom_id))
+    if not classroom:
+        raise HTTPException(status_code=404, detail="班级不存在")
+
+    student_count = await db.execute(
+        select(func.count()).select_from(User).where(User.classroom_id == classroom_id)
+    )
+    if student_count.scalar() > 0:
+        raise HTTPException(status_code=400, detail="班级下仍有关联学生，无法删除")
+
+    await db.delete(classroom)
+    await db.commit()
+
+    return {"message": "班级删除成功"}
 
 
 # ==================== Tree Structure Endpoints ====================

@@ -46,6 +46,10 @@ export interface User {
   is_active: boolean
   created_at: string
   last_login?: string
+  region_id?: number | null
+  school_id?: number | null
+  grade_id?: number | null
+  classroom_id?: number | null
 }
 
 export interface UserListResponse {
@@ -62,6 +66,10 @@ export interface UserCreate {
   password: string
   role: string
   is_active: boolean
+  region_id?: number | null
+  school_id?: number | null
+  grade_id?: number | null
+  classroom_id?: number | null
 }
 
 export interface UserUpdate {
@@ -69,6 +77,10 @@ export interface UserUpdate {
   email?: string
   role?: string
   is_active?: boolean
+  region_id?: number | null
+  school_id?: number | null
+  grade_id?: number | null
+  classroom_id?: number | null
 }
 
 export interface BatchImportResult {
@@ -118,6 +130,28 @@ export interface RegionListResponse {
 
 export interface SchoolListResponse {
   schools: School[]
+  total: number
+  page: number
+  size: number
+  total_pages: number
+}
+
+export interface Classroom {
+  id: number
+  name: string
+  school_id: number
+  grade_id: number
+  code?: string | null
+  enrollment_year?: number | null
+  head_teacher_id?: number | null
+  is_active: boolean
+  description?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ClassroomListResponse {
+  classrooms: Classroom[]
   total: number
   page: number
   size: number
@@ -303,6 +337,41 @@ export const adminService = {
    */
   async getSchoolsByRegion(regionId: number): Promise<{ schools: School[] }> {
     return await api.get(`/admin/organization/schools/by-region/${regionId}`)
+  },
+
+  /**
+   * 获取班级列表
+   */
+  async getClassrooms(params: {
+    page?: number
+    size?: number
+    school_id?: number
+    grade_id?: number
+    is_active?: boolean
+    search?: string
+  } = {}): Promise<ClassroomListResponse> {
+    return await api.get('/admin/organization/classrooms', { params })
+  },
+
+  /**
+   * 创建班级
+   */
+  async createClassroom(data: Partial<Classroom>): Promise<Classroom> {
+    return await api.post('/admin/organization/classrooms', data)
+  },
+
+  /**
+   * 更新班级
+   */
+  async updateClassroom(classroomId: number, data: Partial<Classroom>): Promise<Classroom> {
+    return await api.put(`/admin/organization/classrooms/${classroomId}`, data)
+  },
+
+  /**
+   * 删除班级
+   */
+  async deleteClassroom(classroomId: number): Promise<void> {
+    return await api.delete(`/admin/organization/classrooms/${classroomId}`)
   }
 }
 

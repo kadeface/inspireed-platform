@@ -233,6 +233,74 @@
                 <span class="text-sm text-gray-700">激活用户</span>
               </label>
             </div>
+            <div v-if="showOrganizationFields" class="pt-4 border-t border-gray-200 space-y-4">
+              <h4 class="text-sm font-semibold text-gray-700">组织信息</h4>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">区域</label>
+                <select
+                  :value="userForm.region_id ?? ''"
+                  @change="handleRegionChange"
+                  class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2"
+                >
+                  <option value="">未指定</option>
+                  <option v-for="region in regions" :key="region.id" :value="region.id">
+                    {{ region.name }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">学校</label>
+                <select
+                  :value="userForm.school_id ?? ''"
+                  @change="handleSchoolChange"
+                  class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2"
+                >
+                  <option value="">未指定</option>
+                  <option v-for="school in filteredSchools" :key="school.id" :value="school.id">
+                    {{ school.name }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">年级</label>
+                <select
+                  :value="userForm.grade_id ?? ''"
+                  @change="handleGradeChange"
+                  class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2"
+                >
+                  <option value="">未指定</option>
+                  <option v-for="grade in grades" :key="grade.id" :value="grade.id">
+                    {{ grade.name }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">班级</label>
+                <select
+                  :value="userForm.classroom_id ?? ''"
+                  @change="handleClassroomChange"
+                  :disabled="!userForm.school_id || classroomLoading"
+                  class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 disabled:opacity-60"
+                >
+                  <option value="">未指定</option>
+                  <option v-for="classroom in classrooms" :key="classroom.id" :value="classroom.id">
+                    {{ classroom.name }}
+                  </option>
+                </select>
+                <p
+                  v-if="classroomLoading"
+                  class="mt-1 text-xs text-gray-500"
+                >
+                  班级加载中...
+                </p>
+                <p
+                  v-else-if="userForm.school_id && classrooms.length === 0"
+                  class="mt-1 text-xs text-gray-500"
+                >
+                  暂无可选班级，请先在组织架构中创建。
+                </p>
+              </div>
+            </div>
           </div>
           <div class="mt-6 flex justify-end gap-3">
             <button
@@ -263,9 +331,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useToast } from '@/composables/useToast'
-import adminService, { type User, type UserCreate, type UserUpdate } from '@/services/admin'
+import adminService, {
+  type User,
+  type UserCreate,
+  type UserUpdate,
+  type Region,
+  type School,
+  type Classroom
+} from '@/services/admin'
+import curriculumService from '@/services/curriculum'
+import type { Grade } from '@/types/curriculum'
 import BatchImportModal from '@/components/Admin/BatchImportModal.vue'
 
 const toast = useToast()
@@ -278,6 +355,11 @@ const roleFilter = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
 const totalUsers = ref(0)
+const regions = ref<Region[]>([])
+const schools = ref<School[]>([])
+const grades = ref<Grade[]>([])
+const classrooms = ref<Classroom[]>([])
+const classroomLoading = ref(false)
 
 // 模态框状态
 const showUserModal = ref(false)
@@ -288,11 +370,24 @@ const userForm = ref<UserCreate>({
   email: '',
   role: 'teacher',
   password: '',
-  is_active: true
+  is_active: true,
+  region_id: null,
+  school_id: null,
+  grade_id: null,
+  classroom_id: null
 })
 
 // 计算属性
 const totalPages = computed(() => Math.ceil(totalUsers.value / pageSize.value))
+const filteredSchools = computed(() => {
+  if (!userForm.value.region_id) {
+    return schools.value
+  }
+  return schools.value.filter(school => school.region_id === userForm.value.region_id)
+})
+const showOrganizationFields = computed(() =>
+  ['student', 'teacher'].includes(userForm.value.role)
+)
 
 // 移除客户端过滤，使用服务端分页和搜索
 
@@ -357,6 +452,71 @@ function refreshUsers() {
   toast.success('用户列表已刷新')
 }
 
+async function loadRegions() {
+  try {
+    const response = await adminService.getRegions({ page: 1, size: 200 })
+    regions.value = response.regions
+  } catch (error: any) {
+    console.error('Failed to load regions:', error)
+    toast.error(error.response?.data?.detail || '加载区域列表失败')
+  }
+}
+
+async function loadSchools() {
+  try {
+    const response = await adminService.getSchools({ page: 1, size: 1000 })
+    schools.value = response.schools
+  } catch (error: any) {
+    console.error('Failed to load schools:', error)
+    toast.error(error.response?.data?.detail || '加载学校列表失败')
+  }
+}
+
+async function loadGrades() {
+  try {
+    grades.value = await curriculumService.getGrades()
+  } catch (error: any) {
+    console.error('Failed to load grades:', error)
+    toast.error(error.response?.data?.detail || '加载年级列表失败')
+  }
+}
+
+async function refreshClassrooms() {
+  if (!showUserModal.value) return
+
+  const schoolId = userForm.value.school_id
+  if (!schoolId) {
+    classrooms.value = []
+    userForm.value.classroom_id = null
+    return
+  }
+
+  try {
+    classroomLoading.value = true
+    const params: Record<string, number | boolean> = {
+      school_id: schoolId,
+      size: 1000,
+      is_active: true
+    }
+    if (userForm.value.grade_id) {
+      params.grade_id = userForm.value.grade_id
+    }
+    const response = await adminService.getClassrooms(params)
+    classrooms.value = response.classrooms
+    if (
+      userForm.value.classroom_id &&
+      !classrooms.value.some(cls => cls.id === userForm.value.classroom_id)
+    ) {
+      userForm.value.classroom_id = null
+    }
+  } catch (error: any) {
+    console.error('Failed to load classrooms:', error)
+    toast.error(error.response?.data?.detail || '加载班级列表失败')
+  } finally {
+    classroomLoading.value = false
+  }
+}
+
 function openCreateUserModal() {
   editingUser.value = null
   userForm.value = {
@@ -364,21 +524,31 @@ function openCreateUserModal() {
     email: '',
     role: 'teacher',
     password: '',
-    is_active: true
+    is_active: true,
+    region_id: null,
+    school_id: null,
+    grade_id: null,
+    classroom_id: null
   }
+  classrooms.value = []
   showUserModal.value = true
 }
 
-function editUser(user: User) {
+async function editUser(user: User) {
   editingUser.value = user
   userForm.value = {
     username: user.username,
     email: user.email,
     role: user.role,
     password: '',
-    is_active: user.is_active
+    is_active: user.is_active,
+    region_id: user.region_id ?? null,
+    school_id: user.school_id ?? null,
+    grade_id: user.grade_id ?? null,
+    classroom_id: user.classroom_id ?? null
   }
   showUserModal.value = true
+  await refreshClassrooms()
 }
 
 function closeUserModal() {
@@ -393,7 +563,11 @@ async function saveUser() {
         username: userForm.value.username,
         email: userForm.value.email,
         role: userForm.value.role,
-        is_active: userForm.value.is_active
+        is_active: userForm.value.is_active,
+        region_id: userForm.value.region_id ?? null,
+        school_id: userForm.value.school_id ?? null,
+        grade_id: userForm.value.grade_id ?? null,
+        classroom_id: userForm.value.classroom_id ?? null
       }
       await adminService.updateUser(editingUser.value.id, updateData)
       toast.success('用户更新成功')
@@ -407,6 +581,38 @@ async function saveUser() {
     console.error('Failed to save user:', error)
     toast.error(error.response?.data?.detail || '保存用户失败')
   }
+}
+
+function handleRegionChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  userForm.value.region_id = value ? Number(value) : null
+  if (
+    userForm.value.school_id &&
+    !filteredSchools.value.some(school => school.id === userForm.value.school_id)
+  ) {
+    userForm.value.school_id = null
+    userForm.value.classroom_id = null
+    classrooms.value = []
+  }
+}
+
+function handleSchoolChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  userForm.value.school_id = value ? Number(value) : null
+  userForm.value.classroom_id = null
+  refreshClassrooms()
+}
+
+function handleGradeChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  userForm.value.grade_id = value ? Number(value) : null
+  userForm.value.classroom_id = null
+  refreshClassrooms()
+}
+
+function handleClassroomChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  userForm.value.classroom_id = value ? Number(value) : null
 }
 
 async function toggleUserStatus(user: User) {
@@ -474,7 +680,21 @@ function nextPage() {
 
 onMounted(() => {
   loadUsers()
+  loadRegions()
+  loadSchools()
+  loadGrades()
 })
+
+watch(
+  () => showUserModal.value,
+  async modalOpen => {
+    if (modalOpen) {
+      await refreshClassrooms()
+    } else {
+      classrooms.value = []
+    }
+  }
+)
 </script>
 
 <style scoped>
