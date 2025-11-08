@@ -89,7 +89,7 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <h2 class="text-3xl font-bold text-gray-900 mb-8 text-center">探索学科</h2>
         
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <button
             v-for="category in categories"
             :key="category.id"
@@ -101,7 +101,7 @@
             ]"
           >
             <div class="relative z-10">
-              <div class="text-4xl mb-3">{{ category.icon }}</div>
+              <div class="w-14 h-14 mx-auto mb-3 flex items-center justify-center text-4xl leading-none">{{ category.icon }}</div>
               <h3 class="text-lg font-bold text-white mb-1">{{ category.name }}</h3>
               <p class="text-sm text-white opacity-90">{{ category.count }} 门课程</p>
             </div>

@@ -652,11 +652,16 @@ async def get_recommended_lessons(
     result = await db.execute(query)
     lessons = result.scalars().all()
 
-    # 为每个lesson添加教师信息（使用setattr确保属性被正确设置）
+    # 为每个lesson添加教师信息（使用字典格式，与list_lessons保持一致）
+    lessons_with_creator = []
     for lesson in lessons:
-        setattr(lesson, 'creator_name', lesson.creator.full_name if lesson.creator else None)
-        setattr(lesson, 'creator_avatar', lesson.creator.avatar_url if lesson.creator else None)
+        lesson_dict = {
+            **{k: v for k, v in lesson.__dict__.items() if not k.startswith("_")},
+            "creator_name": lesson.creator.full_name if lesson.creator else None,
+            "creator_avatar": lesson.creator.avatar_url if lesson.creator else None,
+        }
+        lessons_with_creator.append(lesson_dict)
 
     return LessonListResponse(
-        items=lessons, total=len(lessons), page=1, page_size=limit
+        items=lessons_with_creator, total=len(lessons), page=1, page_size=limit
     )
