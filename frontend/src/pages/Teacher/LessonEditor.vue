@@ -387,6 +387,8 @@ const isPreviewMode = ref(false)
 const isFullscreenPreview = ref(false)
 const cellListRef = ref<HTMLElement>()
 const lessonTitle = ref('')
+const isFlowInteractionActive = ref(false)
+let flowInteractionResumeTimer: ReturnType<typeof setTimeout> | null = null
 
 // MVP: 参考资源相关状态
 const referenceResource = ref<any>(null)
@@ -419,7 +421,9 @@ const { saveStatus, lastSavedAt, manualSave } = useAutoSave({
     }
   },
   delay: 3000,
-  enabled: computed(() => !isPreviewMode.value && !!currentLesson.value),
+  enabled: computed(
+    () => !isPreviewMode.value && !!currentLesson.value && !isFlowInteractionActive.value
+  ),
 })
 
 // 格式化保存时间
@@ -790,6 +794,24 @@ function handleFullscreenKeydown(event: KeyboardEvent) {
   }
 }
 
+function handleFlowInteractionStartEvent() {
+  if (flowInteractionResumeTimer) {
+    clearTimeout(flowInteractionResumeTimer)
+    flowInteractionResumeTimer = null
+  }
+  isFlowInteractionActive.value = true
+}
+
+function handleFlowInteractionEndEvent() {
+  if (flowInteractionResumeTimer) {
+    clearTimeout(flowInteractionResumeTimer)
+  }
+  flowInteractionResumeTimer = setTimeout(() => {
+    isFlowInteractionActive.value = false
+    flowInteractionResumeTimer = null
+  }, 500)
+}
+
 // 监听标题变化
 watch(() => currentLesson.value?.title, (newTitle) => {
   if (newTitle !== undefined) {
@@ -806,6 +828,9 @@ function handleNotesUpdated(notes: string) {
 
 // 页面加载
 onMounted(async () => {
+  window.addEventListener('flowchart-interaction-start', handleFlowInteractionStartEvent)
+  window.addEventListener('flowchart-interaction-end', handleFlowInteractionEndEvent)
+
   const lessonId = Number(route.params.id)
   
   if (!lessonId || isNaN(lessonId)) {
@@ -857,6 +882,12 @@ onUnmounted(() => {
   document.body.style.overflow = ''
   // 移除键盘事件监听
   document.removeEventListener('keydown', handleFullscreenKeydown)
+  window.removeEventListener('flowchart-interaction-start', handleFlowInteractionStartEvent)
+  window.removeEventListener('flowchart-interaction-end', handleFlowInteractionEndEvent)
+  if (flowInteractionResumeTimer) {
+    clearTimeout(flowInteractionResumeTimer)
+    flowInteractionResumeTimer = null
+  }
 })
 </script>
 

@@ -142,7 +142,6 @@ export const useLessonStore = defineStore('lesson', () => {
           description: currentLesson.value.description,
           content: currentLesson.value.content,
           tags: currentLesson.value.tags,
-          status: currentLesson.value.status,
         })
       } else {
         // 创建新教案（理论上不会到这里，因为创建用 createNewLesson）

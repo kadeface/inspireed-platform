@@ -157,7 +157,7 @@ export interface ActivityCell extends CellBase {
 // Flowchart Cell
 export interface FlowchartNode {
   id: string
-  type: 'start' | 'process' | 'decision' | 'end' | 'custom'
+  type: 'start' | 'process' | 'decision' | 'loop' | 'end' | 'custom'
   label: string
   position: { x: number; y: number }
   data?: any
