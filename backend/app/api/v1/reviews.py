@@ -46,9 +46,7 @@ async def create_review(
     existing = existing_result.scalar_one_or_none()
 
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="已经评论过该课程，请使用更新接口"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="已经评论过该课程，请使用更新接口")
 
     # 创建评论
     review = Review(
@@ -171,9 +169,7 @@ async def get_lesson_reviews(
 
 
 @router.get("/lesson/{lesson_id}/stats", response_model=LessonRatingStats)
-async def get_lesson_rating_stats(
-    *, db: AsyncSession = Depends(get_db), lesson_id: int
-) -> Any:
+async def get_lesson_rating_stats(*, db: AsyncSession = Depends(get_db), lesson_id: int) -> Any:
     """
     获取课程的评分统计
     """
@@ -210,9 +206,7 @@ async def get_my_review(
     获取我对某课程的评论
     """
     result = await db.execute(
-        select(Review).where(
-            Review.user_id == current_user.id, Review.lesson_id == lesson_id
-        )
+        select(Review).where(Review.user_id == current_user.id, Review.lesson_id == lesson_id)
     )
     review = result.scalar_one_or_none()
 

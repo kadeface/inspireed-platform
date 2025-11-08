@@ -644,7 +644,7 @@ async def get_recommended_lessons(
         .where(Lesson.status == LessonStatus.PUBLISHED)
         .order_by(
             func.coalesce(Lesson.average_rating, 0).desc(),
-            func.coalesce(Lesson.published_at, Lesson.created_at).desc()
+            func.coalesce(Lesson.published_at, Lesson.created_at).desc(),
         )
         .limit(limit)
     )
