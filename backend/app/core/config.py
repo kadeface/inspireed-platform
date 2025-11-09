@@ -82,14 +82,12 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v
         values = info.data
-        return PostgresDsn.build(
-            scheme="postgresql+asyncpg",
-            username=values.get("POSTGRES_USER"),
-            password=values.get("POSTGRES_PASSWORD"),
-            host=values.get("POSTGRES_SERVER"),
-            port=values.get("POSTGRES_PORT"),
-            path=f"{values.get('POSTGRES_DB') or ''}",
-        )
+        user = values.get("POSTGRES_USER") or ""
+        password = values.get("POSTGRES_PASSWORD") or ""
+        host = values.get("POSTGRES_SERVER") or "localhost"
+        port = values.get("POSTGRES_PORT") or 5432
+        database = values.get("POSTGRES_DB") or ""
+        return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{database}"
 
     # Redis配置
     REDIS_HOST: str = "localhost"

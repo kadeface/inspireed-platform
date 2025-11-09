@@ -13,17 +13,11 @@
 
     <!-- 主内容区 -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div>
-        <!-- MVP: 课程和资源浏览（新组件） -->
-        <div class="mb-8">
-          <CurriculumWithResources 
-            @lesson-created="handleLessonCreated"
-          />
-        </div>
-
+      <div class="space-y-8">
         <!-- 问答统计卡片 -->
-        <div class="mb-8 grid grid-cols-1 md:grid-cols-4 gap-6">
-          <!-- 问答总览卡片 -->
+        <section>
+          <div class="overview-grid">
+            <!-- 问答总览卡片 -->
           <router-link
             to="/teacher/questions"
             class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white hover:shadow-xl transition-shadow cursor-pointer"
@@ -72,121 +66,87 @@
               加载中...
             </div>
           </router-link>
-
-          <!-- 快捷操作卡片 -->
-          <div class="bg-white rounded-lg shadow-md p-6 border-2 border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">📋 快捷操作</h3>
-            <div class="space-y-3">
-              <router-link
-                to="/teacher/questions"
-                class="block px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
-              >
-                → 查看所有问题
-              </router-link>
-              <router-link
-                to="/teacher/subject-groups"
-                class="block px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
-              >
-                → 学科教研组
-              </router-link>
-              <button
-                @click="showCreateModal = true"
-                class="w-full px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium text-left"
-              >
-                → 创建新教案
-              </button>
-            </div>
           </div>
+        </section>
 
-          <!-- 提示卡片 -->
-          <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-md p-6 text-white">
-            <div class="flex items-start gap-3 mb-3">
-              <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div>
-                <h3 class="text-lg font-semibold mb-2">💡 新功能</h3>
-                <p class="text-sm text-purple-100">
-                  回答学生问题时，可以使用教案编辑器的所有功能，包括代码示例、图表等！
-                </p>
-              </div>
-            </div>
+      <!-- PDCA 教学质量管理循环 -->
+      <section class="dashboard-section">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <span>🔄</span>
+              <span>PDCA 教学质量管理循环</span>
+            </h2>
+            <p class="mt-1 text-sm text-gray-500">
+              从教学设计到课堂实施、过程评估与循证改进，持续优化教学闭环。
+            </p>
+          </div>
+          <div v-if="isPdcaLoading" class="flex items-center gap-2 text-sm text-gray-500">
+            <svg class="w-4 h-4 text-blue-500 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span>数据刷新中...</span>
           </div>
         </div>
 
-      <!-- PDCA 教学质量管理循环 -->
-      <section class="mb-8">
-        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                <span>🔄</span>
-                <span>PDCA 教学质量管理循环</span>
-              </h2>
-              <p class="mt-1 text-sm text-gray-500">
-                从教学设计到课堂实施、过程评估与循证改进，持续优化教学闭环。
-              </p>
-            </div>
-            <div v-if="isPdcaLoading" class="flex items-center gap-2 text-sm text-gray-500">
-              <svg class="w-4 h-4 text-blue-500 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-              </svg>
-              <span>数据刷新中...</span>
-            </div>
-          </div>
-
-          <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div
+            v-for="stage in pdcaStages"
+            :key="stage.key"
+            class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
+          >
+            <span :class="['absolute inset-x-0 top-0 h-1', stage.accentBar]"></span>
             <div
-              v-for="stage in pdcaStages"
-              :key="stage.key"
-              class="group relative overflow-hidden rounded-lg border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm transition-all hover:border-blue-400 hover:shadow-lg"
-            >
-              <div class="flex items-start justify-between">
-                <div>
-                  <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    {{ stage.label }}
-                  </p>
-                  <h3 class="mt-1 text-lg font-semibold text-gray-900">
-                    {{ stage.title }}
-                  </h3>
-                </div>
-                <span class="text-2xl">{{ stage.icon }}</span>
+              :class="['absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none', stage.hoverGradient]"
+            ></div>
+
+            <div class="relative flex items-start justify-between">
+              <div>
+                <p :class="['text-xs font-semibold uppercase tracking-wide', stage.labelClass]">
+                  {{ stage.label }}
+                </p>
+                <h3 class="mt-1 text-lg font-semibold text-gray-900">
+                  {{ stage.title }}
+                </h3>
               </div>
-
-              <div class="mt-4 flex items-baseline gap-2">
-                <span class="text-3xl font-bold text-blue-600">
-                  {{ stage.value }}
-                </span>
-                <span class="text-sm text-gray-500">{{ stage.unit }}</span>
+              <div :class="['flex h-11 w-11 items-center justify-center rounded-full', stage.iconBg]">
+                <span :class="['text-xl', stage.iconText]">{{ stage.icon }}</span>
               </div>
-
-              <p class="mt-2 text-sm text-gray-600">
-                {{ stage.description }}
-              </p>
-              <p v-if="stage.secondary" class="mt-1 text-xs text-gray-400">
-                {{ stage.secondary }}
-              </p>
-
-              <button
-                v-if="stage.cta && stage.action"
-                type="button"
-                @click="stage.action()"
-                class="mt-4 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700"
-              >
-                {{ stage.cta }}
-                <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
             </div>
+
+            <div class="relative mt-4 flex items-baseline gap-2">
+              <span :class="['text-3xl font-bold', stage.metricText]">
+                {{ stage.value }}
+              </span>
+              <span class="text-sm text-gray-400">{{ stage.unit }}</span>
+            </div>
+
+            <p class="relative mt-3 text-sm text-gray-600 leading-relaxed">
+              {{ stage.description }}
+            </p>
+            <p v-if="stage.secondary" class="relative mt-1 text-xs text-gray-400">
+              {{ stage.secondary }}
+            </p>
+
+            <button
+              v-if="stage.cta && stage.action"
+              type="button"
+              @click="stage.action()"
+              :class="['relative mt-4 inline-flex items-center gap-1 text-sm font-medium', stage.buttonClass]"
+            >
+              {{ stage.cta }}
+              <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
         </div>
       </section>
 
-        <!-- 页面标题和操作栏 -->
+        <!-- 页面标题、筛选与操作栏 -->
         <div class="mb-6">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <h2 class="text-2xl font-bold text-gray-900">我的教案</h2>
               <p class="mt-1 text-sm text-gray-500">
@@ -205,7 +165,14 @@
                 </span>
               </p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
+              <CurriculumWithResources
+                compact
+                class="w-full sm:w-auto"
+                @lesson-created="handleLessonCreated"
+              />
+
+              <div class="flex items-center gap-3">
               <!-- 视图切换按钮 -->
               <div class="inline-flex rounded-md shadow-sm" role="group">
                 <button
@@ -239,7 +206,7 @@
                   </svg>
                 </button>
               </div>
-              
+ 
               <!-- 创建教案按钮 -->
               <button
                 @click="showCreateModal = true"
@@ -250,6 +217,7 @@
                 </svg>
                 创建新教案
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -669,6 +637,56 @@ function navigateToSubjectGroups() {
 }
 
 const pdcaStages = computed(() => {
+  const stageThemes: Record<
+    string,
+    {
+      accentBar: string
+      hoverGradient: string
+      iconBg: string
+      iconText: string
+      metricText: string
+      labelClass: string
+      buttonClass: string
+    }
+  > = {
+    plan: {
+      accentBar: 'bg-indigo-400',
+      hoverGradient: 'bg-gradient-to-br from-indigo-50/80 via-transparent to-transparent',
+      iconBg: 'bg-indigo-100',
+      iconText: 'text-indigo-600',
+      metricText: 'text-indigo-700',
+      labelClass: 'text-indigo-500',
+      buttonClass: 'text-indigo-600 hover:text-indigo-700',
+    },
+    do: {
+      accentBar: 'bg-sky-400',
+      hoverGradient: 'bg-gradient-to-br from-sky-50/80 via-transparent to-transparent',
+      iconBg: 'bg-sky-100',
+      iconText: 'text-sky-600',
+      metricText: 'text-sky-700',
+      labelClass: 'text-sky-500',
+      buttonClass: 'text-sky-600 hover:text-sky-700',
+    },
+    check: {
+      accentBar: 'bg-emerald-400',
+      hoverGradient: 'bg-gradient-to-br from-emerald-50/80 via-transparent to-transparent',
+      iconBg: 'bg-emerald-100',
+      iconText: 'text-emerald-600',
+      metricText: 'text-emerald-700',
+      labelClass: 'text-emerald-500',
+      buttonClass: 'text-emerald-600 hover:text-emerald-700',
+    },
+    act: {
+      accentBar: 'bg-purple-400',
+      hoverGradient: 'bg-gradient-to-br from-purple-50/80 via-transparent to-transparent',
+      iconBg: 'bg-purple-100',
+      iconText: 'text-purple-600',
+      metricText: 'text-purple-700',
+      labelClass: 'text-purple-500',
+      buttonClass: 'text-purple-600 hover:text-purple-700',
+    },
+  }
+
   const draft = lessonStatusSummary.value.draft ?? 0
   const published = lessonStatusSummary.value.published ?? 0
   const archived = lessonStatusSummary.value.archived ?? 0
@@ -699,6 +717,7 @@ const pdcaStages = computed(() => {
       secondary: archived ? `已归档 ${archived} 篇` : undefined,
       cta: draft > 0 ? '整理草稿' : '创建教案',
       action: draft > 0 ? focusDraftLessons : openCreateLessonModal,
+      ...stageThemes.plan,
     },
     {
       key: 'do',
@@ -714,6 +733,7 @@ const pdcaStages = computed(() => {
       secondary: totalLessonsCount ? `累计教案 ${totalLessonsCount} 篇` : undefined,
       cta: published > 0 ? '查看已发布' : undefined,
       action: published > 0 ? focusPublishedLessons : undefined,
+      ...stageThemes.do,
     },
     {
       key: 'check',
@@ -732,6 +752,7 @@ const pdcaStages = computed(() => {
           : '等待课堂数据同步',
       cta: '查看总览',
       action: navigateToQuestions,
+      ...stageThemes.check,
     },
     {
       key: 'act',
@@ -752,6 +773,7 @@ const pdcaStages = computed(() => {
           : undefined,
       cta: '进入教研组',
       action: navigateToSubjectGroups,
+      ...stageThemes.act,
     },
   ]
 })
@@ -1146,6 +1168,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.dashboard-section {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 1.25rem;
+  box-shadow: 0 12px 35px -25px rgba(15, 23, 42, 0.35);
+  padding: 1.75rem;
+}
+
+.overview-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 .toast-enter-active,
 .toast-leave-active {
   transition: all 0.3s ease;

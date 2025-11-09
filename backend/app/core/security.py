@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from jose import jwt
 from passlib.context import CryptContext
@@ -15,7 +15,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def create_access_token(
-    subject: Union[str, Any], expires_delta: timedelta = None
+    subject: Union[str, Any], expires_delta: Optional[timedelta] = None
 ) -> str:
     """
     创建 JWT 访问令牌

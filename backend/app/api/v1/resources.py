@@ -33,9 +33,7 @@ async def list_resources(
 ):
     """获取资源列表（支持按章节筛选）"""
 
-    query = select(Resource).order_by(
-        Resource.display_order, Resource.created_at.desc()
-    )
+    query = select(Resource).order_by(Resource.display_order, Resource.created_at.desc())
 
     # 按章节筛选
     if chapter_id is not None:
@@ -77,9 +75,7 @@ async def get_resource(
 
     # 统计基于此资源的教案数量
     lessons_count_query = (
-        select(func.count())
-        .select_from(Lesson)
-        .where(Lesson.reference_resource_id == resource_id)
+        select(func.count()).select_from(Lesson).where(Lesson.reference_resource_id == resource_id)
     )
     lessons_count_result = await db.execute(lessons_count_query)
     lessons_count = lessons_count_result.scalar()
@@ -196,9 +192,7 @@ async def delete_resource(
 
     # 检查是否有教案引用此资源
     lessons_query = (
-        select(func.count())
-        .select_from(Lesson)
-        .where(Lesson.reference_resource_id == resource_id)
+        select(func.count()).select_from(Lesson).where(Lesson.reference_resource_id == resource_id)
     )
     lessons_count_result = await db.execute(lessons_query)
     lessons_count = lessons_count_result.scalar()
@@ -212,7 +206,7 @@ async def delete_resource(
     # 删除文件
     file_url = cast(Optional[str], resource.file_url)
     if file_url:
-        await upload_service.delete_file(cast(str, resource.file_url))
+        await upload_service.delete_file(file_url)
 
     # 删除资源记录
     await db.delete(resource)
@@ -270,9 +264,7 @@ async def get_resource_preview(
 
     # 检查文件类型
     file_ext = (
-        cast(str, resource.file_url).split(".")[-1].lower()
-        if cast(Optional[str], resource.file_url)
-        else ""
+        cast(str, resource.file_url).split(".")[-1].lower() if cast(Optional[str], resource.file_url) else ""
     )
 
     preview_info = {
@@ -282,8 +274,7 @@ async def get_resource_preview(
         "file_type": file_ext,
         "file_size": resource.file_size,
         "page_count": resource.page_count,
-        "can_preview_directly": file_ext
-        in ["pdf", "jpg", "jpeg", "png", "gif", "webp", "svg"],
+        "can_preview_directly": file_ext in ["pdf", "jpg", "jpeg", "png", "gif", "webp", "svg"],
         "preview_url": resource.file_url,
         "converted_to_pdf": False,
         "conversion_error": None,

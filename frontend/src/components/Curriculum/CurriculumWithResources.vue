@@ -1,57 +1,73 @@
 <template>
-  <div class="curriculum-with-resources">
+  <div :class="['curriculum-with-resources', { 'is-compact': isCompact }]">
     <!-- 课程选择器 -->
-    <div class="course-selector">
-      <div class="selector-header">
-        <h3 class="selector-title">课程资源</h3>
-        <button
-          v-if="selectedCourse"
-          @click="clearSelection"
-          class="clear-btn"
-          title="清除选择"
-        >
-          <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+    <div :class="['selection-bar', { 'selection-bar-compact': isCompact }]">
+      <div class="selection-inputs">
+        <div class="form-group">
+          <label class="sr-only">学科</label>
+          <div class="form-control-wrap">
+            <svg class="form-control-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422A12.083 12.083 0 0112 21.5c-2.764-1.94-6.16-3.421-6.16-3.421L12 14z" />
+            </svg>
+            <select
+              v-model="selectedSubjectId"
+              @change="loadCourses"
+              class="form-select"
+            >
+              <option value="">请选择学科</option>
+              <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+                {{ subject.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="sr-only">年级</label>
+          <div class="form-control-wrap">
+            <svg class="form-control-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+            </svg>
+            <select
+              v-model="selectedGradeId"
+              @change="loadCourses"
+              class="form-select"
+            >
+              <option value="">请选择年级</option>
+              <option v-for="grade in grades" :key="grade.id" :value="grade.id">
+                {{ grade.name }}
+              </option>
+            </select>
+          </div>
+        </div>
       </div>
+      <button
+        v-if="selectedCourse"
+        @click="clearSelection"
+        class="clear-btn"
+        title="重新选择课程"
+      >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        重选课程
+      </button>
+    </div>
 
-      <!-- 课程选择表单 -->
-      <div v-if="!selectedCourse" class="selection-form">
-        <div class="form-group">
-          <label class="form-label">学科</label>
-          <select
-            v-model="selectedSubjectId"
-            @change="loadCourses"
-            class="form-select"
-          >
-            <option value="">请选择学科</option>
-            <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
-              {{ subject.name }}
-            </option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">年级</label>
-          <select
-            v-model="selectedGradeId"
-            @change="loadCourses"
-            class="form-select"
-          >
-            <option value="">请选择年级</option>
-            <option v-for="grade in grades" :key="grade.id" :value="grade.id">
-              {{ grade.name }}
-            </option>
-          </select>
-        </div>
-
-        <div v-if="availableCourse" class="course-card">
+    <Transition name="fade">
+      <template v-if="availableCourse">
+        <div v-if="!isCompact" class="course-card">
           <div class="course-info">
-            <div class="course-name">{{ availableCourse.name }}</div>
-            <div class="course-meta">
-              {{ availableCourse.subject?.name }} · {{ availableCourse.grade?.name }}
+            <div class="course-chip">
+              <span>{{ availableCourse.subject?.name }}</span>
+              <span>·</span>
+              <span>{{ availableCourse.grade?.name }}</span>
             </div>
+            <div class="course-name">{{ availableCourse.name }}</div>
+            <p class="course-description">
+              即可预览官方章节资源与历史教案，支持一键引用。
+            </p>
           </div>
           <button
             @click="selectCourse(availableCourse)"
@@ -60,24 +76,31 @@
             查看章节
           </button>
         </div>
-      </div>
-
-      <!-- 已选择的课程信息 -->
-      <div v-else class="selected-course-info">
-        <div class="course-badge">
-          <div class="badge-icon">📚</div>
-          <div class="badge-text">
-            <div class="badge-title">{{ selectedCourse.name }}</div>
-            <div class="badge-subtitle">
-              {{ selectedCourse.subject?.name }} · {{ selectedCourse.grade?.name }}
+      </template>
+      <template v-else-if="selectedCourse && !isCompact">
+        <div class="selected-course-info">
+          <div class="course-summary">
+            <div class="course-summary-icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m8-6H4" />
+              </svg>
+            </div>
+            <div class="course-summary-text">
+              <div class="course-summary-title">{{ selectedCourse.name }}</div>
+              <div class="course-summary-subtitle">
+                {{ selectedCourse.subject?.name }} · {{ selectedCourse.grade?.name }}
+              </div>
             </div>
           </div>
+          <p class="course-summary-tip">
+            已为你展开课程章节，可直接预览资源或创建教案。
+          </p>
         </div>
-      </div>
-    </div>
+      </template>
+    </Transition>
 
     <!-- 章节和资源列表 -->
-    <div v-if="selectedCourse" class="content-area">
+    <div v-if="selectedCourse && !isCompact" class="content-area">
       <!-- 加载状态 -->
       <div v-if="isLoadingChapters" class="loading-state">
         <div class="spinner"></div>
@@ -274,7 +297,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import type { Grade, Course, SubjectTreeNode } from '../../types/curriculum'
 import type { Resource, ChapterWithChildren } from '../../types/resource'
 import type { Lesson } from '../../types/lesson'
@@ -289,6 +312,12 @@ import LessonResourceItem from '../Resource/LessonResourceItem.vue'
 const emit = defineEmits<{
   'lesson-created': [lessonId: number]
 }>()
+
+const props = defineProps<{
+  compact?: boolean
+}>()
+
+const isCompact = computed(() => props.compact === true)
 
 // 基础数据
 const subjects = ref<SubjectTreeNode[]>([])
@@ -419,7 +448,9 @@ async function loadCourses() {
 // 选择课程
 async function selectCourse(course: Course) {
   selectedCourse.value = course
-  await loadChapters(course.id)
+  if (!isCompact.value) {
+    await loadChapters(course.id)
+  }
 }
 
 // 清除选择
@@ -431,6 +462,7 @@ function clearSelection() {
 
 // 加载章节
 async function loadChapters(courseId: number) {
+  if (isCompact.value) return
   isLoadingChapters.value = true
   
   try {
@@ -553,43 +585,37 @@ function handlePublishLesson(lessonId: number) {
   overflow: hidden;
 }
 
-.course-selector {
-  padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+.curriculum-with-resources.is-compact {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  background: transparent;
 }
 
-.selector-header {
+.selection-bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-.selector-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0;
-}
-
-.clear-btn {
-  padding: 0.5rem;
-  background: #fee2e2;
-  border: 1px solid #fecaca;
-  border-radius: 0.375rem;
-  color: #dc2626;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.clear-btn:hover {
-  background: #fecaca;
-}
-
-.selection-form {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  flex-direction: column;
   gap: 1rem;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  background: linear-gradient(135deg, #ffffff 0%, #f4f7ff 100%);
+}
+
+.selection-bar-compact {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.selection-inputs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.curriculum-with-resources.is-compact .selection-inputs {
+  gap: 0.5rem;
 }
 
 .form-group {
@@ -605,31 +631,68 @@ function handlePublishLesson(lessonId: number) {
 }
 
 .form-select {
-  padding: 0.625rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  background: white;
+  width: 100%;
+  padding: 0.7rem 2.5rem 0.7rem 2.75rem;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
 .form-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.form-control-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.form-control-icon {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: rgba(79, 70, 229, 0.65);
+}
+
+.clear-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.clear-btn:hover {
+  background: rgba(248, 113, 113, 0.2);
 }
 
 .course-card {
-  grid-column: 1 / -1;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem;
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  border-radius: 0.5rem;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(56, 189, 248, 0.08));
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 1.1rem;
   margin-top: 0.5rem;
+  box-shadow: 0 12px 25px -15px rgba(79, 70, 229, 0.4);
 }
 
 .course-info {
@@ -638,60 +701,109 @@ function handlePublishLesson(lessonId: number) {
 
 .course-name {
   font-weight: 600;
-  color: #0c4a6e;
-  margin-bottom: 0.25rem;
+  color: #0f172a;
+  margin-bottom: 0.4rem;
+  font-size: 1.15rem;
 }
 
 .course-meta {
-  font-size: 0.813rem;
-  color: #075985;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #4338ca;
+  background: rgba(99, 102, 241, 0.12);
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.2);
 }
 
 .select-course-btn {
-  padding: 0.5rem 1rem;
-  background: #0284c7;
+  align-self: flex-start;
+  padding: 0.65rem 1.35rem;
+  background: linear-gradient(135deg, #4338ca, #2563eb);
   color: white;
   border: none;
-  border-radius: 0.375rem;
+  border-radius: 0.9rem;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 10px 25px -12px rgba(59, 130, 246, 0.7);
 }
 
 .select-course-btn:hover {
-  background: #0369a1;
+  background: linear-gradient(135deg, #3730a3, #1d4ed8);
+  transform: translateY(-1px);
 }
 
 .selected-course-info {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .course-badge {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.875rem 1.125rem;
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-  border: 1px solid #93c5fd;
-  border-radius: 0.5rem;
-  flex: 1;
+  gap: 0.9rem;
+  padding: 1rem 1.3rem;
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.15), rgba(59, 130, 246, 0.1));
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 1rem;
+  box-shadow: inset 0 0 0 1px rgba(94, 129, 244, 0.15);
 }
 
 .badge-icon {
-  font-size: 1.5rem;
+  font-size: 1.85rem;
 }
 
 .badge-title {
   font-weight: 600;
-  color: #1e3a8a;
-  margin-bottom: 0.125rem;
+  color: #111827;
+  margin-bottom: 0.2rem;
+  font-size: 1.05rem;
 }
 
 .badge-subtitle {
-  font-size: 0.813rem;
-  color: #3b82f6;
+  font-size: 0.85rem;
+  color: #4c1d95;
+}
+
+.course-summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.course-summary-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.95rem;
+  background: rgba(99, 102, 241, 0.15);
+  color: #4338ca;
+}
+
+.course-summary-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.2rem;
+}
+
+.course-summary-subtitle {
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.course-summary-tip {
+  font-size: 0.85rem;
+  color: #6b7280;
 }
 
 .content-area {
