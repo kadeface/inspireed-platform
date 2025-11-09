@@ -285,6 +285,8 @@ export interface ActivitySubmission {
   lessonId: number
   studentId: number
   responses: Record<string, ItemAnswer>  // key: item_id, value: 答案
+  processTrace?: ProcessTraceEvent[]
+  context?: Record<string, any>
   score?: number
   maxScore?: number
   autoGraded: boolean
@@ -295,8 +297,10 @@ export interface ActivitySubmission {
   submittedAt?: string
   gradedAt?: string
   submissionCount: number
+  attemptNo: number
   timeSpent?: number  // 秒
   isLate: boolean
+  activityPhase?: string
   version: number
   synced: boolean
   createdAt: string
@@ -337,9 +341,60 @@ export interface ActivityStatistics {
   medianScore?: number
   averageTimeSpent?: number  // 秒
   itemStatistics?: Record<string, any>
+  flowchartMetrics?: Record<string, any>
   peerReviewCount: number
   avgPeerReviewScore?: number
   updatedAt: string
+}
+
+// ========== 过程追踪 ==========
+export interface ProcessTraceEvent {
+  type: string
+  timestamp: string
+  payload?: Record<string, any>
+}
+
+// ========== 题目级统计 ==========
+export interface ActivityItemStatistic {
+  id: number
+  cellId: number
+  lessonId: number
+  itemId: string
+  attempts: number
+  correctCount: number
+  avgScore?: number
+  avgTimeSpent?: number
+  optionDistribution?: Record<string, number>
+  scoreDistribution?: Record<string, any>
+  knowledgeStats?: Record<string, number>
+  updatedAt: string
+}
+
+// ========== 流程图快照 ==========
+export interface FlowchartSnapshot {
+  id: number
+  submissionId: number
+  studentId: number
+  lessonId: number
+  cellId: number
+  graph: Record<string, any>
+  analysis?: Record<string, any>
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+// ========== 过程性评估 ==========
+export interface FormativeAssessmentRecord {
+  id: number
+  lessonId: number
+  studentId: number
+  phase?: string
+  metrics: Record<string, any>
+  riskLevel?: 'low' | 'medium' | 'high'
+  recommendations?: Array<Record<string, any>>
+  updatedAt: string
+  createdAt: string
 }
 
 // ========== 创建活动提交请求 ==========
@@ -348,6 +403,10 @@ export interface CreateActivitySubmissionRequest {
   lessonId: number
   responses?: Record<string, ItemAnswer>
   startedAt?: string
+  processTrace?: ProcessTraceEvent[]
+  context?: Record<string, any>
+  activityPhase?: string
+  attemptNo?: number
 }
 
 // ========== 更新活动提交请求 ==========
@@ -355,12 +414,20 @@ export interface UpdateActivitySubmissionRequest {
   responses?: Record<string, ItemAnswer>
   status?: ActivitySubmissionStatus
   timeSpent?: number
+  processTrace?: ProcessTraceEvent[]
+  context?: Record<string, any>
+  activityPhase?: string
+  attemptNo?: number
 }
 
 // ========== 提交活动请求 ==========
 export interface SubmitActivityRequest {
   responses: Record<string, ItemAnswer>
   timeSpent?: number
+  processTrace?: ProcessTraceEvent[]
+  context?: Record<string, any>
+  activityPhase?: string
+  attemptNo?: number
 }
 
 // ========== 评分请求 ==========

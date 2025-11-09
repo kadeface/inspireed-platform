@@ -3,7 +3,8 @@
 """
 
 from datetime import datetime
-from typing import List, Optional, Any, cast
+from statistics import mean
+from typing import Any, Dict, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, Integer
@@ -17,6 +18,9 @@ from app.models.activity import (
     PeerReview,
     PeerReviewStatus,
     ActivityStatistics,
+    ActivityItemStatistic,
+    FlowchartSnapshot,
+    FormativeAssessment,
 )
 from app.models.lesson import Lesson
 from app.models.cell import Cell
@@ -27,6 +31,7 @@ from app.schemas.activity import (
     ActivitySubmissionGrade,
     ActivitySubmissionResponse,
     ActivitySubmissionWithStudent,
+    ActivityItemStatisticResponse,
     PeerReviewCreate,
     PeerReviewUpdate,
     PeerReviewResponse,
@@ -37,6 +42,12 @@ from app.schemas.activity import (
     BulkReturnRequest,
     OfflineSyncRequest,
     OfflineSyncResponse,
+    FlowchartSnapshotResponse,
+    FormativeAssessmentResponse,
+    FlowchartSnapshotPayload,
+)
+from app.services.formative_assessment import (
+    recompute_formative_assessment,
 )
 
 router = APIRouter()
@@ -78,6 +89,14 @@ async def create_submission(
     if existing:
         # 更新现有草稿
         setattr(existing, "responses", cast(dict[str, Any], data.responses))
+        if data.process_trace is not None:
+            setattr(existing, "process_trace", cast(List[Dict[str, Any]], data.process_trace))
+        if data.context is not None:
+            setattr(existing, "context", cast(Dict[str, Any], data.context))
+        if data.activity_phase is not None:
+            setattr(existing, "activity_phase", data.activity_phase)
+        if data.attempt_no is not None:
+            setattr(existing, "attempt_no", cast(int, data.attempt_no))
         setattr(existing, "updated_at", datetime.utcnow())
         await db.commit()
         await db.refresh(existing)
@@ -87,10 +106,14 @@ async def create_submission(
     submission = ActivitySubmission(
         cell_id=data.cell_id,
         lesson_id=data.lesson_id,
-        student_id=current_user.id,
+        student_id=cast(int, current_user.id),
         responses=data.responses,
         status=ActivitySubmissionStatus.DRAFT,
         started_at=data.started_at or datetime.utcnow(),
+        process_trace=data.process_trace or [],
+        context=data.context or {},
+        activity_phase=data.activity_phase,
+        attempt_no=data.attempt_no or 1,
     )
 
     db.add(submission)
@@ -153,6 +176,28 @@ async def update_submission(
         setattr(submission, "status", cast(ActivitySubmissionStatus, data.status))
     if data.time_spent is not None:
         setattr(submission, "time_spent", cast(int, data.time_spent))
+    if data.process_trace is not None:
+        setattr(submission, "process_trace", cast(List[Dict[str, Any]], data.process_trace))
+    if data.context is not None:
+        setattr(submission, "context", cast(Dict[str, Any], data.context))
+    if data.activity_phase is not None:
+        setattr(submission, "activity_phase", data.activity_phase)
+    if data.attempt_no is not None:
+        setattr(submission, "attempt_no", cast(int, data.attempt_no))
+    if data.flowchart_snapshot is not None:
+        await _save_flowchart_snapshot(
+            db,
+            submission,
+            data.flowchart_snapshot,
+            student_id=submission_student_id,
+        )
+    if data.flowchart_snapshot is not None:
+        await _save_flowchart_snapshot(
+            db,
+            submission,
+            data.flowchart_snapshot,
+            student_id=submission_student_id,
+        )
 
     setattr(submission, "updated_at", datetime.utcnow())
 
@@ -189,6 +234,14 @@ async def submit_activity(
     setattr(submission, "submitted_at", datetime.utcnow())
     if data.time_spent:
         setattr(submission, "time_spent", cast(int, data.time_spent))
+    if data.process_trace is not None:
+        setattr(submission, "process_trace", cast(List[Dict[str, Any]], data.process_trace))
+    if data.context is not None:
+        setattr(submission, "context", cast(Dict[str, Any], data.context))
+    if data.activity_phase is not None:
+        setattr(submission, "activity_phase", data.activity_phase)
+    if data.attempt_no is not None:
+        setattr(submission, "attempt_no", cast(int, data.attempt_no))
 
     # TODO: 实现自动评分逻辑
     # 如果是选择题等可自动评分的题型，这里自动计算分数
@@ -203,6 +256,15 @@ async def submit_activity(
         db,
         cast(int, submission.cell_id),
         cast(int, submission.lesson_id),
+    )
+
+    phase_value = cast(Optional[str], getattr(submission, "activity_phase", None))
+
+    await recompute_formative_assessment(
+        db,
+        cast(int, submission.lesson_id),
+        cast(int, submission.student_id),
+        phase=phase_value,
     )
 
     return submission
@@ -251,6 +313,53 @@ async def get_cell_submissions(
 
 
 @router.get(
+    "/cells/{cell_id}/item-statistics",
+    response_model=List[ActivityItemStatisticResponse],
+)
+async def get_cell_item_statistics(
+    cell_id: int,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """获取某个 Cell 的题目级统计（教师端）"""
+
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    result = await db.execute(
+        select(ActivityItemStatistic).where(ActivityItemStatistic.cell_id == cell_id)
+    )
+    return result.scalars().all()
+
+
+@router.get(
+    "/cells/{cell_id}/flowchart-snapshots",
+    response_model=List[FlowchartSnapshotResponse],
+)
+async def get_cell_flowchart_snapshots(
+    cell_id: int,
+    student_id: Optional[int] = Query(None),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """获取流程图快照列表"""
+
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    query = select(FlowchartSnapshot).where(FlowchartSnapshot.cell_id == cell_id)
+    if student_id is not None:
+        query = query.where(FlowchartSnapshot.student_id == student_id)
+
+    query = query.order_by(FlowchartSnapshot.updated_at.desc())
+
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.get(
     "/lessons/{lesson_id}/my-submissions",
     response_model=List[ActivitySubmissionResponse],
 )
@@ -272,6 +381,63 @@ async def get_my_lesson_submissions(
     submissions = result.scalars().all()
 
     return submissions
+
+
+@router.get(
+    "/lessons/{lesson_id}/formative-assessments",
+    response_model=List[FormativeAssessmentResponse],
+)
+async def get_formative_assessments(
+    lesson_id: int,
+    student_id: Optional[int] = Query(None),
+    phase: Optional[str] = Query(None),
+    risk_level: Optional[str] = Query(None),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """获取课程的过程性评估数据（教师端）"""
+
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    query = select(FormativeAssessment).where(
+        FormativeAssessment.lesson_id == lesson_id
+    )
+    if student_id is not None:
+        query = query.where(FormativeAssessment.student_id == student_id)
+    if phase:
+        query = query.where(FormativeAssessment.phase == phase)
+    if risk_level:
+        query = query.where(FormativeAssessment.risk_level == risk_level)
+
+    query = query.order_by(FormativeAssessment.updated_at.desc())
+
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.post(
+    "/lessons/{lesson_id}/formative-assessments/{student_id}/recompute",
+    response_model=FormativeAssessmentResponse,
+)
+async def recompute_formative_assessment_endpoint(
+    lesson_id: int,
+    student_id: int,
+    phase: Optional[str] = Query(None),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """重新计算指定学生的过程性评估"""
+
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    record = await recompute_formative_assessment(
+        db, lesson_id=lesson_id, student_id=student_id, phase=phase
+    )
+    return record
 
 
 # ========== 评分相关 API ==========
@@ -324,6 +490,15 @@ async def grade_submission(
         db, cast(int, submission.cell_id), cast(int, submission.lesson_id)
     )
 
+    phase_value = cast(Optional[str], getattr(submission, "activity_phase", None))
+
+    await recompute_formative_assessment(
+        db,
+        cast(int, submission.lesson_id),
+        cast(int, submission.student_id),
+        phase=phase_value,
+    )
+
     return submission
 
 
@@ -340,6 +515,9 @@ async def bulk_grade_submissions(
         raise HTTPException(status_code=403, detail="权限不足")
 
     graded_count = 0
+    cells_to_update: set[tuple[int, int]] = set()
+    recompute_targets: set[tuple[int, int, Optional[str]]] = set()
+
     for submission_id in data.submission_ids:
         submission = await db.get(ActivitySubmission, submission_id)
         if (
@@ -347,14 +525,33 @@ async def bulk_grade_submissions(
             and cast(ActivitySubmissionStatus, submission.status)
             == ActivitySubmissionStatus.SUBMITTED
         ):
+            phase_value = cast(Optional[str], getattr(submission, "activity_phase", None))
             setattr(submission, "score", cast(float, data.score))
             setattr(submission, "teacher_feedback", cast(str, data.teacher_feedback))
             setattr(submission, "graded_by", cast(int, current_user.id))
             setattr(submission, "graded_at", datetime.utcnow())
             setattr(submission, "status", ActivitySubmissionStatus.GRADED)
             graded_count += 1
+            cells_to_update.add(
+                (cast(int, submission.cell_id), cast(int, submission.lesson_id))
+            )
+            recompute_targets.add(
+                (
+                    cast(int, submission.lesson_id),
+                    cast(int, submission.student_id),
+                    phase_value,
+                )
+            )
 
     await db.commit()
+
+    for cell_id, lesson_id in cells_to_update:
+        await _update_statistics(db, cell_id, lesson_id)
+
+    for lesson_id, student_id, phase in recompute_targets:
+        await recompute_formative_assessment(
+            db, lesson_id, student_id, phase=phase
+        )
 
     return {"graded_count": graded_count}
 
@@ -617,6 +814,39 @@ async def sync_offline_submissions(
                     "responses",
                     cast(dict[str, Any], submission_data["responses"]),
                 )
+                if "process_trace" in submission_data:
+                    setattr(
+                        existing,
+                        "process_trace",
+                        cast(
+                            List[Dict[str, Any]],
+                            submission_data.get("process_trace") or [],
+                        ),
+                    )
+                if "context" in submission_data:
+                    setattr(
+                        existing,
+                        "context",
+                        cast(Dict[str, Any], submission_data.get("context") or {}),
+                    )
+                if "activity_phase" in submission_data:
+                    setattr(existing, "activity_phase", submission_data["activity_phase"])
+                if "attempt_no" in submission_data:
+                    setattr(
+                        existing,
+                        "attempt_no",
+                        cast(int, submission_data.get("attempt_no") or 1),
+                    )
+                if submission_data.get("flowchart_snapshot"):
+                    snapshot_payload = FlowchartSnapshotPayload.model_validate(
+                        submission_data["flowchart_snapshot"]
+                    )
+                    await _save_flowchart_snapshot(
+                        db,
+                        existing,
+                        snapshot_payload,
+                        student_id=cast(int, current_user.id),
+                    )
                 setattr(existing, "version", cast(int, existing.version) + 1)
                 setattr(existing, "synced", cast(bool, True))
                 setattr(existing, "updated_at", cast(datetime, datetime.utcnow()))
@@ -626,12 +856,27 @@ async def sync_offline_submissions(
                 submission = ActivitySubmission(
                     cell_id=submission_data["cell_id"],
                     lesson_id=submission_data["lesson_id"],
-                    student_id=current_user.id,
+                    student_id=cast(int, current_user.id),
                     responses=submission_data["responses"],
                     status=ActivitySubmissionStatus.DRAFT,
                     synced=cast(bool, True),
+                    process_trace=submission_data.get("process_trace") or [],
+                    context=submission_data.get("context") or {},
+                    activity_phase=submission_data.get("activity_phase"),
+                    attempt_no=submission_data.get("attempt_no") or 1,
                 )
                 db.add(submission)
+                await db.flush()
+                if submission_data.get("flowchart_snapshot"):
+                    snapshot_payload = FlowchartSnapshotPayload.model_validate(
+                        submission_data["flowchart_snapshot"]
+                    )
+                    await _save_flowchart_snapshot(
+                        db,
+                        submission,
+                        snapshot_payload,
+                        student_id=cast(int, current_user.id),
+                    )
                 synced_count += 1
 
         except Exception as e:
@@ -648,6 +893,41 @@ async def sync_offline_submissions(
 
 
 # ========== 辅助函数 ==========
+
+
+async def _save_flowchart_snapshot(
+    db: AsyncSession,
+    submission: ActivitySubmission,
+    snapshot: FlowchartSnapshotPayload,
+    student_id: int,
+) -> FlowchartSnapshot:
+    """
+    保存流程图快照。
+    """
+
+    version = snapshot.version
+    if version is None:
+        result = await db.execute(
+            select(func.max(FlowchartSnapshot.version)).where(
+                FlowchartSnapshot.submission_id == submission.id
+            )
+        )
+        latest_version = result.scalar()
+        version = cast(int, (latest_version or 0) + 1)
+
+    flowchart_snapshot = FlowchartSnapshot(
+        submission_id=submission.id,
+        student_id=student_id,
+        lesson_id=cast(int, submission.lesson_id),
+        cell_id=cast(int, submission.cell_id),
+        graph=snapshot.graph,
+        analysis=snapshot.analysis or {},
+        version=version,
+    )
+    db.add(flowchart_snapshot)
+    await db.flush()
+
+    return flowchart_snapshot
 
 
 async def _update_statistics(db: AsyncSession, cell_id: int, lesson_id: int):
@@ -723,5 +1003,161 @@ async def _update_statistics(db: AsyncSession, cell_id: int, lesson_id: int):
 
     setattr(statistics, "peer_review_count", peer_review_count)
     setattr(statistics, "avg_peer_review_score", avg_peer_review_score)
+
+    # 题目级统计
+    submissions_result = await db.execute(
+        select(ActivitySubmission).where(ActivitySubmission.cell_id == cell_id)
+    )
+    submissions = submissions_result.scalars().all()
+
+    item_aggregates: Dict[str, Dict[str, Any]] = {}
+    for submission in submissions:
+        responses = submission.responses or {}
+        for item_id, item_value in responses.items():
+            if not isinstance(item_value, dict):
+                continue
+            aggregate = item_aggregates.setdefault(
+                item_id,
+                {
+                    "attempts": 0,
+                    "correct_count": 0,
+                    "scores": [],
+                    "options": {},
+                    "knowledge": {},
+                    "times": [],
+                },
+            )
+            aggregate["attempts"] += 1
+
+            if item_value.get("is_correct"):
+                aggregate["correct_count"] += 1
+
+            score = item_value.get("score")
+            if isinstance(score, (int, float)):
+                aggregate["scores"].append(float(score))
+
+            time_spent = item_value.get("time_spent")
+            if isinstance(time_spent, (int, float)):
+                aggregate["times"].append(float(time_spent))
+
+            answer = item_value.get("answer") or item_value.get("value")
+            if isinstance(answer, list):
+                for option in answer:
+                    key = str(option)
+                    aggregate["options"][key] = aggregate["options"].get(key, 0) + 1
+            elif answer is not None:
+                key = str(answer)
+                aggregate["options"][key] = aggregate["options"].get(key, 0) + 1
+
+            knowledge_tags = item_value.get("knowledge_tags") or item_value.get("tags")
+            if isinstance(knowledge_tags, list):
+                for tag in knowledge_tags:
+                    tag_key = str(tag)
+                    aggregate["knowledge"][tag_key] = (
+                        aggregate["knowledge"].get(tag_key, 0) + 1
+                    )
+
+    existing_stats_result = await db.execute(
+        select(ActivityItemStatistic).where(ActivityItemStatistic.cell_id == cell_id)
+    )
+    existing_stats = {
+        cast(str, stat.item_id): stat
+        for stat in existing_stats_result.scalars().all()
+    }
+
+    summary_payload: Dict[str, Any] = {}
+
+    for item_id, aggregate in item_aggregates.items():
+        attempts = aggregate["attempts"]
+        accuracy = (
+            round(aggregate["correct_count"] / attempts, 4) if attempts else None
+        )
+        avg_score = (
+            round(mean(aggregate["scores"]), 2) if aggregate["scores"] else None
+        )
+        avg_time = round(mean(aggregate["times"]), 2) if aggregate["times"] else None
+
+        summary_payload[item_id] = {
+            "attempts": attempts,
+            "correct_count": aggregate["correct_count"],
+            "accuracy": accuracy,
+            "avg_score": avg_score,
+            "avg_time_spent": avg_time,
+            "option_distribution": aggregate["options"],
+            "knowledge_stats": aggregate["knowledge"],
+        }
+
+        stat_record = existing_stats.get(item_id)
+        if stat_record:
+            setattr(stat_record, "attempts", attempts)
+            setattr(stat_record, "correct_count", aggregate["correct_count"])
+            setattr(stat_record, "avg_score", avg_score)
+            setattr(stat_record, "avg_time_spent", avg_time)
+            setattr(stat_record, "option_distribution", aggregate["options"])
+            setattr(
+                stat_record, "score_distribution", {"values": aggregate["scores"]}
+            )
+            setattr(stat_record, "knowledge_stats", aggregate["knowledge"])
+            setattr(stat_record, "updated_at", datetime.utcnow())
+        else:
+            stat_record = ActivityItemStatistic(
+                cell_id=cell_id,
+                lesson_id=lesson_id,
+                item_id=item_id,
+                attempts=attempts,
+                correct_count=aggregate["correct_count"],
+                avg_score=avg_score,
+                avg_time_spent=avg_time,
+                option_distribution=aggregate["options"],
+                score_distribution={"values": aggregate["scores"]},
+                knowledge_stats=aggregate["knowledge"],
+            )
+            db.add(stat_record)
+
+    # 移除已经不存在的题目统计
+    removed_item_ids = set(existing_stats.keys()) - set(item_aggregates.keys())
+    for item_id in removed_item_ids:
+        await db.delete(existing_stats[item_id])
+
+    setattr(statistics, "item_statistics", summary_payload or None)
+
+    # 流程图统计
+    flowchart_result = await db.execute(
+        select(FlowchartSnapshot).where(FlowchartSnapshot.cell_id == cell_id)
+    )
+    flowchart_snapshots = flowchart_result.scalars().all()
+
+    flowchart_metrics: Optional[Dict[str, Any]] = None
+    if flowchart_snapshots:
+        updated_values = [
+            cast(datetime, snapshot.updated_at)
+            for snapshot in flowchart_snapshots
+            if snapshot.updated_at is not None
+        ]
+        version_values = [
+            cast(int, snapshot.version or 0) for snapshot in flowchart_snapshots
+        ]
+
+        latest_updated = max(updated_values) if updated_values else None
+        max_version = max(version_values) if version_values else None
+
+        flowchart_metrics = {
+            "snapshot_count": len(flowchart_snapshots),
+            "latest_updated_at": latest_updated.isoformat() if latest_updated else None,
+            "max_version": max_version,
+        }
+        numeric_aggregates: Dict[str, List[float]] = {}
+        for snapshot in flowchart_snapshots:
+            analysis_data = snapshot.analysis or {}
+            if not isinstance(analysis_data, dict):
+                continue
+            for key, value in analysis_data.items():
+                if isinstance(value, (int, float)):
+                    numeric_aggregates.setdefault(key, []).append(float(value))
+
+        for key, values in numeric_aggregates.items():
+            flowchart_metrics[f"avg_{key}"] = round(mean(values), 2)
+
+    setattr(statistics, "flowchart_metrics", flowchart_metrics)
 
     await db.commit()

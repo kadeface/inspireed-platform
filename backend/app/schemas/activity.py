@@ -24,6 +24,18 @@ class ActivitySubmissionCreate(ActivitySubmissionBase):
     """创建活动提交请求"""
 
     started_at: Optional[datetime] = None
+    process_trace: Optional[List[Dict[str, Any]]] = None
+    context: Optional[Dict[str, Any]] = None
+    activity_phase: Optional[str] = None
+    attempt_no: Optional[int] = None
+
+
+class FlowchartSnapshotPayload(BaseModel):
+    """流程图快照数据"""
+
+    graph: Dict[str, Any]
+    analysis: Optional[Dict[str, Any]] = None
+    version: Optional[int] = None
 
 
 class ActivitySubmissionUpdate(BaseModel):
@@ -32,6 +44,11 @@ class ActivitySubmissionUpdate(BaseModel):
     responses: Optional[Dict[str, Any]] = None
     status: Optional[ActivitySubmissionStatus] = None
     time_spent: Optional[int] = None
+    process_trace: Optional[List[Dict[str, Any]]] = None
+    context: Optional[Dict[str, Any]] = None
+    activity_phase: Optional[str] = None
+    attempt_no: Optional[int] = None
+    flowchart_snapshot: Optional[FlowchartSnapshotPayload] = None
 
 
 class ActivitySubmissionSubmit(BaseModel):
@@ -39,6 +56,11 @@ class ActivitySubmissionSubmit(BaseModel):
 
     responses: Dict[str, Any]
     time_spent: Optional[int] = None
+    process_trace: Optional[List[Dict[str, Any]]] = None
+    context: Optional[Dict[str, Any]] = None
+    activity_phase: Optional[str] = None
+    attempt_no: Optional[int] = None
+    flowchart_snapshot: Optional[FlowchartSnapshotPayload] = None
 
 
 class ActivitySubmissionGrade(BaseModel):
@@ -54,6 +76,8 @@ class ActivitySubmissionResponse(ActivitySubmissionBase):
 
     id: int
     student_id: int
+    process_trace: Optional[List[Dict[str, Any]]] = None
+    context: Optional[Dict[str, Any]] = None
     score: Optional[float] = None
     max_score: Optional[float] = None
     auto_graded: bool
@@ -64,8 +88,10 @@ class ActivitySubmissionResponse(ActivitySubmissionBase):
     submitted_at: Optional[datetime] = None
     graded_at: Optional[datetime] = None
     submission_count: int
+    attempt_no: int
     time_spent: Optional[int] = None
     is_late: bool
+    activity_phase: Optional[str] = None
     version: int
     synced: bool
     created_at: datetime
@@ -165,9 +191,65 @@ class ActivityStatisticsResponse(BaseModel):
     median_score: Optional[float] = None
     average_time_spent: Optional[int] = None
     item_statistics: Optional[Dict[str, Any]] = None
+    flowchart_metrics: Optional[Dict[str, Any]] = None
     peer_review_count: int
     avg_peer_review_score: Optional[float] = None
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ActivityItemStatisticResponse(BaseModel):
+    """题目级统计响应"""
+
+    id: int
+    cell_id: int
+    lesson_id: int
+    item_id: str
+    attempts: int
+    correct_count: int
+    avg_score: Optional[float] = None
+    avg_time_spent: Optional[float] = None
+    option_distribution: Optional[Dict[str, Any]] = None
+    score_distribution: Optional[Dict[str, Any]] = None
+    knowledge_stats: Optional[Dict[str, Any]] = None
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class FlowchartSnapshotResponse(BaseModel):
+    """流程图快照响应"""
+
+    id: int
+    submission_id: int
+    student_id: int
+    lesson_id: int
+    cell_id: int
+    graph: Dict[str, Any]
+    analysis: Optional[Dict[str, Any]] = None
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class FormativeAssessmentResponse(BaseModel):
+    """过程性评估响应"""
+
+    id: int
+    lesson_id: int
+    student_id: int
+    phase: Optional[str] = None
+    metrics: Dict[str, Any]
+    risk_level: Optional[str] = None
+    recommendations: Optional[List[Dict[str, Any]]] = None
+    updated_at: datetime
+    created_at: datetime
 
     class Config:
         from_attributes = True

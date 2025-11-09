@@ -109,6 +109,69 @@
         </div>
       </div>
 
+      <div v-if="itemStats.length" class="stats-section">
+        <h4 class="stats-title">📍 题目表现</h4>
+        <div class="item-stats-list">
+          <div v-for="item in itemStats" :key="item.itemId" class="item-stat-card">
+            <div class="item-stat-header">
+              <span class="item-id">题目 {{ item.itemId }}</span>
+              <span class="item-accuracy" :class="getAccuracyBadge(item.accuracy)">
+                {{ item.accuracy !== null ? `${Math.round(item.accuracy * 100)}%` : '未统计' }}
+              </span>
+            </div>
+            <div class="item-stat-body">
+              <div class="item-stat-row">
+                <span>作答次数</span>
+                <span>{{ item.attempts }}</span>
+              </div>
+              <div class="item-stat-row" v-if="item.avgScore !== null">
+                <span>平均得分</span>
+                <span>{{ item.avgScore.toFixed(1) }}</span>
+              </div>
+              <div class="item-stat-row" v-if="item.avgTime !== null">
+                <span>平均用时</span>
+                <span>{{ Math.round(item.avgTime) }} 秒</span>
+              </div>
+              <div class="item-stat-row" v-if="Object.keys(item.knowledgeStats).length > 0">
+                <span>知识点高频</span>
+                <span class="knowledge-badges">
+                  <span v-for="(count, tag) in item.knowledgeStats" :key="tag" class="badge">
+                    {{ tag }} × {{ count }}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="flowchartMetrics" class="stats-section">
+        <h4 class="stats-title">🧠 流程图表现</h4>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value">{{ flowchartMetrics.snapshot_count || flowchartMetrics.snapshotCount || 0 }}</div>
+            <div class="stat-label">快照数量</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ flowchartMetrics.max_version || flowchartMetrics.maxVersion || '-' }}</div>
+            <div class="stat-label">最高版本</div>
+          </div>
+          <div class="stat-card" v-if="flowchartMetrics.latest_updated_at || flowchartMetrics.latestUpdatedAt">
+            <div class="stat-value text-base">
+              {{ formatDate(flowchartMetrics.latest_updated_at || flowchartMetrics.latestUpdatedAt) }}
+            </div>
+            <div class="stat-label">最近更新</div>
+          </div>
+        </div>
+
+        <div v-if="hasFlowchartAnalytics" class="flowchart-analytics">
+          <div v-for="metric in flowchartAnalytics" :key="metric.key" class="analytics-row">
+            <span>{{ metric.label }}</span>
+            <span>{{ metric.value }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 时间统计 -->
       <div v-if="statistics.averageTimeSpent" class="stats-section">
         <h4 class="stats-title">⏱️ 时间统计</h4>
@@ -177,24 +240,88 @@ const submissionRate = computed(() => {
   )
 })
 
-// 获取成绩分布（模拟数据，实际需要从后端获取详细数据）
+const itemStats = computed(() => {
+  const rawStats = statistics.value?.itemStatistics
+  if (!rawStats) return []
+
+  return Object.entries(rawStats).map(([itemId, data]: [string, any]) => ({
+    itemId,
+    attempts: data.attempts || 0,
+    accuracy: typeof data.accuracy === 'number' ? data.accuracy : null,
+    avgScore: typeof data.avg_score === 'number' ? data.avg_score : (typeof data.avgScore === 'number' ? data.avgScore : null),
+    avgTime: typeof data.avg_time_spent === 'number' ? data.avg_time_spent : (typeof data.avgTimeSpent === 'number' ? data.avgTimeSpent : null),
+    optionDistribution: data.option_distribution || data.optionDistribution || {},
+    knowledgeStats: data.knowledge_stats || data.knowledgeStats || {},
+  }))
+})
+
+const scoreDistribution = computed(() => {
+  const distribution = {
+    excellent: 0,
+    good: 0,
+    pass: 0,
+    fail: 0,
+  }
+  if (!statistics.value) {
+    return distribution
+  }
+
+  itemStats.value.forEach((item) => {
+    const accuracy = item.accuracy ?? 0
+    if (accuracy >= 0.9) distribution.excellent += 1
+    else if (accuracy >= 0.75) distribution.good += 1
+    else if (accuracy >= 0.6) distribution.pass += 1
+    else distribution.fail += 1
+  })
+
+  return distribution
+})
+
 function getScoreDistribution(level: 'excellent' | 'good' | 'pass' | 'fail'): number {
-  // TODO: 从 itemStatistics 中获取实际分布数据
+  const total = itemStats.value.length || 1
   const count = getScoreCount(level)
-  const total = statistics.value?.gradedCount || 1
   return Math.round((count / total) * 100)
 }
 
 function getScoreCount(level: 'excellent' | 'good' | 'pass' | 'fail'): number {
-  // TODO: 从 itemStatistics 中计算实际数量
-  if (!statistics.value) return 0
-  
-  // 临时模拟数据
-  const total = statistics.value.gradedCount
-  if (level === 'excellent') return Math.floor(total * 0.3)
-  if (level === 'good') return Math.floor(total * 0.4)
-  if (level === 'pass') return Math.floor(total * 0.2)
-  return Math.floor(total * 0.1)
+  return scoreDistribution.value[level]
+}
+
+const flowchartMetrics = computed(() => statistics.value?.flowchartMetrics)
+
+const hasFlowchartAnalytics = computed(() => {
+  if (!flowchartMetrics.value) return false
+  return Object.keys(flowchartMetrics.value).some((key) => key.startsWith('avg_') || key.startsWith('avg'))
+})
+
+const flowchartAnalytics = computed(() => {
+  if (!flowchartMetrics.value) return []
+  return Object.entries(flowchartMetrics.value)
+    .filter(([key]) => key.startsWith('avg_') || key.startsWith('avg'))
+    .map(([key, value]) => ({
+      key,
+      label: key.replace(/^avg[_-]?/, '').replace(/_/g, ' ').toUpperCase(),
+      value: typeof value === 'number' ? value.toFixed(2) : value,
+    }))
+})
+
+function getAccuracyBadge(accuracy: number | null): string {
+  if (accuracy === null || accuracy === undefined) {
+    return 'badge-neutral'
+  }
+  if (accuracy >= 0.9) return 'badge-success'
+  if (accuracy >= 0.75) return 'badge-info'
+  if (accuracy >= 0.6) return 'badge-warning'
+  return 'badge-danger'
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 // 格式化时间
@@ -279,6 +406,70 @@ onMounted(() => {
 
 .stats-title {
   @apply text-lg font-semibold text-gray-800 mb-4;
+}
+
+.item-stats-list {
+  @apply space-y-3;
+}
+
+.item-stat-card {
+  @apply border border-gray-200 rounded-lg p-4 bg-white shadow-sm;
+}
+
+.item-stat-header {
+  @apply flex items-center justify-between mb-3;
+}
+
+.item-id {
+  @apply text-sm font-semibold text-gray-700;
+}
+
+.item-accuracy {
+  @apply px-2 py-1 text-xs font-medium rounded-full;
+}
+
+.item-stat-body {
+  @apply space-y-2 text-sm text-gray-600;
+}
+
+.item-stat-row {
+  @apply flex items-center justify-between;
+}
+
+.knowledge-badges {
+  @apply flex flex-wrap gap-2 justify-end;
+}
+
+.knowledge-badges .badge {
+  @apply inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full;
+}
+
+.badge-success {
+  @apply bg-green-100 text-green-700;
+}
+
+.badge-info {
+  @apply bg-blue-100 text-blue-700;
+}
+
+.badge-warning {
+  @apply bg-yellow-100 text-yellow-700;
+}
+
+.badge-danger {
+  @apply bg-red-100 text-red-700;
+}
+
+.badge-neutral {
+  @apply bg-gray-100 text-gray-600;
+}
+
+.flowchart-analytics {
+  @apply mt-4 border border-gray-200 rounded-lg divide-y divide-gray-200;
+}
+
+.analytics-row {
+  @apply flex items-center justify-between px-4 py-2 text-sm text-gray-700;
 }
 
 .stats-grid {

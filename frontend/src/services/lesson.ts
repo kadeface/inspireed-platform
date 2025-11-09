@@ -4,7 +4,7 @@
  */
 
 import { api } from './api'
-import type { Lesson, LessonCreate, LessonUpdate } from '../types/lesson'
+import type { Lesson, LessonCreate, LessonUpdate, LessonClassroom } from '../types/lesson'
 import type { LessonListParams, LessonListResponse } from '../types/api'
 import type { 
   Resource, 
@@ -108,9 +108,11 @@ class LessonService {
    * @param id 教案 ID
    * @returns 发布后的教案
    */
-  async publishLesson(id: number): Promise<Lesson> {
+  async publishLesson(id: number, classroomIds: number[]): Promise<Lesson> {
     try {
-      const response = await api.post<Lesson>(`${this.basePath}/${id}/publish`)
+      const response = await api.post<Lesson>(`${this.basePath}/${id}/publish`, {
+        classroom_ids: classroomIds
+      })
       return response
     } catch (error: any) {
       console.error(`Failed to publish lesson ${id}:`, error)
@@ -243,6 +245,19 @@ class LessonService {
     } catch (error: any) {
       console.error('Failed to fetch recommended lessons:', error)
       throw new Error(error.response?.data?.detail || '获取推荐课程失败')
+    }
+  }
+
+  /**
+   * 获取可用于发布的班级列表
+   */
+  async fetchAvailableClassrooms(): Promise<LessonClassroom[]> {
+    try {
+      const response = await api.get<LessonClassroom[]>(`${this.basePath}/available-classrooms`)
+      return response
+    } catch (error: any) {
+      console.error('Failed to fetch available classrooms:', error)
+      throw new Error(error.response?.data?.detail || '获取班级列表失败')
     }
   }
 }

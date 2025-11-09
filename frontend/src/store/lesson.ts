@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Lesson, LessonCreate } from '../types/lesson'
+import type { Lesson, LessonCreate, LessonClassroom } from '../types/lesson'
 import type { Cell } from '../types/cell'
 import type { LessonListParams } from '../types/api'
 import { lessonService } from '../services/lesson'
@@ -10,10 +10,13 @@ export const useLessonStore = defineStore('lesson', () => {
   const lessons = ref<Lesson[]>([])
   const isLoading = ref(false)
   const isSaving = ref(false)
+  const isLoadingClassrooms = ref(false)
   const error = ref<string | null>(null)
+  const classroomsError = ref<string | null>(null)
   const totalLessons = ref(0)
   const currentPage = ref(1)
   const pageSize = ref(20)
+  const availableClassrooms = ref<LessonClassroom[]>([])
 
   const cells = computed(() => currentLesson.value?.content || [])
 
@@ -31,21 +34,25 @@ export const useLessonStore = defineStore('lesson', () => {
     }
   }
 
-  function updateCell(cellId: string, updates: Partial<Cell>) {
+  function updateCell(cellId: string | number, updates: Partial<Cell>) {
     if (currentLesson.value) {
-      const index = currentLesson.value.content.findIndex((c) => c.id === cellId)
+      const index = currentLesson.value.content.findIndex(
+        (c) => String(c.id) === String(cellId)
+      )
       if (index !== -1) {
         currentLesson.value.content[index] = {
           ...currentLesson.value.content[index],
           ...updates,
-        }
+        } as Cell
       }
     }
   }
 
-  function deleteCell(cellId: string) {
+  function deleteCell(cellId: string | number) {
     if (currentLesson.value) {
-      currentLesson.value.content = currentLesson.value.content.filter((c) => c.id !== cellId)
+      currentLesson.value.content = currentLesson.value.content.filter(
+        (c) => String(c.id) !== String(cellId)
+      )
     }
   }
 
@@ -150,6 +157,8 @@ export const useLessonStore = defineStore('lesson', () => {
           description: currentLesson.value.description,
           content: currentLesson.value.content,
           tags: currentLesson.value.tags,
+          course_id: currentLesson.value.course_id,
+          chapter_id: currentLesson.value.chapter_id,
         })
       }
 
@@ -206,16 +215,23 @@ export const useLessonStore = defineStore('lesson', () => {
   /**
    * 发布当前教案
    */
-  async function publishCurrentLesson() {
+  async function publishCurrentLesson(classroomIds: number[]) {
     if (!currentLesson.value?.id) {
       throw new Error('没有要发布的教案')
+    }
+
+    if (!classroomIds || classroomIds.length === 0) {
+      throw new Error('请选择至少一个班级')
     }
 
     isSaving.value = true
     error.value = null
 
     try {
-      const publishedLesson = await lessonService.publishLesson(currentLesson.value.id)
+      const publishedLesson = await lessonService.publishLesson(
+        currentLesson.value.id,
+        classroomIds
+      )
       currentLesson.value = publishedLesson
 
       // 更新列表中的教案
@@ -312,6 +328,28 @@ export const useLessonStore = defineStore('lesson', () => {
     }
   }
 
+  /**
+   * 获取教师可用的班级列表
+   */
+  async function loadAvailableClassrooms(force = false) {
+    if (availableClassrooms.value.length > 0 && !force) {
+      return
+    }
+
+    isLoadingClassrooms.value = true
+    classroomsError.value = null
+
+    try {
+      availableClassrooms.value = await lessonService.fetchAvailableClassrooms()
+    } catch (err: any) {
+      const message = err.message || '获取班级列表失败'
+      classroomsError.value = message
+      throw err
+    } finally {
+      isLoadingClassrooms.value = false
+    }
+  }
+
   return {
     // 状态
     currentLesson,
@@ -319,10 +357,13 @@ export const useLessonStore = defineStore('lesson', () => {
     cells,
     isLoading,
     isSaving,
+    isLoadingClassrooms,
     error,
+    classroomsError,
     totalLessons,
     currentPage,
     pageSize,
+    availableClassrooms,
     
     // 本地操作方法
     setCurrentLesson,
@@ -342,6 +383,7 @@ export const useLessonStore = defineStore('lesson', () => {
     publishCurrentLesson,
     deleteLessonById,
     duplicateLessonById,
+    loadAvailableClassrooms,
   }
 })
 

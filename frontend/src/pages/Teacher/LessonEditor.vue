@@ -269,6 +269,16 @@
       </div>
     </Transition>
 
+    <ClassroomSelectorModal
+      v-model="showPublishModal"
+      :classrooms="availableClassrooms"
+      :initial-selected-ids="selectedClassroomIds"
+      :loading="isLoadingClassrooms"
+      :error="publishModalError"
+      @confirm="handlePublishConfirm"
+      @cancel="handlePublishCancel"
+    />
+
     <!-- MVP: PDF 查看器 -->
     <PDFViewerModal
       v-model="showPDFViewer"
@@ -370,6 +380,7 @@ import CellContainer from '../../components/Cell/CellContainer.vue'
 import AddCellMenu from '../../components/Lesson/AddCellMenu.vue'
 import ReferenceResourcePanel from '../../components/Resource/ReferenceResourcePanel.vue'
 import PDFViewerModal from '../../components/Resource/PDFViewerModal.vue'
+import ClassroomSelectorModal from '../../components/Lesson/ClassroomSelectorModal.vue'
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
@@ -394,6 +405,9 @@ let flowInteractionResumeTimer: ReturnType<typeof setTimeout> | null = null
 const referenceResource = ref<any>(null)
 const showReferencePanel = ref(true)
 const showPDFViewer = ref(false)
+const showPublishModal = ref(false)
+const selectedClassroomIds = ref<number[]>([])
+const publishError = ref<string | null>(null)
 
 // Toast 提示
 const toast = ref({
@@ -406,6 +420,12 @@ const toast = ref({
 const currentLesson = computed(() => lessonStore.currentLesson)
 const cells = computed(() => lessonStore.cells)
 const isSaving = computed(() => lessonStore.isSaving)
+const availableClassrooms = computed(() => lessonStore.availableClassrooms)
+const isLoadingClassrooms = computed(() => lessonStore.isLoadingClassrooms)
+const classroomsError = computed(() => lessonStore.classroomsError)
+const publishModalError = computed(
+  () => publishError.value || classroomsError.value || null
+)
 
 // 标记是否最近从未发布状态切换的
 const isRecentlyUnpublished = ref(false)
@@ -660,12 +680,46 @@ async function handleManualSave() {
 
 // 发布教案
 async function handlePublish() {
+  publishError.value = null
+
   try {
-    await lessonStore.publishCurrentLesson()
+    await lessonStore.loadAvailableClassrooms()
+    const existingIds = currentLesson.value?.classroom_ids ?? []
+    selectedClassroomIds.value = [...existingIds]
+
+    if (
+      selectedClassroomIds.value.length === 0 &&
+      availableClassrooms.value.length === 1
+    ) {
+      selectedClassroomIds.value = [availableClassrooms.value[0].id]
+    }
+
+    showPublishModal.value = true
+  } catch (error: any) {
+    showToast('error', error.message || '获取班级列表失败')
+  }
+}
+
+async function handlePublishConfirm(classroomIds: number[]) {
+  if (classroomIds.length === 0) {
+    publishError.value = '请选择至少一个班级'
+    return
+  }
+
+  publishError.value = null
+
+  try {
+    await lessonStore.publishCurrentLesson(classroomIds)
+    selectedClassroomIds.value = [...classroomIds]
+    showPublishModal.value = false
     showToast('success', '教案已发布')
   } catch (error: any) {
-    showToast('error', error.message || '发布失败')
+    publishError.value = error.message || '发布失败'
   }
+}
+
+function handlePublishCancel() {
+  publishError.value = null
 }
 
 // 返回

@@ -10,6 +10,20 @@ from app.models.lesson import LessonStatus
 from app.schemas.curriculum import CourseResponse
 
 
+class LessonClassroomInfo(BaseModel):
+    """教案关联班级信息"""
+
+    id: int
+    name: str
+    school_id: int
+    grade_id: int
+    code: Optional[str] = None
+    enrollment_year: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
 class LessonBase(BaseModel):
     """教案基础Schema"""
 
@@ -55,6 +69,8 @@ class LessonResponse(LessonBase):
     created_at: datetime
     updated_at: datetime
     published_at: Optional[datetime] = None
+    classroom_ids: List[int] = Field(default_factory=list)
+    classrooms: List[LessonClassroomInfo] = Field(default_factory=list)
 
     # 教师信息
     creator_name: Optional[str] = None
@@ -82,3 +98,11 @@ class LessonListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class LessonPublishRequest(BaseModel):
+    """教案发布请求"""
+
+    classroom_ids: List[int] = Field(
+        ..., min_length=1, description="教案发布的目标班级ID列表"
+    )

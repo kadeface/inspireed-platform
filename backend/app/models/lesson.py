@@ -15,6 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     Enum as SQLEnum,
     JSON,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -121,6 +122,53 @@ class Lesson(Base):
     questions = relationship(
         "Question", back_populates="lesson", cascade="all, delete-orphan"
     )
+    lesson_classrooms = relationship(
+        "LessonClassroom",
+        back_populates="lesson",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def __repr__(self) -> str:
         return f"<Lesson(id={self.id}, title={self.title}, status={self.status})>"
+
+
+class LessonClassroom(Base):
+    """教案与班级关联"""
+
+    __tablename__ = "lesson_classrooms"
+    __table_args__ = (
+        UniqueConstraint("lesson_id", "classroom_id", name="uq_lesson_classroom"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    lesson_id = Column(
+        Integer,
+        ForeignKey("lessons.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="教案ID",
+    )
+    classroom_id = Column(
+        Integer,
+        ForeignKey("classrooms.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="班级ID",
+    )
+    assigned_by = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="分配教师ID",
+    )
+    assigned_at = Column(
+        DateTime, default=datetime.utcnow, nullable=False, comment="分配时间"
+    )
+
+    lesson = relationship("Lesson", back_populates="lesson_classrooms")
+    classroom = relationship("Classroom")
+    teacher = relationship("User", foreign_keys=[assigned_by])
+
+    def __repr__(self) -> str:
+        return f"<LessonClassroom(lesson_id={self.lesson_id}, classroom_id={self.classroom_id})>"

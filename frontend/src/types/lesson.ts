@@ -2,6 +2,15 @@ import type { Cell } from './cell'
 import type { Course, Chapter } from './curriculum'
 import type { Resource } from './resource'
 
+export interface LessonClassroom {
+  id: number
+  name: string
+  school_id: number
+  grade_id: number
+  code?: string | null
+  enrollment_year?: number | null
+}
+
 export const LessonStatus = {
   DRAFT: 'draft',
   PUBLISHED: 'published',
@@ -23,6 +32,8 @@ export interface Lesson {
   parent_id?: number
   national_resource_id?: string
   tags?: string[]
+  classroom_ids: number[]
+  classrooms: LessonClassroom[]
   cover_image_url?: string
   created_at: string
   updated_at: string

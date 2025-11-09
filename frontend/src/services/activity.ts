@@ -5,6 +5,9 @@
 import api from './api'
 import type {
   ActivitySubmission,
+  ActivityItemStatistic,
+  FlowchartSnapshot,
+  FormativeAssessmentRecord,
   CreateActivitySubmissionRequest,
   UpdateActivitySubmissionRequest,
   SubmitActivityRequest,
@@ -192,6 +195,66 @@ export const activityService = {
    */
   async getStatistics(cellId: number): Promise<ActivityStatistics> {
     const response = await api.get(`/activities/cells/${cellId}/statistics`)
+    return response.data
+  },
+
+  /**
+   * 获取题目级统计
+   */
+  async getItemStatistics(cellId: number): Promise<ActivityItemStatistic[]> {
+    const response = await api.get(
+      `/activities/cells/${cellId}/item-statistics`
+    )
+    return response.data
+  },
+
+  /**
+   * 获取流程图快照
+   */
+  async getFlowchartSnapshots(
+    cellId: number,
+    options: { studentId?: number } = {}
+  ): Promise<FlowchartSnapshot[]> {
+    const params = options.studentId ? { student_id: options.studentId } : undefined
+    const response = await api.get(
+      `/activities/cells/${cellId}/flowchart-snapshots`,
+      { params }
+    )
+    return response.data
+  },
+
+  /**
+   * 获取课程的过程性评估摘要
+   */
+  async getFormativeAssessments(
+    lessonId: number,
+    filters: { studentId?: number; phase?: string; riskLevel?: string } = {}
+  ): Promise<FormativeAssessmentRecord[]> {
+    const params: Record<string, any> = {}
+    if (filters.studentId !== undefined) params.student_id = filters.studentId
+    if (filters.phase) params.phase = filters.phase
+    if (filters.riskLevel) params.risk_level = filters.riskLevel
+    const response = await api.get(
+      `/activities/lessons/${lessonId}/formative-assessments`,
+      { params }
+    )
+    return response.data
+  },
+
+  /**
+   * 重新计算指定学生的过程性评估
+   */
+  async recomputeFormativeAssessment(
+    lessonId: number,
+    studentId: number,
+    phase?: string
+  ): Promise<FormativeAssessmentRecord> {
+    const params = phase ? { phase } : undefined
+    const response = await api.post(
+      `/activities/lessons/${lessonId}/formative-assessments/${studentId}/recompute`,
+      undefined,
+      { params }
+    )
     return response.data
   },
 

@@ -2,8 +2,8 @@
 教案API路由
 """
 
-from datetime import datetime, timezone
-from typing import Any, List, Optional, Union, cast
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Union, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,24 +12,80 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.models import (
     User,
+    UserRole,
     Lesson,
     LessonStatus,
+    LessonClassroom,
     Course,
     Resource,
     Chapter,
     DifficultyLevel,
+    Classroom,
 )
 from app.schemas.lesson import (
     LessonCreate,
     LessonUpdate,
     LessonResponse,
     LessonListResponse,
+    LessonClassroomInfo,
+    LessonPublishRequest,
 )
 from app.api.v1.auth import get_current_active_user
 from app.api.deps import get_current_user_optional
 from pydantic import BaseModel, Field
 
 router = APIRouter()
+
+
+async def _get_lesson_with_relations(
+    db: AsyncSession, lesson_id: int
+) -> Optional[Lesson]:
+    """加载包含必要关联关系的教案"""
+    result = await db.execute(
+        select(Lesson)
+            .options(
+                selectinload(Lesson.course).selectinload(Course.subject),
+                selectinload(Lesson.course).selectinload(Course.grade),
+                selectinload(Lesson.creator),
+                selectinload(Lesson.chapter),
+                selectinload(Lesson.reference_resource),
+                selectinload(Lesson.lesson_classrooms).selectinload(
+                    LessonClassroom.classroom
+                ),
+            )
+            .where(Lesson.id == lesson_id)
+    )
+    return result.scalar_one_or_none()
+
+
+def _lesson_to_response(lesson: Lesson) -> LessonResponse:
+    """将教案对象转换为响应字典"""
+    lesson_data = {
+        k: v
+        for k, v in lesson.__dict__.items()
+        if not k.startswith("_") and k not in {"lesson_classrooms", "creator"}
+    }
+    lesson_data.setdefault("content", lesson.content or [])
+    lesson_data.setdefault("tags", lesson.tags or [])
+    lesson_data.update(
+        {
+            "creator_name": lesson.creator.full_name if lesson.creator else None,
+            "creator_avatar": lesson.creator.avatar_url if lesson.creator else None,
+            "classroom_ids": [
+                relation.classroom_id for relation in lesson.lesson_classrooms
+            ],
+            "classrooms": [
+                LessonClassroomInfo.model_validate(relation.classroom).model_dump()
+                for relation in lesson.lesson_classrooms
+                if relation.classroom is not None
+            ],
+        }
+    )
+    if lesson_data["content"] is None:
+        lesson_data["content"] = []
+    if lesson_data.get("tags") is None:
+        lesson_data["tags"] = []
+    return LessonResponse.model_validate(lesson_data)
 
 
 @router.post("/", response_model=LessonResponse, status_code=201)
@@ -71,20 +127,11 @@ async def create_lesson(
     )
     db.add(lesson)
     await db.commit()
-    await db.refresh(lesson)
-
-    # 重新加载以获取课程关联信息
-    result = await db.execute(
-        select(Lesson)
-        .options(
-            selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade),
-        )
-        .where(Lesson.id == lesson.id)
-    )
-    lesson = result.scalar_one()
-
-    return lesson
+    lesson_id_value = cast(int, lesson.id)
+    lesson = await _get_lesson_with_relations(db, lesson_id_value)
+    if not lesson:
+        raise HTTPException(status_code=500, detail="教案创建后加载失败")
+    return _lesson_to_response(lesson)
 
 
 @router.get("/", response_model=LessonListResponse)
@@ -101,77 +148,115 @@ async def list_lessons(
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """获取教案列表"""
-    # 转换 status 字符串为枚举类型
-    status_enum = None
-    if status:
-        try:
-            status_enum = LessonStatus(status.lower())
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"无效的状态值: {status}")
+    try:
+        status_enum = LessonStatus(status.lower()) if status else None
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"无效的状态值: {status}")
 
-    # 构建查询
-    query = select(Lesson).options(
+    role_value = cast(str, getattr(current_user.role, "value", current_user.role))
+    try:
+        user_role = UserRole(role_value)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="当前用户角色无效")
+
+    base_query = select(Lesson).options(
         selectinload(Lesson.course).selectinload(Course.subject),
         selectinload(Lesson.course).selectinload(Course.grade),
-        selectinload(Lesson.creator),  # 加载教师信息
+        selectinload(Lesson.creator),
+        selectinload(Lesson.lesson_classrooms).selectinload(
+            LessonClassroom.classroom
+        ),
     )
 
-    # 根据用户角色应用不同的过滤条件
-    if cast(str, current_user.role) == "student":
-        # 学生：只能看到已发布的课程
-        query = query.where(Lesson.status == LessonStatus.PUBLISHED)
+    if user_role == UserRole.STUDENT:
+        classroom_id = current_user.classroom_id
+        if classroom_id is None:
+            return LessonListResponse(
+                items=[],
+                total=0,
+                page=page,
+                page_size=page_size,
+            )
+        base_query = (
+            base_query.join(LessonClassroom)
+            .where(Lesson.status == LessonStatus.PUBLISHED)
+            .where(LessonClassroom.classroom_id == classroom_id)
+            .distinct(Lesson.id)
+        )
     else:
-        # 教师/管理员/教研员：只能看到自己创建的课程
-        query = query.where(Lesson.creator_id == current_user.id)
-        # 对于非学生用户，可以通过status参数进一步筛选
+        base_query = base_query.where(Lesson.creator_id == current_user.id)
         if status_enum:
-            query = query.where(Lesson.status == status_enum)
+            base_query = base_query.where(Lesson.status == status_enum)
 
     if search:
-        query = query.where(Lesson.title.ilike(f"%{search}%"))
+        base_query = base_query.where(Lesson.title.ilike(f"%{search}%"))
 
     if course_id:
-        query = query.where(Lesson.course_id == course_id)
+        base_query = base_query.where(Lesson.course_id == course_id)
 
     if chapter_id:
-        query = query.where(Lesson.chapter_id == chapter_id)
+        base_query = base_query.where(Lesson.chapter_id == chapter_id)
 
-    # 如果按学科或年级筛选，需要join课程表
     if subject_id or grade_id:
-        query = query.join(Course)
+        base_query = base_query.join(Course)
         if subject_id:
-            query = query.where(Course.subject_id == subject_id)
+            base_query = base_query.where(Course.subject_id == subject_id)
         if grade_id:
-            query = query.where(Course.grade_id == grade_id)
+            base_query = base_query.where(Course.grade_id == grade_id)
 
-    # 获取总数
-    count_query = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
+    count_subquery = (
+        base_query.with_only_columns(Lesson.id)
+        .order_by(None)
+        .distinct()
+        .subquery()
+    )
+    count_query = select(func.count()).select_from(count_subquery)
+    total = (await db.execute(count_query)).scalar() or 0
 
-    # 分页查询
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    query = query.order_by(Lesson.updated_at.desc())
+    ordered_query = base_query.order_by(Lesson.updated_at.desc())
+    paginated_query = ordered_query.offset((page - 1) * page_size).limit(page_size)
 
-    result = await db.execute(query)
-    lessons = result.scalars().all()
-
-    # 为每个lesson添加教师信息
-    lessons_with_creator = []
-    for lesson in lessons:
-        lesson_dict = {
-            **{k: v for k, v in lesson.__dict__.items() if not k.startswith("_")},
-            "creator_name": lesson.creator.full_name if lesson.creator else None,
-            "creator_avatar": lesson.creator.avatar_url if lesson.creator else None,
-        }
-        lessons_with_creator.append(lesson_dict)
+    lessons = (await db.execute(paginated_query)).scalars().all()
+    serialized_lessons = [_lesson_to_response(lesson) for lesson in lessons]
 
     return LessonListResponse(
-        items=lessons_with_creator,
+        items=serialized_lessons,
         total=total,
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/available-classrooms", response_model=List[LessonClassroomInfo])
+async def get_available_classrooms(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """获取教师可选的班级列表"""
+    role_value = cast(str, getattr(current_user.role, "value", current_user.role))
+    try:
+        user_role = UserRole(role_value)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="当前用户角色无效")
+
+    query = select(Classroom).where(Classroom.is_active.is_(True))
+
+    if user_role == UserRole.TEACHER:
+        if current_user.school_id is None:
+            raise HTTPException(status_code=400, detail="教师未关联学校，无法获取班级列表")
+        query = query.where(Classroom.school_id == current_user.school_id)
+    elif user_role in {UserRole.ADMIN, UserRole.RESEARCHER}:
+        # 管理员或教研员可以查看全部激活班级
+        pass
+    else:
+        raise HTTPException(status_code=403, detail="仅教师或管理员可查看班级列表")
+
+    query = query.order_by(Classroom.grade_id, Classroom.name)
+
+    classrooms = (await db.execute(query)).scalars().all()
+    return [
+        LessonClassroomInfo.model_validate(classroom) for classroom in classrooms
+    ]
 
 
 @router.get("/{lesson_id}", response_model=LessonResponse)
@@ -181,34 +266,34 @@ async def get_lesson(
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """获取教案详情"""
-    result = await db.execute(
-        select(Lesson)
-        .options(
-            selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade),
-            selectinload(Lesson.creator),  # 加载教师信息
-        )
-        .where(Lesson.id == lesson_id)
-    )
-    lesson = result.scalar_one_or_none()
+    lesson = await _get_lesson_with_relations(db, lesson_id)
 
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
 
-    # 检查权限（可以查看自己的或已发布的）
-    creator_id = cast(Optional[int], lesson.creator_id)
+    role_value = cast(str, getattr(current_user.role, "value", current_user.role))
+    try:
+        user_role = UserRole(role_value)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="当前用户角色无效")
+
     lesson_status = LessonStatus(cast(str, lesson.status))
-    if creator_id != current_user.id and lesson_status != LessonStatus.PUBLISHED:
-        raise HTTPException(status_code=403, detail="无权访问该教案")
+    creator_id = cast(Optional[int], lesson.creator_id)
 
-    # 添加教师信息
-    lesson_dict = {
-        **{k: v for k, v in lesson.__dict__.items() if not k.startswith("_")},
-        "creator_name": lesson.creator.full_name if lesson.creator else None,
-        "creator_avatar": lesson.creator.avatar_url if lesson.creator else None,
-    }
+    if user_role == UserRole.STUDENT:
+        if lesson_status != LessonStatus.PUBLISHED:
+            raise HTTPException(status_code=403, detail="无权访问该教案")
+        classroom_id = current_user.classroom_id
+        assigned_classroom_ids = {
+            relation.classroom_id for relation in lesson.lesson_classrooms
+        }
+        if classroom_id is None or classroom_id not in assigned_classroom_ids:
+            raise HTTPException(status_code=403, detail="该教案未分配到你的班级")
+    else:
+        if creator_id != current_user.id and lesson_status != LessonStatus.PUBLISHED:
+            raise HTTPException(status_code=403, detail="无权访问该教案")
 
-    return lesson_dict
+    return _lesson_to_response(lesson)
 
 
 @router.put("/{lesson_id}", response_model=LessonResponse)
@@ -267,11 +352,14 @@ async def update_lesson(
         new_version = (current_version or 1) + 1
         setattr(lesson, "version", new_version)
         # 更新 published_at 时间戳，表示内容已更新
-        setattr(lesson, "published_at", datetime.now(timezone.utc))
+        setattr(lesson, "published_at", datetime.utcnow())
 
     await db.commit()
-    await db.refresh(lesson)
-    return lesson
+    lesson_id_value = cast(int, lesson.id)
+    lesson = await _get_lesson_with_relations(db, lesson_id_value)
+    if not lesson:
+        raise HTTPException(status_code=500, detail="教案更新后加载失败")
+    return _lesson_to_response(lesson)
 
 
 @router.delete("/{lesson_id}", status_code=204)
@@ -297,19 +385,12 @@ async def delete_lesson(
 @router.post("/{lesson_id}/publish", response_model=LessonResponse)
 async def publish_lesson(
     lesson_id: int,
+    publish_in: LessonPublishRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """发布教案"""
-    result = await db.execute(
-        select(Lesson)
-        .options(
-            selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade),
-        )
-        .where(Lesson.id == lesson_id)
-    )
-    lesson = result.scalar_one_or_none()
+    lesson = await _get_lesson_with_relations(db, lesson_id)
 
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
@@ -317,24 +398,77 @@ async def publish_lesson(
     if cast(Optional[int], lesson.creator_id) != current_user.id:
         raise HTTPException(status_code=403, detail="无权发布该教案")
 
+    classroom_ids = set(publish_in.classroom_ids)
+    if not classroom_ids:
+        raise HTTPException(status_code=400, detail="发布教案时必须指定至少一个班级")
+
+    classrooms_result = await db.execute(
+        select(Classroom).where(Classroom.id.in_(classroom_ids))
+    )
+    classrooms = classrooms_result.scalars().all()
+    existing_classroom_ids = {cast(int, classroom.id) for classroom in classrooms}
+    missing_ids = classroom_ids - existing_classroom_ids
+    if missing_ids:
+        missing_str = ", ".join(str(cid) for cid in sorted(missing_ids))
+        raise HTTPException(status_code=404, detail=f"班级不存在: {missing_str}")
+
+    role_value = cast(str, getattr(current_user.role, "value", current_user.role))
+    try:
+        user_role = UserRole(role_value)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="当前用户角色无效")
+
+    if user_role == UserRole.TEACHER:
+        if current_user.school_id is None:
+            raise HTTPException(status_code=400, detail="教师缺少所属学校信息，无法分配班级")
+        for classroom in classrooms:
+            classroom_school_id = cast(Optional[int], classroom.school_id)
+            classroom_head_teacher_id = cast(Optional[int], classroom.head_teacher_id)
+            if (
+                classroom_school_id != current_user.school_id
+                and classroom_head_teacher_id != current_user.id
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"无权将教案发布到班级 {classroom.name}",
+                )
+
+    existing_relations = {
+        cast(int, relation.classroom_id): relation
+        for relation in lesson.lesson_classrooms
+    }
+
+    for classroom_id, relation in list(existing_relations.items()):
+        if classroom_id not in classroom_ids:
+            await db.delete(relation)
+
+    now = datetime.utcnow()
+    lesson_id_value = cast(int, lesson.id)
+    for classroom in classrooms:
+        classroom_id_value = cast(int, classroom.id)
+        relation = existing_relations.get(classroom_id_value)
+        if relation:
+            relation.assigned_by = current_user.id
+            relation.assigned_at = now
+        else:
+            db.add(
+                LessonClassroom(
+                    lesson_id=lesson_id_value,
+                    classroom_id=classroom_id_value,
+                    assigned_by=current_user.id,
+                    assigned_at=now,
+                )
+            )
+
     setattr(lesson, "status", LessonStatus.PUBLISHED)
-    setattr(lesson, "published_at", datetime.now(timezone.utc))
+    setattr(lesson, "published_at", datetime.utcnow())
 
     await db.commit()
-    await db.refresh(lesson)
+    lesson = await _get_lesson_with_relations(db, lesson_id_value)
+    if not lesson:
+        raise HTTPException(status_code=500, detail="教案发布后加载失败")
 
-    # 重新加载以确保关联信息完整
-    result = await db.execute(
-        select(Lesson)
-        .options(
-            selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade),
-        )
-        .where(Lesson.id == lesson.id)
-    )
-    lesson = result.scalar_one()
-
-    return lesson
+    return _lesson_to_response(lesson)
 
 
 @router.post("/{lesson_id}/unpublish", response_model=LessonResponse)
@@ -344,15 +478,7 @@ async def unpublish_lesson(
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """将已发布的教案切换回草稿状态"""
-    result = await db.execute(
-        select(Lesson)
-        .options(
-            selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade),
-        )
-        .where(Lesson.id == lesson_id)
-    )
-    lesson = result.scalar_one_or_none()
+    lesson = await _get_lesson_with_relations(db, lesson_id)
 
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
@@ -367,20 +493,12 @@ async def unpublish_lesson(
     setattr(lesson, "published_at", None)
 
     await db.commit()
-    await db.refresh(lesson)
+    lesson_id_value = cast(int, lesson.id)
+    lesson = await _get_lesson_with_relations(db, lesson_id_value)
+    if not lesson:
+        raise HTTPException(status_code=500, detail="教案取消发布后加载失败")
 
-    # 重新加载以确保关联信息完整
-    result = await db.execute(
-        select(Lesson)
-        .options(
-            selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade),
-        )
-        .where(Lesson.id == lesson.id)
-    )
-    lesson = result.scalar_one()
-
-    return lesson
+    return _lesson_to_response(lesson)
 
 
 @router.post("/{lesson_id}/duplicate", response_model=LessonResponse)
@@ -410,20 +528,12 @@ async def duplicate_lesson(
 
     db.add(new_lesson)
     await db.commit()
-    await db.refresh(new_lesson)
+    new_lesson_id = cast(int, new_lesson.id)
+    lesson_copy = await _get_lesson_with_relations(db, new_lesson_id)
+    if not lesson_copy:
+        raise HTTPException(status_code=500, detail="教案复制后加载失败")
 
-    # 重新加载以获取课程关联信息
-    result = await db.execute(
-        select(Lesson)
-        .options(
-            selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade),
-        )
-        .where(Lesson.id == new_lesson.id)
-    )
-    new_lesson = result.scalar_one()
-
-    return new_lesson
+    return _lesson_to_response(lesson_copy)
 
 
 # ========== MVP: 基于资源创建教案相关端点 ==========
@@ -483,21 +593,12 @@ async def create_lesson_from_resource(
 
     db.add(lesson)
     await db.commit()
-    await db.refresh(lesson)
+    lesson_id_value = cast(int, lesson.id)
+    lesson = await _get_lesson_with_relations(db, lesson_id_value)
+    if not lesson:
+        raise HTTPException(status_code=500, detail="教案创建后加载失败")
 
-    # 4. 重新加载以获取关联信息
-    result = await db.execute(
-        select(Lesson)
-        .options(
-            selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade),
-            selectinload(Lesson.reference_resource),
-        )
-        .where(Lesson.id == lesson.id)
-    )
-    lesson = result.scalar_one()
-
-    return lesson
+    return _lesson_to_response(lesson)
 
 
 @router.get("/{lesson_id}/reference-resource")
@@ -550,16 +651,7 @@ async def update_reference_notes(
 ) -> Any:
     """更新教案的参考笔记"""
 
-    result = await db.execute(
-        select(Lesson)
-        .options(
-            selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade),
-            selectinload(Lesson.reference_resource),
-        )
-        .where(Lesson.id == lesson_id)
-    )
-    lesson = result.scalar_one_or_none()
+    lesson = await _get_lesson_with_relations(db, lesson_id)
 
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
@@ -570,9 +662,12 @@ async def update_reference_notes(
     setattr(lesson, "reference_notes", data.notes)
 
     await db.commit()
-    await db.refresh(lesson)
+    lesson_id_value = cast(int, lesson.id)
+    lesson = await _get_lesson_with_relations(db, lesson_id_value)
+    if not lesson:
+        raise HTTPException(status_code=500, detail="更新参考笔记后加载失败")
 
-    return lesson
+    return _lesson_to_response(lesson)
 
 
 @router.get("/chapter/{chapter_id}", response_model=LessonListResponse)
@@ -604,13 +699,17 @@ async def get_chapter_lessons(
     if chapter.is_active is False:
         raise HTTPException(status_code=400, detail="该章节已被禁用")
 
-    # 构建查询
     query = (
         select(Lesson)
         .options(
             selectinload(Lesson.course).selectinload(Course.subject),
             selectinload(Lesson.course).selectinload(Course.grade),
             selectinload(Lesson.chapter),
+            selectinload(Lesson.creator),
+            selectinload(Lesson.lesson_classrooms).selectinload(
+                LessonClassroom.classroom
+            ),
+            selectinload(Lesson.reference_resource),
         )
         .where(Lesson.creator_id == current_user.id, Lesson.chapter_id == chapter_id)
     )
@@ -621,20 +720,17 @@ async def get_chapter_lessons(
     if search:
         query = query.where(Lesson.title.ilike(f"%{search}%"))
 
-    # 获取总数
     count_query = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
+    total = (await db.execute(count_query)).scalar() or 0
 
-    # 分页查询
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    query = query.order_by(Lesson.updated_at.desc())
+    ordered_query = query.order_by(Lesson.updated_at.desc())
+    paginated_query = ordered_query.offset((page - 1) * page_size).limit(page_size)
 
-    result = await db.execute(query)
-    lessons = result.scalars().all()
+    lessons = (await db.execute(paginated_query)).scalars().all()
+    serialized_lessons = [_lesson_to_response(lesson) for lesson in lessons]
 
     return LessonListResponse(
-        items=[lesson.model_dump() for lesson in lessons],
+        items=serialized_lessons,
         total=total,
         page=page,
         page_size=page_size,
@@ -659,7 +755,11 @@ async def get_recommended_lessons(
         .options(
             selectinload(Lesson.course).selectinload(Course.subject),
             selectinload(Lesson.course).selectinload(Course.grade),
-            selectinload(Lesson.creator),  # 加载教师信息
+            selectinload(Lesson.creator),
+            selectinload(Lesson.lesson_classrooms).selectinload(
+                LessonClassroom.classroom
+            ),
+            selectinload(Lesson.reference_resource),
         )
         .where(Lesson.status == LessonStatus.PUBLISHED)
         .order_by(
@@ -672,16 +772,20 @@ async def get_recommended_lessons(
     result = await db.execute(query)
     lessons = result.scalars().all()
 
-    # 为每个lesson添加教师信息（使用字典格式，与list_lessons保持一致）
-    lessons_with_creator = []
-    for lesson in lessons:
-        lesson_dict = {
-            **{k: v for k, v in lesson.__dict__.items() if not k.startswith("_")},
-            "creator_name": lesson.creator.full_name if lesson.creator else None,
-            "creator_avatar": lesson.creator.avatar_url if lesson.creator else None,
-        }
-        lessons_with_creator.append(lesson_dict)
+    lesson_responses = [_lesson_to_response(lesson) for lesson in lessons]
+
+    if current_user and isinstance(current_user.role, UserRole) and cast(UserRole, current_user.role) == UserRole.STUDENT:
+        classroom_id = current_user.classroom_id
+        if classroom_id is not None:
+            lesson_responses = [
+                lesson
+                for lesson in lesson_responses
+                if classroom_id in lesson.classroom_ids
+            ]
 
     return LessonListResponse(
-        items=lessons_with_creator, total=len(lessons), page=1, page_size=limit
+        items=lesson_responses,
+        total=len(lesson_responses),
+        page=1,
+        page_size=limit,
     )

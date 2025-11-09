@@ -16,6 +16,7 @@ from sqlalchemy import (
     Enum as SQLEnum,
     JSON,
     Index,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -60,6 +61,8 @@ class ActivitySubmission(Base):
     #   "item_4": {"files": ["url1.pdf", "url2.docx"], "score": null}
     # }
     responses = Column(JSON, nullable=False, default=dict)
+    process_trace = Column(JSON, nullable=True, default=list)
+    context = Column(JSON, nullable=True, default=dict)
 
     # 评分
     score = Column(Float, nullable=True)  # 实际得分
@@ -85,8 +88,10 @@ class ActivitySubmission(Base):
 
     # 元数据
     submission_count = Column(Integer, default=1, nullable=False)  # 第几次提交
+    attempt_no = Column(Integer, default=1, nullable=False)  # 同一任务的尝试序号
     time_spent = Column(Integer, nullable=True)  # 花费时间（秒）
     is_late = Column(Boolean, default=False, nullable=False)  # 是否迟交
+    activity_phase = Column(String(32), nullable=True, index=True)
 
     # 离线支持：本地保存的版本号
     version = Column(Integer, default=1, nullable=False)
@@ -106,6 +111,12 @@ class ActivitySubmission(Base):
         "PeerReview",
         foreign_keys="PeerReview.submission_id",
         back_populates="submission",
+    )
+    flowchart_snapshots = relationship(
+        "FlowchartSnapshot",
+        foreign_keys="FlowchartSnapshot.submission_id",
+        back_populates="submission",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
@@ -224,6 +235,7 @@ class ActivityStatistics(Base):
     # 互评统计
     peer_review_count = Column(Integer, default=0, nullable=False)
     avg_peer_review_score = Column(Float, nullable=True)
+    flowchart_metrics = Column(JSON, nullable=True, default=dict)
 
     updated_at = Column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
@@ -234,6 +246,106 @@ class ActivityStatistics(Base):
 
     def __repr__(self) -> str:
         return f"<ActivityStatistics(id={self.id}, cell_id={self.cell_id})>"
+
+
+class ActivityItemStatistic(Base):
+    """题目级统计数据（按题目维度聚合）"""
+
+    __tablename__ = "activity_item_statistics"
+    __table_args__ = (
+        UniqueConstraint("cell_id", "item_id", name="uq_activity_item_stats_cell_item"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    cell_id = Column(Integer, ForeignKey("cells.id"), nullable=False, index=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
+    item_id = Column(String(64), nullable=False)
+
+    attempts = Column(Integer, default=0, nullable=False)
+    correct_count = Column(Integer, default=0, nullable=False)
+    avg_score = Column(Float, nullable=True)
+    avg_time_spent = Column(Float, nullable=True)
+    option_distribution = Column(JSON, nullable=True, default=dict)
+    score_distribution = Column(JSON, nullable=True, default=dict)
+    knowledge_stats = Column(JSON, nullable=True, default=dict)
+
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    lesson = relationship("Lesson", foreign_keys=[lesson_id])
+
+    def __repr__(self) -> str:
+        return f"<ActivityItemStatistic(cell_id={self.cell_id}, item_id={self.item_id})>"
+
+
+class FlowchartSnapshot(Base):
+    """学生流程图快照"""
+
+    __tablename__ = "flowchart_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(
+        Integer, ForeignKey("activity_submissions.id"), nullable=False, index=True
+    )
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
+    cell_id = Column(Integer, ForeignKey("cells.id"), nullable=False, index=True)
+
+    graph = Column(JSON, nullable=False, default=dict)
+    analysis = Column(JSON, nullable=True, default=dict)
+    version = Column(Integer, default=1, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    submission = relationship(
+        "ActivitySubmission",
+        foreign_keys=[submission_id],
+        back_populates="flowchart_snapshots",
+    )
+    student = relationship("User", foreign_keys=[student_id])
+    lesson = relationship("Lesson", foreign_keys=[lesson_id])
+    cell = relationship("Cell", foreign_keys=[cell_id])
+
+    def __repr__(self) -> str:
+        return f"<FlowchartSnapshot(id={self.id}, submission_id={self.submission_id})>"
+
+
+class FormativeAssessment(Base):
+    """过程性评估聚合结果"""
+
+    __tablename__ = "formative_assessments"
+    __table_args__ = (
+        UniqueConstraint(
+            "lesson_id", "student_id", "phase", name="uq_formative_assessment_scope"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    phase = Column(String(32), nullable=True, index=True)
+
+    metrics = Column(JSON, nullable=False, default=dict)
+    risk_level = Column(String(16), nullable=True)
+    recommendations = Column(JSON, nullable=True, default=list)
+
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    lesson = relationship("Lesson", foreign_keys=[lesson_id])
+    student = relationship("User", foreign_keys=[student_id])
+
+    def __repr__(self) -> str:
+        return (
+            f"<FormativeAssessment(lesson_id={self.lesson_id}, "
+            f"student_id={self.student_id}, phase={self.phase})>"
+        )
 
 
 # 创建索引以优化查询性能
@@ -249,3 +361,13 @@ Index(
 )
 Index("idx_peer_review_submission", PeerReview.submission_id)
 Index("idx_peer_review_reviewer", PeerReview.reviewer_id)
+Index(
+    "idx_flowchart_snapshot_submission",
+    FlowchartSnapshot.submission_id,
+    FlowchartSnapshot.version,
+)
+Index(
+    "idx_formative_assessment_student",
+    FormativeAssessment.student_id,
+    FormativeAssessment.lesson_id,
+)

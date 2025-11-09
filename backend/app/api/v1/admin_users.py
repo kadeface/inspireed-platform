@@ -131,7 +131,25 @@ async def _fetch_user_with_relations(db: AsyncSession, user_id: int) -> Optional
 
 
 def _serialize_user(user: User) -> UserResponse:
-    return UserResponse.model_validate(user)
+    """Serialize user with related organization names."""
+    return UserResponse(
+        id=cast(int, user.id),
+        username=cast(str, user.username),
+        email=cast(str, user.email),
+        full_name=cast(Optional[str], user.full_name),
+        role=cast(UserRole, user.role),
+        is_active=cast(bool, user.is_active),
+        created_at=cast(datetime, user.created_at),
+        last_login=cast(Optional[datetime], getattr(user, "last_login", None)),
+        region_id=cast(Optional[int], user.region_id),
+        school_id=cast(Optional[int], user.school_id),
+        grade_id=cast(Optional[int], user.grade_id),
+        classroom_id=cast(Optional[int], user.classroom_id),
+        region_name=user.region.name if user.region else None,
+        school_name=user.school.name if user.school else None,
+        grade_name=user.grade.name if user.grade else None,
+        classroom_name=user.classroom.name if user.classroom else None,
+    )
 
 
 async def _validate_scope_ids(
