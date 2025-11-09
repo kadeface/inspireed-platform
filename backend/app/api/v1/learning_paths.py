@@ -2,6 +2,9 @@
 学习路径相关API
 """
 
+from datetime import datetime
+from typing import Any, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -19,6 +22,81 @@ from app.schemas.learning_path import (
 )
 
 router = APIRouter()
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    """将值安全转换为整数。"""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_optional_int(value: Any) -> Optional[int]:
+    """将值安全转换为可选整数。"""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_str(value: Any, default: str = "") -> str:
+    """将值安全转换为字符串。"""
+    if value is None:
+        return default
+    return str(value)
+
+
+def _safe_optional_str(value: Any) -> Optional[str]:
+    """将值安全转换为可选字符串。"""
+    if value is None:
+        return None
+    return str(value)
+
+
+def _safe_bool(value: Any, default: bool = False) -> bool:
+    """将值安全转换为布尔值。"""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """将值安全转换为浮点数。"""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return float(value)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_datetime(value: Any, default: Optional[datetime] = None) -> Optional[datetime]:
+    """将值安全转换为 datetime。"""
+    if isinstance(value, datetime):
+        return value
+    return default
+
+
+def _get_role_value(role: Any) -> str:
+    """获取角色的字符串值。"""
+    if isinstance(role, UserRole):
+        return role.value
+    if role is None:
+        return ""
+    return str(role)
 
 
 @router.post("/", response_model=LearningPathResponse, status_code=status.HTTP_201_CREATED)
@@ -86,7 +164,12 @@ def update_learning_path(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="学习路径不存在")
 
     # 检查权限
-    if learning_path.creator_id != current_user.id and current_user.role != UserRole.ADMIN:
+    creator_id = getattr(learning_path, "creator_id", None)
+    current_user_id = getattr(current_user, "id", None)
+    current_user_role = _get_role_value(getattr(current_user, "role", None))
+    is_admin = current_user_role == UserRole.ADMIN.value
+
+    if creator_id != current_user_id and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权修改此学习路径")
 
     # 更新字段
@@ -115,7 +198,12 @@ def delete_learning_path(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="学习路径不存在")
 
     # 检查权限
-    if learning_path.creator_id != current_user.id and current_user.role != UserRole.ADMIN:
+    creator_id = getattr(learning_path, "creator_id", None)
+    current_user_id = getattr(current_user, "id", None)
+    current_user_role = _get_role_value(getattr(current_user, "role", None))
+    is_admin = current_user_role == UserRole.ADMIN.value
+
+    if creator_id != current_user_id and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权删除此学习路径")
 
     db.delete(learning_path)
@@ -145,29 +233,45 @@ def get_learning_paths(
     # 组装返回数据
     result = []
     for path in paths:
+        path_id = _safe_int(getattr(path, "id", None))
         lesson_count = (
             db.query(LearningPathLesson)
-            .filter(LearningPathLesson.learning_path_id == path.id)
+            .filter(LearningPathLesson.learning_path_id == path_id)
             .count()
         )
 
-        creator = db.query(User).filter(User.id == path.creator_id).first()
-        creator_name = creator.full_name or creator.username if creator else "未知"
+        creator = db.query(User).filter(User.id == getattr(path, "creator_id", None)).first()
+        creator_full_name = (
+            _safe_optional_str(getattr(creator, "full_name", None)) if creator else None
+        )
+        creator_username = (
+            _safe_optional_str(getattr(creator, "username", None)) if creator else None
+        )
+        creator_name = creator_full_name or creator_username or "未知"
+
+        difficulty_attr = getattr(path, "difficulty_level", None)
+        difficulty_value = getattr(difficulty_attr, "value", difficulty_attr)
+
+        created_at_raw = getattr(path, "created_at", None)
+        updated_at_raw = getattr(path, "updated_at", None)
+        timestamp_fallback = datetime.utcnow()
+        created_at_value = _safe_datetime(created_at_raw, timestamp_fallback) or timestamp_fallback
+        updated_at_value = _safe_datetime(updated_at_raw, timestamp_fallback) or timestamp_fallback
 
         result.append(
             LearningPathListItem(
-                id=path.id,
-                title=path.title,
-                description=path.description,
-                creator_id=path.creator_id,
-                difficulty_level=path.difficulty_level.value,
-                cover_image_url=path.cover_image_url,
-                is_published=path.is_published,
-                estimated_hours=path.estimated_hours,
-                created_at=path.created_at,
-                updated_at=path.updated_at,
+                id=path_id,
+                title=_safe_str(getattr(path, "title", "")),
+                description=_safe_optional_str(getattr(path, "description", None)),
+                creator_id=_safe_int(getattr(path, "creator_id", None)),
+                difficulty_level=_safe_str(difficulty_value, ""),
+                cover_image_url=_safe_optional_str(getattr(path, "cover_image_url", None)),
+                is_published=_safe_bool(getattr(path, "is_published", False)),
+                estimated_hours=_safe_optional_int(getattr(path, "estimated_hours", None)),
+                created_at=created_at_value,
+                updated_at=updated_at_value,
                 lesson_count=lesson_count,
-                creator_name=creator_name,
+                creator_name=_safe_str(creator_name),
             )
         )
 
@@ -193,45 +297,62 @@ def get_learning_path(*, db: Session = Depends(deps.get_db), path_id: int):
 
     lessons_details = []
     for pl in path_lessons:
-        lesson = db.query(Lesson).filter(Lesson.id == pl.lesson_id).first()
-        if lesson:
-            lessons_details.append(
-                LearningPathLessonWithDetails(
-                    id=pl.id,
-                    learning_path_id=pl.learning_path_id,
-                    lesson_id=pl.lesson_id,
-                    order_index=pl.order_index,
-                    is_required=pl.is_required,
-                    created_at=pl.created_at,
-                    lesson_title=lesson.title,
-                    lesson_description=lesson.description,
-                    lesson_cover_image=lesson.cover_image_url,
-                    lesson_difficulty=(
-                        lesson.difficulty_level.value if lesson.difficulty_level else None
-                    ),
-                    lesson_rating=lesson.average_rating,
-                    lesson_duration=lesson.estimated_duration,
-                )
+        lesson = db.query(Lesson).filter(Lesson.id == getattr(pl, "lesson_id", None)).first()
+        if not lesson:
+            continue
+
+        difficulty_attr = getattr(lesson, "difficulty_level", None)
+        difficulty_value = getattr(difficulty_attr, "value", difficulty_attr)
+        timestamp_fallback = datetime.utcnow()
+
+        lessons_details.append(
+            LearningPathLessonWithDetails(
+                id=_safe_int(getattr(pl, "id", None)),
+                learning_path_id=_safe_int(getattr(pl, "learning_path_id", None)),
+                lesson_id=_safe_int(getattr(pl, "lesson_id", None)),
+                order_index=_safe_int(getattr(pl, "order_index", None)),
+                is_required=_safe_bool(getattr(pl, "is_required", False)),
+                created_at=_safe_datetime(getattr(pl, "created_at", None), timestamp_fallback)
+                or timestamp_fallback,
+                lesson_title=_safe_str(getattr(lesson, "title", "")),
+                lesson_description=_safe_optional_str(getattr(lesson, "description", None)),
+                lesson_cover_image=_safe_optional_str(getattr(lesson, "cover_image_url", None)),
+                lesson_difficulty=_safe_optional_str(difficulty_value),
+                lesson_rating=_safe_float(getattr(lesson, "average_rating", 0.0)),
+                lesson_duration=_safe_optional_int(getattr(lesson, "estimated_duration", None)),
             )
+        )
 
     # 获取创建者信息
-    creator = db.query(User).filter(User.id == learning_path.creator_id).first()
-    creator_name = creator.full_name or creator.username if creator else "未知"
+    creator = db.query(User).filter(User.id == getattr(learning_path, "creator_id", None)).first()
+    creator_full_name = (
+        _safe_optional_str(getattr(creator, "full_name", None)) if creator else None
+    )
+    creator_username = (
+        _safe_optional_str(getattr(creator, "username", None)) if creator else None
+    )
+    creator_name = creator_full_name or creator_username or "未知"
+
+    difficulty_attr = getattr(learning_path, "difficulty_level", None)
+    difficulty_value = getattr(difficulty_attr, "value", difficulty_attr)
+    timestamp_fallback = datetime.utcnow()
 
     return LearningPathWithLessons(
-        id=learning_path.id,
-        title=learning_path.title,
-        description=learning_path.description,
-        creator_id=learning_path.creator_id,
-        difficulty_level=learning_path.difficulty_level.value,
-        cover_image_url=learning_path.cover_image_url,
-        is_published=learning_path.is_published,
-        estimated_hours=learning_path.estimated_hours,
-        created_at=learning_path.created_at,
-        updated_at=learning_path.updated_at,
+        id=_safe_int(getattr(learning_path, "id", None)),
+        title=_safe_str(getattr(learning_path, "title", "")),
+        description=_safe_optional_str(getattr(learning_path, "description", None)),
+        creator_id=_safe_int(getattr(learning_path, "creator_id", None)),
+        difficulty_level=_safe_str(difficulty_value, ""),
+        cover_image_url=_safe_optional_str(getattr(learning_path, "cover_image_url", None)),
+        is_published=_safe_bool(getattr(learning_path, "is_published", False)),
+        estimated_hours=_safe_optional_int(getattr(learning_path, "estimated_hours", None)),
+        created_at=_safe_datetime(getattr(learning_path, "created_at", None), timestamp_fallback)
+        or timestamp_fallback,
+        updated_at=_safe_datetime(getattr(learning_path, "updated_at", None), timestamp_fallback)
+        or timestamp_fallback,
         lessons=lessons_details,
         lesson_count=len(lessons_details),
-        creator_name=creator_name,
+        creator_name=_safe_str(creator_name),
     )
 
 
@@ -255,7 +376,12 @@ def add_lesson_to_path(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="学习路径不存在")
 
     # 检查权限
-    if learning_path.creator_id != current_user.id and current_user.role != UserRole.ADMIN:
+    creator_id = getattr(learning_path, "creator_id", None)
+    current_user_id = getattr(current_user, "id", None)
+    current_user_role = _get_role_value(getattr(current_user, "role", None))
+    is_admin = current_user_role == UserRole.ADMIN.value
+
+    if creator_id != current_user_id and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权修改此学习路径")
 
     # 检查课程是否存在
@@ -275,19 +401,24 @@ def add_lesson_to_path(
     db.refresh(path_lesson)
 
     # 返回详细信息
+    difficulty_attr = getattr(lesson, "difficulty_level", None)
+    difficulty_value = getattr(difficulty_attr, "value", difficulty_attr)
+    timestamp_fallback = datetime.utcnow()
+
     return LearningPathLessonWithDetails(
-        id=path_lesson.id,
-        learning_path_id=path_lesson.learning_path_id,
-        lesson_id=path_lesson.lesson_id,
-        order_index=path_lesson.order_index,
-        is_required=path_lesson.is_required,
-        created_at=path_lesson.created_at,
-        lesson_title=lesson.title,
-        lesson_description=lesson.description,
-        lesson_cover_image=lesson.cover_image_url,
-        lesson_difficulty=lesson.difficulty_level.value if lesson.difficulty_level else None,
-        lesson_rating=lesson.average_rating,
-        lesson_duration=lesson.estimated_duration,
+        id=_safe_int(getattr(path_lesson, "id", None)),
+        learning_path_id=_safe_int(getattr(path_lesson, "learning_path_id", None)),
+        lesson_id=_safe_int(getattr(path_lesson, "lesson_id", None)),
+        order_index=_safe_int(getattr(path_lesson, "order_index", None)),
+        is_required=_safe_bool(getattr(path_lesson, "is_required", False)),
+        created_at=_safe_datetime(getattr(path_lesson, "created_at", None), timestamp_fallback)
+        or timestamp_fallback,
+        lesson_title=_safe_str(getattr(lesson, "title", "")),
+        lesson_description=_safe_optional_str(getattr(lesson, "description", None)),
+        lesson_cover_image=_safe_optional_str(getattr(lesson, "cover_image_url", None)),
+        lesson_difficulty=_safe_optional_str(difficulty_value),
+        lesson_rating=_safe_float(getattr(lesson, "average_rating", 0.0)),
+        lesson_duration=_safe_optional_int(getattr(lesson, "estimated_duration", None)),
     )
 
 
@@ -307,7 +438,12 @@ def remove_lesson_from_path(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="学习路径不存在")
 
     # 检查权限
-    if learning_path.creator_id != current_user.id and current_user.role != UserRole.ADMIN:
+    creator_id = getattr(learning_path, "creator_id", None)
+    current_user_id = getattr(current_user, "id", None)
+    current_user_role = _get_role_value(getattr(current_user, "role", None))
+    is_admin = current_user_role == UserRole.ADMIN.value
+
+    if creator_id != current_user_id and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权修改此学习路径")
 
     path_lesson = (

@@ -486,6 +486,8 @@ async def import_courses(
                 )
                 existing_subject = existing.scalar_one_or_none()
 
+                subject_id_value = None
+
                 if existing_subject:
                     if overwrite_existing:
                         # 更新现有学科
@@ -496,6 +498,7 @@ async def import_courses(
                         import_result["subjects"]["skipped"] += 1
                     else:
                         import_result["subjects"]["skipped"] += 1
+                    subject_id_value = existing_subject.id
                 else:
                     # 创建新学科
                     subject = Subject(**subject_data)
@@ -503,10 +506,10 @@ async def import_courses(
                     await db.commit()
                     await db.refresh(subject)
                     import_result["subjects"]["created"] += 1
+                    subject_id_value = subject.id
 
-                subject_code_map[subject_data["code"]] = (
-                    existing_subject.id if existing_subject else subject.id
-                )
+                if subject_id_value is not None:
+                    subject_code_map[subject_data["code"]] = subject_id_value
 
             except Exception as e:
                 import_result["errors"].append(f"导入学科失败 {subject_data.get('name', '')}: {str(e)}")
@@ -518,6 +521,8 @@ async def import_courses(
                 existing = await db.execute(select(Grade).where(Grade.level == grade_data["level"]))
                 existing_grade = existing.scalar_one_or_none()
 
+                grade_id_value = None
+
                 if existing_grade:
                     if overwrite_existing:
                         # 更新现有年级
@@ -528,6 +533,7 @@ async def import_courses(
                         import_result["grades"]["skipped"] += 1
                     else:
                         import_result["grades"]["skipped"] += 1
+                    grade_id_value = existing_grade.id
                 else:
                     # 创建新年级
                     grade = Grade(**grade_data)
@@ -535,10 +541,10 @@ async def import_courses(
                     await db.commit()
                     await db.refresh(grade)
                     import_result["grades"]["created"] += 1
+                    grade_id_value = grade.id
 
-                grade_level_map[grade_data["level"]] = (
-                    existing_grade.id if existing_grade else grade.id
-                )
+                if grade_id_value is not None:
+                    grade_level_map[grade_data["level"]] = grade_id_value
 
             except Exception as e:
                 import_result["errors"].append(f"导入年级失败 {grade_data.get('name', '')}: {str(e)}")
@@ -562,6 +568,8 @@ async def import_courses(
                 )
                 existing_course = existing.scalar_one_or_none()
 
+                course_id_value = None
+
                 if existing_course:
                     if overwrite_existing:
                         # 更新现有课程
@@ -572,6 +580,7 @@ async def import_courses(
                         import_result["courses"]["skipped"] += 1
                     else:
                         import_result["courses"]["skipped"] += 1
+                    course_id_value = existing_course.id
                 else:
                     # 创建新课程
                     course = Course(
@@ -588,10 +597,10 @@ async def import_courses(
                     await db.commit()
                     await db.refresh(course)
                     import_result["courses"]["created"] += 1
+                    course_id_value = course.id
 
-                course_code_map[course_data["code"]] = (
-                    existing_course.id if existing_course else course.id
-                )
+                if course_id_value is not None:
+                    course_code_map[course_data["code"]] = course_id_value
 
             except Exception as e:
                 import_result["errors"].append(f"导入课程失败 {course_data.get('name', '')}: {str(e)}")
@@ -621,17 +630,20 @@ async def import_courses(
                 )
                 existing_chapter = existing.scalar_one_or_none()
 
+                chapter_id_value = None
+
                 if existing_chapter:
                     if overwrite_existing:
                         # 更新现有章节
                         for key, value in chapter_data.items():
                             if key not in ["course_code", "parent_code"]:
                                 setattr(existing_chapter, key, value)
-                        existing_chapter.parent_id = parent_id
+                        setattr(existing_chapter, "parent_id", parent_id)
                         await db.commit()
                         import_result["chapters"]["skipped"] += 1
                     else:
                         import_result["chapters"]["skipped"] += 1
+                    chapter_id_value = existing_chapter.id
                 else:
                     # 创建新章节
                     chapter = Chapter(
@@ -647,10 +659,10 @@ async def import_courses(
                     await db.commit()
                     await db.refresh(chapter)
                     import_result["chapters"]["created"] += 1
+                    chapter_id_value = chapter.id
 
-                chapter_code_map[chapter_data["code"]] = (
-                    existing_chapter.id if existing_chapter else chapter.id
-                )
+                if chapter_id_value is not None:
+                    chapter_code_map[chapter_data["code"]] = chapter_id_value
 
             except Exception as e:
                 import_result["errors"].append(f"导入章节失败 {chapter_data.get('name', '')}: {str(e)}")
@@ -686,7 +698,7 @@ async def import_courses(
                         for key, value in lesson_data.items():
                             if key not in ["course_code", "chapter_code"]:
                                 setattr(existing_lesson, key, value)
-                        existing_lesson.chapter_id = chapter_id
+                        setattr(existing_lesson, "chapter_id", chapter_id)
                         await db.commit()
                         import_result["lessons"]["skipped"] += 1
                     else:

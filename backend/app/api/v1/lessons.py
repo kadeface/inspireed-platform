@@ -2,8 +2,8 @@
 教案API路由
 """
 
-from datetime import datetime
-from typing import Any, List, Optional, Union
+from datetime import datetime, timezone
+from typing import Any, List, Optional, Union, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,25 +27,23 @@ async def create_lesson(
 ) -> Any:
     """创建教案"""
     # 验证课程存在
-    course_result = await db.execute(select(Course).where(Course.id == lesson_in.course_id))
-    course = course_result.scalar_one_or_none()
-    if not course:
+    course = await db.get(Course, lesson_in.course_id)
+    if course is None:
         raise HTTPException(status_code=404, detail="课程不存在")
 
-    if not course.is_active:
+    if course.is_active is False:
         raise HTTPException(status_code=400, detail="该课程已被禁用")
 
     # 验证章节存在（如果提供了章节ID）
     if lesson_in.chapter_id:
-        chapter_result = await db.execute(select(Chapter).where(Chapter.id == lesson_in.chapter_id))
-        chapter = chapter_result.scalar_one_or_none()
-        if not chapter:
+        chapter = await db.get(Chapter, lesson_in.chapter_id)
+        if chapter is None:
             raise HTTPException(status_code=404, detail="章节不存在")
 
-        if chapter.course_id != lesson_in.course_id:
+        if cast(int, chapter.course_id) != lesson_in.course_id:
             raise HTTPException(status_code=400, detail="章节不属于指定课程")
 
-        if not chapter.is_active:
+        if chapter.is_active is False:
             raise HTTPException(status_code=400, detail="该章节已被禁用")
 
     lesson = Lesson(
@@ -106,7 +104,7 @@ async def list_lessons(
     )
 
     # 根据用户角色应用不同的过滤条件
-    if current_user.role == "student":
+    if cast(str, current_user.role) == "student":
         # 学生：只能看到已发布的课程
         query = query.where(Lesson.status == LessonStatus.PUBLISHED)
     else:
@@ -185,7 +183,9 @@ async def get_lesson(
         raise HTTPException(status_code=404, detail="教案不存在")
 
     # 检查权限（可以查看自己的或已发布的）
-    if lesson.creator_id != current_user.id and lesson.status != LessonStatus.PUBLISHED:
+    creator_id = cast(Optional[int], lesson.creator_id)
+    lesson_status = LessonStatus(cast(str, lesson.status))
+    if creator_id != current_user.id and lesson_status != LessonStatus.PUBLISHED:
         raise HTTPException(status_code=403, detail="无权访问该教案")
 
     # 添加教师信息
@@ -219,7 +219,7 @@ async def update_lesson(
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
 
-    if lesson.creator_id != current_user.id:
+    if cast(Optional[int], lesson.creator_id) != current_user.id:
         raise HTTPException(status_code=403, detail="无权修改该教案")
 
     # 如果更新 course_id，验证课程存在
@@ -231,7 +231,7 @@ async def update_lesson(
         course = course_result.scalar_one_or_none()
         if not course:
             raise HTTPException(status_code=404, detail="课程不存在")
-        if not course.is_active:
+        if course.is_active is False:
             raise HTTPException(status_code=400, detail="该课程已被禁用")
 
     # 检查是否更新了内容（content字段）
@@ -249,10 +249,12 @@ async def update_lesson(
 
     # 如果更新了已发布教案的内容，自动更新版本号
     # 这样学生端可以通过版本号判断是否有新内容
-    if content_updated and lesson.status == LessonStatus.PUBLISHED:
-        lesson.version = (lesson.version or 1) + 1
+    if content_updated and cast(str, lesson.status) == LessonStatus.PUBLISHED:
+        current_version = cast(Optional[int], lesson.version)
+        new_version = (current_version or 1) + 1
+        setattr(lesson, "version", new_version)
         # 更新 published_at 时间戳，表示内容已更新
-        lesson.published_at = datetime.utcnow()
+        setattr(lesson, "published_at", datetime.now(timezone.utc))
 
     await db.commit()
     await db.refresh(lesson)
@@ -272,7 +274,7 @@ async def delete_lesson(
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
 
-    if lesson.creator_id != current_user.id:
+    if cast(Optional[int], lesson.creator_id) != current_user.id:
         raise HTTPException(status_code=403, detail="无权删除该教案")
 
     await db.delete(lesson)
@@ -299,11 +301,11 @@ async def publish_lesson(
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
 
-    if lesson.creator_id != current_user.id:
+    if cast(Optional[int], lesson.creator_id) != current_user.id:
         raise HTTPException(status_code=403, detail="无权发布该教案")
 
-    lesson.status = LessonStatus.PUBLISHED
-    lesson.published_at = datetime.utcnow()
+    setattr(lesson, "status", LessonStatus.PUBLISHED)
+    setattr(lesson, "published_at", datetime.now(timezone.utc))
 
     await db.commit()
     await db.refresh(lesson)
@@ -342,14 +344,14 @@ async def unpublish_lesson(
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
 
-    if lesson.creator_id != current_user.id:
+    if cast(Optional[int], lesson.creator_id) != current_user.id:
         raise HTTPException(status_code=403, detail="无权修改该教案")
 
-    if lesson.status != LessonStatus.PUBLISHED:
+    if LessonStatus(cast(str, lesson.status)) != LessonStatus.PUBLISHED:
         raise HTTPException(status_code=400, detail="该教案不是已发布状态，无需取消发布")
 
-    lesson.status = LessonStatus.DRAFT
-    lesson.published_at = None
+    setattr(lesson, "status", LessonStatus.DRAFT)
+    setattr(lesson, "published_at", None)
 
     await db.commit()
     await db.refresh(lesson)
@@ -447,7 +449,7 @@ async def create_lesson_from_resource(
     if not course:
         raise HTTPException(status_code=404, detail="课程不存在")
 
-    if not course.is_active:
+    if course.is_active is False:
         raise HTTPException(status_code=400, detail="该课程已被禁用")
 
     # 3. 创建教案，自动关联到章节
@@ -497,10 +499,10 @@ async def get_lesson_reference_resource(
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
 
-    if lesson.creator_id != current_user.id:
+    if cast(Optional[int], lesson.creator_id) != current_user.id:
         raise HTTPException(status_code=403, detail="无权访问该教案")
 
-    if not lesson.reference_resource_id:
+    if lesson.reference_resource_id is None:
         return None
 
     resource = await db.get(Resource, lesson.reference_resource_id)
@@ -549,10 +551,10 @@ async def update_reference_notes(
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
 
-    if lesson.creator_id != current_user.id:
+    if cast(Optional[int], lesson.creator_id) != current_user.id:
         raise HTTPException(status_code=403, detail="无权修改该教案")
 
-    lesson.reference_notes = data.notes
+    setattr(lesson, "reference_notes", data.notes)
 
     await db.commit()
     await db.refresh(lesson)
@@ -586,7 +588,7 @@ async def get_chapter_lessons(
     if not chapter:
         raise HTTPException(status_code=404, detail="章节不存在")
 
-    if not chapter.is_active:
+    if chapter.is_active is False:
         raise HTTPException(status_code=400, detail="该章节已被禁用")
 
     # 构建查询
@@ -618,7 +620,7 @@ async def get_chapter_lessons(
     result = await db.execute(query)
     lessons = result.scalars().all()
 
-    return LessonListResponse(items=lessons, total=total, page=page, page_size=page_size)
+    return LessonListResponse(items=[lesson.model_dump() for lesson in lessons], total=total, page=page, page_size=page_size)
 
 
 @router.get("/recommended", response_model=LessonListResponse)

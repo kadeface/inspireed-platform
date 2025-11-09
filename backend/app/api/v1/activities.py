@@ -3,10 +3,10 @@
 """
 
 from datetime import datetime
-from typing import List, Optional, Any
+from typing import List, Optional, Any, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, Integer
 from sqlalchemy.orm import selectinload
 
 from app.api import deps
@@ -77,8 +77,8 @@ async def create_submission(
 
     if existing:
         # 更新现有草稿
-        existing.responses = data.responses
-        existing.updated_at = datetime.utcnow()
+        setattr(existing, "responses", cast(dict[str, Any], data.responses))
+        setattr(existing, "updated_at", datetime.utcnow())
         await db.commit()
         await db.refresh(existing)
         return existing
@@ -113,7 +113,10 @@ async def get_submission(
         raise HTTPException(status_code=404, detail="提交不存在")
 
     # 权限检查：学生只能查看自己的，教师可以查看所有
-    if current_user.role == UserRole.STUDENT and submission.student_id != current_user.id:
+    current_role = cast(UserRole, current_user.role)
+    submission_student_id = cast(int, submission.student_id)
+    current_user_id = cast(int, current_user.id)
+    if current_role == UserRole.STUDENT and submission_student_id != current_user_id:
         raise HTTPException(status_code=403, detail="无权访问")
 
     return submission
@@ -133,22 +136,25 @@ async def update_submission(
         raise HTTPException(status_code=404, detail="提交不存在")
 
     # 只有学生本人可以更新草稿
-    if submission.student_id != current_user.id:
+    submission_student_id = cast(int, submission.student_id)
+    current_user_id = cast(int, current_user.id)
+    if submission_student_id != current_user_id:
         raise HTTPException(status_code=403, detail="无权修改")
 
     # 已提交的不能再修改（除非允许多次提交）
-    if submission.status != ActivitySubmissionStatus.DRAFT:
+    submission_status = cast(ActivitySubmissionStatus, submission.status)
+    if submission_status != ActivitySubmissionStatus.DRAFT:
         raise HTTPException(status_code=400, detail="已提交的作业不能修改")
 
     # 更新字段
     if data.responses is not None:
-        submission.responses = data.responses
+        setattr(submission, "responses", cast(dict[str, Any], data.responses))
     if data.status is not None:
-        submission.status = data.status
+        setattr(submission, "status", cast(ActivitySubmissionStatus, data.status))
     if data.time_spent is not None:
-        submission.time_spent = data.time_spent
+        setattr(submission, "time_spent", cast(int, data.time_spent))
 
-    submission.updated_at = datetime.utcnow()
+    setattr(submission, "updated_at", datetime.utcnow())
 
     await db.commit()
     await db.refresh(submission)
@@ -170,15 +176,17 @@ async def submit_activity(
         raise HTTPException(status_code=404, detail="提交不存在")
 
     # 只有学生本人可以提交
-    if submission.student_id != current_user.id:
+    submission_student_id = cast(int, submission.student_id)
+    current_user_id = cast(int, current_user.id)
+    if submission_student_id != current_user_id:
         raise HTTPException(status_code=403, detail="无权操作")
 
     # 更新提交数据
-    submission.responses = data.responses
-    submission.status = ActivitySubmissionStatus.SUBMITTED
-    submission.submitted_at = datetime.utcnow()
+    setattr(submission, "responses", cast(dict[str, Any], data.responses))
+    setattr(submission, "status", ActivitySubmissionStatus.SUBMITTED)
+    setattr(submission, "submitted_at", datetime.utcnow())
     if data.time_spent:
-        submission.time_spent = data.time_spent
+        setattr(submission, "time_spent", cast(int, data.time_spent))
 
     # TODO: 实现自动评分逻辑
     # 如果是选择题等可自动评分的题型，这里自动计算分数
@@ -189,7 +197,11 @@ async def submit_activity(
     await db.refresh(submission)
 
     # 更新统计数据
-    await _update_statistics(db, submission.cell_id, submission.lesson_id)
+    await _update_statistics(
+        db,
+        cast(int, submission.cell_id),
+        cast(int, submission.lesson_id),
+    )
 
     return submission
 
@@ -204,7 +216,8 @@ async def get_cell_submissions(
     """获取某个 Cell 的所有提交（教师端）"""
 
     # 只有教师可以查看
-    if current_user.role != UserRole.TEACHER:
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="权限不足")
 
     # 构建查询
@@ -267,34 +280,36 @@ async def grade_submission(
     """评分"""
 
     # 只有教师可以评分
-    if current_user.role != UserRole.TEACHER:
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="权限不足")
 
     submission = await db.get(ActivitySubmission, submission_id)
     if not submission:
         raise HTTPException(status_code=404, detail="提交不存在")
 
-    if submission.status != ActivitySubmissionStatus.SUBMITTED:
+    submission_status = cast(ActivitySubmissionStatus, submission.status)
+    if submission_status != ActivitySubmissionStatus.SUBMITTED:
         raise HTTPException(status_code=400, detail="只能评分已提交的作业")
 
     # 更新评分
-    submission.score = data.score
-    submission.teacher_feedback = data.teacher_feedback
-    submission.graded_by = current_user.id
-    submission.graded_at = datetime.utcnow()
-    submission.status = ActivitySubmissionStatus.GRADED
+    setattr(submission, "score", cast(float, data.score))
+    setattr(submission, "teacher_feedback", cast(str, data.teacher_feedback))
+    setattr(submission, "graded_by", cast(int, current_user.id))
+    setattr(submission, "graded_at", datetime.utcnow())
+    setattr(submission, "status", ActivitySubmissionStatus.GRADED)
 
     # 如果有分项分数，更新 responses 中的 score 字段
     if data.item_scores:
         for item_id, item_score in data.item_scores.items():
-            if item_id in submission.responses:
-                submission.responses[item_id]["score"] = item_score
+            if item_id in cast(dict[str, Any], submission.responses):
+                cast(dict[str, Any], submission.responses)[item_id]["score"] = item_score
 
     await db.commit()
     await db.refresh(submission)
 
     # 更新统计数据
-    await _update_statistics(db, submission.cell_id, submission.lesson_id)
+    await _update_statistics(db, cast(int, submission.cell_id), cast(int, submission.lesson_id))
 
     return submission
 
@@ -307,18 +322,19 @@ async def bulk_grade_submissions(
 ) -> Any:
     """批量评分"""
 
-    if current_user.role != UserRole.TEACHER:
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="权限不足")
 
     graded_count = 0
     for submission_id in data.submission_ids:
         submission = await db.get(ActivitySubmission, submission_id)
-        if submission and submission.status == ActivitySubmissionStatus.SUBMITTED:
-            submission.score = data.score
-            submission.teacher_feedback = data.teacher_feedback
-            submission.graded_by = current_user.id
-            submission.graded_at = datetime.utcnow()
-            submission.status = ActivitySubmissionStatus.GRADED
+        if submission and cast(ActivitySubmissionStatus, submission.status) == ActivitySubmissionStatus.SUBMITTED:
+            setattr(submission, "score", cast(float, data.score))
+            setattr(submission, "teacher_feedback", cast(str, data.teacher_feedback))
+            setattr(submission, "graded_by", cast(int, current_user.id))
+            setattr(submission, "graded_at", datetime.utcnow())
+            setattr(submission, "status", ActivitySubmissionStatus.GRADED)
             graded_count += 1
 
     await db.commit()
@@ -337,7 +353,8 @@ async def assign_peer_reviews(
 ) -> Any:
     """分配互评任务（教师端）"""
 
-    if current_user.role != UserRole.TEACHER:
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="权限不足")
 
     # 获取所有已提交的作业
@@ -365,7 +382,9 @@ async def assign_peer_reviews(
             reviewer_submission = submissions[reviewer_index]
 
             # 不能评价自己的作业
-            if reviewer_submission.student_id == submission.student_id:
+            reviewer_submission_student_id = cast(int, reviewer_submission.student_id)
+            submission_student_id = cast(int, submission.student_id)
+            if reviewer_submission_student_id == submission_student_id:
                 continue
 
             # 检查是否已分配
@@ -411,7 +430,10 @@ async def get_submission_peer_reviews(
         raise HTTPException(status_code=404, detail="提交不存在")
 
     # 权限检查
-    if current_user.role == UserRole.STUDENT and submission.student_id != current_user.id:
+    current_role = cast(UserRole, current_user.role)
+    submission_student_id = cast(int, submission.student_id)
+    current_user_id = cast(int, current_user.id)
+    if current_role == UserRole.STUDENT and submission_student_id != current_user_id:
         raise HTTPException(status_code=403, detail="无权访问")
 
     result = await db.execute(
@@ -464,15 +486,17 @@ async def submit_peer_review(
     if not review:
         raise HTTPException(status_code=404, detail="互评任务不存在")
 
-    if review.reviewer_id != current_user.id:
+    reviewer_id = cast(int, review.reviewer_id)
+    current_user_id = cast(int, current_user.id)
+    if reviewer_id != current_user_id:
         raise HTTPException(status_code=403, detail="无权操作")
 
     # 更新互评数据
-    review.review_data = data.review_data
-    review.score = data.score
-    review.comment = data.comment
-    review.status = PeerReviewStatus.COMPLETED
-    review.completed_at = datetime.utcnow()
+    setattr(review, "review_data", cast(dict[str, Any], data.review_data))
+    setattr(review, "score", cast(float, data.score))
+    setattr(review, "comment", cast(str, data.comment))
+    setattr(review, "status", PeerReviewStatus.COMPLETED)
+    setattr(review, "completed_at", datetime.utcnow())
 
     await db.commit()
     await db.refresh(review)
@@ -491,7 +515,8 @@ async def get_cell_statistics(
 ) -> Any:
     """获取活动统计数据"""
 
-    if current_user.role != UserRole.TEACHER:
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="权限不足")
 
     result = await db.execute(
@@ -507,14 +532,14 @@ async def get_cell_statistics(
 
         statistics = ActivityStatistics(
             cell_id=cell_id,
-            lesson_id=cell.lesson_id,
+            lesson_id=cast(int, cell.lesson_id),
         )
         db.add(statistics)
         await db.commit()
         await db.refresh(statistics)
 
         # 立即计算统计数据
-        await _update_statistics(db, cell_id, cell.lesson_id)
+        await _update_statistics(db, cast(int, cell_id), cast(int, cell.lesson_id))
 
         # 重新加载
         result = await db.execute(
@@ -567,10 +592,10 @@ async def sync_offline_submissions(
                     continue
 
                 # 更新现有提交
-                existing.responses = submission_data["responses"]
-                existing.version += 1
-                existing.synced = True
-                existing.updated_at = datetime.utcnow()
+                setattr(existing, "responses", cast(dict[str, Any], submission_data["responses"]))
+                setattr(existing, "version", cast(int, existing.version) + 1)
+                setattr(existing, "synced", cast(bool, True))
+                setattr(existing, "updated_at", cast(datetime, datetime.utcnow()))
                 synced_count += 1
             else:
                 # 创建新提交
@@ -580,7 +605,7 @@ async def sync_offline_submissions(
                     student_id=current_user.id,
                     responses=submission_data["responses"],
                     status=ActivitySubmissionStatus.DRAFT,
-                    synced=True,
+                    synced=cast(bool, True),
                 )
                 db.add(submission)
                 synced_count += 1
@@ -635,15 +660,24 @@ async def _update_statistics(db: AsyncSession, cell_id: int, lesson_id: int):
     )
     stats = result.one()
 
-    statistics.total_students = stats.total or 0
-    statistics.draft_count = stats.draft or 0
-    statistics.submitted_count = stats.submitted or 0
-    statistics.graded_count = stats.graded or 0
-    statistics.average_score = float(stats.avg_score) if stats.avg_score else None
-    statistics.highest_score = float(stats.max_score) if stats.max_score else None
-    statistics.lowest_score = float(stats.min_score) if stats.min_score else None
-    statistics.average_time_spent = int(stats.avg_time) if stats.avg_time else None
-    statistics.updated_at = datetime.utcnow()
+    total_students = int(stats.total or 0)
+    draft_count = int(stats.draft or 0)
+    submitted_count = int(stats.submitted or 0)
+    graded_count = int(stats.graded or 0)
+    average_score = float(stats.avg_score) if stats.avg_score is not None else None
+    highest_score = float(stats.max_score) if stats.max_score is not None else None
+    lowest_score = float(stats.min_score) if stats.min_score is not None else None
+    average_time_spent = int(stats.avg_time) if stats.avg_time is not None else None
+
+    setattr(statistics, "total_students", total_students)
+    setattr(statistics, "draft_count", draft_count)
+    setattr(statistics, "submitted_count", submitted_count)
+    setattr(statistics, "graded_count", graded_count)
+    setattr(statistics, "average_score", average_score)
+    setattr(statistics, "highest_score", highest_score)
+    setattr(statistics, "lowest_score", lowest_score)
+    setattr(statistics, "average_time_spent", average_time_spent)
+    setattr(statistics, "updated_at", datetime.utcnow())
 
     # 互评统计
     result = await db.execute(
@@ -652,7 +686,10 @@ async def _update_statistics(db: AsyncSession, cell_id: int, lesson_id: int):
         )
     )
     peer_stats = result.one()
-    statistics.peer_review_count = peer_stats[0] or 0
-    statistics.avg_peer_review_score = float(peer_stats[1]) if peer_stats[1] else None
+    peer_review_count = int(peer_stats[0] or 0)
+    avg_peer_review_score = float(peer_stats[1]) if peer_stats[1] is not None else None
+
+    setattr(statistics, "peer_review_count", peer_review_count)
+    setattr(statistics, "avg_peer_review_score", avg_peer_review_score)
 
     await db.commit()

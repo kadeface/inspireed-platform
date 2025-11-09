@@ -5,13 +5,37 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import desc, select
-from typing import Any
+from typing import Any, Optional
 
 from app.api.deps import get_db, get_current_active_user
 from app.models import User, Favorite, Lesson
 from app.schemas.favorite import FavoriteCreate, FavoriteResponse, FavoriteWithLesson
 
 router = APIRouter()
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    """将值安全地转换为整数。"""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_str(value: Any, default: str = "") -> str:
+    """将值安全地转换为字符串。"""
+    if value is None:
+        return default
+    return str(value)
+
+
+def _safe_optional_str(value: Any) -> Optional[str]:
+    """将值安全地转换为可选字符串。"""
+    if value is None:
+        return None
+    return str(value)
 
 
 @router.post("/", response_model=FavoriteResponse, status_code=status.HTTP_201_CREATED)
@@ -100,19 +124,26 @@ async def get_my_favorites(
         lesson_result = await db.execute(select(Lesson).where(Lesson.id == fav.lesson_id))
         lesson = lesson_result.scalar_one_or_none()
         if lesson:
+            lesson_title = _safe_str(getattr(lesson, "title", ""))
+            lesson_description = _safe_optional_str(getattr(lesson, "description", None))
+            lesson_cover = _safe_optional_str(getattr(lesson, "cover_image_url", None))
+            difficulty = getattr(lesson, "difficulty_level", None)
+            if difficulty is not None:
+                difficulty_value = getattr(difficulty, "value", None)
+            else:
+                difficulty_value = None
+
             result.append(
                 FavoriteWithLesson(
-                    id=fav.id,
-                    user_id=fav.user_id,
-                    lesson_id=fav.lesson_id,
-                    created_at=fav.created_at,
-                    lesson_title=lesson.title,
-                    lesson_description=lesson.description,
-                    lesson_cover_image=lesson.cover_image_url,
-                    lesson_difficulty=(
-                        lesson.difficulty_level.value if lesson.difficulty_level else None
-                    ),
-                    lesson_rating=lesson.average_rating,
+                    id=_safe_int(getattr(fav, "id", None)),
+                    user_id=_safe_int(getattr(fav, "user_id", None)),
+                    lesson_id=_safe_int(getattr(fav, "lesson_id", None)),
+                    created_at=getattr(fav, "created_at"),
+                    lesson_title=lesson_title,
+                    lesson_description=lesson_description,
+                    lesson_cover_image=lesson_cover,
+                    lesson_difficulty=_safe_optional_str(difficulty_value),
+                    lesson_rating=float(getattr(lesson, "average_rating", 0.0)),
                 )
             )
 

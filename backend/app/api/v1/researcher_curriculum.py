@@ -3,7 +3,7 @@
 从管理员端迁移而来，专供教研员使用
 """
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,10 +70,10 @@ async def toggle_subject(
             .select_from(Course)
             .where(Course.subject_id == subject_id, Course.is_active == True)
         )
-        if course_count.scalar() > 0:
+        if (course_count.scalar() or 0) > 0:
             raise HTTPException(status_code=400, detail="该学科下有活跃的课程，无法禁用")
 
-    subject.is_active = toggle_data.is_active
+    setattr(subject, "is_active", toggle_data.is_active)
     await db.commit()
     await db.refresh(subject)
     return subject
@@ -120,10 +120,10 @@ async def toggle_grade(
             .select_from(Course)
             .where(Course.grade_id == grade_id, Course.is_active == True)
         )
-        if course_count.scalar() > 0:
+        if (course_count.scalar() or 0) > 0:
             raise HTTPException(status_code=400, detail="该年级下有活跃的课程，无法禁用")
 
-    grade.is_active = toggle_data.is_active
+    setattr(grade, "is_active", toggle_data.is_active)
     await db.commit()
     await db.refresh(grade)
     return grade
@@ -260,7 +260,7 @@ async def delete_course(
     lesson_count = await db.execute(
         select(func.count()).select_from(Lesson).where(Lesson.course_id == course_id)
     )
-    if lesson_count.scalar() > 0:
+    if (lesson_count.scalar() or 0) > 0:
         raise HTTPException(status_code=400, detail="该课程下有教案，无法删除。请先删除或移动相关教案。")
 
     await db.delete(course)
@@ -300,23 +300,26 @@ async def get_curriculum_tree(
     courses = course_result.scalars().all()
 
     # 获取每个课程的教案数量
-    lesson_count_query = select(Lesson.course_id, func.count(Lesson.id).label("count")).group_by(
-        Lesson.course_id
-    )
+    lesson_count_query = select(
+        Lesson.course_id, func.count(Lesson.id).label("count")
+    ).group_by(Lesson.course_id)
     lesson_count_result = await db.execute(lesson_count_query)
-    lesson_counts = {row.course_id: row.count for row in lesson_count_result}
+    lesson_counts = {
+        cast(int, course_id): cast(int, count)
+        for course_id, count in lesson_count_result
+    }
 
     # 构建课程字典 {(subject_id, grade_id): course}
     course_map = {}
     for course in courses:
         key = (course.subject_id, course.grade_id)
         course_map[key] = CourseTreeNode(
-            id=course.id,
-            name=course.name,
-            code=course.code,
-            description=course.description,
-            is_active=course.is_active,
-            lesson_count=lesson_counts.get(course.id, 0),
+            id=cast(int, course.id),
+            name=cast(str, course.name),
+            code=cast(Optional[str], course.code),
+            description=cast(Optional[str], course.description),
+            is_active=cast(bool, course.is_active),
+            lesson_count=lesson_counts.get(cast(int, course.id), 0),
         )
 
     # 构建树形结构
@@ -334,10 +337,10 @@ async def get_curriculum_tree(
                 course_node = course_map[key]
                 grade_nodes.append(
                     GradeTreeNode(
-                        id=grade.id,
-                        name=grade.name,
-                        level=grade.level,
-                        is_active=grade.is_active,
+                        id=cast(int, grade.id),
+                        name=cast(str, grade.name),
+                        level=cast(int, grade.level),
+                        is_active=cast(bool, grade.is_active),
                         courses=[course_node],
                         lesson_count=course_node.lesson_count,
                     )
@@ -349,11 +352,11 @@ async def get_curriculum_tree(
         if grade_nodes or include_inactive:
             subject_nodes.append(
                 SubjectTreeNode(
-                    id=subject.id,
-                    name=subject.name,
-                    code=subject.code,
-                    description=subject.description,
-                    is_active=subject.is_active,
+                    id=cast(int, subject.id),
+                    name=cast(str, subject.name),
+                    code=(cast(Optional[str], subject.code) or ""),
+                    description=cast(Optional[str], subject.description),
+                    is_active=cast(bool, subject.is_active),
                     grades=grade_nodes,
                     lesson_count=subject_lesson_count,
                 )

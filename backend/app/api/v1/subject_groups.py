@@ -2,7 +2,11 @@
 学科教研组API接口
 """
 
-from typing import List, Optional
+from sqlalchemy.sql.schema import Column
+from sqlalchemy.sql.schema import Column
+from sqlalchemy.sql.schema import Column
+from sqlalchemy.sql.schema import Column
+from typing import List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -90,19 +94,19 @@ async def create_subject_group(
 
     # 构建响应
     response = SubjectGroupResponse.model_validate(group)
-    response.subject_name = subject.name
-    response.creator_name = current_user.full_name or current_user.username
-    response.user_role = MemberRole.OWNER
+    response.subject_name = cast(str, subject.name)
+    response.creator_name = (cast(str, current_user.full_name) or cast(str, current_user.username)) if current_user else None
+    response.user_role = cast(Optional[MemberRole], MemberRole.OWNER)
 
-    if group.grade_id:
+    if cast(Optional[int], group.grade_id):
         grade = await db.get(Grade, group.grade_id)
-        response.grade_name = grade.name if grade else None
-    if group.school_id:
+        response.grade_name = cast(str, grade.name) if grade else None
+    if cast(Optional[int], group.school_id):
         school = await db.get(School, group.school_id)
-        response.school_name = school.name if school else None
-    if group.region_id:
+        response.school_name = cast(str, school.name) if school else None
+    if cast(Optional[int], group.region_id):
         region = await db.get(Region, group.region_id)
-        response.region_name = region.name if region else None
+        response.region_name = cast(str, region.name) if region else None
 
     return response
 
@@ -177,13 +181,13 @@ async def list_subject_groups(
             user_roles[membership.group_id] = membership.role
 
     # 获取关联信息
-    subject_ids = list(set(g.subject_id for g in groups))
+    subject_ids = list[Column[int]](set[Column[int]](g.subject_id for g in groups))
     subjects = {}
     if subject_ids:
         subject_result = await db.execute(select(Subject).where(Subject.id.in_(subject_ids)))
         subjects = {s.id: s for s in subject_result.scalars()}
 
-    grade_ids = list(set(g.grade_id for g in groups if g.grade_id))
+    grade_ids = list[Column[int]](set[Column[int]](g.grade_id for g in groups if cast(Optional[int], g.grade_id)))
     grades = {}
     if grade_ids:
         grade_result = await db.execute(select(Grade).where(Grade.id.in_(grade_ids)))
@@ -194,15 +198,19 @@ async def list_subject_groups(
     for group in groups:
         response = SubjectGroupResponse.model_validate(group)
         response.subject_name = (
-            subjects[group.subject_id].name if group.subject_id in subjects else None
+            cast(str, subjects[group.subject_id].name)
+            if group.subject_id in subjects
+            else None
         )
         response.grade_name = (
-            grades[group.grade_id].name if group.grade_id and group.grade_id in grades else None
+            cast(str, grades[group.grade_id].name)
+            if cast(Optional[int], group.grade_id) and cast(Optional[int], group.grade_id) in cast(dict, grades)
+            else None
         )
         response.user_role = user_roles.get(group.id)
         items.append(response)
 
-    return SubjectGroupListResponse(items=items, total=total, page=page, page_size=page_size)
+    return SubjectGroupListResponse(items=items, total=cast(int, total), page=page, page_size=page_size)
 
 
 @router.get("/{group_id}", response_model=SubjectGroupResponse)
@@ -214,16 +222,16 @@ async def get_subject_group(
     """获取教研组详情"""
 
     group = await db.get(SubjectGroup, group_id)
-    if not group or not group.is_active:
+    if not group or not cast(bool, group.is_active):
         raise HTTPException(status_code=404, detail="教研组不存在")
 
     # 检查用户是否是成员（如果不是公开组）
-    if not group.is_public:
+    if not cast(bool, group.is_public):
         membership = await db.scalar(
             select(GroupMembership).where(
                 and_(
                     GroupMembership.group_id == group_id,
-                    GroupMembership.user_id == current_user.id,
+                    GroupMembership.user_id == cast(int, current_user.id),
                     GroupMembership.is_active == True,
                 )
             )
@@ -237,7 +245,7 @@ async def get_subject_group(
         select(GroupMembership).where(
             and_(
                 GroupMembership.group_id == group_id,
-                GroupMembership.user_id == current_user.id,
+                GroupMembership.user_id == cast(int, current_user.id),
                 GroupMembership.is_active == True,
             )
         )
@@ -248,20 +256,20 @@ async def get_subject_group(
     # 获取关联信息
     subject = await db.get(Subject, group.subject_id)
     creator = await db.get(User, group.creator_id)
-    grade = await db.get(Grade, group.grade_id) if group.grade_id else None
+    grade = await db.get(Grade, group.grade_id) if cast(Optional[int], group.grade_id) else None
 
     response = SubjectGroupResponse.model_validate(group)
-    response.subject_name = subject.name if subject else None
-    response.grade_name = grade.name if grade else None
-    response.creator_name = creator.full_name or creator.username if creator else None
-    response.user_role = user_role
+    response.subject_name = cast(str, subject.name) if subject else None
+    response.grade_name = cast(str, grade.name) if grade else None
+    response.creator_name = (cast(str, creator.full_name) or cast(str, creator.username)) if creator else None
+    response.user_role = cast(Optional[MemberRole], user_role)
 
-    if group.school_id:
+    if cast(Optional[int], group.school_id):
         school = await db.get(School, group.school_id)
-        response.school_name = school.name if school else None
-    if group.region_id:
+        response.school_name = cast(str, school.name) if school else None
+    if cast(Optional[int], group.region_id):
         region = await db.get(Region, group.region_id)
-        response.region_name = region.name if region else None
+        response.region_name = cast(str, region.name) if region else None
 
     return response
 
@@ -276,7 +284,7 @@ async def update_subject_group(
     """更新教研组（仅组长和管理员可用）"""
 
     group = await db.get(SubjectGroup, group_id)
-    if not group or not group.is_active:
+    if not group or not cast(bool, group.is_active):
         raise HTTPException(status_code=404, detail="教研组不存在")
 
     # 检查权限
@@ -302,10 +310,10 @@ async def update_subject_group(
 
     # 构建响应
     response = SubjectGroupResponse.model_validate(group)
-    response.user_role = membership.role
+    response.user_role = cast(Optional[MemberRole], membership.role)
 
     subject = await db.get(Subject, group.subject_id)
-    response.subject_name = subject.name if subject else None
+    response.subject_name = cast(str, subject.name) if subject else None
 
     return response
 
@@ -319,7 +327,7 @@ async def delete_subject_group(
     """删除教研组（仅组长可用）"""
 
     group = await db.get(SubjectGroup, group_id)
-    if not group or not group.is_active:
+    if not group or not cast(bool, group.is_active):
         raise HTTPException(status_code=404, detail="教研组不存在")
 
     # 检查权限（仅组长可删除）
@@ -327,16 +335,16 @@ async def delete_subject_group(
         select(GroupMembership).where(
             and_(
                 GroupMembership.group_id == group_id,
-                GroupMembership.user_id == current_user.id,
+                GroupMembership.user_id == cast(int, current_user.id),
                 GroupMembership.is_active == True,
             )
         )
     )
-    if not membership or membership.role != MemberRole.OWNER:
+    if not membership or cast(Optional[MemberRole], membership.role) != MemberRole.OWNER:
         raise HTTPException(status_code=403, detail="仅组长可删除教研组")
 
     # 软删除
-    group.is_active = False
+    setattr(group, "is_active", False)
     await db.commit()
 
     return {"message": "教研组已删除"}
@@ -357,7 +365,7 @@ async def list_group_members(
 
     # 检查教研组是否存在
     group = await db.get(SubjectGroup, group_id)
-    if not group or not group.is_active:
+    if not group or not cast(bool, group.is_active):
         raise HTTPException(status_code=404, detail="教研组不存在")
 
     # 检查用户是否是成员
@@ -365,12 +373,12 @@ async def list_group_members(
         select(GroupMembership).where(
             and_(
                 GroupMembership.group_id == group_id,
-                GroupMembership.user_id == current_user.id,
+                GroupMembership.user_id == cast(int, current_user.id),
                 GroupMembership.is_active == True,
             )
         )
     )
-    if not user_membership and not group.is_public:
+    if not user_membership and not cast(bool, group.is_public):
         raise HTTPException(status_code=403, detail="无权访问此教研组成员列表")
 
     # 查询成员
@@ -403,12 +411,12 @@ async def list_group_members(
         response = GroupMembershipResponse.model_validate(membership)
         user = users.get(membership.user_id)
         if user:
-            response.user_name = user.full_name or user.username
-            response.user_email = user.email
-            response.user_avatar_url = user.avatar_url
+            response.user_name = (cast(str, user.full_name) or cast(str, user.username)) if user else None
+            response.user_email = cast(str, user.email) if user else None
+            response.user_avatar_url = cast(str, user.avatar_url) if user else None
         items.append(response)
 
-    return GroupMembershipListResponse(items=items, total=total, page=page, page_size=page_size)
+    return GroupMembershipListResponse(items=items, total=cast(int, total), page=page, page_size=page_size)
 
 
 @router.post("/{group_id}/members", response_model=GroupMembershipResponse)
@@ -422,7 +430,7 @@ async def add_group_member(
 
     # 检查教研组是否存在
     group = await db.get(SubjectGroup, group_id)
-    if not group or not group.is_active:
+    if not group or not cast(bool, group.is_active):
         raise HTTPException(status_code=404, detail="教研组不存在")
 
     # 检查权限
@@ -430,7 +438,7 @@ async def add_group_member(
         select(GroupMembership).where(
             and_(
                 GroupMembership.group_id == group_id,
-                GroupMembership.user_id == current_user.id,
+                GroupMembership.user_id == cast(int, current_user.id),
                 GroupMembership.is_active == True,
             )
         )
@@ -456,12 +464,12 @@ async def add_group_member(
         )
     )
     if existing:
-        if existing.is_active:
+        if cast(bool, existing.is_active):
             raise HTTPException(status_code=400, detail="用户已是教研组成员")
         else:
             # 重新激活
-            existing.is_active = True
-            existing.role = member_data.role
+            setattr(existing, "is_active", True)
+            setattr(existing, "role", member_data.role)
             await db.commit()
             await db.refresh(existing)
             membership = existing
@@ -473,16 +481,16 @@ async def add_group_member(
         db.add(membership)
 
         # 更新教研组成员数
-        group.member_count += 1
+        setattr(group, "member_count", cast(int, group.member_count) + 1)
 
         await db.commit()
         await db.refresh(membership)
 
     # 构建响应
     response = GroupMembershipResponse.model_validate(membership)
-    response.user_name = new_user.full_name or new_user.username
-    response.user_email = new_user.email
-    response.user_avatar_url = new_user.avatar_url
+    response.user_name = (cast(str, new_user.full_name) or cast(str, new_user.username)) if new_user else None
+    response.user_email = cast(str, new_user.email) if new_user else None
+    response.user_avatar_url = cast(str, new_user.avatar_url) if new_user else None
 
     return response
 
@@ -499,7 +507,7 @@ async def update_group_member(
 
     # 检查教研组是否存在
     group = await db.get(SubjectGroup, group_id)
-    if not group or not group.is_active:
+    if not group or not cast(bool, group.is_active):
         raise HTTPException(status_code=404, detail="教研组不存在")
 
     # 检查权限
@@ -507,12 +515,12 @@ async def update_group_member(
         select(GroupMembership).where(
             and_(
                 GroupMembership.group_id == group_id,
-                GroupMembership.user_id == current_user.id,
+                GroupMembership.user_id == cast(int, current_user.id),
                 GroupMembership.is_active == True,
             )
         )
     )
-    if not user_membership or user_membership.role not in [
+    if not user_membership or cast(Optional[MemberRole], user_membership.role) not in [
         MemberRole.OWNER,
         MemberRole.ADMIN,
     ]:
@@ -531,7 +539,7 @@ async def update_group_member(
         raise HTTPException(status_code=404, detail="成员不存在")
 
     # 不能修改组长
-    if target_membership.role == MemberRole.OWNER:
+    if cast(Optional[MemberRole], target_membership.role) == MemberRole.OWNER:
         raise HTTPException(status_code=403, detail="不能修改组长角色")
 
     # 更新数据
@@ -546,9 +554,9 @@ async def update_group_member(
     user = await db.get(User, user_id)
     response = GroupMembershipResponse.model_validate(target_membership)
     if user:
-        response.user_name = user.full_name or user.username
-        response.user_email = user.email
-        response.user_avatar_url = user.avatar_url
+        response.user_name = (cast(str, user.full_name) or cast(str, user.username)) if user else None  
+        response.user_email = cast(str, user.email) if user else None
+        response.user_avatar_url = cast(str, user.avatar_url) if user else None
 
     return response
 
@@ -564,7 +572,7 @@ async def remove_group_member(
 
     # 检查教研组是否存在
     group = await db.get(SubjectGroup, group_id)
-    if not group or not group.is_active:
+    if not group or not cast(bool, group.is_active):
         raise HTTPException(status_code=404, detail="教研组不存在")
 
     # 查找要移除的成员
@@ -581,31 +589,31 @@ async def remove_group_member(
         raise HTTPException(status_code=404, detail="成员不存在")
 
     # 不能移除组长
-    if target_membership.role == MemberRole.OWNER:
+    if cast(Optional[MemberRole], target_membership.role) == MemberRole.OWNER:
         raise HTTPException(status_code=403, detail="不能移除组长")
 
     # 检查权限：用户自己可以退出，或者组长/管理员可以移除其他成员
-    if user_id != current_user.id:
+    if user_id != cast(int, current_user.id):
         user_membership = await db.scalar(
             select(GroupMembership).where(
                 and_(
                     GroupMembership.group_id == group_id,
-                    GroupMembership.user_id == current_user.id,
+                    GroupMembership.user_id == cast(int, current_user.id),
                     GroupMembership.is_active == True,
                 )
             )
         )
-        if not user_membership or user_membership.role not in [
+        if not user_membership or cast(Optional[MemberRole], user_membership.role) not in [
             MemberRole.OWNER,
             MemberRole.ADMIN,
         ]:
             raise HTTPException(status_code=403, detail="无权限移除成员")
 
     # 软删除成员关系
-    target_membership.is_active = False
+    setattr(target_membership, "is_active", False)
 
     # 更新教研组成员数
-    group.member_count = max(0, group.member_count - 1)
+    setattr(group, "member_count", max(0, cast(int, group.member_count) - 1))
 
     await db.commit()
 
@@ -627,7 +635,7 @@ async def list_shared_lessons(
 
     # 检查教研组是否存在
     group = await db.get(SubjectGroup, group_id)
-    if not group or not group.is_active:
+    if not group or not cast(bool, group.is_active):
         raise HTTPException(status_code=404, detail="教研组不存在")
 
     # 检查用户是否是成员
@@ -635,12 +643,12 @@ async def list_shared_lessons(
         select(GroupMembership).where(
             and_(
                 GroupMembership.group_id == group_id,
-                GroupMembership.user_id == current_user.id,
+                GroupMembership.user_id == cast(int, current_user.id),
                 GroupMembership.is_active == True,
             )
         )
     )
-    if not user_membership and not group.is_public:
+    if not user_membership and not cast(bool, group.is_public):
         raise HTTPException(status_code=403, detail="无权访问此教研组的共享教学设计")
 
     # 查询共享教学设计
@@ -650,7 +658,7 @@ async def list_shared_lessons(
 
     # 计算总数
     count_query = select(func.count()).select_from(query.subquery())
-    total = await db.scalar(count_query)
+    total = cast(int, await db.scalar(count_query))
 
     # 分页
     query = query.offset((page - 1) * page_size).limit(page_size)
@@ -680,18 +688,18 @@ async def list_shared_lessons(
 
         lesson = lessons.get(shared_lesson.lesson_id)
         if lesson:
-            response.lesson_title = lesson.title
-            response.lesson_description = lesson.description
-            response.lesson_cover_image_url = lesson.cover_image_url
-            response.lesson_cell_count = lesson.cell_count
-            response.lesson_estimated_duration = lesson.estimated_duration
+            response.lesson_title = cast(str, lesson.title)
+            response.lesson_description = cast(str, lesson.description)
+            response.lesson_cover_image_url = cast(str, lesson.cover_image_url)
+            response.lesson_cell_count = cast(int, lesson.cell_count)
+            response.lesson_estimated_duration = cast(int, lesson.estimated_duration)
 
         sharer = sharers.get(shared_lesson.sharer_id)
         if sharer:
-            response.sharer_name = sharer.full_name or sharer.username
-            response.sharer_avatar_url = sharer.avatar_url
+            response.sharer_name = (cast(str, sharer.full_name) or cast(str, sharer.username)) if sharer else None
+            response.sharer_avatar_url = cast(str, sharer.avatar_url) if sharer else None
 
-        response.group_name = group.name
+        response.group_name = cast(str, group.name) if group else None
         items.append(response)
 
     return SharedLessonListResponse(items=items, total=total, page=page, page_size=page_size)
@@ -708,7 +716,7 @@ async def share_lesson_to_group(
 
     # 检查教研组是否存在
     group = await db.get(SubjectGroup, group_id)
-    if not group or not group.is_active:
+    if not group or not cast(bool, group.is_active):
         raise HTTPException(status_code=404, detail="教研组不存在")
 
     # 检查用户是否是成员
@@ -716,7 +724,7 @@ async def share_lesson_to_group(
         select(GroupMembership).where(
             and_(
                 GroupMembership.group_id == group_id,
-                GroupMembership.user_id == current_user.id,
+                GroupMembership.user_id == cast(int, current_user.id),
                 GroupMembership.is_active == True,
             )
         )
@@ -728,7 +736,7 @@ async def share_lesson_to_group(
     lesson = await db.get(Lesson, lesson_data.lesson_id)
     if not lesson:
         raise HTTPException(status_code=404, detail="教学设计不存在")
-    if lesson.creator_id != current_user.id:
+    if cast(Optional[int], lesson.creator_id) != cast(int, current_user.id):
         raise HTTPException(status_code=403, detail="只能分享自己的教学设计")
 
     # 检查是否已经分享过
@@ -741,12 +749,12 @@ async def share_lesson_to_group(
         )
     )
     if existing:
-        if existing.is_active:
+        if cast(bool, existing.is_active):
             raise HTTPException(status_code=400, detail="该教学设计已分享到此教研组")
         else:
             # 重新激活
-            existing.is_active = True
-            existing.share_note = lesson_data.share_note
+            setattr(existing, "is_active", True)
+            setattr(existing, "share_note", cast(str, lesson_data.share_note))
             await db.commit()
             await db.refresh(existing)
             shared_lesson = existing
@@ -755,27 +763,27 @@ async def share_lesson_to_group(
         shared_lesson = SharedLesson(
             group_id=group_id,
             lesson_id=lesson_data.lesson_id,
-            sharer_id=current_user.id,
+            sharer_id=cast(int, current_user.id),
             share_note=lesson_data.share_note,
         )
         db.add(shared_lesson)
 
         # 更新教研组共享教案数
-        group.lesson_count += 1
+        setattr(group, "lesson_count", cast(int, group.lesson_count) + 1)
 
         await db.commit()
         await db.refresh(shared_lesson)
 
     # 构建响应
     response = SharedLessonResponse.model_validate(shared_lesson)
-    response.lesson_title = lesson.title
-    response.lesson_description = lesson.description
-    response.lesson_cover_image_url = lesson.cover_image_url
-    response.lesson_cell_count = lesson.cell_count
-    response.lesson_estimated_duration = lesson.estimated_duration
-    response.sharer_name = current_user.full_name or current_user.username
-    response.sharer_avatar_url = current_user.avatar_url
-    response.group_name = group.name
+    response.lesson_title = cast(str, lesson.title)
+    response.lesson_description = cast(str, lesson.description)
+    response.lesson_cover_image_url = cast(str, lesson.cover_image_url) if lesson else None
+    response.lesson_cell_count = cast(int, lesson.cell_count)
+    response.lesson_estimated_duration = cast(int, lesson.estimated_duration)
+    response.sharer_name = (cast(str, current_user.full_name) or cast(str, current_user.username)) if current_user else None
+    response.sharer_avatar_url = cast(str, current_user.avatar_url) if current_user else None
+    response.group_name = cast(str, group.name) if group else None
 
     return response
 
@@ -803,7 +811,7 @@ async def update_shared_lesson(
         raise HTTPException(status_code=404, detail="共享记录不存在")
 
     # 检查权限
-    if shared_lesson.sharer_id != current_user.id:
+    if cast(Optional[int], shared_lesson.sharer_id) != cast(int, current_user.id):
         raise HTTPException(status_code=403, detail="只能修改自己分享的教学设计")
 
     # 更新数据
@@ -820,15 +828,15 @@ async def update_shared_lesson(
 
     response = SharedLessonResponse.model_validate(shared_lesson)
     if lesson:
-        response.lesson_title = lesson.title
-        response.lesson_description = lesson.description
-        response.lesson_cover_image_url = lesson.cover_image_url
-        response.lesson_cell_count = lesson.cell_count
-        response.lesson_estimated_duration = lesson.estimated_duration
-    response.sharer_name = current_user.full_name or current_user.username
-    response.sharer_avatar_url = current_user.avatar_url
+        response.lesson_title = cast(str, lesson.title)
+        response.lesson_description = cast(str, lesson.description)
+        response.lesson_cover_image_url = cast(str, lesson.cover_image_url) if lesson else None
+        response.lesson_cell_count = cast(int, lesson.cell_count)
+        response.lesson_estimated_duration = cast(int, lesson.estimated_duration)
+    response.sharer_name = (cast(str, current_user.full_name) or cast(str, current_user.username)) if current_user else None
+    response.sharer_avatar_url = cast(str, current_user.avatar_url) if current_user else None
     if group:
-        response.group_name = group.name
+        response.group_name = cast(str, group.name)
 
     return response
 
@@ -856,29 +864,29 @@ async def unshare_lesson(
         raise HTTPException(status_code=404, detail="共享记录不存在")
 
     # 检查权限：分享者或组长/管理员
-    if shared_lesson.sharer_id != current_user.id:
+    if cast(Optional[int], shared_lesson.sharer_id) != cast(int, current_user.id):
         user_membership = await db.scalar(
             select(GroupMembership).where(
                 and_(
                     GroupMembership.group_id == group_id,
-                    GroupMembership.user_id == current_user.id,
+                    GroupMembership.user_id == cast(int, current_user.id),
                     GroupMembership.is_active == True,
                 )
             )
         )
-        if not user_membership or user_membership.role not in [
+        if not user_membership or cast(Optional[MemberRole], user_membership.role) not in [
             MemberRole.OWNER,
             MemberRole.ADMIN,
         ]:
             raise HTTPException(status_code=403, detail="无权限取消此分享")
 
     # 软删除共享记录
-    shared_lesson.is_active = False
+    setattr(shared_lesson, "is_active", False)
 
     # 更新教研组共享教案数
     group = await db.get(SubjectGroup, group_id)
     if group:
-        group.lesson_count = max(0, group.lesson_count - 1)
+        setattr(group, "lesson_count", max(0, cast(int, group.lesson_count) - 1))
 
     await db.commit()
 
@@ -908,7 +916,7 @@ async def increment_lesson_view(
         raise HTTPException(status_code=404, detail="共享记录不存在")
 
     # 增加查看次数
-    shared_lesson.view_count += 1
+    setattr(shared_lesson, "view_count", cast(int, shared_lesson.view_count) + 1)
     await db.commit()
 
     return {"message": "查看次数已更新", "view_count": shared_lesson.view_count}
@@ -937,7 +945,7 @@ async def increment_lesson_download(
         raise HTTPException(status_code=404, detail="共享记录不存在")
 
     # 增加下载次数
-    shared_lesson.download_count += 1
+    setattr(shared_lesson, "download_count", cast(int, shared_lesson.download_count) + 1)
     await db.commit()
 
     return {
@@ -975,7 +983,7 @@ async def get_statistics(
     my_groups = await db.scalar(
         select(func.count(GroupMembership.id)).where(
             and_(
-                GroupMembership.user_id == current_user.id,
+                GroupMembership.user_id == cast(int, current_user.id),
                 GroupMembership.is_active == True,
             )
         )
@@ -985,7 +993,7 @@ async def get_statistics(
     my_shared_lessons = await db.scalar(
         select(func.count(SharedLesson.id)).where(
             and_(
-                SharedLesson.sharer_id == current_user.id,
+                SharedLesson.sharer_id == cast(int, current_user.id),
                 SharedLesson.is_active == True,
             )
         )

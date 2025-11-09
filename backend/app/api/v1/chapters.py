@@ -2,12 +2,14 @@
 章节管理 API
 """
 
-from typing import List, Optional
+from typing import List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 import pandas as pd
+from pandas._typing import WriteExcelBuffer
+from pandas.io.excel._openpyxl import OpenpyxlWriter
 import io
 
 from app.core.database import get_db
@@ -19,7 +21,7 @@ from app.schemas.chapter import (
     ChapterWithChildren,
     ChapterListResponse,
 )
-from app.schemas.resource import ResourceListResponse
+from app.schemas.resource import ResourceResponse, ResourceListResponse
 from app.api.deps import get_current_user, get_current_admin, get_current_researcher
 
 router = APIRouter()
@@ -73,7 +75,8 @@ async def get_import_template():
 
     # 转换为Excel字节流
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+    excel_buffer = cast(WriteExcelBuffer, output)
+    with OpenpyxlWriter(path=excel_buffer) as writer:
         df.to_excel(writer, sheet_name="章节模板", index=False)
 
     output.seek(0)
@@ -138,7 +141,9 @@ async def batch_import_chapters(
 
         for index, row in df.iterrows():
             # 基本验证
-            if pd.isna(row["name"]) or pd.isna(row["code"]):
+            name_is_na = cast(bool, pd.isna(row["name"]))
+            code_is_na = cast(bool, pd.isna(row["code"]))
+            if name_is_na or code_is_na:
                 continue
 
             chapter_data = {
@@ -146,20 +151,24 @@ async def batch_import_chapters(
                 "name": str(row["name"]).strip(),
                 "code": str(row["code"]).strip(),
                 "display_order": (
-                    int(row["display_order"]) if not pd.isna(row["display_order"]) else 0
+                    int(row["display_order"])
+                    if not cast(bool, pd.isna(row["display_order"]))
+                    else 0
                 ),
                 "description": (
                     str(row.get("description", "")).strip()
-                    if not pd.isna(row.get("description"))
+                    if not cast(bool, pd.isna(row.get("description")))
                     else None
                 ),
                 "parent_code": (
                     str(row.get("parent_code", "")).strip()
-                    if not pd.isna(row.get("parent_code"))
+                    if not cast(bool, pd.isna(row.get("parent_code")))
                     else None
                 ),
                 "is_active": (
-                    bool(row.get("is_active", True)) if not pd.isna(row.get("is_active")) else True
+                    bool(row.get("is_active", True))
+                    if not cast(bool, pd.isna(row.get("is_active")))
+                    else True
                 ),
             }
 
@@ -321,7 +330,7 @@ async def create_chapter(
         parent = await db.get(Chapter, data.parent_id)
         if not parent:
             raise HTTPException(404, "Parent chapter not found")
-        if parent.course_id != data.course_id:
+        if cast(int, getattr(parent, "course_id", None)) != data.course_id:
             raise HTTPException(400, "Parent chapter must belong to the same course")
 
     # 创建章节
@@ -433,4 +442,4 @@ async def get_chapter_resources(
     result = await db.execute(query)
     resources = result.scalars().all()
 
-    return ResourceListResponse(items=resources, total=total, page=page, page_size=page_size)
+    return ResourceListResponse(items=[ResourceResponse.from_orm(r) for r in resources], total=total or 0, page=page, page_size=page_size)

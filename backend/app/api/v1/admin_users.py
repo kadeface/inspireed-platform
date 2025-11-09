@@ -3,7 +3,7 @@
 提供用户账号的增删改查、状态管理、密码重置等功能
 """
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -131,24 +131,7 @@ async def _fetch_user_with_relations(db: AsyncSession, user_id: int) -> Optional
 
 
 def _serialize_user(user: User) -> UserResponse:
-    return UserResponse(
-        id=user.id,
-        username=user.username,
-        email=user.email,
-        full_name=user.full_name,
-        role=user.role,
-        is_active=user.is_active,
-        created_at=user.created_at,
-        last_login=getattr(user, "last_login", None),
-        region_id=user.region_id,
-        school_id=user.school_id,
-        grade_id=user.grade_id,
-        classroom_id=user.classroom_id,
-        region_name=user.region.name if user.region else None,
-        school_name=user.school.name if user.school else None,
-        grade_name=user.grade.name if user.grade else None,
-        classroom_name=user.classroom.name if user.classroom else None,
-    )
+    return UserResponse.model_validate(user)
 
 
 async def _validate_scope_ids(
@@ -175,9 +158,9 @@ async def _validate_scope_ids(
         if not classroom:
             raise HTTPException(status_code=404, detail="班级不存在")
 
-        resolved["classroom_id"] = classroom.id
-        resolved["grade_id"] = classroom.grade_id
-        resolved["school_id"] = classroom.school_id
+        resolved["classroom_id"] = cast(int, classroom.id)
+        resolved["grade_id"] = cast(Optional[int], classroom.grade_id)
+        resolved["school_id"] = cast(Optional[int], classroom.school_id)
         school_obj = await db.scalar(select(School).where(School.id == classroom.school_id))
 
     if resolved["grade_id"] is not None:
@@ -191,11 +174,11 @@ async def _validate_scope_ids(
         )
         if not school_obj:
             raise HTTPException(status_code=404, detail="学校不存在")
-        resolved["school_id"] = school_obj.id
+        resolved["school_id"] = cast(Optional[int], school_obj.id)
 
         if resolved["region_id"] is None:
-            resolved["region_id"] = school_obj.region_id
-        elif resolved["region_id"] != school_obj.region_id:
+            resolved["region_id"] = cast(Optional[int], school_obj.region_id)
+        elif resolved["region_id"] != cast(Optional[int], school_obj.region_id):
             raise HTTPException(status_code=400, detail="学校与区域不匹配")
 
     if resolved["region_id"] is not None:
@@ -311,7 +294,7 @@ async def create_user(
     db.add(user)
     await db.commit()
 
-    refreshed_user = await _fetch_user_with_relations(db, user.id)
+    refreshed_user = await _fetch_user_with_relations(db, cast(int, user.id))
     if refreshed_user is None:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -368,7 +351,7 @@ async def update_user(
 
     await db.commit()
 
-    refreshed_user = await _fetch_user_with_relations(db, user.id)
+    refreshed_user = await _fetch_user_with_relations(db, cast(int, user.id))
     if refreshed_user is None:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -417,10 +400,12 @@ async def toggle_user_status(
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
-    user.is_active = not user.is_active
+    current_status = bool(getattr(user, "is_active"))
+    setattr(user, "is_active", not current_status)
     await db.commit()
 
-    return {"message": f"用户已{'启用' if user.is_active else '禁用'}", "is_active": user.is_active}
+    updated_status = bool(getattr(user, "is_active"))
+    return {"message": f"用户已{'启用' if updated_status else '禁用'}", "is_active": updated_status}
 
 
 @router.post("/{user_id}/reset-password")
@@ -440,7 +425,7 @@ async def reset_user_password(
     # 生成新密码（8位随机密码，包含字母和数字）
     alphabet = string.ascii_letters + string.digits
     new_password = "".join(secrets.choice(alphabet) for _ in range(8))
-    user.hashed_password = get_password_hash(new_password)
+    setattr(user, "hashed_password", get_password_hash(new_password))
 
     await db.commit()
 
@@ -502,7 +487,7 @@ async def batch_import_users(
 
             db.add(user)
             await db.flush()  # 获取ID但不提交
-            created_user_ids.append(user.id)
+            created_user_ids.append(cast(int, user.id))
 
         except HTTPException as exc:
             errors.append(f"第{i+1}行：{exc.detail}")
@@ -518,7 +503,9 @@ async def batch_import_users(
         )
         created_user_objs = result.scalars().all()
         # 按创建顺序排序
-        created_users_map = {user.id: user for user in created_user_objs}
+        created_users_map: dict[int, User] = {
+            cast(int, user.id): user for user in created_user_objs if user.id is not None
+        }
         for user_id in created_user_ids:
             user_obj = created_users_map.get(user_id)
             if user_obj:

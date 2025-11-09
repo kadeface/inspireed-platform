@@ -343,17 +343,19 @@ async def delete_region(
         raise HTTPException(status_code=404, detail="区域不存在")
 
     # 检查是否有子区域
-    children_count = await db.execute(
+    children_count_result = await db.execute(
         select(func.count()).select_from(Region).where(Region.parent_id == region_id)
     )
-    if children_count.scalar() > 0:
+    children_count = children_count_result.scalar() or 0
+    if children_count > 0:
         raise HTTPException(status_code=400, detail="该区域下还有子区域，无法删除")
 
     # 检查是否有学校
-    schools_count = await db.execute(
+    schools_count_result = await db.execute(
         select(func.count()).select_from(School).where(School.region_id == region_id)
     )
-    if schools_count.scalar() > 0:
+    schools_count = schools_count_result.scalar() or 0
+    if schools_count > 0:
         raise HTTPException(status_code=400, detail="该区域下还有学校，无法删除")
 
     await db.delete(region)
@@ -388,6 +390,7 @@ async def get_schools(
     if school_type:
         query = query.where(School.school_type == school_type)
 
+    search_filter = None
     # 搜索筛选
     if search:
         search_filter = or_(
@@ -403,7 +406,7 @@ async def get_schools(
         count_query = count_query.where(School.region_id == region_id)
     if school_type:
         count_query = count_query.where(School.school_type == school_type)
-    if search:
+    if search_filter is not None:
         count_query = count_query.where(search_filter)
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
@@ -540,10 +543,11 @@ async def delete_school(
         raise HTTPException(status_code=404, detail="学校不存在")
 
     # 检查是否有用户
-    users_count = await db.execute(
+    users_count_result = await db.execute(
         select(func.count()).select_from(User).where(User.school_id == school_id)
     )
-    if users_count.scalar() > 0:
+    users_count = users_count_result.scalar() or 0
+    if users_count > 0:
         raise HTTPException(status_code=400, detail="该学校下还有用户，无法删除")
 
     await db.delete(school)
@@ -698,10 +702,11 @@ async def delete_classroom(
     if not classroom:
         raise HTTPException(status_code=404, detail="班级不存在")
 
-    student_count = await db.execute(
+    student_count_result = await db.execute(
         select(func.count()).select_from(User).where(User.classroom_id == classroom_id)
     )
-    if student_count.scalar() > 0:
+    student_count = student_count_result.scalar() or 0
+    if student_count > 0:
         raise HTTPException(status_code=400, detail="班级下仍有关联学生，无法删除")
 
     await db.delete(classroom)

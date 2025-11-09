@@ -2,7 +2,7 @@
 课程体系管理 API 路由
 """
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,9 +30,44 @@ from app.api.v1.auth import get_current_active_user
 router = APIRouter()
 
 
+def _safe_int(value: Any, default: int = 0) -> int:
+    """将可能为 None 或其他类型的值安全地转换为 int。"""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_optional_int(value: Any) -> Optional[int]:
+    """将值安全地转换为可选的 int。"""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_str(value: Any, default: str = "") -> str:
+    """将值安全地转换为字符串。"""
+    if value is None:
+        return default
+    return str(value)
+
+
+def _safe_optional_str(value: Any) -> Optional[str]:
+    """将值安全地转换为可选字符串。"""
+    if value is None:
+        return None
+    return str(value)
+
+
 def require_admin(current_user: User = Depends(get_current_active_user)) -> User:
     """要求管理员权限"""
-    if current_user.role != UserRole.ADMIN:
+    user_role = cast(str, getattr(current_user, "role", ""))
+    if user_role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return current_user
 
@@ -78,10 +113,11 @@ async def toggle_subject(
             .select_from(Course)
             .where(Course.subject_id == subject_id, Course.is_active == True)
         )
-        if course_count.scalar() > 0:
+        active_courses = course_count.scalar() or 0
+        if active_courses > 0:
             raise HTTPException(status_code=400, detail="该学科下有活跃的课程，无法禁用")
 
-    subject.is_active = toggle_data.is_active
+    setattr(subject, "is_active", toggle_data.is_active)
     await db.commit()
     await db.refresh(subject)
     return subject
@@ -128,10 +164,11 @@ async def toggle_grade(
             .select_from(Course)
             .where(Course.grade_id == grade_id, Course.is_active == True)
         )
-        if course_count.scalar() > 0:
+        active_courses = course_count.scalar() or 0
+        if active_courses > 0:
             raise HTTPException(status_code=400, detail="该年级下有活跃的课程，无法禁用")
 
-    grade.is_active = toggle_data.is_active
+    setattr(grade, "is_active", toggle_data.is_active)
     await db.commit()
     await db.refresh(grade)
     return grade
@@ -268,7 +305,8 @@ async def delete_course(
     lesson_count = await db.execute(
         select(func.count()).select_from(Lesson).where(Lesson.course_id == course_id)
     )
-    if lesson_count.scalar() > 0:
+    lessons_total = lesson_count.scalar() or 0
+    if lessons_total > 0:
         raise HTTPException(status_code=400, detail="该课程下有教案，无法删除。请先删除或移动相关教案。")
 
     await db.delete(course)
@@ -312,19 +350,33 @@ async def get_curriculum_tree(
         Lesson.course_id
     )
     lesson_count_result = await db.execute(lesson_count_query)
-    lesson_counts = {row.course_id: row.count for row in lesson_count_result}
+    lesson_counts: dict[int, int] = {}
+    for row in lesson_count_result:
+        course_id_val = _safe_optional_int(getattr(row, "course_id", None))
+        if course_id_val is None:
+            continue
+        count_value = getattr(row, "count", 0)
+        if callable(count_value):
+            count_value = count_value()
+        lesson_counts[course_id_val] = _safe_int(count_value, 0)
 
     # 构建课程字典 {(subject_id, grade_id): course}
     course_map = {}
     for course in courses:
-        key = (course.subject_id, course.grade_id)
+        subject_id = _safe_optional_int(getattr(course, "subject_id", None))
+        grade_id = _safe_optional_int(getattr(course, "grade_id", None))
+        course_id = _safe_optional_int(getattr(course, "id", None))
+        if subject_id is None or grade_id is None or course_id is None:
+            continue
+
+        key = (subject_id, grade_id)
         course_map[key] = CourseTreeNode(
-            id=course.id,
-            name=course.name,
-            code=course.code,
-            description=course.description,
-            is_active=course.is_active,
-            lesson_count=lesson_counts.get(course.id, 0),
+            id=course_id,
+            name=_safe_str(getattr(course, "name", "")),
+            code=_safe_optional_str(getattr(course, "code", None)),
+            description=_safe_optional_str(getattr(course, "description", None)),
+            is_active=bool(getattr(course, "is_active", True)),
+            lesson_count=lesson_counts.get(course_id, 0),
         )
 
     # 构建树形结构
@@ -337,15 +389,20 @@ async def get_curriculum_tree(
         subject_lesson_count = 0
 
         for grade in grades:
-            key = (subject.id, grade.id)
+            subject_id_val = _safe_optional_int(getattr(subject, "id", None))
+            grade_id_val = _safe_optional_int(getattr(grade, "id", None))
+            if subject_id_val is None or grade_id_val is None:
+                continue
+
+            key = (subject_id_val, grade_id_val)
             if key in course_map:
                 course_node = course_map[key]
                 grade_nodes.append(
                     GradeTreeNode(
-                        id=grade.id,
-                        name=grade.name,
-                        level=grade.level,
-                        is_active=grade.is_active,
+                        id=grade_id_val,
+                        name=_safe_str(getattr(grade, "name", "")),
+                        level=_safe_int(getattr(grade, "level", 0)),
+                        is_active=bool(getattr(grade, "is_active", True)),
                         courses=[course_node],
                         lesson_count=course_node.lesson_count,
                     )
@@ -355,13 +412,17 @@ async def get_curriculum_tree(
                 total_lessons += course_node.lesson_count
 
         if grade_nodes or include_inactive:
+            subject_id_val = _safe_optional_int(getattr(subject, "id", None))
+            if subject_id_val is None:
+                continue
+
             subject_nodes.append(
                 SubjectTreeNode(
-                    id=subject.id,
-                    name=subject.name,
-                    code=subject.code,
-                    description=subject.description,
-                    is_active=subject.is_active,
+                    id=subject_id_val,
+                    name=_safe_str(getattr(subject, "name", "")),
+                    code=_safe_str(getattr(subject, "code", "")),
+                    description=_safe_optional_str(getattr(subject, "description", None)),
+                    is_active=bool(getattr(subject, "is_active", True)),
                     grades=grade_nodes,
                     lesson_count=subject_lesson_count,
                 )
@@ -412,27 +473,40 @@ async def get_course_with_chapters(
     )
 
     lesson_count_result = await db.execute(lesson_count_query)
-    lesson_counts = {row.chapter_id: row.count for row in lesson_count_result}
+    lesson_counts: dict[int, int] = {}
+    for row in lesson_count_result:
+        chapter_id_val = _safe_optional_int(getattr(row, "chapter_id", None))
+        if chapter_id_val is None:
+            continue
+        count_value = getattr(row, "count", 0)
+        if callable(count_value):
+            count_value = count_value()
+        lesson_counts[chapter_id_val] = _safe_int(count_value, 0)
 
     # 构建章节树形结构
     chapter_map = {}  # {id: chapter_node}
     for chapter in chapters:
-        chapter_map[chapter.id] = ChapterTreeNode(
-            id=chapter.id,
-            name=chapter.name,
-            code=chapter.code,
-            description=chapter.description,
-            display_order=chapter.display_order,
-            parent_id=chapter.parent_id,
-            lesson_count=lesson_counts.get(chapter.id, 0),
+        chapter_id = _safe_optional_int(getattr(chapter, "id", None))
+        if chapter_id is None:
+            continue
+
+        chapter_map[chapter_id] = ChapterTreeNode(
+            id=chapter_id,
+            name=_safe_str(getattr(chapter, "name", "")),
+            code=_safe_optional_str(getattr(chapter, "code", None)),
+            description=_safe_optional_str(getattr(chapter, "description", None)),
+            display_order=_safe_int(getattr(chapter, "display_order", 0)),
+            parent_id=_safe_optional_int(getattr(chapter, "parent_id", None)),
+            lesson_count=lesson_counts.get(chapter_id, 0),
             children=[],
         )
 
     # 构建父子关系
     root_chapters = []
     for chapter_node in chapter_map.values():
-        if chapter_node.parent_id:
-            parent = chapter_map.get(chapter_node.parent_id)
+        parent_id = chapter_node.parent_id
+        if parent_id:
+            parent = chapter_map.get(parent_id)
             if parent:
                 parent.children.append(chapter_node)
         else:
@@ -445,10 +519,10 @@ async def get_course_with_chapters(
     total_lessons = total_lessons_result.scalar() or 0
 
     return CourseWithChaptersResponse(
-        id=course.id,
-        name=course.name,
-        code=course.code,
-        description=course.description,
+        id=_safe_int(getattr(course, "id", course_id), course_id),
+        name=_safe_str(getattr(course, "name", "")),
+        code=_safe_optional_str(getattr(course, "code", None)),
+        description=_safe_optional_str(getattr(course, "description", None)),
         subject=SubjectResponse.model_validate(course.subject) if course.subject else None,
         grade=GradeResponse.model_validate(course.grade) if course.grade else None,
         chapters=root_chapters,

@@ -2,7 +2,8 @@
 评分评论相关API
 """
 
-from typing import Optional, Any
+from typing import Optional, Any, cast
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
@@ -82,16 +83,16 @@ async def update_review(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
 
     # 检查权限
-    if review.user_id != current_user.id:
+    if cast(int, review.user_id) != cast(int, current_user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权修改此评论")
 
     # 更新评论
-    review.rating = review_in.rating
-    review.comment = review_in.comment
+    setattr(review, "rating", review_in.rating)
+    setattr(review, "comment", review_in.comment)
     await db.commit()
 
     # 更新课程的平均评分
-    await _update_lesson_rating(db, review.lesson_id)
+    await _update_lesson_rating(db, cast(int, review.lesson_id))
 
     await db.refresh(review)
     return review
@@ -113,7 +114,7 @@ async def delete_review(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
 
     # 检查权限
-    if review.user_id != current_user.id:
+    if cast(Optional[int], review.user_id) != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权删除此评论")
 
     lesson_id = review.lesson_id
@@ -121,7 +122,7 @@ async def delete_review(
     await db.commit()
 
     # 更新课程的平均评分
-    await _update_lesson_rating(db, lesson_id)
+    await _update_lesson_rating(db, cast(int, lesson_id))
 
     return None
 
@@ -153,15 +154,15 @@ async def get_lesson_reviews(
         user = user_result.scalar_one_or_none()
         review_list.append(
             ReviewWithUser(
-                id=review.id,
-                user_id=review.user_id,
-                lesson_id=review.lesson_id,
-                rating=review.rating,
-                comment=review.comment,
-                created_at=review.created_at,
-                updated_at=review.updated_at,
-                user_name=user.full_name or user.username if user else "未知用户",
-                user_avatar=user.avatar_url if user else None,
+                id=cast(int, review.id),
+                user_id=cast(int, review.user_id),
+                lesson_id=cast(int, review.lesson_id),
+                rating=cast(int, review.rating),
+                comment=cast(Optional[str], review.comment),
+                created_at=cast(datetime, review.created_at),
+                updated_at=cast(datetime, review.updated_at),
+                user_name=(cast(str, user.full_name) or cast(str, user.username)) if user else "未知用户",
+                user_avatar=cast(Optional[str], user.avatar_url) if user else None,
             )
         )
 
@@ -185,12 +186,16 @@ async def get_lesson_rating_stats(*, db: AsyncSession = Depends(get_db), lesson_
     reviews = reviews_result.scalars().all()
 
     for review in reviews:
-        rating_distribution[review.rating] += 1
+        rating_value = cast(int, review.rating)
+        rating_distribution[rating_value] += 1
+
+    average_rating = float(cast(float, lesson.average_rating)) if lesson.average_rating is not None else 0.0
+    review_count = cast(int, lesson.review_count or 0)
 
     return LessonRatingStats(
         lesson_id=lesson_id,
-        average_rating=lesson.average_rating,
-        review_count=lesson.review_count,
+        average_rating=average_rating,
+        review_count=review_count,
         rating_distribution=rating_distribution,
     )
 
@@ -228,6 +233,8 @@ async def _update_lesson_rating(db: AsyncSession, lesson_id: int) -> None:
     lesson_result = await db.execute(select(Lesson).where(Lesson.id == lesson_id))
     lesson = lesson_result.scalar_one_or_none()
     if lesson and stats:
-        lesson.average_rating = float(stats.avg_rating) if stats.avg_rating else 0.0
-        lesson.review_count = stats.count if stats.count else 0
+        new_average_rating = float(stats.avg_rating) if stats.avg_rating else 0.0
+        new_review_count = stats.count or 0
+        setattr(lesson, "average_rating", new_average_rating)
+        setattr(lesson, "review_count", new_review_count)
         await db.commit()

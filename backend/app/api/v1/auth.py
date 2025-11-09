@@ -3,7 +3,7 @@
 """
 
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -34,8 +34,8 @@ async def get_current_user(
 
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        user_id = payload.get("sub")
+        if not isinstance(user_id, str):
             raise credentials_exception
     except JWTError:
         raise credentials_exception
@@ -54,7 +54,7 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
-    if not user.is_active:
+    if not cast(bool, user.is_active):
         raise HTTPException(status_code=400, detail="用户未激活")
 
     # 预先填充组织信息，方便序列化
@@ -69,7 +69,7 @@ async def get_current_active_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """获取当前活跃用户"""
-    if not current_user.is_active:
+    if not cast(bool, current_user.is_active):
         raise HTTPException(status_code=400, detail="用户未激活")
     return current_user
 
@@ -115,14 +115,14 @@ async def login(
     )
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not verify_password(form_data.password, cast(str, user.hashed_password)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if not user.is_active:
+    if not cast(bool, user.is_active):
         raise HTTPException(status_code=400, detail="用户未激活")
 
     # 创建访问令牌

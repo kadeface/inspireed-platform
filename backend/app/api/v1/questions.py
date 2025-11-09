@@ -2,7 +2,7 @@
 问答系统API路由
 """
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, and_
@@ -106,7 +106,7 @@ async def create_question(
     # 如果指定了cell_id，验证cell存在
     if question_in.cell_id:
         cell = await db.get(Cell, question_in.cell_id)
-        if not cell or cell.lesson_id != question_in.lesson_id:
+        if cell is None or cast(Optional[int], cell.lesson_id) != question_in.lesson_id:
             raise HTTPException(status_code=404, detail="Cell不存在或不属于该课程")
 
     # 创建问题
@@ -143,13 +143,13 @@ async def create_question(
         db.add(ai_answer)
 
         # 更新问题状态为已回答
-        question.status = QuestionStatus.ANSWERED
+        setattr(question, "status", QuestionStatus.ANSWERED)
 
         await db.commit()
         await db.refresh(ai_answer)
 
     # 重新加载问题以包含关联数据
-    question = await get_question_or_404(question.id, db, load_relations=True)
+    question = await get_question_or_404(cast(int, question.id), db, load_relations=True)
 
     return question
 
@@ -210,7 +210,7 @@ async def get_my_questions(
         "total": total,
         "page": page,
         "page_size": page_size,
-        "has_more": page * page_size < total,
+        "has_more": total is not None and page * page_size < total,
     }
 
 
@@ -278,7 +278,7 @@ async def get_lesson_questions(
         "total": total,
         "page": page,
         "page_size": page_size,
-        "has_more": page * page_size < total,
+        "has_more": total is not None and page * page_size < total,
     }
 
 
@@ -297,15 +297,18 @@ async def get_question_detail(
     question = await get_question_or_404(question_id, db, load_relations=True)
 
     # 权限检查：只有提问者和教师可以查看私有问题
+    is_public = cast(Optional[bool], question.is_public) or False
+    student_id = cast(Optional[int], question.student_id)
     if (
-        not question.is_public
-        and question.student_id != current_user.id
+        not is_public
+        and student_id != current_user.id
         and current_user.role.value != "teacher"
     ):
         raise HTTPException(status_code=403, detail="无权查看该问题")
 
     # 增加查看次数
-    question.views += 1
+    current_views = cast(Optional[int], question.views) or 0
+    setattr(question, "views", current_views + 1)
     await db.commit()
 
     return question
@@ -323,10 +326,11 @@ async def resolve_question(
     question = await get_question_or_404(question_id, db)
 
     # 只有提问者可以标记为已解决
-    if question.student_id != current_user.id:
+    student_id = cast(Optional[int], question.student_id)
+    if student_id != current_user.id:
         raise HTTPException(status_code=403, detail="只有提问者可以标记问题为已解决")
 
-    question.status = QuestionStatus.RESOLVED
+    setattr(question, "status", QuestionStatus.RESOLVED)
     await db.commit()
 
     # 重新加载
@@ -452,7 +456,7 @@ async def pin_question(
     """
     question = await get_question_or_404(question_id, db)
 
-    question.is_pinned = not question.is_pinned
+    setattr(question, "is_pinned", not cast(bool, question.is_pinned))
     await db.commit()
 
     question = await get_question_or_404(question_id, db, load_relations=True)
@@ -485,8 +489,8 @@ async def create_answer(
     db.add(answer)
 
     # 更新问题状态
-    if question.status == QuestionStatus.PENDING:
-        question.status = QuestionStatus.ANSWERED
+    if cast(str, question.status) == QuestionStatus.PENDING:
+        setattr(question, "status", QuestionStatus.ANSWERED)
 
     await db.commit()
     await db.refresh(answer)
@@ -515,7 +519,8 @@ async def update_answer(
         raise HTTPException(status_code=404, detail="回答不存在")
 
     # 权限检查
-    if answer.answerer_id != current_user.id:
+    answerer_id = cast(Optional[int], answer.answerer_id)
+    if answerer_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权修改该回答")
 
     # 更新
@@ -550,11 +555,12 @@ async def rate_answer(
         raise HTTPException(status_code=404, detail="回答不存在")
 
     # 获取问题，确保是提问者
-    question = await get_question_or_404(answer.question_id, db)
-    if question.student_id != current_user.id:
+    question = await get_question_or_404(cast(int, answer.question_id), db)
+    student_id = cast(Optional[int], question.student_id)
+    if student_id != current_user.id:
         raise HTTPException(status_code=403, detail="只有提问者可以评分")
 
-    answer.rating = rating_in.rating
+    setattr(answer, "rating", rating_in.rating)
     await db.commit()
     await db.refresh(answer)
 

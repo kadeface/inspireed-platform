@@ -2,7 +2,7 @@
 资源管理 API
 """
 
-from typing import List, Optional
+from typing import List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
@@ -66,7 +66,8 @@ async def get_resource(
         raise HTTPException(404, "Resource not found")
 
     # 增加查看次数
-    resource.view_count += 1
+    current_view_count = resource.view_count or 0
+    setattr(resource, "view_count", current_view_count + 1)
     await db.commit()
 
     # 获取章节信息
@@ -116,13 +117,16 @@ async def create_resource(
         raise HTTPException(404, "Chapter not found")
 
     # 创建资源记录
+    role_value = cast(str, current_user.role)
+    resource_is_official = is_official if role_value == UserRole.ADMIN else False
+
     resource = Resource(
         chapter_id=chapter_id,
         title=title,
         description=description,
         resource_type=resource_type,
         # 教研员上传的资源不标记为官方
-        is_official=is_official if current_user.role == UserRole.ADMIN else False,
+        is_official=resource_is_official,
         is_downloadable=is_downloadable,
         created_by=current_user.id,
     )
@@ -135,7 +139,8 @@ async def create_resource(
             resource.file_url = upload_result["file_url"]
             resource.file_size = upload_result["file_size"]
             resource.page_count = upload_result["page_count"]
-            resource.thumbnail_url = upload_result.get("thumbnail_url")
+            thumbnail_url = cast(Optional[str], upload_result.get("thumbnail_url"))
+            setattr(resource, "thumbnail_url", thumbnail_url)
         else:
             # 上传其他类型文件
             upload_result = await upload_service.upload_file(file)
@@ -192,14 +197,16 @@ async def delete_resource(
     lessons_count_result = await db.execute(lessons_query)
     lessons_count = lessons_count_result.scalar()
 
+    lessons_count = lessons_count or 0
     if lessons_count > 0:
         raise HTTPException(
             400, f"Cannot delete resource: {lessons_count} lesson(s) are referencing it"
         )
 
     # 删除文件
-    if resource.file_url:
-        await upload_service.delete_file(resource.file_url)
+    file_url = cast(Optional[str], resource.file_url)
+    if file_url:
+        await upload_service.delete_file(cast(str, resource.file_url))
 
     # 删除资源记录
     await db.delete(resource)
@@ -220,11 +227,12 @@ async def download_resource(
     if not resource:
         raise HTTPException(404, "Resource not found")
 
-    if not resource.is_downloadable:
+    if not (cast(bool, resource.is_downloadable)):
         raise HTTPException(403, "Resource is not downloadable")
 
     # 增加下载次数
-    resource.download_count += 1
+    current_download_count = resource.download_count or 0
+    setattr(resource, "download_count", current_download_count + 1)
     await db.commit()
 
     # 从 file_url 中提取文件扩展名
@@ -236,7 +244,7 @@ async def download_resource(
         return path[last_dot_index:] if last_dot_index > 0 else ""
 
     # 构建完整的文件名（标题 + 扩展名）
-    extension = get_file_extension(resource.file_url)
+    extension = get_file_extension(cast(str, resource.file_url))
     full_filename = f"{resource.title}{extension}" if extension else resource.title
 
     return {"download_url": resource.file_url, "filename": full_filename}
@@ -255,7 +263,9 @@ async def get_resource_preview(
         raise HTTPException(404, "Resource not found")
 
     # 检查文件类型
-    file_ext = resource.file_url.split(".")[-1].lower() if resource.file_url else ""
+    file_ext = (
+        cast(str, resource.file_url).split(".")[-1].lower() if cast(Optional[str], resource.file_url) else ""
+    )
 
     preview_info = {
         "resource_id": resource.id,
@@ -274,7 +284,7 @@ async def get_resource_preview(
     if file_ext in ["docx", "doc", "pptx", "ppt"]:
         try:
             converted_pdf_url = await office_converter_service.get_converted_pdf_url(
-                resource.file_url
+                cast(str, resource.file_url)
             )
             if converted_pdf_url:
                 preview_info["preview_url"] = converted_pdf_url
