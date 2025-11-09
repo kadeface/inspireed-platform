@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -38,7 +39,15 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    result = await db.execute(select(User).where(User.id == int(user_id)))
+    result = await db.execute(
+        select(User)
+        .options(
+            selectinload(User.region),
+            selectinload(User.school),
+            selectinload(User.grade),
+        )
+        .where(User.id == int(user_id))
+    )
     user = result.scalar_one_or_none()
 
     if user is None:
@@ -46,6 +55,10 @@ async def get_current_user(
 
     if not user.is_active:
         raise HTTPException(status_code=400, detail="用户未激活")
+
+    user.region_name = user.region.name if user.region else None  # type: ignore[attr-defined]
+    user.school_name = user.school.name if user.school else None  # type: ignore[attr-defined]
+    user.grade_name = user.grade.name if user.grade else None  # type: ignore[attr-defined]
 
     return user
 
@@ -65,11 +78,23 @@ async def get_current_user_optional(
     except JWTError:
         return None
 
-    result = await db.execute(select(User).where(User.id == int(user_id)))
+    result = await db.execute(
+        select(User)
+        .options(
+            selectinload(User.region),
+            selectinload(User.school),
+            selectinload(User.grade),
+        )
+        .where(User.id == int(user_id))
+    )
     user = result.scalar_one_or_none()
 
     if user is None or not user.is_active:
         return None
+
+    user.region_name = user.region.name if user.region else None  # type: ignore[attr-defined]
+    user.school_name = user.school.name if user.school else None  # type: ignore[attr-defined]
+    user.grade_name = user.grade.name if user.grade else None  # type: ignore[attr-defined]
 
     return user
 

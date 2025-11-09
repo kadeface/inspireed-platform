@@ -62,6 +62,10 @@ class UserResponse(UserBase):
     school_id: Optional[int] = None
     grade_id: Optional[int] = None
     classroom_id: Optional[int] = None
+    region_name: Optional[str] = None
+    school_name: Optional[str] = None
+    grade_name: Optional[str] = None
+
     created_at: datetime
     updated_at: datetime
 

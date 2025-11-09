@@ -18,6 +18,7 @@ from app.core.security import get_password_hash
 from app.core.config import settings
 import secrets
 import string
+from sqlalchemy.orm import selectinload
 
 
 router = APIRouter()
@@ -32,6 +33,7 @@ class UserCreate(BaseModel):
     username: str
     email: EmailStr
     password: str
+    full_name: Optional[str] = None
     role: UserRole
     is_active: bool = True
     region_id: Optional[int] = None
@@ -53,6 +55,7 @@ class UserUpdate(BaseModel):
 
     username: Optional[str] = None
     email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
     region_id: Optional[int] = None
@@ -73,6 +76,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: str
+    full_name: Optional[str] = None
     role: UserRole
     is_active: bool
     created_at: datetime
@@ -81,6 +85,10 @@ class UserResponse(BaseModel):
     school_id: Optional[int] = None
     grade_id: Optional[int] = None
     classroom_id: Optional[int] = None
+    region_name: Optional[str] = None
+    school_name: Optional[str] = None
+    grade_name: Optional[str] = None
+    classroom_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -106,6 +114,41 @@ class BatchImportRequest(BaseModel):
     """批量导入请求"""
 
     users: List[UserCreate]
+
+
+def _user_with_relations_query():
+    return select(User).options(
+        selectinload(User.region),
+        selectinload(User.school),
+        selectinload(User.grade),
+        selectinload(User.classroom),
+    )
+
+
+async def _fetch_user_with_relations(db: AsyncSession, user_id: int) -> Optional[User]:
+    result = await db.execute(_user_with_relations_query().where(User.id == user_id))
+    return result.scalar_one_or_none()
+
+
+def _serialize_user(user: User) -> UserResponse:
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        last_login=getattr(user, "last_login", None),
+        region_id=user.region_id,
+        school_id=user.school_id,
+        grade_id=user.grade_id,
+        classroom_id=user.classroom_id,
+        region_name=user.region.name if user.region else None,
+        school_name=user.school.name if user.school else None,
+        grade_name=user.grade.name if user.grade else None,
+        classroom_name=user.classroom.name if user.classroom else None,
+    )
 
 
 async def _validate_scope_ids(
@@ -178,7 +221,7 @@ async def get_users(
     """获取用户列表"""
 
     # 构建查询
-    query = select(User)
+    query = _user_with_relations_query()
 
     # 角色筛选
     if role:
@@ -204,7 +247,7 @@ async def get_users(
     total_pages = (total + size - 1) // size
 
     return UserListResponse(
-        users=[UserResponse.model_validate(user) for user in users],
+        users=[_serialize_user(user) for user in users],
         total=total,
         page=page,
         size=size,
@@ -220,13 +263,12 @@ async def get_user(
 ) -> Any:
     """获取用户详情"""
 
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    user = await _fetch_user_with_relations(db, user_id)
 
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
-    return UserResponse.model_validate(user)
+    return _serialize_user(user)
 
 
 @router.post("/", response_model=UserResponse)
@@ -260,6 +302,7 @@ async def create_user(
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed_password,
+        full_name=user_data.full_name,
         role=user_data.role,
         is_active=user_data.is_active,
         **scope_ids,
@@ -267,9 +310,12 @@ async def create_user(
 
     db.add(user)
     await db.commit()
-    await db.refresh(user)
 
-    return UserResponse.model_validate(user)
+    refreshed_user = await _fetch_user_with_relations(db, user.id)
+    if refreshed_user is None:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    return _serialize_user(refreshed_user)
 
 
 @router.put("/{user_id}", response_model=UserResponse)
@@ -321,9 +367,12 @@ async def update_user(
         setattr(user, field, value)
 
     await db.commit()
-    await db.refresh(user)
 
-    return UserResponse.model_validate(user)
+    refreshed_user = await _fetch_user_with_relations(db, user.id)
+    if refreshed_user is None:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    return _serialize_user(refreshed_user)
 
 
 @router.delete("/{user_id}")
@@ -413,7 +462,7 @@ async def batch_import_users(
 ) -> Any:
     """批量导入用户"""
 
-    created_users = []
+    created_user_ids: list[int] = []
     errors = []
 
     for i, user_data in enumerate(import_data.users):
@@ -445,6 +494,7 @@ async def batch_import_users(
                 username=user_data.username,
                 email=user_data.email,
                 hashed_password=hashed_password,
+                full_name=user_data.full_name,
                 role=user_data.role,
                 is_active=user_data.is_active,
                 **scope_ids,
@@ -452,7 +502,7 @@ async def batch_import_users(
 
             db.add(user)
             await db.flush()  # 获取ID但不提交
-            created_users.append(UserResponse.model_validate(user))
+            created_user_ids.append(user.id)
 
         except HTTPException as exc:
             errors.append(f"第{i+1}行：{exc.detail}")
@@ -460,6 +510,19 @@ async def batch_import_users(
             errors.append(f"第{i+1}行：{str(e)}")
 
     await db.commit()
+
+    created_users: list[UserResponse] = []
+    if created_user_ids:
+        result = await db.execute(
+            _user_with_relations_query().where(User.id.in_(created_user_ids))
+        )
+        created_user_objs = result.scalars().all()
+        # 按创建顺序排序
+        created_users_map = {user.id: user for user in created_user_objs}
+        for user_id in created_user_ids:
+            user_obj = created_users_map.get(user_id)
+            if user_obj:
+                created_users.append(_serialize_user(user_obj))
 
     return {
         "message": f"批量导入完成，成功创建 {len(created_users)} 个用户",
@@ -476,13 +539,23 @@ async def download_import_template(
 ) -> Any:
     """下载批量导入模板"""
 
-    # 返回CSV模板内容
-    template_content = "username,email,password,role,is_active\n"
-    template_content += "user1,user1@example.com,password123,teacher,true\n"
-    template_content += "user2,user2@example.com,password123,student,true\n"
+    # 返回CSV模板内容（中文字段，包含备注说明）
+    template_content = (
+        "学号/用户名,姓名,邮箱,密码,角色,是否激活,区域ID(可选),学校ID(可选),年级ID(可选),班级ID(可选),备注\n"
+    )
+    template_content += (
+        "202301001,张慧,student01@example.com,student123,学生,是,1,101,3,1001,学生账户请填写学号作为登录名\n"
+    )
+    template_content += (
+        "teacher01,李老师,teacher01@example.com,teacher123,教师,是,,,,,教师/管理员可留空组织信息\n"
+    )
 
     return {
         "template": template_content,
         "filename": "user_import_template.csv",
-        "note": "请按照模板格式填写用户信息，role可选值：admin, researcher, teacher, student",
+        "note": (
+            "请按照模板格式填写用户信息，角色支持：管理员、教研员、教师、学生（或对应英文缩写）；"
+            "学生账号的“学号/用户名”需使用学号；“是否激活”可填写 是/否 或 true/false；"
+            "组织信息字段可留空，若填写请使用系统中的数值ID。"
+        ),
     }

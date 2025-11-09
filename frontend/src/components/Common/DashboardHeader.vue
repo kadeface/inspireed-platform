@@ -10,8 +10,18 @@
 
         <!-- 右侧：用户信息和操作 -->
         <div class="flex items-center gap-4">
-          <!-- 用户名 -->
-          <span class="text-sm text-gray-700">{{ userName }}</span>
+          <!-- 用户信息 -->
+          <div class="flex flex-col items-end text-right">
+            <span class="text-sm font-medium text-gray-700">{{ userName }}</span>
+            <div
+              v-if="organizationInfo.length"
+              class="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs text-gray-500"
+            >
+              <span v-for="(info, index) in organizationInfo" :key="index" class="whitespace-nowrap">
+                {{ info }}
+              </span>
+            </div>
+          </div>
 
           <!-- 个人中心按钮（可选） -->
           <button
@@ -39,12 +49,33 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { computed, toRefs } from 'vue'
+
+const props = defineProps<{
   title: string
   subtitle?: string
   userName: string
   showProfileButton?: boolean
+  regionName?: string | null
+  schoolName?: string | null
+  gradeName?: string | null
 }>()
+
+const { title, subtitle, userName, showProfileButton, regionName, schoolName, gradeName } = toRefs(props)
+
+const organizationInfo = computed(() => {
+  const info: string[] = []
+  if (regionName.value) {
+    info.push(`区域：${regionName.value}`)
+  }
+  if (schoolName.value) {
+    info.push(`学校：${schoolName.value}`)
+  }
+  if (gradeName.value) {
+    info.push(`年级：${gradeName.value}`)
+  }
+  return info
+})
 
 defineEmits<{
   (e: 'logout'): void

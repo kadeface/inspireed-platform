@@ -76,6 +76,18 @@
                 状态
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                区域
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                学校
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                年级
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                班级
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 创建时间
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -98,7 +110,12 @@
                     </div>
                   </div>
                   <div class="ml-4">
-                    <div class="text-sm font-medium text-gray-900">{{ user.username }}</div>
+                    <div class="text-sm font-medium text-gray-900">
+                      {{ user.full_name || user.username }}
+                    </div>
+                    <div v-if="user.full_name" class="text-xs text-gray-500">
+                      用户名：{{ user.username }}
+                    </div>
                     <div class="text-sm text-gray-500">{{ user.email }}</div>
                   </div>
                 </div>
@@ -118,6 +135,18 @@
                 >
                   {{ user.is_active ? '激活' : '未激活' }}
                 </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ user.region_name || '—' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ user.school_name || '—' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ user.grade_name || '—' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ user.classroom_name || '—' }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {{ formatDate(user.created_at) }}
@@ -206,6 +235,15 @@
                 v-model="userForm.email"
                 type="email"
                 required
+                class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">姓名</label>
+              <input
+                v-model="userForm.full_name"
+                type="text"
+                placeholder="可选，学生建议填写真实姓名"
                 class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2"
               />
             </div>
@@ -367,6 +405,7 @@ const showBatchImportModal = ref(false)
 const editingUser = ref<User | null>(null)
 const userForm = ref<UserCreate>({
   username: '',
+  full_name: '',
   email: '',
   role: 'teacher',
   password: '',
@@ -494,8 +533,9 @@ async function refreshClassrooms() {
   try {
     classroomLoading.value = true
     const params: Record<string, number | boolean> = {
+      page: 1,
       school_id: schoolId,
-      size: 1000,
+      size: 100,
       is_active: true
     }
     if (userForm.value.grade_id) {
@@ -521,6 +561,7 @@ function openCreateUserModal() {
   editingUser.value = null
   userForm.value = {
     username: '',
+    full_name: '',
     email: '',
     role: 'teacher',
     password: '',
@@ -538,6 +579,7 @@ async function editUser(user: User) {
   editingUser.value = user
   userForm.value = {
     username: user.username,
+    full_name: user.full_name ?? '',
     email: user.email,
     role: user.role,
     password: '',
@@ -562,6 +604,7 @@ async function saveUser() {
       const updateData: UserUpdate = {
         username: userForm.value.username,
         email: userForm.value.email,
+        full_name: userForm.value.full_name?.trim() || null,
         role: userForm.value.role,
         is_active: userForm.value.is_active,
         region_id: userForm.value.region_id ?? null,
@@ -572,7 +615,11 @@ async function saveUser() {
       await adminService.updateUser(editingUser.value.id, updateData)
       toast.success('用户更新成功')
     } else {
-      await adminService.createUser(userForm.value)
+      const payload = {
+        ...userForm.value,
+        full_name: userForm.value.full_name?.trim() || undefined,
+      }
+      await adminService.createUser(payload)
       toast.success('用户创建成功')
     }
     closeUserModal()

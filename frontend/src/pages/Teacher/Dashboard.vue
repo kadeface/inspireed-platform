@@ -5,6 +5,9 @@
       title="教师工作台"
       subtitle="管理您的教案和课程资源"
       :user-name="userName"
+      :region-name="regionName"
+      :school-name="schoolName"
+      :grade-name="gradeName"
       @logout="handleLogout"
     />
 
@@ -110,6 +113,76 @@
             </div>
           </div>
         </div>
+
+      <!-- PDCA 教学质量管理循环 -->
+      <section class="mb-8">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <span>🔄</span>
+                <span>PDCA 教学质量管理循环</span>
+              </h2>
+              <p class="mt-1 text-sm text-gray-500">
+                从教学设计到课堂实施、过程评估与循证改进，持续优化教学闭环。
+              </p>
+            </div>
+            <div v-if="isPdcaLoading" class="flex items-center gap-2 text-sm text-gray-500">
+              <svg class="w-4 h-4 text-blue-500 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+              <span>数据刷新中...</span>
+            </div>
+          </div>
+
+          <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div
+              v-for="stage in pdcaStages"
+              :key="stage.key"
+              class="group relative overflow-hidden rounded-lg border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm transition-all hover:border-blue-400 hover:shadow-lg"
+            >
+              <div class="flex items-start justify-between">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {{ stage.label }}
+                  </p>
+                  <h3 class="mt-1 text-lg font-semibold text-gray-900">
+                    {{ stage.title }}
+                  </h3>
+                </div>
+                <span class="text-2xl">{{ stage.icon }}</span>
+              </div>
+
+              <div class="mt-4 flex items-baseline gap-2">
+                <span class="text-3xl font-bold text-blue-600">
+                  {{ stage.value }}
+                </span>
+                <span class="text-sm text-gray-500">{{ stage.unit }}</span>
+              </div>
+
+              <p class="mt-2 text-sm text-gray-600">
+                {{ stage.description }}
+              </p>
+              <p v-if="stage.secondary" class="mt-1 text-xs text-gray-400">
+                {{ stage.secondary }}
+              </p>
+
+              <button
+                v-if="stage.cta && stage.action"
+                type="button"
+                @click="stage.action()"
+                class="mt-4 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700"
+              >
+                {{ stage.cta }}
+                <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
         <!-- 页面标题和操作栏 -->
         <div class="mb-6">
@@ -480,6 +553,7 @@ import CurriculumWithResources from '../../components/Curriculum/CurriculumWithR
 import CurriculumTreeView from '../../components/Curriculum/CurriculumTreeView.vue'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import questionService from '@/services/question'
+import { lessonService } from '@/services/lesson'
 import curriculumService from '@/services/curriculum'
 import { getSubjectGroupStatistics } from '@/services/subjectGroup'
 import type { QuestionStats } from '@/types/question'
@@ -495,8 +569,21 @@ const questionStats = ref<QuestionStats | null>(null)
 // 学科教研组统计
 const subjectGroupStats = ref<SubjectGroupStatistics | null>(null)
 
+// 教案状态统计（用于 PDCA）
+const lessonStatusSummary = ref({
+  draft: 0,
+  published: 0,
+  archived: 0,
+})
+
+// PDCA 加载状态
+const isPdcaLoading = ref(false)
+
 // 用户名
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '教师')
+const regionName = computed(() => userStore.user?.region_name || '')
+const schoolName = computed(() => userStore.user?.school_name || '')
+const gradeName = computed(() => userStore.user?.grade_name || '')
 
 // 本地状态
 const showCreateModal = ref(false)
@@ -527,6 +614,123 @@ const statusFilters = [
   { label: '已发布', value: LessonStatus.PUBLISHED },
   { label: '已归档', value: LessonStatus.ARCHIVED },
 ]
+
+function focusDraftLessons() {
+  viewMode.value = 'list'
+  if (currentStatus.value !== LessonStatus.DRAFT) {
+    currentStatus.value = LessonStatus.DRAFT
+  } else {
+    loadLessons()
+  }
+}
+
+function focusPublishedLessons() {
+  viewMode.value = 'list'
+  if (currentStatus.value !== LessonStatus.PUBLISHED) {
+    currentStatus.value = LessonStatus.PUBLISHED
+  } else {
+    loadLessons()
+  }
+}
+
+function openCreateLessonModal() {
+  showCreateModal.value = true
+}
+
+function navigateToQuestions() {
+  router.push('/teacher/questions')
+}
+
+function navigateToSubjectGroups() {
+  router.push('/teacher/subject-groups')
+}
+
+const pdcaStages = computed(() => {
+  const draft = lessonStatusSummary.value.draft ?? 0
+  const published = lessonStatusSummary.value.published ?? 0
+  const archived = lessonStatusSummary.value.archived ?? 0
+  const totalLessonsCount = draft + published + archived
+
+  const totalQuestions = questionStats.value?.total ?? 0
+  const resolvedQuestions = questionStats.value?.resolved ?? 0
+  const pendingQuestions = questionStats.value?.pending ?? 0
+  const resolutionRate =
+    totalQuestions > 0 ? Math.round((resolvedQuestions / totalQuestions) * 100) : null
+
+  const myGroups = subjectGroupStats.value?.my_groups ?? 0
+  const mySharedLessons = subjectGroupStats.value?.my_shared_lessons ?? 0
+  const platformSharedLessons = subjectGroupStats.value?.total_shared_lessons ?? 0
+
+  return [
+    {
+      key: 'plan',
+      label: 'Plan',
+      title: '系统化设计',
+      icon: '🧭',
+      value: draft,
+      unit: '草稿',
+      description:
+        draft > 0
+          ? '完善教学目标、策略与活动链路。'
+          : '创建新的教案，规划教学目标与策略。',
+      secondary: archived ? `已归档 ${archived} 篇` : undefined,
+      cta: draft > 0 ? '整理草稿' : '创建教案',
+      action: draft > 0 ? focusDraftLessons : openCreateLessonModal,
+    },
+    {
+      key: 'do',
+      label: 'Do',
+      title: '结构化实施',
+      icon: '🚀',
+      value: published,
+      unit: '发布',
+      description:
+        published > 0
+          ? '已发布教案正在课堂落地实施。'
+          : '发布教案，让教学设计进入课堂实践。',
+      secondary: totalLessonsCount ? `累计教案 ${totalLessonsCount} 篇` : undefined,
+      cta: published > 0 ? '查看已发布' : undefined,
+      action: published > 0 ? focusPublishedLessons : undefined,
+    },
+    {
+      key: 'check',
+      label: 'Check',
+      title: '过程性评估',
+      icon: '✅',
+      value: pendingQuestions,
+      unit: '待答',
+      description:
+        pendingQuestions > 0
+          ? '关注学生提问与学习反馈，及时响应。'
+          : '保持课堂互动，关注新的学生问题。',
+      secondary: totalQuestions
+        ? `已解决 ${resolvedQuestions} · 完成度 ${resolutionRate}%`
+        : '等待学生数据',
+      cta: '管理问答',
+      action: navigateToQuestions,
+    },
+    {
+      key: 'act',
+      label: 'Act',
+      title: '循证改进',
+      icon: '🔄',
+      value: mySharedLessons,
+      unit: '共享',
+      description:
+        mySharedLessons > 0
+          ? '在教研组内沉淀成果，推动持续改进。'
+          : '将优秀实践分享到教研组，形成共研。',
+      secondary:
+        myGroups > 0
+          ? `所属教研组 ${myGroups} 个 · 平台共享 ${platformSharedLessons} 篇`
+          : platformSharedLessons
+          ? `平台累计共享 ${platformSharedLessons} 篇`
+          : undefined,
+      cta: '进入教研组',
+      action: navigateToSubjectGroups,
+    },
+  ]
+})
 
 // 计算总页数
 const totalPages = computed(() => {
@@ -569,6 +773,35 @@ async function loadSubjectGroupStats() {
   }
 }
 
+// 加载教案状态统计
+async function loadLessonStatusStats() {
+  try {
+    const [draftResponse, publishedResponse, archivedResponse] = await Promise.all([
+      lessonService.fetchLessons({ status: LessonStatus.DRAFT, page_size: 1 }),
+      lessonService.fetchLessons({ status: LessonStatus.PUBLISHED, page_size: 1 }),
+      lessonService.fetchLessons({ status: LessonStatus.ARCHIVED, page_size: 1 }),
+    ])
+
+    lessonStatusSummary.value = {
+      draft: draftResponse.total ?? 0,
+      published: publishedResponse.total ?? 0,
+      archived: archivedResponse.total ?? 0,
+    }
+  } catch (error: any) {
+    console.error('Failed to load lesson status summary:', error)
+  }
+}
+
+// 刷新 PDCA 相关数据
+async function refreshPdcaOverview() {
+  isPdcaLoading.value = true
+  try {
+    await Promise.all([loadLessonStatusStats(), loadQuestionStats(), loadSubjectGroupStats()])
+  } finally {
+    isPdcaLoading.value = false
+  }
+}
+
 // 处理年级选择
 function handleGradeSelected(gradeId: number | null) {
   selectedGrade.value = gradeId
@@ -588,6 +821,7 @@ function handleLessonCreated(lessonId: number) {
   console.log('Lesson created:', lessonId)
   // 刷新教案列表
   loadLessons()
+  refreshPdcaOverview()
   showToast('success', '教案创建成功')
 }
 
@@ -618,6 +852,7 @@ async function handleCreate(lessonData: LessonCreate) {
     pendingChapterId.value = null
     pendingCourseId.value = null
     showToast('success', '教案创建成功')
+    refreshPdcaOverview()
     
     // 跳转到编辑页面
     router.push(`/teacher/lesson/${newLesson.id}`)
@@ -646,6 +881,7 @@ async function handleEditPublished(lessonId: number) {
     
     // 刷新列表
     loadLessons()
+    refreshPdcaOverview()
     
     // 跳转到编辑页面
     router.push(`/teacher/lesson/${lessonId}`)
@@ -665,6 +901,7 @@ async function handleDuplicate(lessonId: number) {
     await lessonStore.duplicateLessonById(lessonId)
     showToast('success', '教案复制成功')
     loadLessons() // 刷新列表
+    refreshPdcaOverview()
   } catch (error: any) {
     showToast('error', error.message || '复制教案失败')
   }
@@ -689,6 +926,7 @@ async function handleDeleteConfirm() {
       lessonStore.currentPage -= 1
     }
     loadLessons()
+    refreshPdcaOverview()
   } catch (error: any) {
     showToast('error', error.message || '删除教案失败')
   } finally {
@@ -711,6 +949,7 @@ async function handleUnpublish(lessonId: number) {
     }
     
     loadLessons() // 刷新列表
+    refreshPdcaOverview()
   } catch (error: any) {
     showToast('error', error.message || '取消发布失败')
   }
@@ -722,6 +961,7 @@ async function handlePublish(lessonId: number) {
     await lessonStore.publishCurrentLesson()
     showToast('success', '教案发布成功')
     loadLessons() // 刷新列表
+    refreshPdcaOverview()
   } catch (error: any) {
     // 如果当前教案不是要发布的，先加载
     try {
@@ -729,6 +969,7 @@ async function handlePublish(lessonId: number) {
       await lessonStore.publishCurrentLesson()
       showToast('success', '教案发布成功')
       loadLessons()
+      refreshPdcaOverview()
     } catch (err: any) {
       showToast('error', err.message || '发布教案失败')
     }
@@ -825,8 +1066,7 @@ async function loadAvailableChapters() {
 onMounted(() => {
   loadLessons()
   loadAvailableChapters()
-  loadQuestionStats()
-  loadSubjectGroupStats()
+  refreshPdcaOverview()
 })
 </script>
 

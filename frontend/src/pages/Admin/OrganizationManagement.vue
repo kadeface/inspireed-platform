@@ -240,6 +240,9 @@
                   <button @click="editSchool(school)" class="text-blue-600 hover:text-blue-900">
                     编辑
                   </button>
+                  <button @click="openClassroomManager(school)" class="text-indigo-600 hover:text-indigo-900">
+                    班级管理
+                  </button>
                   <button @click="deleteSchool(school)" class="text-red-600 hover:text-red-900">
                     删除
                   </button>
@@ -452,13 +455,247 @@
         </form>
       </div>
     </div>
+
+    <!-- 班级管理抽屉 -->
+    <div v-if="showClassroomManager" class="fixed inset-0 bg-gray-800 bg-opacity-40 flex justify-end z-50">
+      <div class="w-full max-w-4xl h-full bg-white shadow-xl flex flex-col">
+        <div class="px-6 py-4 border-b flex items-center justify-between">
+          <div>
+            <h3 class="text-xl font-semibold text-gray-900">
+              {{ classroomSchool?.name }} - 年级与班级管理
+            </h3>
+            <p class="text-sm text-gray-500 mt-1">
+              课程体系中的年级数据用于创建班级，一个班级只能关联一个年级，并记录入学年份。
+            </p>
+          </div>
+          <button @click="closeClassroomManager" class="text-gray-500 hover:text-gray-700">
+            ✕
+          </button>
+        </div>
+
+        <div class="px-6 py-4 border-b flex flex-wrap gap-3 items-center">
+          <button
+            @click="openCreateClassroomModal"
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            :disabled="!classroomSchool"
+          >
+            + 新增班级
+          </button>
+          <button
+            @click="loadClassrooms"
+            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          >
+            🔄 刷新
+          </button>
+          <select
+            v-model="classroomGradeFilter"
+            @change="handleClassroomFilterChange"
+            class="px-3 py-2 border rounded-lg"
+          >
+            <option value="">全部年级</option>
+            <option v-for="grade in grades" :key="grade.id" :value="grade.id">
+              {{ grade.name }}
+            </option>
+          </select>
+          <input
+            v-model="classroomSearchQuery"
+            @keyup.enter="handleClassroomFilterChange"
+            type="text"
+            placeholder="搜索班级名称或编码..."
+            class="px-3 py-2 border rounded-lg flex-1 min-w-[200px]"
+          />
+        </div>
+
+        <div class="flex-1 overflow-y-auto">
+          <div v-if="classroomLoading" class="p-6 text-center text-gray-500">
+            班级数据加载中...
+          </div>
+          <div v-else class="p-6">
+            <div v-if="classrooms.length === 0" class="text-center text-gray-500 py-12 border-2 border-dashed rounded-lg">
+              暂无班级，请点击上方“新增班级”创建。
+            </div>
+            <div v-else class="bg-white rounded-lg shadow overflow-hidden">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      班级名称
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      年级
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      入学年份
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      状态
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr v-for="classroom in classrooms" :key="classroom.id" class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm font-medium text-gray-900">{{ classroom.name }}</div>
+                      <div class="text-xs text-gray-500">
+                        编码：{{ classroom.code || '—' }}
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {{ getGradeName(classroom.grade_id) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {{ classroom.enrollment_year || '—' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <span
+                        class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                        :class="classroom.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                      >
+                        {{ classroom.is_active ? '激活' : '未激活' }}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div class="flex gap-2">
+                        <button @click="editClassroom(classroom)" class="text-blue-600 hover:text-blue-900">
+                          编辑
+                        </button>
+                        <button @click="deleteClassroom(classroom)" class="text-red-600 hover:text-red-900">
+                          删除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t flex justify-between items-center">
+          <div class="text-sm text-gray-600">
+            显示 {{ (classroomPage - 1) * classroomPageSize + (classrooms.length ? 1 : 0) }} -
+            {{ Math.min(classroomPage * classroomPageSize, classroomTotal) }} 条，共 {{ classroomTotal }} 条
+          </div>
+          <div class="flex gap-2">
+            <button
+              @click="prevClassroomPage"
+              :disabled="classroomPage === 1"
+              class="px-3 py-2 border rounded-lg disabled:opacity-50"
+            >
+              上一页
+            </button>
+            <span class="px-3 py-2 text-sm text-gray-600">{{ classroomPage }} / {{ classroomTotalPages || 1 }}</span>
+            <button
+              @click="nextClassroomPage"
+              :disabled="classroomPage === classroomTotalPages || classroomTotalPages === 0"
+              class="px-3 py-2 border rounded-lg disabled:opacity-50"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 班级编辑模态框 -->
+    <div v-if="showClassroomModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 w-full max-w-lg">
+        <h3 class="text-lg font-semibold mb-4">
+          {{ editingClassroom ? '编辑班级' : '创建班级' }}
+        </h3>
+        <form @submit.prevent="saveClassroom">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">班级名称</label>
+              <input
+                v-model="classroomForm.name"
+                type="text"
+                required
+                class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">所属年级</label>
+              <select
+                v-model="classroomForm.grade_id"
+                required
+                class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="">请选择年级</option>
+                <option v-for="grade in grades" :key="grade.id" :value="grade.id">
+                  {{ grade.name }}
+                </option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700">入学年份</label>
+                <input
+                  v-model="classroomForm.enrollment_year"
+                  type="number"
+                  min="1990"
+                  max="2099"
+                  class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">班级编码</label>
+                <input
+                  v-model="classroomForm.code"
+                  type="text"
+                  class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-600"
+                  disabled
+                />
+                <p class="mt-1 text-xs text-gray-500">
+                  自动生成，格式为“入学年份 + 班级名称”，例如 2025 + 01 = 202501
+                </p>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">描述</label>
+              <textarea
+                v-model="classroomForm.description"
+                rows="3"
+                class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2"
+              ></textarea>
+            </div>
+            <div>
+              <label class="flex items-center">
+                <input v-model="classroomForm.is_active" type="checkbox" class="mr-2" />
+                <span class="text-sm text-gray-700">激活状态</span>
+              </label>
+            </div>
+          </div>
+          <div class="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
+              @click="closeClassroomModal"
+              class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              {{ editingClassroom ? '更新' : '创建' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useToast } from '@/composables/useToast'
-import adminService, { type Region, type School } from '@/services/admin'
+import adminService, { type Region, type School, type Classroom } from '@/services/admin'
+import curriculumService from '@/services/curriculum'
+import type { Grade } from '@/types/curriculum'
 
 const toast = useToast()
 
@@ -505,9 +742,32 @@ const schoolForm = ref({
   is_active: true
 })
 
+// 班级管理状态
+const showClassroomManager = ref(false)
+const classroomSchool = ref<School | null>(null)
+const classrooms = ref<Classroom[]>([])
+const classroomLoading = ref(false)
+const classroomPage = ref(1)
+const classroomPageSize = ref(50)
+const classroomTotal = ref(0)
+const grades = ref<Grade[]>([])
+const classroomSearchQuery = ref('')
+const classroomGradeFilter = ref<number | ''>('')
+const showClassroomModal = ref(false)
+const editingClassroom = ref<Classroom | null>(null)
+const classroomForm = ref({
+  name: '',
+  grade_id: '',
+  enrollment_year: new Date().getFullYear().toString(),
+  code: '',
+  description: '',
+  is_active: true,
+})
+
 // 计算属性
 const regionTotalPages = computed(() => Math.ceil(regionTotal.value / regionPageSize.value))
 const schoolTotalPages = computed(() => Math.ceil(schoolTotal.value / schoolPageSize.value))
+const classroomTotalPages = computed(() => Math.ceil(classroomTotal.value / classroomPageSize.value))
 
 // 区域管理方法
 function getRegionLevelName(level: number): string {
@@ -555,6 +815,15 @@ async function loadAllRegions() {
     allRegions.value = response.regions
   } catch (error: any) {
     console.error('Failed to load all regions:', error)
+  }
+}
+
+async function loadGradesList() {
+  try {
+    grades.value = await curriculumService.getGrades()
+  } catch (error: any) {
+    console.error('Failed to load grades:', error)
+    toast.error(error.response?.data?.detail || '加载年级列表失败')
   }
 }
 
@@ -754,10 +1023,165 @@ function nextSchoolPage() {
   }
 }
 
+function getGradeName(gradeId?: number | null): string {
+  if (!gradeId) return '—'
+  const grade = grades.value.find(g => g.id === gradeId)
+  return grade ? grade.name : `年级 #${gradeId}`
+}
+
+async function openClassroomManager(school: School) {
+  classroomSchool.value = school
+  classroomPage.value = 1
+  classroomSearchQuery.value = ''
+  classroomGradeFilter.value = ''
+  await Promise.all([loadGradesList(), loadClassrooms()])
+  showClassroomManager.value = true
+}
+
+function closeClassroomManager() {
+  showClassroomManager.value = false
+  classroomSchool.value = null
+  classrooms.value = []
+}
+
+async function loadClassrooms() {
+  if (!classroomSchool.value) return
+  try {
+    classroomLoading.value = true
+    const response = await adminService.getClassrooms({
+      page: classroomPage.value,
+      size: classroomPageSize.value,
+      school_id: classroomSchool.value.id,
+      grade_id: classroomGradeFilter.value ? Number(classroomGradeFilter.value) : undefined,
+      search: classroomSearchQuery.value || undefined,
+      is_active: undefined,
+    })
+    classrooms.value = response.classrooms
+    classroomTotal.value = response.total
+  } catch (error: any) {
+    console.error('Failed to load classrooms:', error)
+    toast.error(error.response?.data?.detail || '加载班级列表失败')
+  } finally {
+    classroomLoading.value = false
+  }
+}
+
+function handleClassroomFilterChange() {
+  classroomPage.value = 1
+  loadClassrooms()
+}
+
+function prevClassroomPage() {
+  if (classroomPage.value > 1) {
+    classroomPage.value--
+    loadClassrooms()
+  }
+}
+
+function nextClassroomPage() {
+  if (classroomPage.value < classroomTotalPages.value) {
+    classroomPage.value++
+    loadClassrooms()
+  }
+}
+
+function openCreateClassroomModal() {
+  if (!classroomSchool.value) return
+  editingClassroom.value = null
+  classroomForm.value = {
+    name: '',
+    grade_id: '',
+    enrollment_year: new Date().getFullYear().toString(),
+    code: '',
+    description: '',
+    is_active: true,
+  }
+  showClassroomModal.value = true
+}
+
+function editClassroom(classroom: Classroom) {
+  editingClassroom.value = classroom
+  classroomForm.value = {
+    name: classroom.name,
+    grade_id: classroom.grade_id ? classroom.grade_id.toString() : '',
+    enrollment_year: classroom.enrollment_year ? classroom.enrollment_year.toString() : '',
+    code: classroom.code || '',
+    description: classroom.description || '',
+    is_active: classroom.is_active,
+  }
+  showClassroomModal.value = true
+}
+
+function closeClassroomModal() {
+  showClassroomModal.value = false
+  editingClassroom.value = null
+}
+
+async function saveClassroom() {
+  if (!classroomSchool.value) {
+    toast.error('请先选择学校')
+    return
+  }
+  try {
+    const enrollmentYearNumber = classroomForm.value.enrollment_year
+      ? Number(classroomForm.value.enrollment_year)
+      : undefined
+    const payload: any = {
+      name: classroomForm.value.name,
+      grade_id: classroomForm.value.grade_id ? Number(classroomForm.value.grade_id) : undefined,
+      school_id: classroomSchool.value.id,
+      is_active: classroomForm.value.is_active,
+      description: classroomForm.value.description || undefined,
+      enrollment_year: enrollmentYearNumber,
+    }
+
+    const generatedCode =
+      enrollmentYearNumber && classroomForm.value.name
+        ? `${enrollmentYearNumber}${classroomForm.value.name.replace(/\s+/g, '')}`
+        : undefined
+
+    if (!payload.grade_id) {
+      toast.error('请选择年级')
+      return
+    }
+
+    payload.code = generatedCode
+    classroomForm.value.code = generatedCode || ''
+
+    if (editingClassroom.value) {
+      await adminService.updateClassroom(editingClassroom.value.id, payload)
+      toast.success('班级更新成功')
+    } else {
+      await adminService.createClassroom(payload)
+      toast.success('班级创建成功')
+    }
+    closeClassroomModal()
+    loadClassrooms()
+  } catch (error: any) {
+    console.error('Failed to save classroom:', error)
+    toast.error(error.response?.data?.detail || '保存班级失败')
+  }
+}
+
+async function deleteClassroom(classroom: Classroom) {
+  if (!confirm(`确定要删除班级 ${classroom.name} 吗？`)) {
+    return
+  }
+  try {
+    await adminService.deleteClassroom(classroom.id)
+    toast.success('班级删除成功')
+    loadClassrooms()
+  } catch (error: any) {
+    console.error('Failed to delete classroom:', error)
+    toast.error(error.response?.data?.detail || '删除班级失败')
+  }
+}
+
 onMounted(() => {
   loadRegions()
   loadSchools()
   loadAllRegions()
+  loadGradesList()
 })
 </script>
 

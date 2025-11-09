@@ -42,6 +42,7 @@ export interface User {
   id: number
   username: string
   email: string
+  full_name?: string | null
   role: string
   is_active: boolean
   created_at: string
@@ -50,6 +51,10 @@ export interface User {
   school_id?: number | null
   grade_id?: number | null
   classroom_id?: number | null
+  region_name?: string | null
+  school_name?: string | null
+  grade_name?: string | null
+  classroom_name?: string | null
 }
 
 export interface UserListResponse {
@@ -62,6 +67,7 @@ export interface UserListResponse {
 
 export interface UserCreate {
   username: string
+  full_name?: string | null
   email: string
   password: string
   role: string
@@ -75,6 +81,7 @@ export interface UserCreate {
 export interface UserUpdate {
   username?: string
   email?: string
+  full_name?: string | null
   role?: string
   is_active?: boolean
   region_id?: number | null

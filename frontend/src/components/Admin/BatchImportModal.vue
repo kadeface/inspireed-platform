@@ -46,7 +46,10 @@
             <li>• 支持 CSV 和 Excel 格式文件（.csv, .xlsx, .xls），文件大小不超过5MB</li>
             <li>• 用户名和邮箱必须唯一，不能与现有用户重复</li>
             <li>• 角色可选值：admin, researcher, teacher, student</li>
-            <li>• is_active字段：true表示激活，false表示未激活</li>
+            <li>• 姓名列用于显示真实姓名，可选填写</li>
+            <li>• 学生账号请使用“学号/用户名”列填写学号作为登录名</li>
+            <li>• “是否激活”字段支持填写 是/否 或 true/false（不区分大小写）</li>
+            <li>• 区域/学校/年级/班级为可选字段，填写时请使用对应的数值ID</li>
           </ul>
         </div>
         
@@ -74,13 +77,13 @@
       <div v-if="currentStep === 2" class="space-y-4">
         <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
           <input
-            ref="fileInput"
+            ref="fileInputRef"
             type="file"
             accept=".csv,.xlsx,.xls"
             @change="handleFileSelect"
             class="hidden"
           />
-          <div v-if="!selectedFile" @click="$refs.fileInput.click()" class="cursor-pointer">
+          <div v-if="!selectedFile" @click="triggerFileSelect" class="cursor-pointer">
             <div class="text-4xl mb-4">📁</div>
             <p class="text-lg font-medium text-gray-700">点击选择文件</p>
             <p class="text-sm text-gray-500 mt-2">支持 CSV 或 Excel 文件（.csv, .xlsx, .xls）</p>
@@ -91,7 +94,7 @@
             <p class="text-lg font-medium text-green-700">{{ selectedFile.name }}</p>
             <p class="text-sm text-gray-500 mt-2">文件大小: {{ formatFileSize(selectedFile.size) }}</p>
             <button
-              @click="selectedFile = null; $refs.fileInput.value = ''"
+              @click="resetSelectedFile"
               class="mt-2 text-sm text-red-600 hover:text-red-800"
             >
               重新选择
@@ -213,6 +216,60 @@ const currentStep = ref(1)
 const selectedFile = ref<File | null>(null)
 const importing = ref(false)
 const importResult = ref<BatchImportResult | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+const HEADER_MAP: Record<string, string | null> = {
+  username: 'username',
+  用户名: 'username',
+  '学号/用户名': 'username',
+  学号: 'username',
+  full_name: 'full_name',
+  姓名: 'full_name',
+  name: 'full_name',
+  真实姓名: 'full_name',
+  email: 'email',
+  邮箱: 'email',
+  password: 'password',
+  密码: 'password',
+  role: 'role',
+  角色: 'role',
+  is_active: 'is_active',
+  '是否激活': 'is_active',
+  '激活状态': 'is_active',
+  region_id: 'region_id',
+  '区域ID': 'region_id',
+  '区域ID(可选)': 'region_id',
+  school_id: 'school_id',
+  '学校ID': 'school_id',
+  '学校ID(可选)': 'school_id',
+  grade_id: 'grade_id',
+  '年级ID': 'grade_id',
+  '年级ID(可选)': 'grade_id',
+  classroom_id: 'classroom_id',
+  '班级ID': 'classroom_id',
+  '班级ID(可选)': 'classroom_id',
+  备注: null,
+  说明: null,
+  remark: null,
+}
+
+const ROLE_MAP: Record<string, string> = {
+  admin: 'admin',
+  管理员: 'admin',
+  teacher: 'teacher',
+  教师: 'teacher',
+  student: 'student',
+  学生: 'student',
+  researcher: 'researcher',
+  教研员: 'researcher',
+}
+
+function normalizeHeader(header: string): string | null {
+  if (Object.prototype.hasOwnProperty.call(HEADER_MAP, header)) {
+    return HEADER_MAP[header]
+  }
+  return header
+}
 
 // 方法
 function close() {
@@ -230,6 +287,17 @@ function getRoleDisplayName(role: string): string {
     student: '学生'
   }
   return roleMap[role] || role
+}
+
+function triggerFileSelect() {
+  fileInputRef.value?.click()
+}
+
+function resetSelectedFile() {
+  selectedFile.value = null
+  if (fileInputRef.value) {
+    fileInputRef.value.value = ''
+  }
 }
 
 function formatFileSize(bytes: number): string {
@@ -339,39 +407,74 @@ function readFileAsText(file: File): Promise<string> {
 
 function parseCSV(csvText: string): UserCreate[] {
   const lines = csvText.trim().split('\n')
-  const headers = lines[0].split(',').map(h => h.trim())
+  const originalHeaders = lines[0].split(',').map(h => h.trim())
+  const normalizedHeaders = originalHeaders.map(normalizeHeader)
+  const activeHeaders = normalizedHeaders.filter((header): header is string => Boolean(header))
   
   // 验证必需的列
   const requiredColumns = ['username', 'email', 'password', 'role', 'is_active']
-  const missingColumns = requiredColumns.filter(col => !headers.includes(col))
+  const missingColumns = requiredColumns.filter(col => !activeHeaders.includes(col))
   
   if (missingColumns.length > 0) {
     throw new Error(`缺少必需的列: ${missingColumns.join(', ')}`)
   }
   
+  const parseBoolean = (value: string, rowNumber: number) => {
+    const normalized = value.trim().toLowerCase()
+    if (['true', '1', 'yes', 'y', '是', '激活'].includes(normalized)) return true
+    if (['false', '0', 'no', 'n', '', '否', '未激活'].includes(normalized)) return false
+    throw new Error(`第${rowNumber}行 is_active 列只能填写 true/false`)
+  }
+  const parseOptionalNumber = (value: string | undefined, column: string, rowNumber: number) => {
+    if (value === undefined || value === null || value === '') {
+      return null
+    }
+    const parsed = Number(value)
+    if (Number.isNaN(parsed)) {
+      throw new Error(`第${rowNumber}行 ${column} 列必须填写数字ID或留空`)
+    }
+    return parsed
+  }
+
   const users: UserCreate[] = []
   
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim()
     if (!line) continue
+    const rowNumber = i + 1
     
     const values = line.split(',').map(v => v.trim())
-    if (values.length !== headers.length) {
-      throw new Error(`第${i+1}行数据列数不匹配`)
+    if (values.length !== normalizedHeaders.length) {
+      throw new Error(`第${rowNumber}行数据列数不匹配`)
     }
     
     const user: any = {}
-    headers.forEach((header, index) => {
-      user[header] = values[index]
+    normalizedHeaders.forEach((_, index) => {
+      const normalizedHeader = normalizeHeader(originalHeaders[index])
+      if (!normalizedHeader) {
+        return
+      }
+      user[normalizedHeader] = values[index]
     })
     
+    const roleValue = (user.role ?? '').toString()
+    const normalizedRole = ROLE_MAP[roleValue.trim().toLowerCase()]
+    if (!normalizedRole) {
+      throw new Error(`第${rowNumber}行 角色 列仅支持 管理员/教研员/教师/学生（或 admin/researcher/teacher/student）`)
+    }
+
     // 转换数据类型
     users.push({
       username: user.username,
+      full_name: user.full_name ? user.full_name.trim() : undefined,
       email: user.email,
       password: user.password,
-      role: user.role,
-      is_active: user.is_active.toLowerCase() === 'true'
+      role: normalizedRole,
+      is_active: parseBoolean(user.is_active ?? '', rowNumber),
+      region_id: parseOptionalNumber(user.region_id, 'region_id', rowNumber),
+      school_id: parseOptionalNumber(user.school_id, 'school_id', rowNumber),
+      grade_id: parseOptionalNumber(user.grade_id, 'grade_id', rowNumber),
+      classroom_id: parseOptionalNumber(user.classroom_id, 'classroom_id', rowNumber)
     })
   }
   
@@ -399,40 +502,75 @@ async function parseExcel(file: File): Promise<UserCreate[]> {
         }
         
         // 第一行是表头
-        const headers = jsonData[0].map(h => String(h).trim())
+        const originalHeaders = jsonData[0].map(h => String(h).trim())
+        const normalizedHeaders = originalHeaders.map(normalizeHeader)
+        const activeHeaders = normalizedHeaders.filter((header): header is string => Boolean(header))
         
         // 验证必需的列
         const requiredColumns = ['username', 'email', 'password', 'role', 'is_active']
-        const missingColumns = requiredColumns.filter(col => !headers.includes(col))
+        const missingColumns = requiredColumns.filter(col => !activeHeaders.includes(col))
         
         if (missingColumns.length > 0) {
           throw new Error(`缺少必需的列: ${missingColumns.join(', ')}`)
         }
         
+        const parseBoolean = (value: string, rowNumber: number) => {
+          const normalized = value.trim().toLowerCase()
+          if (['true', '1', 'yes', 'y', '是', '激活'].includes(normalized)) return true
+          if (['false', '0', 'no', 'n', '', '否', '未激活'].includes(normalized)) return false
+          throw new Error(`第${rowNumber}行 is_active 列只能填写 true/false`)
+        }
+        const parseOptionalNumber = (value: string | undefined, column: string, rowNumber: number) => {
+          if (value === undefined || value === null || value === '') {
+            return null
+          }
+          const parsed = Number(value)
+          if (Number.isNaN(parsed)) {
+            throw new Error(`第${rowNumber}行 ${column} 列必须填写数字ID或留空`)
+          }
+          return parsed
+        }
+
         const users: UserCreate[] = []
         
         // 从第二行开始解析数据
         for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i]
           if (!row || row.length === 0) continue
+          const rowNumber = i + 1
           
           const user: any = {}
-          headers.forEach((header, index) => {
-            user[header] = row[index] !== undefined ? String(row[index]).trim() : ''
+          normalizedHeaders.forEach((_, index) => {
+            const normalizedHeader = normalizeHeader(originalHeaders[index])
+            if (!normalizedHeader) {
+              return
+            }
+            user[normalizedHeader] = row[index] !== undefined ? String(row[index]).trim() : ''
           })
           
           // 验证必需字段
           if (!user.username || !user.email || !user.password || !user.role) {
-            throw new Error(`第${i+1}行数据不完整`)
+            throw new Error(`第${rowNumber}行数据不完整`)
           }
           
+          const roleValue = (user.role ?? '').toString()
+          const normalizedRole = ROLE_MAP[roleValue.trim().toLowerCase()]
+          if (!normalizedRole) {
+            throw new Error(`第${rowNumber}行 角色 列仅支持 管理员/教研员/教师/学生（或 admin/researcher/teacher/student）`)
+          }
+
           // 转换数据类型
           users.push({
             username: user.username,
+            full_name: user.full_name ? user.full_name.trim() : undefined,
             email: user.email,
             password: user.password,
-            role: user.role,
-            is_active: String(user.is_active).toLowerCase() === 'true'
+            role: normalizedRole,
+            is_active: parseBoolean(String(user.is_active ?? ''), rowNumber),
+            region_id: parseOptionalNumber(user.region_id, 'region_id', rowNumber),
+            school_id: parseOptionalNumber(user.school_id, 'school_id', rowNumber),
+            grade_id: parseOptionalNumber(user.grade_id, 'grade_id', rowNumber),
+            classroom_id: parseOptionalNumber(user.classroom_id, 'classroom_id', rowNumber)
           })
         }
         
