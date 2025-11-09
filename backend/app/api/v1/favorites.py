@@ -57,7 +57,8 @@ async def create_favorite(
     # 检查是否已经收藏
     result = await db.execute(
         select(Favorite).where(
-            Favorite.user_id == current_user.id, Favorite.lesson_id == favorite_in.lesson_id
+            Favorite.user_id == current_user.id,
+            Favorite.lesson_id == favorite_in.lesson_id,
         )
     )
     existing = result.scalar_one_or_none()
@@ -85,7 +86,9 @@ async def delete_favorite(
     取消收藏
     """
     result = await db.execute(
-        select(Favorite).where(Favorite.user_id == current_user.id, Favorite.lesson_id == lesson_id)
+        select(Favorite).where(
+            Favorite.user_id == current_user.id, Favorite.lesson_id == lesson_id
+        )
     )
     favorite = result.scalar_one_or_none()
 
@@ -121,11 +124,15 @@ async def get_my_favorites(
     # 组装返回数据
     result = []
     for fav in favorites:
-        lesson_result = await db.execute(select(Lesson).where(Lesson.id == fav.lesson_id))
+        lesson_result = await db.execute(
+            select(Lesson).where(Lesson.id == fav.lesson_id)
+        )
         lesson = lesson_result.scalar_one_or_none()
         if lesson:
             lesson_title = _safe_str(getattr(lesson, "title", ""))
-            lesson_description = _safe_optional_str(getattr(lesson, "description", None))
+            lesson_description = _safe_optional_str(
+                getattr(lesson, "description", None)
+            )
             lesson_cover = _safe_optional_str(getattr(lesson, "cover_image_url", None))
             difficulty = getattr(lesson, "difficulty_level", None)
             if difficulty is not None:
@@ -161,7 +168,9 @@ async def check_favorite(
     检查是否已收藏某课程
     """
     result = await db.execute(
-        select(Favorite).where(Favorite.user_id == current_user.id, Favorite.lesson_id == lesson_id)
+        select(Favorite).where(
+            Favorite.user_id == current_user.id, Favorite.lesson_id == lesson_id
+        )
     )
     favorite = result.scalar_one_or_none()
 

@@ -54,7 +54,9 @@ async def setup_test_accounts():
 
         for account_config in test_accounts:
             # 通过邮箱检查账号是否存在
-            result = await db.execute(select(User).where(User.email == account_config["email"]))
+            result = await db.execute(
+                select(User).where(User.email == account_config["email"])
+            )
             user = result.scalar_one_or_none()
 
             if user:

@@ -4,7 +4,15 @@
 
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Enum as SQLEnum, ForeignKey
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Integer,
+    String,
+    Enum as SQLEnum,
+    ForeignKey,
+)
 from sqlalchemy.orm import relationship, validates
 
 from app.core.database import Base
@@ -47,20 +55,30 @@ class User(Base):
     avatar_url = Column(String(500), nullable=True)
 
     # 组织关联
-    region_id = Column(Integer, ForeignKey("regions.id"), nullable=True, comment="所属区/县ID")
-    school_id = Column(Integer, ForeignKey("schools.id"), nullable=True, comment="所属学校ID")
+    region_id = Column(
+        Integer, ForeignKey("regions.id"), nullable=True, comment="所属区/县ID"
+    )
+    school_id = Column(
+        Integer, ForeignKey("schools.id"), nullable=True, comment="所属学校ID"
+    )
     grade_id = Column(Integer, ForeignKey("grades.id"), nullable=True, comment="所属年级ID")
-    classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=True, comment="所属班级ID")
+    classroom_id = Column(
+        Integer, ForeignKey("classrooms.id"), nullable=True, comment="所属班级ID"
+    )
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     region = relationship("Region")
     school = relationship("School", back_populates="users")
     grade = relationship("Grade")
-    classroom = relationship("Classroom", back_populates="students", foreign_keys=[classroom_id])
+    classroom = relationship(
+        "Classroom", back_populates="students", foreign_keys=[classroom_id]
+    )
     # lessons = relationship("Lesson", back_populates="creator", cascade="all, delete-orphan")
     # execution_logs = relationship("ExecutionLog", back_populates="user")
     # qa_records = relationship("QARecord", back_populates="user")

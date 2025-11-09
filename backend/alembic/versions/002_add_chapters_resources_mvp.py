@@ -35,17 +35,25 @@ def upgrade() -> None:
         sa.Column("display_order", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column(
-            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column(
-            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.ForeignKeyConstraint(["course_id"], ["courses.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["parent_id"], ["chapters.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_chapters_id"), "chapters", ["id"], unique=False)
-    op.create_index(op.f("ix_chapters_course_id"), "chapters", ["course_id"], unique=False)
+    op.create_index(
+        op.f("ix_chapters_course_id"), "chapters", ["course_id"], unique=False
+    )
 
     # Create resources table
     op.create_table(
@@ -62,7 +70,9 @@ def upgrade() -> None:
         sa.Column("thumbnail_url", sa.String(length=500), nullable=True),
         # 权限和状态
         sa.Column("is_official", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("is_downloadable", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column(
+            "is_downloadable", sa.Boolean(), nullable=False, server_default="true"
+        ),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column("display_order", sa.Integer(), nullable=False, server_default="0"),
         # 统计
@@ -72,10 +82,16 @@ def upgrade() -> None:
         sa.Column("created_by", sa.Integer(), nullable=True),
         # 时间戳
         sa.Column(
-            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column(
-            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.ForeignKeyConstraint(["chapter_id"], ["chapters.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
@@ -85,24 +101,35 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_resources_id"), "resources", ["id"], unique=False)
-    op.create_index(op.f("ix_resources_chapter_id"), "resources", ["chapter_id"], unique=False)
+    op.create_index(
+        op.f("ix_resources_chapter_id"), "resources", ["chapter_id"], unique=False
+    )
     op.create_index(
         op.f("ix_resources_resource_type"), "resources", ["resource_type"], unique=False
     )
 
     # Extend lessons table - add reference resource fields
-    op.add_column("lessons", sa.Column("reference_resource_id", sa.Integer(), nullable=True))
+    op.add_column(
+        "lessons", sa.Column("reference_resource_id", sa.Integer(), nullable=True)
+    )
     op.add_column("lessons", sa.Column("reference_notes", sa.Text(), nullable=True))
     op.add_column(
-        "lessons", sa.Column("cell_count", sa.Integer(), nullable=False, server_default="0")
+        "lessons",
+        sa.Column("cell_count", sa.Integer(), nullable=False, server_default="0"),
     )
-    op.add_column("lessons", sa.Column("estimated_duration", sa.Integer(), nullable=True))
     op.add_column(
-        "lessons", sa.Column("view_count", sa.Integer(), nullable=False, server_default="0")
+        "lessons", sa.Column("estimated_duration", sa.Integer(), nullable=True)
+    )
+    op.add_column(
+        "lessons",
+        sa.Column("view_count", sa.Integer(), nullable=False, server_default="0"),
     )
 
     op.create_index(
-        op.f("ix_lessons_reference_resource_id"), "lessons", ["reference_resource_id"], unique=False
+        op.f("ix_lessons_reference_resource_id"),
+        "lessons",
+        ["reference_resource_id"],
+        unique=False,
     )
     op.create_foreign_key(
         "fk_lessons_reference_resource_id",
@@ -117,7 +144,9 @@ def downgrade() -> None:
     """Remove chapters, resources tables and extended lesson fields"""
 
     # Remove extended fields from lessons
-    op.drop_constraint("fk_lessons_reference_resource_id", "lessons", type_="foreignkey")
+    op.drop_constraint(
+        "fk_lessons_reference_resource_id", "lessons", type_="foreignkey"
+    )
     op.drop_index(op.f("ix_lessons_reference_resource_id"), table_name="lessons")
     op.drop_column("lessons", "view_count")
     op.drop_column("lessons", "estimated_duration")

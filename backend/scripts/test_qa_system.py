@@ -38,7 +38,9 @@ async def test_qa_system():
         print(f"✅ 找到教师: {teacher.username} (ID: {teacher.id})")
 
         # 2. 查找已发布的课程
-        lesson = await db.execute(select(Lesson).where(Lesson.status == "published").limit(1))
+        lesson = await db.execute(
+            select(Lesson).where(Lesson.status == "published").limit(1)
+        )
         lesson = lesson.scalar_one_or_none()
 
         if not lesson:
@@ -85,7 +87,10 @@ async def test_qa_system():
                 "id": "cell-2",
                 "type": "code",
                 "order": 1,
-                "content": {"code": "# 示例代码\nprint('Hello, World!')", "language": "python"},
+                "content": {
+                    "code": "# 示例代码\nprint('Hello, World!')",
+                    "language": "python",
+                },
             },
         ]
 

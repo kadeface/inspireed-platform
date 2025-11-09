@@ -81,7 +81,9 @@ class CellExecutionRequest(BaseModel):
     """Cell执行请求Schema"""
 
     cell_id: int = Field(..., description="Cell ID")
-    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="执行参数")
+    parameters: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, description="执行参数"
+    )
 
 
 class CellExecutionResponse(BaseModel):
@@ -137,7 +139,9 @@ class SimConfigRequest(BaseModel):
 
     sim_type: str = Field(..., description="仿真类型")
     config: Dict[str, Any] = Field(..., description="仿真配置")
-    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="仿真参数")
+    parameters: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, description="仿真参数"
+    )
 
 
 class ContestSubmissionRequest(BaseModel):

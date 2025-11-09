@@ -86,7 +86,9 @@ async def create_subject_group(
     await db.flush()
 
     # 创建创建者的成员关系（作为组长）
-    membership = GroupMembership(group_id=group.id, user_id=current_user.id, role=MemberRole.OWNER)
+    membership = GroupMembership(
+        group_id=group.id, user_id=current_user.id, role=MemberRole.OWNER
+    )
     db.add(membership)
 
     await db.commit()
@@ -95,7 +97,11 @@ async def create_subject_group(
     # 构建响应
     response = SubjectGroupResponse.model_validate(group)
     response.subject_name = cast(str, subject.name)
-    response.creator_name = (cast(str, current_user.full_name) or cast(str, current_user.username)) if current_user else None
+    response.creator_name = (
+        (cast(str, current_user.full_name) or cast(str, current_user.username))
+        if current_user
+        else None
+    )
     response.user_role = cast(Optional[MemberRole], MemberRole.OWNER)
 
     if cast(Optional[int], group.grade_id):
@@ -184,10 +190,14 @@ async def list_subject_groups(
     subject_ids = list[Column[int]](set[Column[int]](g.subject_id for g in groups))
     subjects = {}
     if subject_ids:
-        subject_result = await db.execute(select(Subject).where(Subject.id.in_(subject_ids)))
+        subject_result = await db.execute(
+            select(Subject).where(Subject.id.in_(subject_ids))
+        )
         subjects = {s.id: s for s in subject_result.scalars()}
 
-    grade_ids = list[Column[int]](set[Column[int]](g.grade_id for g in groups if cast(Optional[int], g.grade_id)))
+    grade_ids = list[Column[int]](
+        set[Column[int]](g.grade_id for g in groups if cast(Optional[int], g.grade_id))
+    )
     grades = {}
     if grade_ids:
         grade_result = await db.execute(select(Grade).where(Grade.id.in_(grade_ids)))
@@ -204,13 +214,16 @@ async def list_subject_groups(
         )
         response.grade_name = (
             cast(str, grades[group.grade_id].name)
-            if cast(Optional[int], group.grade_id) and cast(Optional[int], group.grade_id) in cast(dict, grades)
+            if cast(Optional[int], group.grade_id)
+            and cast(Optional[int], group.grade_id) in cast(dict, grades)
             else None
         )
         response.user_role = user_roles.get(group.id)
         items.append(response)
 
-    return SubjectGroupListResponse(items=items, total=cast(int, total), page=page, page_size=page_size)
+    return SubjectGroupListResponse(
+        items=items, total=cast(int, total), page=page, page_size=page_size
+    )
 
 
 @router.get("/{group_id}", response_model=SubjectGroupResponse)
@@ -256,12 +269,20 @@ async def get_subject_group(
     # 获取关联信息
     subject = await db.get(Subject, group.subject_id)
     creator = await db.get(User, group.creator_id)
-    grade = await db.get(Grade, group.grade_id) if cast(Optional[int], group.grade_id) else None
+    grade = (
+        await db.get(Grade, group.grade_id)
+        if cast(Optional[int], group.grade_id)
+        else None
+    )
 
     response = SubjectGroupResponse.model_validate(group)
     response.subject_name = cast(str, subject.name) if subject else None
     response.grade_name = cast(str, grade.name) if grade else None
-    response.creator_name = (cast(str, creator.full_name) or cast(str, creator.username)) if creator else None
+    response.creator_name = (
+        (cast(str, creator.full_name) or cast(str, creator.username))
+        if creator
+        else None
+    )
     response.user_role = cast(Optional[MemberRole], user_role)
 
     if cast(Optional[int], group.school_id):
@@ -340,7 +361,10 @@ async def delete_subject_group(
             )
         )
     )
-    if not membership or cast(Optional[MemberRole], membership.role) != MemberRole.OWNER:
+    if (
+        not membership
+        or cast(Optional[MemberRole], membership.role) != MemberRole.OWNER
+    ):
         raise HTTPException(status_code=403, detail="仅组长可删除教研组")
 
     # 软删除
@@ -411,12 +435,18 @@ async def list_group_members(
         response = GroupMembershipResponse.model_validate(membership)
         user = users.get(membership.user_id)
         if user:
-            response.user_name = (cast(str, user.full_name) or cast(str, user.username)) if user else None
+            response.user_name = (
+                (cast(str, user.full_name) or cast(str, user.username))
+                if user
+                else None
+            )
             response.user_email = cast(str, user.email) if user else None
             response.user_avatar_url = cast(str, user.avatar_url) if user else None
         items.append(response)
 
-    return GroupMembershipListResponse(items=items, total=cast(int, total), page=page, page_size=page_size)
+    return GroupMembershipListResponse(
+        items=items, total=cast(int, total), page=page, page_size=page_size
+    )
 
 
 @router.post("/{group_id}/members", response_model=GroupMembershipResponse)
@@ -488,7 +518,11 @@ async def add_group_member(
 
     # 构建响应
     response = GroupMembershipResponse.model_validate(membership)
-    response.user_name = (cast(str, new_user.full_name) or cast(str, new_user.username)) if new_user else None
+    response.user_name = (
+        (cast(str, new_user.full_name) or cast(str, new_user.username))
+        if new_user
+        else None
+    )
     response.user_email = cast(str, new_user.email) if new_user else None
     response.user_avatar_url = cast(str, new_user.avatar_url) if new_user else None
 
@@ -554,7 +588,9 @@ async def update_group_member(
     user = await db.get(User, user_id)
     response = GroupMembershipResponse.model_validate(target_membership)
     if user:
-        response.user_name = (cast(str, user.full_name) or cast(str, user.username)) if user else None  
+        response.user_name = (
+            (cast(str, user.full_name) or cast(str, user.username)) if user else None
+        )
         response.user_email = cast(str, user.email) if user else None
         response.user_avatar_url = cast(str, user.avatar_url) if user else None
 
@@ -603,7 +639,9 @@ async def remove_group_member(
                 )
             )
         )
-        if not user_membership or cast(Optional[MemberRole], user_membership.role) not in [
+        if not user_membership or cast(
+            Optional[MemberRole], user_membership.role
+        ) not in [
             MemberRole.OWNER,
             MemberRole.ADMIN,
         ]:
@@ -672,7 +710,9 @@ async def list_shared_lessons(
     lesson_ids = [sl.lesson_id for sl in shared_lessons]
     lessons = {}
     if lesson_ids:
-        lesson_result = await db.execute(select(Lesson).where(Lesson.id.in_(lesson_ids)))
+        lesson_result = await db.execute(
+            select(Lesson).where(Lesson.id.in_(lesson_ids))
+        )
         lessons = {lesson.id: lesson for lesson in lesson_result.scalars()}
 
     sharer_ids = [sl.sharer_id for sl in shared_lessons]
@@ -696,13 +736,21 @@ async def list_shared_lessons(
 
         sharer = sharers.get(shared_lesson.sharer_id)
         if sharer:
-            response.sharer_name = (cast(str, sharer.full_name) or cast(str, sharer.username)) if sharer else None
-            response.sharer_avatar_url = cast(str, sharer.avatar_url) if sharer else None
+            response.sharer_name = (
+                (cast(str, sharer.full_name) or cast(str, sharer.username))
+                if sharer
+                else None
+            )
+            response.sharer_avatar_url = (
+                cast(str, sharer.avatar_url) if sharer else None
+            )
 
         response.group_name = cast(str, group.name) if group else None
         items.append(response)
 
-    return SharedLessonListResponse(items=items, total=total, page=page, page_size=page_size)
+    return SharedLessonListResponse(
+        items=items, total=total, page=page, page_size=page_size
+    )
 
 
 @router.post("/{group_id}/lessons", response_model=SharedLessonResponse)
@@ -778,11 +826,19 @@ async def share_lesson_to_group(
     response = SharedLessonResponse.model_validate(shared_lesson)
     response.lesson_title = cast(str, lesson.title)
     response.lesson_description = cast(str, lesson.description)
-    response.lesson_cover_image_url = cast(str, lesson.cover_image_url) if lesson else None
+    response.lesson_cover_image_url = (
+        cast(str, lesson.cover_image_url) if lesson else None
+    )
     response.lesson_cell_count = cast(int, lesson.cell_count)
     response.lesson_estimated_duration = cast(int, lesson.estimated_duration)
-    response.sharer_name = (cast(str, current_user.full_name) or cast(str, current_user.username)) if current_user else None
-    response.sharer_avatar_url = cast(str, current_user.avatar_url) if current_user else None
+    response.sharer_name = (
+        (cast(str, current_user.full_name) or cast(str, current_user.username))
+        if current_user
+        else None
+    )
+    response.sharer_avatar_url = (
+        cast(str, current_user.avatar_url) if current_user else None
+    )
     response.group_name = cast(str, group.name) if group else None
 
     return response
@@ -830,11 +886,19 @@ async def update_shared_lesson(
     if lesson:
         response.lesson_title = cast(str, lesson.title)
         response.lesson_description = cast(str, lesson.description)
-        response.lesson_cover_image_url = cast(str, lesson.cover_image_url) if lesson else None
+        response.lesson_cover_image_url = (
+            cast(str, lesson.cover_image_url) if lesson else None
+        )
         response.lesson_cell_count = cast(int, lesson.cell_count)
         response.lesson_estimated_duration = cast(int, lesson.estimated_duration)
-    response.sharer_name = (cast(str, current_user.full_name) or cast(str, current_user.username)) if current_user else None
-    response.sharer_avatar_url = cast(str, current_user.avatar_url) if current_user else None
+    response.sharer_name = (
+        (cast(str, current_user.full_name) or cast(str, current_user.username))
+        if current_user
+        else None
+    )
+    response.sharer_avatar_url = (
+        cast(str, current_user.avatar_url) if current_user else None
+    )
     if group:
         response.group_name = cast(str, group.name)
 
@@ -874,7 +938,9 @@ async def unshare_lesson(
                 )
             )
         )
-        if not user_membership or cast(Optional[MemberRole], user_membership.role) not in [
+        if not user_membership or cast(
+            Optional[MemberRole], user_membership.role
+        ) not in [
             MemberRole.OWNER,
             MemberRole.ADMIN,
         ]:
@@ -945,7 +1011,9 @@ async def increment_lesson_download(
         raise HTTPException(status_code=404, detail="共享记录不存在")
 
     # 增加下载次数
-    setattr(shared_lesson, "download_count", cast(int, shared_lesson.download_count) + 1)
+    setattr(
+        shared_lesson, "download_count", cast(int, shared_lesson.download_count) + 1
+    )
     await db.commit()
 
     return {

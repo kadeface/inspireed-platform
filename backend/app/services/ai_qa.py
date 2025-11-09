@@ -28,7 +28,9 @@ class AIQAService:
 
     def __init__(self):
         self.openai_api_key = getattr(settings, "OPENAI_API_KEY", None)
-        self.openai_base_url = getattr(settings, "OPENAI_BASE_URL", "https://api.openai.com/v1")
+        self.openai_base_url = getattr(
+            settings, "OPENAI_BASE_URL", "https://api.openai.com/v1"
+        )
         self.default_model = getattr(settings, "DEFAULT_AI_MODEL", "gpt-3.5-turbo")
         self.max_tokens = getattr(settings, "AI_MAX_TOKENS", 1000)
         self.temperature = getattr(settings, "AI_TEMPERATURE", 0.7)
@@ -164,7 +166,9 @@ class AIQAService:
                     "tokens_used": usage.get("total_tokens", 0),
                 }
             else:
-                raise Exception(f"OpenAI API错误: {response.status_code} - {response.text}")
+                raise Exception(
+                    f"OpenAI API错误: {response.status_code} - {response.text}"
+                )
 
     async def _get_mock_response(self, prompt: str) -> Dict[str, Any]:
         """获取模拟回答（用于测试或API密钥不可用时）"""
@@ -226,7 +230,11 @@ def solve_problem():
 
 希望这个回答对你有帮助！如果还有其他问题，随时可以问我。"""
 
-        return {"answer": answer, "confidence": 0.75, "tokens_used": len(answer.split())}
+        return {
+            "answer": answer,
+            "confidence": 0.75,
+            "tokens_used": len(answer.split()),
+        }
 
     async def get_related_questions(
         self, question: str, lesson_title: Optional[str] = None, limit: int = 3
@@ -238,7 +246,9 @@ def solve_problem():
 
         return suggestions[:limit]
 
-    async def evaluate_answer_quality(self, question: str, answer: str) -> Dict[str, Any]:
+    async def evaluate_answer_quality(
+        self, question: str, answer: str
+    ) -> Dict[str, Any]:
         """评估回答质量"""
         # 这里可以实现回答质量评估逻辑
         return {

@@ -5,4 +5,3 @@ languages = [
     {"name": "C#", "creator": "Microsoft", "year": 2000},
     {"name": "Ruby", "creator": "Yukihiro Matsumoto", "year": 1995},
 ]
-

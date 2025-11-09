@@ -7,7 +7,9 @@ from sqlalchemy import select
 
 async def reset_password():
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(User).where(User.email == "teacher@inspireed.com"))
+        result = await db.execute(
+            select(User).where(User.email == "teacher@inspireed.com")
+        )
         user = result.scalar_one_or_none()
         if user:
             user.hashed_password = get_password_hash("teacher123")

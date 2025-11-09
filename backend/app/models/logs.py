@@ -46,7 +46,9 @@ class ExecutionLog(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # 执行状态
-    status = Column(SQLEnum(ExecutionStatus), default=ExecutionStatus.PENDING, nullable=False)
+    status = Column(
+        SQLEnum(ExecutionStatus), default=ExecutionStatus.PENDING, nullable=False
+    )
 
     # 输入参数
     input_params = Column(JSON, nullable=True)

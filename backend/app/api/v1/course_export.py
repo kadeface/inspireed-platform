@@ -196,7 +196,9 @@ async def export_course(
         # 处理父章节关系
         if chapter.parent_id:
             # 查找父章节的code
-            parent_chapter = next((c for c in course.chapters if c.id == chapter.parent_id), None)
+            parent_chapter = next(
+                (c for c in course.chapters if c.id == chapter.parent_id), None
+            )
             if parent_chapter:
                 chapter_data["parent_code"] = parent_chapter.code
 
@@ -228,7 +230,9 @@ async def export_course(
             lesson_data = {
                 "course_code": course.code,
                 "chapter_code": (
-                    chapter_code_map.get(lesson.chapter_id) if lesson.chapter_id else None
+                    chapter_code_map.get(lesson.chapter_id)
+                    if lesson.chapter_id
+                    else None
                 ),
                 "title": lesson.title,
                 "description": lesson.description,
@@ -389,7 +393,9 @@ async def export_all_courses(
                 lesson_data = {
                     "course_code": course.code,
                     "chapter_code": (
-                        chapter_code_map.get(lesson.chapter_id) if lesson.chapter_id else None
+                        chapter_code_map.get(lesson.chapter_id)
+                        if lesson.chapter_id
+                        else None
                     ),
                     "title": lesson.title,
                     "description": lesson.description,
@@ -398,7 +404,9 @@ async def export_all_courses(
                     "tags": lesson.tags,
                     "cover_image_url": lesson.cover_image_url,
                     "difficulty_level": (
-                        lesson.difficulty_level.value if lesson.difficulty_level else None
+                        lesson.difficulty_level.value
+                        if lesson.difficulty_level
+                        else None
                     ),
                     "estimated_duration": lesson.estimated_duration,
                     "reference_notes": lesson.reference_notes,
@@ -420,7 +428,9 @@ async def export_all_courses(
     # 返回文件下载
     import urllib.parse
 
-    filename = urllib.parse.quote(f"完整课程体系导出_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    filename = urllib.parse.quote(
+        f"完整课程体系导出_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
     return StreamingResponse(
         output,
         media_type="application/json",
@@ -512,13 +522,17 @@ async def import_courses(
                     subject_code_map[subject_data["code"]] = subject_id_value
 
             except Exception as e:
-                import_result["errors"].append(f"导入学科失败 {subject_data.get('name', '')}: {str(e)}")
+                import_result["errors"].append(
+                    f"导入学科失败 {subject_data.get('name', '')}: {str(e)}"
+                )
 
         # 2. 导入年级
         for grade_data in data.get("grades", []):
             try:
                 # 检查是否已存在
-                existing = await db.execute(select(Grade).where(Grade.level == grade_data["level"]))
+                existing = await db.execute(
+                    select(Grade).where(Grade.level == grade_data["level"])
+                )
                 existing_grade = existing.scalar_one_or_none()
 
                 grade_id_value = None
@@ -547,7 +561,9 @@ async def import_courses(
                     grade_level_map[grade_data["level"]] = grade_id_value
 
             except Exception as e:
-                import_result["errors"].append(f"导入年级失败 {grade_data.get('name', '')}: {str(e)}")
+                import_result["errors"].append(
+                    f"导入年级失败 {grade_data.get('name', '')}: {str(e)}"
+                )
 
         # 3. 导入课程
         for course_data in data.get("courses", []):
@@ -557,7 +573,9 @@ async def import_courses(
                 grade_id = grade_level_map.get(course_data["grade_level"])
 
                 if not subject_id or not grade_id:
-                    import_result["errors"].append(f"课程 {course_data.get('name', '')} 的学科或年级不存在")
+                    import_result["errors"].append(
+                        f"课程 {course_data.get('name', '')} 的学科或年级不存在"
+                    )
                     continue
 
                 # 检查是否已存在
@@ -603,7 +621,9 @@ async def import_courses(
                     course_code_map[course_data["code"]] = course_id_value
 
             except Exception as e:
-                import_result["errors"].append(f"导入课程失败 {course_data.get('name', '')}: {str(e)}")
+                import_result["errors"].append(
+                    f"导入课程失败 {course_data.get('name', '')}: {str(e)}"
+                )
 
         # 4. 导入章节
         for chapter_data in data.get("chapters", []):
@@ -611,7 +631,9 @@ async def import_courses(
                 # 获取课程ID
                 course_id = course_code_map.get(chapter_data["course_code"])
                 if not course_id:
-                    import_result["errors"].append(f"章节 {chapter_data.get('name', '')} 的课程不存在")
+                    import_result["errors"].append(
+                        f"章节 {chapter_data.get('name', '')} 的课程不存在"
+                    )
                     continue
 
                 # 处理父章节关系
@@ -619,13 +641,16 @@ async def import_courses(
                 if chapter_data.get("parent_code"):
                     parent_id = chapter_code_map.get(chapter_data["parent_code"])
                     if not parent_id:
-                        import_result["errors"].append(f"章节 {chapter_data.get('name', '')} 的父章节不存在")
+                        import_result["errors"].append(
+                            f"章节 {chapter_data.get('name', '')} 的父章节不存在"
+                        )
                         continue
 
                 # 检查是否已存在
                 existing = await db.execute(
                     select(Chapter).where(
-                        Chapter.course_id == course_id, Chapter.code == chapter_data["code"]
+                        Chapter.course_id == course_id,
+                        Chapter.code == chapter_data["code"],
                     )
                 )
                 existing_chapter = existing.scalar_one_or_none()
@@ -665,7 +690,9 @@ async def import_courses(
                     chapter_code_map[chapter_data["code"]] = chapter_id_value
 
             except Exception as e:
-                import_result["errors"].append(f"导入章节失败 {chapter_data.get('name', '')}: {str(e)}")
+                import_result["errors"].append(
+                    f"导入章节失败 {chapter_data.get('name', '')}: {str(e)}"
+                )
 
         # 5. 导入教案
         for lesson_data in data.get("lessons", []):
@@ -673,7 +700,9 @@ async def import_courses(
                 # 获取课程ID
                 course_id = course_code_map.get(lesson_data["course_code"])
                 if not course_id:
-                    import_result["errors"].append(f"教案 {lesson_data.get('title', '')} 的课程不存在")
+                    import_result["errors"].append(
+                        f"教案 {lesson_data.get('title', '')} 的课程不存在"
+                    )
                     continue
 
                 # 获取章节ID
@@ -681,13 +710,16 @@ async def import_courses(
                 if lesson_data.get("chapter_code"):
                     chapter_id = chapter_code_map.get(lesson_data["chapter_code"])
                     if not chapter_id:
-                        import_result["errors"].append(f"教案 {lesson_data.get('title', '')} 的章节不存在")
+                        import_result["errors"].append(
+                            f"教案 {lesson_data.get('title', '')} 的章节不存在"
+                        )
                         continue
 
                 # 检查是否已存在
                 existing = await db.execute(
                     select(Lesson).where(
-                        Lesson.course_id == course_id, Lesson.title == lesson_data["title"]
+                        Lesson.course_id == course_id,
+                        Lesson.title == lesson_data["title"],
                     )
                 )
                 existing_lesson = existing.scalar_one_or_none()
@@ -725,7 +757,9 @@ async def import_courses(
                     import_result["lessons"]["created"] += 1
 
             except Exception as e:
-                import_result["errors"].append(f"导入教案失败 {lesson_data.get('title', '')}: {str(e)}")
+                import_result["errors"].append(
+                    f"导入教案失败 {lesson_data.get('title', '')}: {str(e)}"
+                )
 
         # 6. 导入资源
         for resource_data in data.get("resources", []):
@@ -733,13 +767,16 @@ async def import_courses(
                 # 获取章节ID
                 chapter_id = chapter_code_map.get(resource_data["chapter_code"])
                 if not chapter_id:
-                    import_result["errors"].append(f"资源 {resource_data.get('title', '')} 的章节不存在")
+                    import_result["errors"].append(
+                        f"资源 {resource_data.get('title', '')} 的章节不存在"
+                    )
                     continue
 
                 # 检查是否已存在
                 existing = await db.execute(
                     select(Resource).where(
-                        Resource.chapter_id == chapter_id, Resource.title == resource_data["title"]
+                        Resource.chapter_id == chapter_id,
+                        Resource.title == resource_data["title"],
                     )
                 )
                 existing_resource = existing.scalar_one_or_none()
@@ -777,7 +814,9 @@ async def import_courses(
                     import_result["resources"]["created"] += 1
 
             except Exception as e:
-                import_result["errors"].append(f"导入资源失败 {resource_data.get('title', '')}: {str(e)}")
+                import_result["errors"].append(
+                    f"导入资源失败 {resource_data.get('title', '')}: {str(e)}"
+                )
 
         return {
             "message": "导入完成",
@@ -785,11 +824,25 @@ async def import_courses(
             "summary": {
                 "total_created": sum(
                     import_result[key]["created"]
-                    for key in ["subjects", "grades", "courses", "chapters", "lessons", "resources"]
+                    for key in [
+                        "subjects",
+                        "grades",
+                        "courses",
+                        "chapters",
+                        "lessons",
+                        "resources",
+                    ]
                 ),
                 "total_skipped": sum(
                     import_result[key]["skipped"]
-                    for key in ["subjects", "grades", "courses", "chapters", "lessons", "resources"]
+                    for key in [
+                        "subjects",
+                        "grades",
+                        "courses",
+                        "chapters",
+                        "lessons",
+                        "resources",
+                    ]
                 ),
                 "total_errors": len(import_result["errors"]),
             },

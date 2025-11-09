@@ -128,16 +128,22 @@ async def get_dashboard_overview(
     total_lessons = total_lessons_result.scalar() or 0
 
     published_lessons_result = await db.execute(
-        select(func.count()).select_from(Lesson).where(Lesson.status == LessonStatus.PUBLISHED)
+        select(func.count())
+        .select_from(Lesson)
+        .where(Lesson.status == LessonStatus.PUBLISHED)
     )
     published_lessons = published_lessons_result.scalar() or 0
 
     draft_lessons_result = await db.execute(
-        select(func.count()).select_from(Lesson).where(Lesson.status == LessonStatus.DRAFT)
+        select(func.count())
+        .select_from(Lesson)
+        .where(Lesson.status == LessonStatus.DRAFT)
     )
     draft_lessons = draft_lessons_result.scalar() or 0
 
-    total_resources_result = await db.execute(select(func.count()).select_from(Resource))
+    total_resources_result = await db.execute(
+        select(func.count()).select_from(Resource)
+    )
     total_resources = total_resources_result.scalar() or 0
 
     content_stats = ContentStats(

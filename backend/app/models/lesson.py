@@ -79,7 +79,9 @@ class Lesson(Base):
     national_resource_id = Column(String(100), nullable=True, index=True)
 
     # 参考资源（MVP新增）
-    reference_resource_id = Column(Integer, ForeignKey("resources.id"), nullable=True, index=True)
+    reference_resource_id = Column(
+        Integer, ForeignKey("resources.id"), nullable=True, index=True
+    )
     reference_notes = Column(Text, nullable=True)  # 教师的参考笔记
 
     # 标签
@@ -96,13 +98,17 @@ class Lesson(Base):
     # 难度和评分（学生端增强）
     # 注意：数据库中的 difficultylevel 枚举值为小写（migration 004），
     # 为避免大小写不一致导致的插入错误，这里不设置 Python 端默认值，保持为 NULL。
-    difficulty_level = Column(SQLEnum(DifficultyLevel), default=None, nullable=True, comment="难度等级")
+    difficulty_level = Column(
+        SQLEnum(DifficultyLevel), default=None, nullable=True, comment="难度等级"
+    )
     average_rating = Column(Float, default=0.0, nullable=False, comment="平均评分")
     review_count = Column(Integer, default=0, nullable=False, comment="评论数量")
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
     published_at = Column(DateTime, nullable=True)
 
     # 关联关系
@@ -112,7 +118,9 @@ class Lesson(Base):
     reference_resource = relationship("Resource", foreign_keys=[reference_resource_id])
     # cells = relationship("Cell", back_populates="lesson", cascade="all, delete-orphan")
     # execution_logs = relationship("ExecutionLog", back_populates="lesson")
-    questions = relationship("Question", back_populates="lesson", cascade="all, delete-orphan")
+    questions = relationship(
+        "Question", back_populates="lesson", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Lesson(id={self.id}, title={self.title}, status={self.status})>"

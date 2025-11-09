@@ -95,11 +95,15 @@ class Cell(Base):
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     lesson = relationship("Lesson", foreign_keys=[lesson_id])
     # execution_logs = relationship("ExecutionLog", back_populates="cell")
 
     def __repr__(self) -> str:
-        return f"<Cell(id={self.id}, type={self.cell_type}, lesson_id={self.lesson_id})>"
+        return (
+            f"<Cell(id={self.id}, type={self.cell_type}, lesson_id={self.lesson_id})>"
+        )

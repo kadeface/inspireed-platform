@@ -32,7 +32,9 @@ async def get_current_user(
     )
 
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         user_id: Optional[str] = payload.get("sub")
         if not isinstance(user_id, str):
             raise credentials_exception
@@ -64,14 +66,17 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
-    token: Optional[str] = Depends(oauth2_scheme_optional), db: AsyncSession = Depends(get_db)
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    db: AsyncSession = Depends(get_db),
 ) -> Optional[User]:
     """获取当前用户（可选，不强制认证）"""
     if token is None:
         return None
 
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         user_id: Optional[str] = payload.get("sub")
         if not isinstance(user_id, str):
             return None
@@ -89,7 +94,11 @@ async def get_current_user_optional(
     )
     user = result.scalar_one_or_none()
 
-    if user is None or not isinstance(user.is_active, bool) or not cast(bool, user.is_active):
+    if (
+        user is None
+        or not isinstance(user.is_active, bool)
+        or not cast(bool, user.is_active)
+    ):
         return None
 
     user.region_name = user.region.name if user.region else None  # type: ignore[attr-defined]
@@ -101,28 +110,39 @@ async def get_current_user_optional(
 
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     """验证当前用户是否为管理员"""
-    if not isinstance(current_user.role, UserRole) or cast(UserRole, current_user.role) != UserRole.ADMIN:
+    if (
+        not isinstance(current_user.role, UserRole)
+        or cast(UserRole, current_user.role) != UserRole.ADMIN
+    ):
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return current_user
 
 
 def get_current_teacher(current_user: User = Depends(get_current_user)) -> User:
     """验证当前用户是否为教师"""
-    if not isinstance(current_user.role, UserRole) or cast(UserRole, current_user.role) not in [UserRole.TEACHER, UserRole.ADMIN]:
+    if not isinstance(current_user.role, UserRole) or cast(
+        UserRole, current_user.role
+    ) not in [UserRole.TEACHER, UserRole.ADMIN]:
         raise HTTPException(status_code=403, detail="需要教师权限")
     return current_user
 
 
 def get_current_researcher(current_user: User = Depends(get_current_user)) -> User:
     """验证当前用户是否为教研员"""
-    if not isinstance(current_user.role, UserRole) or cast(UserRole, current_user.role) != UserRole.RESEARCHER:
+    if (
+        not isinstance(current_user.role, UserRole)
+        or cast(UserRole, current_user.role) != UserRole.RESEARCHER
+    ):
         raise HTTPException(status_code=403, detail="需要教研员权限")
     return current_user
 
 
 def get_current_student(current_user: User = Depends(get_current_user)) -> User:
     """验证当前用户是否为学生"""
-    if not isinstance(current_user.role, UserRole) or cast(UserRole, current_user.role) != UserRole.STUDENT:
+    if (
+        not isinstance(current_user.role, UserRole)
+        or cast(UserRole, current_user.role) != UserRole.STUDENT
+    ):
         raise HTTPException(status_code=403, detail="需要学生权限")
     return current_user
 

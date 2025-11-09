@@ -26,7 +26,9 @@ class UploadService:
         os.makedirs(self.resources_dir, exist_ok=True)
         os.makedirs(self.thumbnails_dir, exist_ok=True)
 
-    async def upload_pdf(self, file: UploadFile, generate_thumbnail: bool = True) -> dict:
+    async def upload_pdf(
+        self, file: UploadFile, generate_thumbnail: bool = True
+    ) -> dict:
         """
         上传 PDF 文件并提取元数据
 
@@ -132,7 +134,9 @@ class UploadService:
             print(f"Error extracting PDF metadata: {e}")
             return {"page_count": 0}
 
-    async def _generate_pdf_thumbnail(self, pdf_path: str, original_filename: str) -> Optional[str]:
+    async def _generate_pdf_thumbnail(
+        self, pdf_path: str, original_filename: str
+    ) -> Optional[str]:
         """
         生成 PDF 缩略图（第一页）
 

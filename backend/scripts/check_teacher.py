@@ -19,7 +19,9 @@ async def check_and_create_teacher():
     """检查教师账号，如果不存在则创建"""
     async with AsyncSessionLocal() as db:
         # 通过邮箱检查是否已有教师账号
-        result = await db.execute(select(User).where(User.email == "teacher@inspireed.com"))
+        result = await db.execute(
+            select(User).where(User.email == "teacher@inspireed.com")
+        )
         teacher = result.scalar_one_or_none()
 
         if teacher:

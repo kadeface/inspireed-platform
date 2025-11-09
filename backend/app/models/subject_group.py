@@ -58,11 +58,17 @@ class SubjectGroup(Base):
 
     # 范围关联
     scope = Column(SQLEnum(GroupScope), nullable=False, comment="教研组范围")
-    school_id = Column(Integer, ForeignKey("schools.id"), nullable=True, comment="关联学校（校级）")
-    region_id = Column(Integer, ForeignKey("regions.id"), nullable=True, comment="关联区域（区域级）")
+    school_id = Column(
+        Integer, ForeignKey("schools.id"), nullable=True, comment="关联学校（校级）"
+    )
+    region_id = Column(
+        Integer, ForeignKey("regions.id"), nullable=True, comment="关联区域（区域级）"
+    )
 
     # 创建者
-    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="创建者ID")
+    creator_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, comment="创建者ID"
+    )
 
     # 状态
     is_active = Column(Boolean, default=True, nullable=False, comment="是否激活")
@@ -77,7 +83,9 @@ class SubjectGroup(Base):
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     subject = relationship("Subject", foreign_keys=[subject_id])
@@ -105,19 +113,31 @@ class GroupMembership(Base):
 
     # 关联
     group_id = Column(
-        Integer, ForeignKey("subject_groups.id"), nullable=False, index=True, comment="教研组ID"
+        Integer,
+        ForeignKey("subject_groups.id"),
+        nullable=False,
+        index=True,
+        comment="教研组ID",
     )
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True, comment="用户ID")
+    user_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True, comment="用户ID"
+    )
 
     # 角色
-    role = Column(SQLEnum(MemberRole), default=MemberRole.MEMBER, nullable=False, comment="成员角色")
+    role = Column(
+        SQLEnum(MemberRole), default=MemberRole.MEMBER, nullable=False, comment="成员角色"
+    )
 
     # 状态
     is_active = Column(Boolean, default=True, nullable=False, comment="是否激活")
 
     # 时间戳
-    joined_at = Column(DateTime, default=datetime.utcnow, nullable=False, comment="加入时间")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    joined_at = Column(
+        DateTime, default=datetime.utcnow, nullable=False, comment="加入时间"
+    )
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     group = relationship("SubjectGroup", back_populates="memberships")
@@ -127,9 +147,7 @@ class GroupMembership(Base):
     __table_args__ = (UniqueConstraint("group_id", "user_id", name="uq_group_user"),)
 
     def __repr__(self) -> str:
-        return (
-            f"<GroupMembership(group_id={self.group_id}, user_id={self.user_id}, role={self.role})>"
-        )
+        return f"<GroupMembership(group_id={self.group_id}, user_id={self.user_id}, role={self.role})>"
 
 
 class SharedLesson(Base):
@@ -141,7 +159,11 @@ class SharedLesson(Base):
 
     # 关联
     group_id = Column(
-        Integer, ForeignKey("subject_groups.id"), nullable=False, index=True, comment="教研组ID"
+        Integer,
+        ForeignKey("subject_groups.id"),
+        nullable=False,
+        index=True,
+        comment="教研组ID",
     )
     lesson_id = Column(
         Integer, ForeignKey("lessons.id"), nullable=False, index=True, comment="教案ID"
@@ -160,8 +182,12 @@ class SharedLesson(Base):
     like_count = Column(Integer, default=0, nullable=False, comment="点赞数")
 
     # 时间戳
-    shared_at = Column(DateTime, default=datetime.utcnow, nullable=False, comment="分享时间")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    shared_at = Column(
+        DateTime, default=datetime.utcnow, nullable=False, comment="分享时间"
+    )
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     group = relationship("SubjectGroup", back_populates="shared_lessons")
@@ -169,7 +195,9 @@ class SharedLesson(Base):
     sharer = relationship("User", foreign_keys=[sharer_id])
 
     # 唯一约束：一个教案在一个教研组中只能被分享一次（同一个教案）
-    __table_args__ = (UniqueConstraint("group_id", "lesson_id", name="uq_group_lesson"),)
+    __table_args__ = (
+        UniqueConstraint("group_id", "lesson_id", name="uq_group_lesson"),
+    )
 
     def __repr__(self) -> str:
         return f"<SharedLesson(id={self.id}, group_id={self.group_id}, lesson_id={self.lesson_id})>"

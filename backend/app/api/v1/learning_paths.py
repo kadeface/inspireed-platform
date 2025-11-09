@@ -83,7 +83,9 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
-def _safe_datetime(value: Any, default: Optional[datetime] = None) -> Optional[datetime]:
+def _safe_datetime(
+    value: Any, default: Optional[datetime] = None
+) -> Optional[datetime]:
     """将值安全转换为 datetime。"""
     if isinstance(value, datetime):
         return value
@@ -99,7 +101,9 @@ def _get_role_value(role: Any) -> str:
     return str(role)
 
 
-@router.post("/", response_model=LearningPathResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=LearningPathResponse, status_code=status.HTTP_201_CREATED
+)
 def create_learning_path(
     *,
     db: Session = Depends(deps.get_db),
@@ -110,7 +114,9 @@ def create_learning_path(
     创建学习路径（仅教师和研究员）
     """
     if current_user.role not in [UserRole.TEACHER, UserRole.RESEARCHER, UserRole.ADMIN]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="只有教师和研究员可以创建学习路径")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="只有教师和研究员可以创建学习路径"
+        )
 
     # 创建学习路径
     learning_path = LearningPath(
@@ -131,7 +137,8 @@ def create_learning_path(
         if not lesson:
             db.rollback()
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"课程 {lesson_data.lesson_id} 不存在"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"课程 {lesson_data.lesson_id} 不存在",
             )
 
         path_lesson = LearningPathLesson(
@@ -228,7 +235,9 @@ def get_learning_paths(
     if published_only:
         query = query.filter(LearningPath.is_published == True)
 
-    paths = query.order_by(desc(LearningPath.created_at)).offset(skip).limit(limit).all()
+    paths = (
+        query.order_by(desc(LearningPath.created_at)).offset(skip).limit(limit).all()
+    )
 
     # 组装返回数据
     result = []
@@ -240,7 +249,9 @@ def get_learning_paths(
             .count()
         )
 
-        creator = db.query(User).filter(User.id == getattr(path, "creator_id", None)).first()
+        creator = (
+            db.query(User).filter(User.id == getattr(path, "creator_id", None)).first()
+        )
         creator_full_name = (
             _safe_optional_str(getattr(creator, "full_name", None)) if creator else None
         )
@@ -255,8 +266,12 @@ def get_learning_paths(
         created_at_raw = getattr(path, "created_at", None)
         updated_at_raw = getattr(path, "updated_at", None)
         timestamp_fallback = datetime.utcnow()
-        created_at_value = _safe_datetime(created_at_raw, timestamp_fallback) or timestamp_fallback
-        updated_at_value = _safe_datetime(updated_at_raw, timestamp_fallback) or timestamp_fallback
+        created_at_value = (
+            _safe_datetime(created_at_raw, timestamp_fallback) or timestamp_fallback
+        )
+        updated_at_value = (
+            _safe_datetime(updated_at_raw, timestamp_fallback) or timestamp_fallback
+        )
 
         result.append(
             LearningPathListItem(
@@ -265,9 +280,13 @@ def get_learning_paths(
                 description=_safe_optional_str(getattr(path, "description", None)),
                 creator_id=_safe_int(getattr(path, "creator_id", None)),
                 difficulty_level=_safe_str(difficulty_value, ""),
-                cover_image_url=_safe_optional_str(getattr(path, "cover_image_url", None)),
+                cover_image_url=_safe_optional_str(
+                    getattr(path, "cover_image_url", None)
+                ),
                 is_published=_safe_bool(getattr(path, "is_published", False)),
-                estimated_hours=_safe_optional_int(getattr(path, "estimated_hours", None)),
+                estimated_hours=_safe_optional_int(
+                    getattr(path, "estimated_hours", None)
+                ),
                 created_at=created_at_value,
                 updated_at=updated_at_value,
                 lesson_count=lesson_count,
@@ -297,7 +316,9 @@ def get_learning_path(*, db: Session = Depends(deps.get_db), path_id: int):
 
     lessons_details = []
     for pl in path_lessons:
-        lesson = db.query(Lesson).filter(Lesson.id == getattr(pl, "lesson_id", None)).first()
+        lesson = (
+            db.query(Lesson).filter(Lesson.id == getattr(pl, "lesson_id", None)).first()
+        )
         if not lesson:
             continue
 
@@ -312,19 +333,31 @@ def get_learning_path(*, db: Session = Depends(deps.get_db), path_id: int):
                 lesson_id=_safe_int(getattr(pl, "lesson_id", None)),
                 order_index=_safe_int(getattr(pl, "order_index", None)),
                 is_required=_safe_bool(getattr(pl, "is_required", False)),
-                created_at=_safe_datetime(getattr(pl, "created_at", None), timestamp_fallback)
+                created_at=_safe_datetime(
+                    getattr(pl, "created_at", None), timestamp_fallback
+                )
                 or timestamp_fallback,
                 lesson_title=_safe_str(getattr(lesson, "title", "")),
-                lesson_description=_safe_optional_str(getattr(lesson, "description", None)),
-                lesson_cover_image=_safe_optional_str(getattr(lesson, "cover_image_url", None)),
+                lesson_description=_safe_optional_str(
+                    getattr(lesson, "description", None)
+                ),
+                lesson_cover_image=_safe_optional_str(
+                    getattr(lesson, "cover_image_url", None)
+                ),
                 lesson_difficulty=_safe_optional_str(difficulty_value),
                 lesson_rating=_safe_float(getattr(lesson, "average_rating", 0.0)),
-                lesson_duration=_safe_optional_int(getattr(lesson, "estimated_duration", None)),
+                lesson_duration=_safe_optional_int(
+                    getattr(lesson, "estimated_duration", None)
+                ),
             )
         )
 
     # 获取创建者信息
-    creator = db.query(User).filter(User.id == getattr(learning_path, "creator_id", None)).first()
+    creator = (
+        db.query(User)
+        .filter(User.id == getattr(learning_path, "creator_id", None))
+        .first()
+    )
     creator_full_name = (
         _safe_optional_str(getattr(creator, "full_name", None)) if creator else None
     )
@@ -343,12 +376,20 @@ def get_learning_path(*, db: Session = Depends(deps.get_db), path_id: int):
         description=_safe_optional_str(getattr(learning_path, "description", None)),
         creator_id=_safe_int(getattr(learning_path, "creator_id", None)),
         difficulty_level=_safe_str(difficulty_value, ""),
-        cover_image_url=_safe_optional_str(getattr(learning_path, "cover_image_url", None)),
+        cover_image_url=_safe_optional_str(
+            getattr(learning_path, "cover_image_url", None)
+        ),
         is_published=_safe_bool(getattr(learning_path, "is_published", False)),
-        estimated_hours=_safe_optional_int(getattr(learning_path, "estimated_hours", None)),
-        created_at=_safe_datetime(getattr(learning_path, "created_at", None), timestamp_fallback)
+        estimated_hours=_safe_optional_int(
+            getattr(learning_path, "estimated_hours", None)
+        ),
+        created_at=_safe_datetime(
+            getattr(learning_path, "created_at", None), timestamp_fallback
+        )
         or timestamp_fallback,
-        updated_at=_safe_datetime(getattr(learning_path, "updated_at", None), timestamp_fallback)
+        updated_at=_safe_datetime(
+            getattr(learning_path, "updated_at", None), timestamp_fallback
+        )
         or timestamp_fallback,
         lessons=lessons_details,
         lesson_count=len(lessons_details),
@@ -411,7 +452,9 @@ def add_lesson_to_path(
         lesson_id=_safe_int(getattr(path_lesson, "lesson_id", None)),
         order_index=_safe_int(getattr(path_lesson, "order_index", None)),
         is_required=_safe_bool(getattr(path_lesson, "is_required", False)),
-        created_at=_safe_datetime(getattr(path_lesson, "created_at", None), timestamp_fallback)
+        created_at=_safe_datetime(
+            getattr(path_lesson, "created_at", None), timestamp_fallback
+        )
         or timestamp_fallback,
         lesson_title=_safe_str(getattr(lesson, "title", "")),
         lesson_description=_safe_optional_str(getattr(lesson, "description", None)),

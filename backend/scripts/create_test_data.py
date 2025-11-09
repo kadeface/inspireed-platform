@@ -12,7 +12,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
-from app.models import Subject, Grade, Course, Chapter, Resource, User, Lesson, LessonStatus
+from app.models import (
+    Subject,
+    Grade,
+    Course,
+    Chapter,
+    Resource,
+    User,
+    Lesson,
+    LessonStatus,
+)
 
 
 async def create_test_data():
@@ -88,7 +97,9 @@ async def create_test_data():
         # 4. 创建章节
         print("\n4️⃣ 创建章节...")
         result = await db.execute(
-            select(Chapter).where(Chapter.course_id == course.id, Chapter.code == "chapter-1")
+            select(Chapter).where(
+                Chapter.course_id == course.id, Chapter.code == "chapter-1"
+            )
         )
         chapter1 = result.scalar_one_or_none()
 
@@ -110,7 +121,9 @@ async def create_test_data():
 
         # 创建子章节
         result = await db.execute(
-            select(Chapter).where(Chapter.course_id == course.id, Chapter.code == "section-1-1")
+            select(Chapter).where(
+                Chapter.course_id == course.id, Chapter.code == "section-1-1"
+            )
         )
         section1_1 = result.scalar_one_or_none()
 
@@ -195,7 +208,9 @@ async def create_test_data():
         # 6. 创建示例教案
         print("\n6️⃣ 创建示例教案...")
         result = await db.execute(
-            select(Lesson).where(Lesson.creator_id == teacher.id, Lesson.title.like("%集合的概念%"))
+            select(Lesson).where(
+                Lesson.creator_id == teacher.id, Lesson.title.like("%集合的概念%")
+            )
         )
         sample_lesson = result.scalar_one_or_none()
 
@@ -305,7 +320,9 @@ async def create_test_data():
                         },
                         "config": {
                             "environment": "jupyterlite",
-                            "test_cases": [{"input": "", "expected_output": "共同学生: {'李四', '王五'}"}],
+                            "test_cases": [
+                                {"input": "", "expected_output": "共同学生: {'李四', '王五'}"}
+                            ],
                         },
                     },
                 ],

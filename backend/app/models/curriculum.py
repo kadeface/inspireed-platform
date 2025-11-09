@@ -32,10 +32,14 @@ class Subject(Base):
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
-    courses = relationship("Course", back_populates="subject", cascade="all, delete-orphan")
+    courses = relationship(
+        "Course", back_populates="subject", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Subject(id={self.id}, name={self.name}, code={self.code})>"
@@ -53,10 +57,14 @@ class Grade(Base):
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
-    courses = relationship("Course", back_populates="grade", cascade="all, delete-orphan")
+    courses = relationship(
+        "Course", back_populates="grade", cascade="all, delete-orphan"
+    )
     classrooms = relationship("Classroom", back_populates="grade")
 
     def __repr__(self) -> str:
@@ -83,17 +91,23 @@ class Course(Base):
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     subject = relationship("Subject", back_populates="courses")
     grade = relationship("Grade", back_populates="courses")
     creator = relationship("User", foreign_keys=[created_by])
     lessons = relationship("Lesson", back_populates="course")
-    chapters = relationship("Chapter", back_populates="course", cascade="all, delete-orphan")
+    chapters = relationship(
+        "Chapter", back_populates="course", cascade="all, delete-orphan"
+    )
 
     # 唯一约束：同一学科和年级只能有一个课程组合
-    __table_args__ = (UniqueConstraint("subject_id", "grade_id", name="uix_subject_grade"),)
+    __table_args__ = (
+        UniqueConstraint("subject_id", "grade_id", name="uix_subject_grade"),
+    )
 
     def __repr__(self) -> str:
         return f"<Course(id={self.id}, name={self.name})>"
@@ -116,13 +130,19 @@ class Chapter(Base):
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     course = relationship("Course", back_populates="chapters")
     parent = relationship("Chapter", remote_side=[id], backref="children")
-    resources = relationship("Resource", back_populates="chapter", cascade="all, delete-orphan")
-    lessons = relationship("Lesson", back_populates="chapter", cascade="all, delete-orphan")
+    resources = relationship(
+        "Resource", back_populates="chapter", cascade="all, delete-orphan"
+    )
+    lessons = relationship(
+        "Lesson", back_populates="chapter", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Chapter(id={self.id}, name={self.name})>"
@@ -162,11 +182,15 @@ class Resource(Base):
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     chapter = relationship("Chapter", back_populates="resources")
     creator = relationship("User", foreign_keys=[created_by])
 
     def __repr__(self) -> str:
-        return f"<Resource(id={self.id}, title={self.title}, type={self.resource_type})>"
+        return (
+            f"<Resource(id={self.id}, title={self.title}, type={self.resource_type})>"
+        )

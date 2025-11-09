@@ -22,7 +22,9 @@ async def create_student_account():
         print("🎓 开始创建学生测试账号...")
 
         # 检查学生账号是否已存在
-        result = await db.execute(select(User).where(User.email == "student@inspireed.com"))
+        result = await db.execute(
+            select(User).where(User.email == "student@inspireed.com")
+        )
         student = result.scalar_one_or_none()
 
         if student:

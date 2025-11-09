@@ -108,10 +108,17 @@ async def evaluate_qa_answer(
     # 评估回答质量
     evaluation = await ai_qa_service.evaluate_answer_quality(question, answer)
 
-    return {"cell_id": cell_id, "evaluation": evaluation, "question": question, "answer": answer}
+    return {
+        "cell_id": cell_id,
+        "evaluation": evaluation,
+        "question": question,
+        "answer": answer,
+    }
 
 
-async def get_lesson_or_404(lesson_id: int, db: AsyncSession, current_user: User) -> Lesson:
+async def get_lesson_or_404(
+    lesson_id: int, db: AsyncSession, current_user: User
+) -> Lesson:
     """获取Lesson或返回404"""
     lesson = await db.get(Lesson, lesson_id)
     if not lesson:
@@ -146,13 +153,16 @@ async def create_cell(
     lesson = await get_lesson_or_404(cell_in.lesson_id, db, current_user)
 
     # 创建Cell
-    cell = Cell(**cell_in.model_dump(exclude={"lesson_id"}), lesson_id=cell_in.lesson_id)
+    cell = Cell(
+        **cell_in.model_dump(exclude={"lesson_id"}), lesson_id=cell_in.lesson_id
+    )
 
     db.add(cell)
     await db.commit()
     await db.refresh(cell)
 
     return cell
+
 
 @router.get("/lesson/{lesson_id}", response_model=List[CellResponse])
 async def get_lesson_cells(
@@ -165,7 +175,11 @@ async def get_lesson_cells(
     lesson = await get_lesson_or_404(lesson_id, db, current_user)
 
     # 查询Cells，按order排序
-    query = select(Cell).where(Cell.lesson_id == lesson_id).order_by(Cell.order, Cell.created_at)
+    query = (
+        select(Cell)
+        .where(Cell.lesson_id == lesson_id)
+        .order_by(Cell.order, Cell.created_at)
+    )
     result = await db.execute(query)
     cells = result.scalars().all()
 
@@ -181,6 +195,7 @@ async def get_cell(
     """获取单个Cell"""
     cell = await get_cell_or_404(cell_id, db, current_user)
     return cell
+
 
 @router.put("/{cell_id}", response_model=CellResponse)
 async def update_cell(
@@ -217,7 +232,9 @@ async def delete_cell(
 
 
 @router.post(
-    "/{cell_id}/duplicate", response_model=CellResponse, status_code=status.HTTP_201_CREATED
+    "/{cell_id}/duplicate",
+    response_model=CellResponse,
+    status_code=status.HTTP_201_CREATED,
 )
 async def duplicate_cell(
     cell_id: int,
@@ -368,7 +385,11 @@ async def ask_question(
 
         # 更新Cell内容
         cell.content.update(
-            {"question": question_request.question, "answer": answer, "isAIAnswer": is_ai_answer}
+            {
+                "question": question_request.question,
+                "answer": answer,
+                "isAIAnswer": is_ai_answer,
+            }
         )
         await db.commit()
 
@@ -497,7 +518,12 @@ async def check_cell_unlock_status(
     raw_prereqs = cast(Optional[List[Any]], getattr(cell, "prerequisite_cells", None))
     prereqs_list = list(raw_prereqs or [])
     if not prereqs_list:
-        return {"cell_id": cell.id, "is_locked": False, "reason": None, "missing_prerequisites": []}
+        return {
+            "cell_id": cell.id,
+            "is_locked": False,
+            "reason": None,
+            "missing_prerequisites": [],
+        }
 
     # TODO: 这里应该查询学生的学习进度数据
     # 暂时模拟：假设学生已完成部分cells

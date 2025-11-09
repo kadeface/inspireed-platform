@@ -162,7 +162,9 @@ async def update_submission(
     return submission
 
 
-@router.post("/submissions/{submission_id}/submit", response_model=ActivitySubmissionResponse)
+@router.post(
+    "/submissions/{submission_id}/submit", response_model=ActivitySubmissionResponse
+)
 async def submit_activity(
     submission_id: int,
     data: ActivitySubmissionSubmit,
@@ -206,7 +208,9 @@ async def submit_activity(
     return submission
 
 
-@router.get("/cells/{cell_id}/submissions", response_model=List[ActivitySubmissionWithStudent])
+@router.get(
+    "/cells/{cell_id}/submissions", response_model=List[ActivitySubmissionWithStudent]
+)
 async def get_cell_submissions(
     cell_id: int,
     status: Optional[ActivitySubmissionStatus] = None,
@@ -246,7 +250,10 @@ async def get_cell_submissions(
     return submissions
 
 
-@router.get("/lessons/{lesson_id}/my-submissions", response_model=List[ActivitySubmissionResponse])
+@router.get(
+    "/lessons/{lesson_id}/my-submissions",
+    response_model=List[ActivitySubmissionResponse],
+)
 async def get_my_lesson_submissions(
     lesson_id: int,
     db: AsyncSession = Depends(deps.get_db),
@@ -270,7 +277,9 @@ async def get_my_lesson_submissions(
 # ========== 评分相关 API ==========
 
 
-@router.post("/submissions/{submission_id}/grade", response_model=ActivitySubmissionResponse)
+@router.post(
+    "/submissions/{submission_id}/grade", response_model=ActivitySubmissionResponse
+)
 async def grade_submission(
     submission_id: int,
     data: ActivitySubmissionGrade,
@@ -303,13 +312,17 @@ async def grade_submission(
     if data.item_scores:
         for item_id, item_score in data.item_scores.items():
             if item_id in cast(dict[str, Any], submission.responses):
-                cast(dict[str, Any], submission.responses)[item_id]["score"] = item_score
+                cast(dict[str, Any], submission.responses)[item_id][
+                    "score"
+                ] = item_score
 
     await db.commit()
     await db.refresh(submission)
 
     # 更新统计数据
-    await _update_statistics(db, cast(int, submission.cell_id), cast(int, submission.lesson_id))
+    await _update_statistics(
+        db, cast(int, submission.cell_id), cast(int, submission.lesson_id)
+    )
 
     return submission
 
@@ -329,7 +342,11 @@ async def bulk_grade_submissions(
     graded_count = 0
     for submission_id in data.submission_ids:
         submission = await db.get(ActivitySubmission, submission_id)
-        if submission and cast(ActivitySubmissionStatus, submission.status) == ActivitySubmissionStatus.SUBMITTED:
+        if (
+            submission
+            and cast(ActivitySubmissionStatus, submission.status)
+            == ActivitySubmissionStatus.SUBMITTED
+        ):
             setattr(submission, "score", cast(float, data.score))
             setattr(submission, "teacher_feedback", cast(str, data.teacher_feedback))
             setattr(submission, "graded_by", cast(int, current_user.id))
@@ -416,7 +433,8 @@ async def assign_peer_reviews(
 
 
 @router.get(
-    "/submissions/{submission_id}/peer-reviews", response_model=List[PeerReviewWithReviewer]
+    "/submissions/{submission_id}/peer-reviews",
+    response_model=List[PeerReviewWithReviewer],
 )
 async def get_submission_peer_reviews(
     submission_id: int,
@@ -447,7 +465,9 @@ async def get_submission_peer_reviews(
     for review, user in rows:
         review_dict = {
             **review.__dict__,
-            "reviewer_name": None if review.is_anonymous else (user.full_name or user.username),
+            "reviewer_name": None
+            if review.is_anonymous
+            else (user.full_name or user.username),
         }
         reviews.append(review_dict)
 
@@ -592,7 +612,11 @@ async def sync_offline_submissions(
                     continue
 
                 # 更新现有提交
-                setattr(existing, "responses", cast(dict[str, Any], submission_data["responses"]))
+                setattr(
+                    existing,
+                    "responses",
+                    cast(dict[str, Any], submission_data["responses"]),
+                )
                 setattr(existing, "version", cast(int, existing.version) + 1)
                 setattr(existing, "synced", cast(bool, True))
                 setattr(existing, "updated_at", cast(datetime, datetime.utcnow()))
@@ -644,13 +668,21 @@ async def _update_statistics(db: AsyncSession, cell_id: int, lesson_id: int):
         select(
             func.count(ActivitySubmission.id).label("total"),
             func.sum(
-                func.cast(ActivitySubmission.status == ActivitySubmissionStatus.DRAFT, Integer)
+                func.cast(
+                    ActivitySubmission.status == ActivitySubmissionStatus.DRAFT, Integer
+                )
             ).label("draft"),
             func.sum(
-                func.cast(ActivitySubmission.status == ActivitySubmissionStatus.SUBMITTED, Integer)
+                func.cast(
+                    ActivitySubmission.status == ActivitySubmissionStatus.SUBMITTED,
+                    Integer,
+                )
             ).label("submitted"),
             func.sum(
-                func.cast(ActivitySubmission.status == ActivitySubmissionStatus.GRADED, Integer)
+                func.cast(
+                    ActivitySubmission.status == ActivitySubmissionStatus.GRADED,
+                    Integer,
+                )
             ).label("graded"),
             func.avg(ActivitySubmission.score).label("avg_score"),
             func.max(ActivitySubmission.score).label("max_score"),

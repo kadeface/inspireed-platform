@@ -38,7 +38,9 @@ def upgrade() -> None:
     op.execute("ALTER TABLE lessons ALTER COLUMN status DROP DEFAULT")
 
     # Convert column to text type
-    op.execute("ALTER TABLE lessons ALTER COLUMN status TYPE VARCHAR USING status::text")
+    op.execute(
+        "ALTER TABLE lessons ALTER COLUMN status TYPE VARCHAR USING status::text"
+    )
 
     # Drop old enum type if it exists
     op.execute("DROP TYPE IF EXISTS lessonstatus CASCADE")
@@ -52,7 +54,9 @@ def upgrade() -> None:
     )
 
     # Restore default
-    op.execute("ALTER TABLE lessons ALTER COLUMN status SET DEFAULT 'draft'::lessonstatus")
+    op.execute(
+        "ALTER TABLE lessons ALTER COLUMN status SET DEFAULT 'draft'::lessonstatus"
+    )
 
 
 def downgrade() -> None:
@@ -64,7 +68,9 @@ def downgrade() -> None:
     op.execute("ALTER TABLE lessons ALTER COLUMN status DROP DEFAULT")
 
     # Convert to text
-    op.execute("ALTER TABLE lessons ALTER COLUMN status TYPE VARCHAR USING status::text")
+    op.execute(
+        "ALTER TABLE lessons ALTER COLUMN status TYPE VARCHAR USING status::text"
+    )
 
     # Drop lowercase enum
     op.execute("DROP TYPE IF EXISTS lessonstatus CASCADE")
@@ -78,4 +84,6 @@ def downgrade() -> None:
     )
 
     # Restore default
-    op.execute("ALTER TABLE lessons ALTER COLUMN status SET DEFAULT 'DRAFT'::lessonstatus")
+    op.execute(
+        "ALTER TABLE lessons ALTER COLUMN status SET DEFAULT 'DRAFT'::lessonstatus"
+    )

@@ -33,26 +33,57 @@ def upgrade() -> None:
         sa.Column("school_id", sa.Integer(), nullable=True, comment="关联学校（校级）"),
         sa.Column("region_id", sa.Integer(), nullable=True, comment="关联区域（区域级）"),
         sa.Column("creator_id", sa.Integer(), nullable=False, comment="创建者ID"),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true", comment="是否激活"),
         sa.Column(
-            "is_public", sa.Boolean(), nullable=False, server_default="false", comment="是否公开"
+            "is_active",
+            sa.Boolean(),
+            nullable=False,
+            server_default="true",
+            comment="是否激活",
         ),
-        sa.Column("member_count", sa.Integer(), nullable=False, server_default="1", comment="成员数量"),
         sa.Column(
-            "lesson_count", sa.Integer(), nullable=False, server_default="0", comment="共享教案数量"
+            "is_public",
+            sa.Boolean(),
+            nullable=False,
+            server_default="false",
+            comment="是否公开",
         ),
-        sa.Column("cover_image_url", sa.String(length=500), nullable=True, comment="封面图URL"),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "member_count",
+            sa.Integer(),
+            nullable=False,
+            server_default="1",
+            comment="成员数量",
+        ),
+        sa.Column(
+            "lesson_count",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+            comment="共享教案数量",
+        ),
+        sa.Column(
+            "cover_image_url", sa.String(length=500), nullable=True, comment="封面图URL"
+        ),
+        sa.Column(
+            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
         sa.ForeignKeyConstraint(["subject_id"], ["subjects.id"]),
         sa.ForeignKeyConstraint(["school_id"], ["schools.id"]),
         sa.ForeignKeyConstraint(["region_id"], ["regions.id"]),
         sa.ForeignKeyConstraint(["creator_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_subject_groups_id"), "subject_groups", ["id"], unique=False)
     op.create_index(
-        op.f("ix_subject_groups_subject_id"), "subject_groups", ["subject_id"], unique=False
+        op.f("ix_subject_groups_id"), "subject_groups", ["id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_subject_groups_subject_id"),
+        "subject_groups",
+        ["subject_id"],
+        unique=False,
     )
 
     # 创建 group_memberships 表
@@ -68,7 +99,13 @@ def upgrade() -> None:
             server_default="member",
             comment="成员角色",
         ),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true", comment="是否激活"),
+        sa.Column(
+            "is_active",
+            sa.Boolean(),
+            nullable=False,
+            server_default="true",
+            comment="是否激活",
+        ),
         sa.Column(
             "joined_at",
             sa.DateTime(),
@@ -76,18 +113,28 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             comment="加入时间",
         ),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
         sa.ForeignKeyConstraint(["group_id"], ["subject_groups.id"]),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("group_id", "user_id", name="uq_group_user"),
     )
-    op.create_index(op.f("ix_group_memberships_id"), "group_memberships", ["id"], unique=False)
     op.create_index(
-        op.f("ix_group_memberships_group_id"), "group_memberships", ["group_id"], unique=False
+        op.f("ix_group_memberships_id"), "group_memberships", ["id"], unique=False
     )
     op.create_index(
-        op.f("ix_group_memberships_user_id"), "group_memberships", ["user_id"], unique=False
+        op.f("ix_group_memberships_group_id"),
+        "group_memberships",
+        ["group_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_group_memberships_user_id"),
+        "group_memberships",
+        ["user_id"],
+        unique=False,
     )
 
     # 创建 shared_lessons 表
@@ -98,12 +145,34 @@ def upgrade() -> None:
         sa.Column("lesson_id", sa.Integer(), nullable=False, comment="教案ID"),
         sa.Column("sharer_id", sa.Integer(), nullable=False, comment="分享者ID"),
         sa.Column("share_note", sa.Text(), nullable=True, comment="分享说明"),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true", comment="是否激活"),
-        sa.Column("view_count", sa.Integer(), nullable=False, server_default="0", comment="查看次数"),
         sa.Column(
-            "download_count", sa.Integer(), nullable=False, server_default="0", comment="下载/复制次数"
+            "is_active",
+            sa.Boolean(),
+            nullable=False,
+            server_default="true",
+            comment="是否激活",
         ),
-        sa.Column("like_count", sa.Integer(), nullable=False, server_default="0", comment="点赞数"),
+        sa.Column(
+            "view_count",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+            comment="查看次数",
+        ),
+        sa.Column(
+            "download_count",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+            comment="下载/复制次数",
+        ),
+        sa.Column(
+            "like_count",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+            comment="点赞数",
+        ),
         sa.Column(
             "shared_at",
             sa.DateTime(),
@@ -111,19 +180,26 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             comment="分享时间",
         ),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
         sa.ForeignKeyConstraint(["group_id"], ["subject_groups.id"]),
         sa.ForeignKeyConstraint(["lesson_id"], ["lessons.id"]),
         sa.ForeignKeyConstraint(["sharer_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("group_id", "lesson_id", name="uq_group_lesson"),
     )
-    op.create_index(op.f("ix_shared_lessons_id"), "shared_lessons", ["id"], unique=False)
+    op.create_index(
+        op.f("ix_shared_lessons_id"), "shared_lessons", ["id"], unique=False
+    )
     op.create_index(
         op.f("ix_shared_lessons_group_id"), "shared_lessons", ["group_id"], unique=False
     )
     op.create_index(
-        op.f("ix_shared_lessons_lesson_id"), "shared_lessons", ["lesson_id"], unique=False
+        op.f("ix_shared_lessons_lesson_id"),
+        "shared_lessons",
+        ["lesson_id"],
+        unique=False,
     )
 
 

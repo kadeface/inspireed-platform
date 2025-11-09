@@ -216,7 +216,9 @@ async def get_regions(
 
     # 搜索筛选
     if search:
-        search_filter = or_(Region.name.ilike(f"%{search}%"), Region.code.ilike(f"%{search}%"))
+        search_filter = or_(
+            Region.name.ilike(f"%{search}%"), Region.code.ilike(f"%{search}%")
+        )
         query = query.where(search_filter)
 
     # 获取总数
@@ -268,13 +270,17 @@ async def create_region(
     """创建区域"""
 
     # 检查编码是否已存在
-    existing_region = await db.execute(select(Region).where(Region.code == region_data.code))
+    existing_region = await db.execute(
+        select(Region).where(Region.code == region_data.code)
+    )
     if existing_region.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="区域编码已存在")
 
     # 检查父级区域是否存在
     if region_data.parent_id:
-        parent_region = await db.execute(select(Region).where(Region.id == region_data.parent_id))
+        parent_region = await db.execute(
+            select(Region).where(Region.id == region_data.parent_id)
+        )
         if not parent_region.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="父级区域不存在")
 
@@ -306,14 +312,18 @@ async def update_region(
     # 检查编码是否已被其他区域使用
     if region_data.code and region_data.code != region.code:
         existing_region = await db.execute(
-            select(Region).where(Region.code == region_data.code, Region.id != region_id)
+            select(Region).where(
+                Region.code == region_data.code, Region.id != region_id
+            )
         )
         if existing_region.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="区域编码已存在")
 
     # 检查父级区域是否存在
     if region_data.parent_id and region_data.parent_id != region.parent_id:
-        parent_region = await db.execute(select(Region).where(Region.id == region_data.parent_id))
+        parent_region = await db.execute(
+            select(Region).where(Region.id == region_data.parent_id)
+        )
         if not parent_region.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="父级区域不存在")
 
@@ -438,7 +448,9 @@ async def get_school(
     """获取学校详情"""
 
     result = await db.execute(
-        select(School).options(selectinload(School.region)).where(School.id == school_id)
+        select(School)
+        .options(selectinload(School.region))
+        .where(School.id == school_id)
     )
     school = result.scalar_one_or_none()
 
@@ -457,7 +469,9 @@ async def create_school(
     """创建学校"""
 
     # 检查编码是否已存在
-    existing_school = await db.execute(select(School).where(School.code == school_data.code))
+    existing_school = await db.execute(
+        select(School).where(School.code == school_data.code)
+    )
     if existing_school.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="学校编码已存在")
 
@@ -475,7 +489,9 @@ async def create_school(
 
     # 重新查询以加载region关系
     result = await db.execute(
-        select(School).options(selectinload(School.region)).where(School.id == school.id)
+        select(School)
+        .options(selectinload(School.region))
+        .where(School.id == school.id)
     )
     school = result.scalar_one()
 
@@ -500,14 +516,18 @@ async def update_school(
     # 检查编码是否已被其他学校使用
     if school_data.code and school_data.code != school.code:
         existing_school = await db.execute(
-            select(School).where(School.code == school_data.code, School.id != school_id)
+            select(School).where(
+                School.code == school_data.code, School.id != school_id
+            )
         )
         if existing_school.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="学校编码已存在")
 
     # 检查区域是否存在
     if school_data.region_id and school_data.region_id != school.region_id:
-        region = await db.execute(select(Region).where(Region.id == school_data.region_id))
+        region = await db.execute(
+            select(Region).where(Region.id == school_data.region_id)
+        )
         if not region.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="区域不存在")
 
@@ -521,7 +541,9 @@ async def update_school(
 
     # 重新查询以加载region关系
     result = await db.execute(
-        select(School).options(selectinload(School.region)).where(School.id == school.id)
+        select(School)
+        .options(selectinload(School.region))
+        .where(School.id == school.id)
     )
     school = result.scalar_one()
 
@@ -610,7 +632,9 @@ async def get_classrooms(
     total_pages = (total + size - 1) // size
 
     return ClassroomListResponse(
-        classrooms=[ClassroomResponse.model_validate(classroom) for classroom in classrooms],
+        classrooms=[
+            ClassroomResponse.model_validate(classroom) for classroom in classrooms
+        ],
         total=total,
         page=page,
         size=size,
@@ -626,7 +650,9 @@ async def create_classroom(
 ) -> Any:
     """创建班级"""
 
-    school = await db.scalar(select(School).where(School.id == classroom_data.school_id))
+    school = await db.scalar(
+        select(School).where(School.id == classroom_data.school_id)
+    )
     if not school:
         raise HTTPException(status_code=404, detail="学校不存在")
 
@@ -663,13 +689,23 @@ async def update_classroom(
     if not classroom:
         raise HTTPException(status_code=404, detail="班级不存在")
 
-    if classroom_data.school_id is not None and classroom_data.school_id != classroom.school_id:
-        school = await db.scalar(select(School).where(School.id == classroom_data.school_id))
+    if (
+        classroom_data.school_id is not None
+        and classroom_data.school_id != classroom.school_id
+    ):
+        school = await db.scalar(
+            select(School).where(School.id == classroom_data.school_id)
+        )
         if not school:
             raise HTTPException(status_code=404, detail="学校不存在")
 
-    if classroom_data.grade_id is not None and classroom_data.grade_id != classroom.grade_id:
-        grade = await db.scalar(select(Grade).where(Grade.id == classroom_data.grade_id))
+    if (
+        classroom_data.grade_id is not None
+        and classroom_data.grade_id != classroom.grade_id
+    ):
+        grade = await db.scalar(
+            select(Grade).where(Grade.id == classroom_data.grade_id)
+        )
         if not grade:
             raise HTTPException(status_code=404, detail="年级不存在")
 

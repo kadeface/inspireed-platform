@@ -21,14 +21,18 @@ async def publish_test_lessons():
         print("📚 开始发布测试课程...")
 
         # 获取所有草稿状态的教案
-        result = await db.execute(select(Lesson).where(Lesson.status == LessonStatus.DRAFT))
+        result = await db.execute(
+            select(Lesson).where(Lesson.status == LessonStatus.DRAFT)
+        )
         draft_lessons = result.scalars().all()
 
         if not draft_lessons:
             print("⚠️  没有找到草稿状态的教案")
 
             # 检查是否有已发布的课程
-            result = await db.execute(select(Lesson).where(Lesson.status == LessonStatus.PUBLISHED))
+            result = await db.execute(
+                select(Lesson).where(Lesson.status == LessonStatus.PUBLISHED)
+            )
             published_lessons = result.scalars().all()
 
             if published_lessons:
@@ -52,7 +56,9 @@ async def publish_test_lessons():
         print(f"\n✅ 成功发布 {published_count} 个课程！")
 
         # 显示所有已发布的课程
-        result = await db.execute(select(Lesson).where(Lesson.status == LessonStatus.PUBLISHED))
+        result = await db.execute(
+            select(Lesson).where(Lesson.status == LessonStatus.PUBLISHED)
+        )
         all_published = result.scalars().all()
 
         print(f"\n📊 当前已发布课程总数: {len(all_published)}")

@@ -214,7 +214,9 @@ async def create_course(
 ) -> Any:
     """创建课程 (仅管理员)"""
     # 验证学科存在
-    subject_result = await db.execute(select(Subject).where(Subject.id == course_in.subject_id))
+    subject_result = await db.execute(
+        select(Subject).where(Subject.id == course_in.subject_id)
+    )
     subject = subject_result.scalar_one_or_none()
     if not subject:
         raise HTTPException(status_code=404, detail="学科不存在")
@@ -228,7 +230,8 @@ async def create_course(
     # 检查是否已存在相同的学科+年级组合
     existing_result = await db.execute(
         select(Course).where(
-            Course.subject_id == course_in.subject_id, Course.grade_id == course_in.grade_id
+            Course.subject_id == course_in.subject_id,
+            Course.grade_id == course_in.grade_id,
         )
     )
     if existing_result.scalar_one_or_none():
@@ -346,9 +349,9 @@ async def get_curriculum_tree(
     courses = course_result.scalars().all()
 
     # 获取每个课程的教案数量
-    lesson_count_query = select(Lesson.course_id, func.count(Lesson.id).label("count")).group_by(
-        Lesson.course_id
-    )
+    lesson_count_query = select(
+        Lesson.course_id, func.count(Lesson.id).label("count")
+    ).group_by(Lesson.course_id)
     lesson_count_result = await db.execute(lesson_count_query)
     lesson_counts: dict[int, int] = {}
     for row in lesson_count_result:
@@ -421,7 +424,9 @@ async def get_curriculum_tree(
                     id=subject_id_val,
                     name=_safe_str(getattr(subject, "name", "")),
                     code=_safe_str(getattr(subject, "code", "")),
-                    description=_safe_optional_str(getattr(subject, "description", None)),
+                    description=_safe_optional_str(
+                        getattr(subject, "description", None)
+                    ),
                     is_active=bool(getattr(subject, "is_active", True)),
                     grades=grade_nodes,
                     lesson_count=subject_lesson_count,
@@ -437,7 +442,9 @@ async def get_curriculum_tree(
     )
 
 
-@router.get("/courses/{course_id}/with-chapters", response_model=CourseWithChaptersResponse)
+@router.get(
+    "/courses/{course_id}/with-chapters", response_model=CourseWithChaptersResponse
+)
 async def get_course_with_chapters(
     course_id: int,
     db: AsyncSession = Depends(get_db),
@@ -523,7 +530,9 @@ async def get_course_with_chapters(
         name=_safe_str(getattr(course, "name", "")),
         code=_safe_optional_str(getattr(course, "code", None)),
         description=_safe_optional_str(getattr(course, "description", None)),
-        subject=SubjectResponse.model_validate(course.subject) if course.subject else None,
+        subject=SubjectResponse.model_validate(course.subject)
+        if course.subject
+        else None,
         grade=GradeResponse.model_validate(course.grade) if course.grade else None,
         chapters=root_chapters,
         total_chapters=len(chapters),

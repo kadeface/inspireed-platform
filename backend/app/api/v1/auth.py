@@ -33,7 +33,9 @@ async def get_current_user(
     )
 
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         user_id = payload.get("sub")
         if not isinstance(user_id, str):
             raise credentials_exception
@@ -74,7 +76,9 @@ async def get_current_active_user(
     return current_user
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)) -> Any:
     """用户注册"""
     # 检查邮箱是否已存在
@@ -115,7 +119,9 @@ async def login(
     )
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(form_data.password, cast(str, user.hashed_password)):
+    if not user or not verify_password(
+        form_data.password, cast(str, user.hashed_password)
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
@@ -127,7 +133,9 @@ async def login(
 
     # 创建访问令牌
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(subject=user.id, expires_delta=access_token_expires)
+    access_token = create_access_token(
+        subject=user.id, expires_delta=access_token_expires
+    )
 
     return {"access_token": access_token, "token_type": "bearer"}
 

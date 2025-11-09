@@ -52,7 +52,8 @@ async def test_cell_api():
         print(f"\n2. 测试获取Cell {cell_id}...")
         try:
             response = await client.get(
-                f"{BASE_URL}/cells/{cell_id}", headers={"Authorization": "Bearer test-token"}
+                f"{BASE_URL}/cells/{cell_id}",
+                headers={"Authorization": "Bearer test-token"},
             )
             if response.status_code == 200:
                 print("✅ Cell获取成功")

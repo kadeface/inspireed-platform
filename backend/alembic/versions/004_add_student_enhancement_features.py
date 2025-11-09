@@ -80,7 +80,9 @@ def upgrade():
             nullable=False,
             comment="难度等级",
         ),
-        sa.Column("cover_image_url", sa.String(length=500), nullable=True, comment="封面图URL"),
+        sa.Column(
+            "cover_image_url", sa.String(length=500), nullable=True, comment="封面图URL"
+        ),
         sa.Column("is_published", sa.Boolean(), nullable=False, comment="是否已发布"),
         sa.Column("estimated_hours", sa.Integer(), nullable=True, comment="预计学习时长（小时）"),
         sa.Column("created_at", sa.DateTime(), nullable=False, comment="创建时间"),
@@ -91,7 +93,9 @@ def upgrade():
             ["users.id"],
         ),
     )
-    op.create_index(op.f("ix_learning_paths_id"), "learning_paths", ["id"], unique=False)
+    op.create_index(
+        op.f("ix_learning_paths_id"), "learning_paths", ["id"], unique=False
+    )
 
     # 创建学习路径课程关联表
     op.create_table(
@@ -113,7 +117,10 @@ def upgrade():
         ),
     )
     op.create_index(
-        op.f("ix_learning_path_lessons_id"), "learning_path_lessons", ["id"], unique=False
+        op.f("ix_learning_path_lessons_id"),
+        "learning_path_lessons",
+        ["id"],
+        unique=False,
     )
 
     # 给Lesson表添加新字段
@@ -129,12 +136,22 @@ def upgrade():
     op.add_column(
         "lessons",
         sa.Column(
-            "average_rating", sa.Float(), nullable=False, server_default="0.0", comment="平均评分"
+            "average_rating",
+            sa.Float(),
+            nullable=False,
+            server_default="0.0",
+            comment="平均评分",
         ),
     )
     op.add_column(
         "lessons",
-        sa.Column("review_count", sa.Integer(), nullable=False, server_default="0", comment="评论数量"),
+        sa.Column(
+            "review_count",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+            comment="评论数量",
+        ),
     )
 
 
@@ -146,7 +163,9 @@ def downgrade():
     op.drop_column("lessons", "difficulty_level")
 
     # 删除学习路径课程关联表
-    op.drop_index(op.f("ix_learning_path_lessons_id"), table_name="learning_path_lessons")
+    op.drop_index(
+        op.f("ix_learning_path_lessons_id"), table_name="learning_path_lessons"
+    )
     op.drop_table("learning_path_lessons")
 
     # 删除学习路径表

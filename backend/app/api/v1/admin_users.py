@@ -154,14 +154,18 @@ async def _validate_scope_ids(
     school_obj: Optional[School] = None
 
     if classroom_id is not None:
-        classroom = await db.scalar(select(Classroom).where(Classroom.id == classroom_id))
+        classroom = await db.scalar(
+            select(Classroom).where(Classroom.id == classroom_id)
+        )
         if not classroom:
             raise HTTPException(status_code=404, detail="班级不存在")
 
         resolved["classroom_id"] = cast(int, classroom.id)
         resolved["grade_id"] = cast(Optional[int], classroom.grade_id)
         resolved["school_id"] = cast(Optional[int], classroom.school_id)
-        school_obj = await db.scalar(select(School).where(School.id == classroom.school_id))
+        school_obj = await db.scalar(
+            select(School).where(School.id == classroom.school_id)
+        )
 
     if resolved["grade_id"] is not None:
         grade = await db.scalar(select(Grade).where(Grade.id == resolved["grade_id"]))
@@ -182,7 +186,9 @@ async def _validate_scope_ids(
             raise HTTPException(status_code=400, detail="学校与区域不匹配")
 
     if resolved["region_id"] is not None:
-        region = await db.scalar(select(Region).where(Region.id == resolved["region_id"]))
+        region = await db.scalar(
+            select(Region).where(Region.id == resolved["region_id"])
+        )
         if not region:
             raise HTTPException(status_code=404, detail="区域不存在")
 
@@ -212,7 +218,9 @@ async def get_users(
 
     # 搜索筛选
     if search:
-        search_filter = or_(User.username.ilike(f"%{search}%"), User.email.ilike(f"%{search}%"))
+        search_filter = or_(
+            User.username.ilike(f"%{search}%"), User.email.ilike(f"%{search}%")
+        )
         query = query.where(search_filter)
 
     # 获取总数
@@ -263,7 +271,9 @@ async def create_user(
     """创建用户"""
 
     # 检查用户名是否已存在
-    existing_user = await db.execute(select(User).where(User.username == user_data.username))
+    existing_user = await db.execute(
+        select(User).where(User.username == user_data.username)
+    )
     if existing_user.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="用户名已存在")
 
@@ -338,7 +348,8 @@ async def update_user(
 
     if any(field in update_data for field in scope_fields):
         scope_kwargs = {
-            field: update_data.get(field, getattr(user, field)) for field in scope_fields
+            field: update_data.get(field, getattr(user, field))
+            for field in scope_fields
         }
         resolved_scope = await _validate_scope_ids(db, **scope_kwargs)
         for field, value in resolved_scope.items():
@@ -405,7 +416,10 @@ async def toggle_user_status(
     await db.commit()
 
     updated_status = bool(getattr(user, "is_active"))
-    return {"message": f"用户已{'启用' if updated_status else '禁用'}", "is_active": updated_status}
+    return {
+        "message": f"用户已{'启用' if updated_status else '禁用'}",
+        "is_active": updated_status,
+    }
 
 
 @router.post("/{user_id}/reset-password")
@@ -461,7 +475,9 @@ async def batch_import_users(
                 continue
 
             # 检查邮箱是否已存在
-            existing_email = await db.execute(select(User).where(User.email == user_data.email))
+            existing_email = await db.execute(
+                select(User).where(User.email == user_data.email)
+            )
             if existing_email.scalar_one_or_none():
                 errors.append(f"第{i+1}行：邮箱 {user_data.email} 已存在")
                 continue
@@ -504,7 +520,9 @@ async def batch_import_users(
         created_user_objs = result.scalars().all()
         # 按创建顺序排序
         created_users_map: dict[int, User] = {
-            cast(int, user.id): user for user in created_user_objs if user.id is not None
+            cast(int, user.id): user
+            for user in created_user_objs
+            if user.id is not None
         }
         for user_id in created_user_ids:
             user_obj = created_users_map.get(user_id)
@@ -530,9 +548,7 @@ async def download_import_template(
     template_content = (
         "学号/用户名,姓名,邮箱,密码,角色,是否激活,区域ID(可选),学校ID(可选),年级ID(可选),班级ID(可选),备注\n"
     )
-    template_content += (
-        "202301001,张慧,student01@example.com,student123,学生,是,1,101,3,1001,学生账户请填写学号作为登录名\n"
-    )
+    template_content += "202301001,张慧,student01@example.com,student123,学生,是,1,101,3,1001,学生账户请填写学号作为登录名\n"
     template_content += (
         "teacher01,李老师,teacher01@example.com,teacher123,教师,是,,,,,教师/管理员可留空组织信息\n"
     )

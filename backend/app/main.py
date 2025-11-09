@@ -49,13 +49,17 @@ if settings.ALLOW_LAN_ACCESS:
     ] = r"https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?"
 else:
     # 只允许配置的源
-    cors_config["allow_origins"] = [str(origin) for origin in settings.BACKEND_CORS_ORIGINS]
+    cors_config["allow_origins"] = [
+        str(origin) for origin in settings.BACKEND_CORS_ORIGINS
+    ]
 
 app.add_middleware(CORSMiddleware, **cors_config)
 
 # 配置静态文件服务
 app.mount(
-    "/uploads/resources", StaticFiles(directory="storage/resources"), name="uploads_resources"
+    "/uploads/resources",
+    StaticFiles(directory="storage/resources"),
+    name="uploads_resources",
 )
 
 # 注册路由

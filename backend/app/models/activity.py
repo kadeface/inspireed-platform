@@ -94,14 +94,18 @@ class ActivitySubmission(Base):
     synced = Column(Boolean, default=True, nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     student = relationship("User", foreign_keys=[student_id])
     grader = relationship("User", foreign_keys=[graded_by])
     lesson = relationship("Lesson", foreign_keys=[lesson_id])
     peer_reviews_received = relationship(
-        "PeerReview", foreign_keys="PeerReview.submission_id", back_populates="submission"
+        "PeerReview",
+        foreign_keys="PeerReview.submission_id",
+        back_populates="submission",
     )
 
     def __repr__(self) -> str:
@@ -119,7 +123,9 @@ class PeerReview(Base):
     submission_id = Column(
         Integer, ForeignKey("activity_submissions.id"), nullable=False, index=True
     )
-    reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # 评价者
+    reviewer_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )  # 评价者
     lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
     cell_id = Column(Integer, ForeignKey("cells.id"), nullable=False, index=True)
 
@@ -154,13 +160,19 @@ class PeerReview(Base):
     completed_at = Column(DateTime, nullable=True)  # 完成时间
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     submission = relationship(
-        "ActivitySubmission", foreign_keys=[submission_id], back_populates="peer_reviews_received"
+        "ActivitySubmission",
+        foreign_keys=[submission_id],
+        back_populates="peer_reviews_received",
     )
-    reviewer = relationship("User", foreign_keys=[reviewer_id], back_populates="peer_reviews_given")
+    reviewer = relationship(
+        "User", foreign_keys=[reviewer_id], back_populates="peer_reviews_given"
+    )
     lesson = relationship("Lesson", foreign_keys=[lesson_id])
 
     def __repr__(self) -> str:
@@ -213,7 +225,9 @@ class ActivityStatistics(Base):
     peer_review_count = Column(Integer, default=0, nullable=False)
     avg_peer_review_score = Column(Float, nullable=True)
 
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # 关联关系
     lesson = relationship("Lesson", foreign_keys=[lesson_id])
@@ -223,7 +237,15 @@ class ActivityStatistics(Base):
 
 
 # 创建索引以优化查询性能
-Index("idx_activity_sub_cell_student", ActivitySubmission.cell_id, ActivitySubmission.student_id)
-Index("idx_activity_sub_lesson_status", ActivitySubmission.lesson_id, ActivitySubmission.status)
+Index(
+    "idx_activity_sub_cell_student",
+    ActivitySubmission.cell_id,
+    ActivitySubmission.student_id,
+)
+Index(
+    "idx_activity_sub_lesson_status",
+    ActivitySubmission.lesson_id,
+    ActivitySubmission.status,
+)
 Index("idx_peer_review_submission", PeerReview.submission_id)
 Index("idx_peer_review_reviewer", PeerReview.reviewer_id)

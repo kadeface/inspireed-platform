@@ -202,6 +202,10 @@ pnpm dev --port 3000
 pnpm dev --host
 ```
 
+## 开发规范
+
+- 在提交 Python 代码前，必须运行 `poetry run black .`（或本地安装的 `black .`）进行格式化，并确保 `poetry run black --check .` 通过。
+
 ### 一键启动脚本
 
 项目提供了便捷的启动脚本：

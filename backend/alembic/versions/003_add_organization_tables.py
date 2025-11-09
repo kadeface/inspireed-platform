@@ -94,8 +94,12 @@ def upgrade() -> None:
     op.create_index(op.f("ix_schools_id"), "schools", ["id"], unique=False)
 
     # 在 users 表添加 school_id 字段
-    op.add_column("users", sa.Column("school_id", sa.Integer(), nullable=True, comment="所属学校ID"))
-    op.create_foreign_key("fk_users_school_id", "users", "schools", ["school_id"], ["id"])
+    op.add_column(
+        "users", sa.Column("school_id", sa.Integer(), nullable=True, comment="所属学校ID")
+    )
+    op.create_foreign_key(
+        "fk_users_school_id", "users", "schools", ["school_id"], ["id"]
+    )
 
 
 def downgrade() -> None:

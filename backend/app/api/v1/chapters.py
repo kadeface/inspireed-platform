@@ -235,7 +235,10 @@ async def get_course_chapters(
     # 获取所有章节及其资源数量
     query = (
         select(Chapter, func.count(Resource.id).label("resources_count"))
-        .outerjoin(Resource, and_(Resource.chapter_id == Chapter.id, Resource.is_active == True))
+        .outerjoin(
+            Resource,
+            and_(Resource.chapter_id == Chapter.id, Resource.is_active == True),
+        )
         .where(and_(Chapter.course_id == course_id, Chapter.is_active == True))
         .group_by(Chapter.id)
         .order_by(Chapter.display_order, Chapter.id)
@@ -274,7 +277,9 @@ async def get_course_chapters(
                 root_chapters.append(chapter_dict[chapter.id])
             else:
                 if chapter.parent_id in chapter_dict:
-                    chapter_dict[chapter.parent_id].children.append(chapter_dict[chapter.id])
+                    chapter_dict[chapter.parent_id].children.append(
+                        chapter_dict[chapter.id]
+                    )
 
         return root_chapters
     else:
@@ -442,4 +447,9 @@ async def get_chapter_resources(
     result = await db.execute(query)
     resources = result.scalars().all()
 
-    return ResourceListResponse(items=[ResourceResponse.from_orm(r) for r in resources], total=total or 0, page=page, page_size=page_size)
+    return ResourceListResponse(
+        items=[ResourceResponse.from_orm(r) for r in resources],
+        total=total or 0,
+        page=page,
+        page_size=page_size,
+    )

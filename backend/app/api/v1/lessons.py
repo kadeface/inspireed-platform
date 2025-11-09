@@ -10,8 +10,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import User, Lesson, LessonStatus, Course, Resource, Chapter, DifficultyLevel
-from app.schemas.lesson import LessonCreate, LessonUpdate, LessonResponse, LessonListResponse
+from app.models import (
+    User,
+    Lesson,
+    LessonStatus,
+    Course,
+    Resource,
+    Chapter,
+    DifficultyLevel,
+)
+from app.schemas.lesson import (
+    LessonCreate,
+    LessonUpdate,
+    LessonResponse,
+    LessonListResponse,
+)
 from app.api.v1.auth import get_current_active_user
 from app.api.deps import get_current_user_optional
 from pydantic import BaseModel, Field
@@ -620,7 +633,12 @@ async def get_chapter_lessons(
     result = await db.execute(query)
     lessons = result.scalars().all()
 
-    return LessonListResponse(items=[lesson.model_dump() for lesson in lessons], total=total, page=page, page_size=page_size)
+    return LessonListResponse(
+        items=[lesson.model_dump() for lesson in lessons],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/recommended", response_model=LessonListResponse)

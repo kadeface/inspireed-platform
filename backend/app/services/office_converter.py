@@ -48,7 +48,9 @@ class OfficeConverterService:
         except Exception as e:
             return {"success": False, "error": str(e), "pdf_url": None}
 
-    async def _convert_docx_to_pdf(self, docx_path: str, pdf_path: str) -> Dict[str, Any]:
+    async def _convert_docx_to_pdf(
+        self, docx_path: str, pdf_path: str
+    ) -> Dict[str, Any]:
         """将DOCX转换为PDF"""
         try:
             # 方法1: 使用LibreOffice命令行工具（推荐）
@@ -84,7 +86,9 @@ class OfficeConverterService:
         except:
             return False
 
-    async def _convert_with_libreoffice(self, input_path: str, output_path: str) -> Dict[str, Any]:
+    async def _convert_with_libreoffice(
+        self, input_path: str, output_path: str
+    ) -> Dict[str, Any]:
         """使用LibreOffice转换文档"""
         try:
             output_dir = os.path.dirname(output_path)
@@ -127,9 +131,15 @@ class OfficeConverterService:
                 }
 
         except Exception as e:
-            return {"success": False, "error": f"LibreOffice转换异常: {str(e)}", "pdf_url": None}
+            return {
+                "success": False,
+                "error": f"LibreOffice转换异常: {str(e)}",
+                "pdf_url": None,
+            }
 
-    async def _convert_docx_content_to_pdf(self, docx_path: str, pdf_path: str) -> Dict[str, Any]:
+    async def _convert_docx_content_to_pdf(
+        self, docx_path: str, pdf_path: str
+    ) -> Dict[str, Any]:
         """从DOCX提取内容并生成简化PDF"""
         try:
             # 读取DOCX文档
@@ -167,20 +177,27 @@ class OfficeConverterService:
                     # 添加文本到PDF
                     try:
                         pdf_doc[-1].insert_text(
-                            (page_margin, y_position), text, fontsize=font_size, color=font_color
+                            (page_margin, y_position),
+                            text,
+                            fontsize=font_size,
+                            color=font_color,
                         )
                         y_position += line_height + (10 if is_heading else 0)
                     except Exception as text_error:
                         print(f"Error inserting text: {text_error}")
                         # 如果插入失败，尝试简单的文本插入
                         try:
-                            pdf_doc[-1].insert_text((page_margin, y_position), text, fontsize=12)
+                            pdf_doc[-1].insert_text(
+                                (page_margin, y_position), text, fontsize=12
+                            )
                             y_position += line_height
                         except:
                             continue
 
             # 如果没有内容，添加提示信息
-            if len(pdf_doc) == 0 or not any(page.get_text().strip() for page in pdf_doc):
+            if len(pdf_doc) == 0 or not any(
+                page.get_text().strip() for page in pdf_doc
+            ):
                 page = pdf_doc.new_page()
                 page.insert_text((50, 100), "文档内容提取中...", fontsize=14)
                 page.insert_text((50, 130), "请使用其他预览方式查看完整内容", fontsize=12)
@@ -199,7 +216,9 @@ class OfficeConverterService:
         except Exception as e:
             return {"success": False, "error": f"内容提取转换失败: {str(e)}", "pdf_url": None}
 
-    async def _convert_ppt_content_to_pdf(self, ppt_path: str, pdf_path: str) -> Dict[str, Any]:
+    async def _convert_ppt_content_to_pdf(
+        self, ppt_path: str, pdf_path: str
+    ) -> Dict[str, Any]:
         """从PPT/PPTX提取内容并生成简化PDF"""
         try:
             # 读取PPT文档
@@ -212,7 +231,9 @@ class OfficeConverterService:
                 page = pdf_doc.new_page()
 
                 # 添加幻灯片标题
-                page.insert_text((50, 50), f"幻灯片 {slide_num + 1}", fontsize=16, color=(0, 0, 0))
+                page.insert_text(
+                    (50, 50), f"幻灯片 {slide_num + 1}", fontsize=16, color=(0, 0, 0)
+                )
 
                 # 提取文本框内容
                 y_pos = 100
@@ -252,7 +273,9 @@ class OfficeConverterService:
                                     )
                                     y_pos = 100
 
-                                page.insert_text((50, y_pos), line, fontsize=12, color=(0, 0, 0))
+                                page.insert_text(
+                                    (50, y_pos), line, fontsize=12, color=(0, 0, 0)
+                                )
                                 y_pos += 25
                         else:
                             if y_pos > 750:  # 页面底部
@@ -265,13 +288,19 @@ class OfficeConverterService:
                                 )
                                 y_pos = 100
 
-                            page.insert_text((50, y_pos), text, fontsize=12, color=(0, 0, 0))
+                            page.insert_text(
+                                (50, y_pos), text, fontsize=12, color=(0, 0, 0)
+                            )
                             y_pos += 25
 
                 # 如果没有找到文本内容，添加提示
                 if not content_found:
-                    page.insert_text((50, 100), "此幻灯片无文本内容", fontsize=12, color=(100, 100, 100))
-                    page.insert_text((50, 130), "可能包含图片或其他媒体内容", fontsize=10, color=(100, 100, 100))
+                    page.insert_text(
+                        (50, 100), "此幻灯片无文本内容", fontsize=12, color=(100, 100, 100)
+                    )
+                    page.insert_text(
+                        (50, 130), "可能包含图片或其他媒体内容", fontsize=10, color=(100, 100, 100)
+                    )
 
             # 如果没有幻灯片，添加提示信息
             if len(pdf_doc) == 0:
@@ -291,7 +320,11 @@ class OfficeConverterService:
             }
 
         except Exception as e:
-            return {"success": False, "error": f"PPT内容提取转换失败: {str(e)}", "pdf_url": None}
+            return {
+                "success": False,
+                "error": f"PPT内容提取转换失败: {str(e)}",
+                "pdf_url": None,
+            }
 
     async def get_converted_pdf_url(self, original_file_url: str) -> Optional[str]:
         """
@@ -309,7 +342,9 @@ class OfficeConverterService:
                 return None
 
             # 构建文件路径
-            file_path = original_file_url.replace("/uploads/resources/", "storage/resources/")
+            file_path = original_file_url.replace(
+                "/uploads/resources/", "storage/resources/"
+            )
             if not os.path.exists(file_path):
                 return None
 

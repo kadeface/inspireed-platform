@@ -30,7 +30,9 @@ def upgrade() -> None:
             sa.Column("grade_id", sa.Integer(), nullable=False),
             sa.Column("enrollment_year", sa.Integer(), nullable=True),
             sa.Column("head_teacher_id", sa.Integer(), nullable=True),
-            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column(
+                "is_active", sa.Boolean(), nullable=False, server_default=sa.true()
+            ),
             sa.Column("description", sa.Text(), nullable=True),
             sa.Column(
                 "created_at",
@@ -45,10 +47,16 @@ def upgrade() -> None:
                 server_default=sa.text("CURRENT_TIMESTAMP"),
             ),
             sa.ForeignKeyConstraint(
-                ["school_id"], ["schools.id"], name="fk_classrooms_school_id", ondelete="CASCADE"
+                ["school_id"],
+                ["schools.id"],
+                name="fk_classrooms_school_id",
+                ondelete="CASCADE",
             ),
             sa.ForeignKeyConstraint(
-                ["grade_id"], ["grades.id"], name="fk_classrooms_grade_id", ondelete="CASCADE"
+                ["grade_id"],
+                ["grades.id"],
+                name="fk_classrooms_grade_id",
+                ondelete="CASCADE",
             ),
             sa.ForeignKeyConstraint(
                 ["head_teacher_id"],
@@ -58,7 +66,9 @@ def upgrade() -> None:
             ),
         )
 
-    existing_classroom_indexes = {index["name"] for index in inspector.get_indexes("classrooms")}
+    existing_classroom_indexes = {
+        index["name"] for index in inspector.get_indexes("classrooms")
+    }
     if "ix_classrooms_school_id" not in existing_classroom_indexes:
         op.create_index("ix_classrooms_school_id", "classrooms", ["school_id"])
     if "ix_classrooms_grade_id" not in existing_classroom_indexes:

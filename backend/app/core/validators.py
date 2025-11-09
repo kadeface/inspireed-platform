@@ -10,7 +10,9 @@ else:
     UserRole = None  # type: ignore[assignment]
 
 
-def normalize_user_role(value: Any, *, allow_none: bool = False) -> Optional["UserRole"]:
+def normalize_user_role(
+    value: Any, *, allow_none: bool = False
+) -> Optional["UserRole"]:
     """
     将外部传入的角色值统一转换为 UserRole 枚举。
 

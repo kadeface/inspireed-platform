@@ -10,7 +10,16 @@ from sqlalchemy.orm import selectinload
 
 from app.api import deps
 from app.core.database import get_db
-from app.models import User, Question, Answer, Lesson, Cell, QuestionStatus, AskType, AnswererType
+from app.models import (
+    User,
+    Question,
+    Answer,
+    Lesson,
+    Cell,
+    QuestionStatus,
+    AskType,
+    AnswererType,
+)
 from app.schemas.question import (
     QuestionCreate,
     QuestionUpdate,
@@ -111,7 +120,9 @@ async def create_question(
 
     # 创建问题
     question = Question(
-        **question_in.model_dump(), student_id=current_user.id, status=QuestionStatus.PENDING
+        **question_in.model_dump(),
+        student_id=current_user.id,
+        status=QuestionStatus.PENDING,
     )
 
     db.add(question)
@@ -149,7 +160,9 @@ async def create_question(
         await db.refresh(ai_answer)
 
     # 重新加载问题以包含关联数据
-    question = await get_question_or_404(cast(int, question.id), db, load_relations=True)
+    question = await get_question_or_404(
+        cast(int, question.id), db, load_relations=True
+    )
 
     return question
 
@@ -185,7 +198,9 @@ async def get_my_questions(
 
     # 总数
     count_query = (
-        select(func.count()).select_from(Question).where(Question.student_id == current_user.id)
+        select(func.count())
+        .select_from(Question)
+        .where(Question.student_id == current_user.id)
     )
     if lesson_id:
         count_query = count_query.where(Question.lesson_id == lesson_id)
@@ -382,7 +397,9 @@ async def get_teacher_pending_questions(
     count_query = (
         select(func.count())
         .select_from(Question)
-        .where(or_(Question.ask_type == AskType.TEACHER, Question.ask_type == AskType.BOTH))
+        .where(
+            or_(Question.ask_type == AskType.TEACHER, Question.ask_type == AskType.BOTH)
+        )
     )
     if lesson_id:
         count_query = count_query.where(Question.lesson_id == lesson_id)
@@ -399,7 +416,9 @@ async def get_teacher_pending_questions(
     # 过滤出还没有教师回答的问题
     pending_questions = []
     for q in questions:
-        has_teacher_answer = any(a.answerer_type == AnswererType.TEACHER for a in q.answers)
+        has_teacher_answer = any(
+            a.answerer_type == AnswererType.TEACHER for a in q.answers
+        )
         if not has_teacher_answer:
             pending_questions.append(q)
 
@@ -466,7 +485,9 @@ async def pin_question(
 # ==================== Answer相关API ====================
 
 
-@router.post("/answers", response_model=AnswerResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/answers", response_model=AnswerResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_answer(
     answer_in: AnswerCreate,
     db: AsyncSession = Depends(get_db),
@@ -483,7 +504,9 @@ async def create_answer(
 
     # 创建回答
     answer = Answer(
-        **answer_in.model_dump(), answerer_type=AnswererType.TEACHER, answerer_id=current_user.id
+        **answer_in.model_dump(),
+        answerer_type=AnswererType.TEACHER,
+        answerer_id=current_user.id,
     )
 
     db.add(answer)
@@ -497,7 +520,9 @@ async def create_answer(
 
     # 加载回答者信息
     result = await db.execute(
-        select(Answer).options(selectinload(Answer.answerer)).where(Answer.id == answer.id)
+        select(Answer)
+        .options(selectinload(Answer.answerer))
+        .where(Answer.id == answer.id)
     )
     answer = result.scalar_one()
 
@@ -533,7 +558,9 @@ async def update_answer(
 
     # 加载回答者信息
     result = await db.execute(
-        select(Answer).options(selectinload(Answer.answerer)).where(Answer.id == answer.id)
+        select(Answer)
+        .options(selectinload(Answer.answerer))
+        .where(Answer.id == answer.id)
     )
     answer = result.scalar_one()
 
@@ -566,7 +593,9 @@ async def rate_answer(
 
     # 加载回答者信息
     result = await db.execute(
-        select(Answer).options(selectinload(Answer.answerer)).where(Answer.id == answer.id)
+        select(Answer)
+        .options(selectinload(Answer.answerer))
+        .where(Answer.id == answer.id)
     )
     answer = result.scalar_one()
 

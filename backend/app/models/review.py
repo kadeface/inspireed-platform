@@ -25,10 +25,14 @@ class Review(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="用户ID")
-    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, comment="课程ID")
+    lesson_id = Column(
+        Integer, ForeignKey("lessons.id"), nullable=False, comment="课程ID"
+    )
     rating = Column(Integer, nullable=False, comment="评分（1-5）")
     comment = Column(Text, nullable=True, comment="评论内容")
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, comment="创建时间")
+    created_at = Column(
+        DateTime, default=datetime.utcnow, nullable=False, comment="创建时间"
+    )
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,

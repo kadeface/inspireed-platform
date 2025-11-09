@@ -7,7 +7,9 @@ from sqlalchemy import select
 
 async def test_login():
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(User).where(User.email == "teacher@inspireed.com"))
+        result = await db.execute(
+            select(User).where(User.email == "teacher@inspireed.com")
+        )
         user = result.scalar_one_or_none()
         if user:
             print(f"User found: {user.email}")

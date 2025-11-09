@@ -61,7 +61,13 @@ def upgrade() -> None:
         sa.Column("auto_graded", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column(
             "status",
-            sa.Enum("draft", "submitted", "graded", "returned", name="activitysubmissionstatus"),
+            sa.Enum(
+                "draft",
+                "submitted",
+                "graded",
+                "returned",
+                name="activitysubmissionstatus",
+            ),
             nullable=False,
             server_default="draft",
         ),
@@ -75,8 +81,12 @@ def upgrade() -> None:
         sa.Column("is_late", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("synced", sa.Boolean(), nullable=False, server_default="true"),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
         sa.ForeignKeyConstraint(
             ["cell_id"],
             ["cells.id"],
@@ -97,15 +107,27 @@ def upgrade() -> None:
     )
 
     # 创建索引
-    op.create_index("idx_activity_submissions_cell", "activity_submissions", ["cell_id"])
-    op.create_index("idx_activity_submissions_lesson", "activity_submissions", ["lesson_id"])
-    op.create_index("idx_activity_submissions_student", "activity_submissions", ["student_id"])
-    op.create_index("idx_activity_submissions_status", "activity_submissions", ["status"])
     op.create_index(
-        "idx_activity_sub_cell_student", "activity_submissions", ["cell_id", "student_id"]
+        "idx_activity_submissions_cell", "activity_submissions", ["cell_id"]
     )
     op.create_index(
-        "idx_activity_sub_lesson_status", "activity_submissions", ["lesson_id", "status"]
+        "idx_activity_submissions_lesson", "activity_submissions", ["lesson_id"]
+    )
+    op.create_index(
+        "idx_activity_submissions_student", "activity_submissions", ["student_id"]
+    )
+    op.create_index(
+        "idx_activity_submissions_status", "activity_submissions", ["status"]
+    )
+    op.create_index(
+        "idx_activity_sub_cell_student",
+        "activity_submissions",
+        ["cell_id", "student_id"],
+    )
+    op.create_index(
+        "idx_activity_sub_lesson_status",
+        "activity_submissions",
+        ["lesson_id", "status"],
     )
 
     # 5. 创建互评表
@@ -132,10 +154,19 @@ def upgrade() -> None:
             server_default="pending",
         ),
         sa.Column("is_anonymous", sa.Boolean(), nullable=False, server_default="true"),
-        sa.Column("assigned_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "assigned_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("completed_at", sa.DateTime(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
         sa.ForeignKeyConstraint(
             ["submission_id"],
             ["activity_submissions.id"],
@@ -176,10 +207,16 @@ def upgrade() -> None:
         sa.Column("lowest_score", sa.Float(), nullable=True),
         sa.Column("median_score", sa.Float(), nullable=True),
         sa.Column("average_time_spent", sa.Integer(), nullable=True),
-        sa.Column("item_statistics", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("peer_review_count", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column(
+            "item_statistics", postgresql.JSONB(astext_type=sa.Text()), nullable=True
+        ),
+        sa.Column(
+            "peer_review_count", sa.Integer(), nullable=False, server_default="0"
+        ),
         sa.Column("avg_peer_review_score", sa.Float(), nullable=True),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
         sa.ForeignKeyConstraint(
             ["cell_id"],
             ["cells.id"],
@@ -193,7 +230,9 @@ def upgrade() -> None:
     )
 
     # 创建索引
-    op.create_index("idx_activity_statistics_lesson", "activity_statistics", ["lesson_id"])
+    op.create_index(
+        "idx_activity_statistics_lesson", "activity_statistics", ["lesson_id"]
+    )
 
 
 def downgrade() -> None:

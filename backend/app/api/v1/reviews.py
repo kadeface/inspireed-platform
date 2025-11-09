@@ -47,7 +47,9 @@ async def create_review(
     existing = existing_result.scalar_one_or_none()
 
     if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="已经评论过该课程，请使用更新接口")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="已经评论过该课程，请使用更新接口"
+        )
 
     # 创建评论
     review = Review(
@@ -161,7 +163,9 @@ async def get_lesson_reviews(
                 comment=cast(Optional[str], review.comment),
                 created_at=cast(datetime, review.created_at),
                 updated_at=cast(datetime, review.updated_at),
-                user_name=(cast(str, user.full_name) or cast(str, user.username)) if user else "未知用户",
+                user_name=(cast(str, user.full_name) or cast(str, user.username))
+                if user
+                else "未知用户",
                 user_avatar=cast(Optional[str], user.avatar_url) if user else None,
             )
         )
@@ -170,7 +174,9 @@ async def get_lesson_reviews(
 
 
 @router.get("/lesson/{lesson_id}/stats", response_model=LessonRatingStats)
-async def get_lesson_rating_stats(*, db: AsyncSession = Depends(get_db), lesson_id: int) -> Any:
+async def get_lesson_rating_stats(
+    *, db: AsyncSession = Depends(get_db), lesson_id: int
+) -> Any:
     """
     获取课程的评分统计
     """
@@ -182,14 +188,20 @@ async def get_lesson_rating_stats(*, db: AsyncSession = Depends(get_db), lesson_
 
     # 计算评分分布
     rating_distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-    reviews_result = await db.execute(select(Review).where(Review.lesson_id == lesson_id))
+    reviews_result = await db.execute(
+        select(Review).where(Review.lesson_id == lesson_id)
+    )
     reviews = reviews_result.scalars().all()
 
     for review in reviews:
         rating_value = cast(int, review.rating)
         rating_distribution[rating_value] += 1
 
-    average_rating = float(cast(float, lesson.average_rating)) if lesson.average_rating is not None else 0.0
+    average_rating = (
+        float(cast(float, lesson.average_rating))
+        if lesson.average_rating is not None
+        else 0.0
+    )
     review_count = cast(int, lesson.review_count or 0)
 
     return LessonRatingStats(
@@ -211,7 +223,9 @@ async def get_my_review(
     获取我对某课程的评论
     """
     result = await db.execute(
-        select(Review).where(Review.user_id == current_user.id, Review.lesson_id == lesson_id)
+        select(Review).where(
+            Review.user_id == current_user.id, Review.lesson_id == lesson_id
+        )
     )
     review = result.scalar_one_or_none()
 

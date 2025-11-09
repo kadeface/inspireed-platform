@@ -33,10 +33,16 @@ def upgrade() -> None:
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column("display_order", sa.Integer(), nullable=False, server_default="0"),
         sa.Column(
-            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column(
-            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
@@ -52,10 +58,16 @@ def upgrade() -> None:
         sa.Column("level", sa.Integer(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column(
-            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column(
-            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
@@ -76,10 +88,16 @@ def upgrade() -> None:
         sa.Column("display_order", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("created_by", sa.Integer(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column(
-            "updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.ForeignKeyConstraint(
             ["subject_id"],
@@ -136,8 +154,12 @@ def upgrade() -> None:
 
     # Add course_id column to lessons table (nullable initially for existing data)
     op.add_column("lessons", sa.Column("course_id", sa.Integer(), nullable=True))
-    op.create_index(op.f("ix_lessons_course_id"), "lessons", ["course_id"], unique=False)
-    op.create_foreign_key("fk_lessons_course_id", "lessons", "courses", ["course_id"], ["id"])
+    op.create_index(
+        op.f("ix_lessons_course_id"), "lessons", ["course_id"], unique=False
+    )
+    op.create_foreign_key(
+        "fk_lessons_course_id", "lessons", "courses", ["course_id"], ["id"]
+    )
 
 
 def downgrade() -> None:

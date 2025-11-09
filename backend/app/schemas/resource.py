@@ -12,7 +12,9 @@ class ResourceBase(BaseModel):
 
     title: str = Field(..., max_length=200, description="资源标题")
     description: Optional[str] = Field(None, description="资源描述")
-    resource_type: str = Field(..., max_length=20, description="资源类型：pdf/video/document/link")
+    resource_type: str = Field(
+        ..., max_length=20, description="资源类型：pdf/video/document/link"
+    )
     is_official: bool = Field(default=False, description="是否官方资源")
     is_downloadable: bool = Field(default=True, description="是否允许下载")
     display_order: int = Field(default=0, description="显示顺序")

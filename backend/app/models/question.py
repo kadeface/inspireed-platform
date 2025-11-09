@@ -91,14 +91,18 @@ class Question(Base):
     # 关联关系
     lesson = relationship("Lesson", back_populates="questions")
     cell = relationship("Cell", foreign_keys=[cell_id])
-    student = relationship("User", foreign_keys=[student_id], back_populates="questions_asked")
+    student = relationship(
+        "User", foreign_keys=[student_id], back_populates="questions_asked"
+    )
     answers = relationship(
         "Answer",
         back_populates="question",
         cascade="all, delete-orphan",
         order_by="Answer.created_at",
     )
-    votes = relationship("QuestionVote", back_populates="question", cascade="all, delete-orphan")
+    votes = relationship(
+        "QuestionVote", back_populates="question", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Question(id={self.id}, title={self.title}, status={self.status})>"
@@ -112,11 +116,14 @@ class Answer(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # 关联问题
-    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, index=True)
+    question_id = Column(
+        Integer, ForeignKey("questions.id"), nullable=False, index=True
+    )
 
     # 回答者信息
     answerer_type = Column(
-        SQLEnum(AnswererType, values_callable=lambda x: [e.value for e in x]), nullable=False
+        SQLEnum(AnswererType, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
     )
     answerer_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     # 如果是教师回答，存储教师ID；如果是AI回答，为NULL
@@ -144,8 +151,12 @@ class Answer(Base):
 
     # 关联关系
     question = relationship("Question", back_populates="answers")
-    answerer = relationship("User", foreign_keys=[answerer_id], back_populates="answers_given")
-    votes = relationship("QuestionVote", back_populates="answer", cascade="all, delete-orphan")
+    answerer = relationship(
+        "User", foreign_keys=[answerer_id], back_populates="answers_given"
+    )
+    votes = relationship(
+        "QuestionVote", back_populates="answer", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Answer(id={self.id}, question_id={self.question_id}, type={self.answerer_type})>"
