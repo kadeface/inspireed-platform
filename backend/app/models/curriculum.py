@@ -3,16 +3,7 @@
 """
 
 from datetime import datetime
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    Text,
-    Boolean,
-    DateTime,
-    ForeignKey,
-    UniqueConstraint,
-)
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -102,11 +93,6 @@ class Course(Base):
     lessons = relationship("Lesson", back_populates="course")
     chapters = relationship(
         "Chapter", back_populates="course", cascade="all, delete-orphan"
-    )
-
-    # 唯一约束：同一学科和年级只能有一个课程组合
-    __table_args__ = (
-        UniqueConstraint("subject_id", "grade_id", name="uix_subject_grade"),
     )
 
     def __repr__(self) -> str:

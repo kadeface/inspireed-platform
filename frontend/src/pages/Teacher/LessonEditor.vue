@@ -60,6 +60,18 @@
               已从已发布状态切换为草稿
             </div>
 
+            <!-- AI 助手 -->
+            <button
+              type="button"
+              @click="showLessonAssistant = true"
+              class="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-[#4C6EF5] to-[#6C8DFF] px-3 py-1.5 text-sm font-medium text-white shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#BFD0FF]"
+            >
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2a6 6 0 00-6 6v1.586l-.707.707A1 1 0 004 12h1v1a4 4 0 004 4v1h2v-1a4 4 0 004-4v-1h1a1 1 0 00.707-1.707L16 9.586V8a6 6 0 00-6-6z" />
+              </svg>
+              AI 助手
+            </button>
+
             <!-- 手动保存按钮 -->
             <button
               @click="handleManualSave"
@@ -269,6 +281,13 @@
       </div>
     </Transition>
 
+    <LessonAiAssistantDrawer
+      v-model="showLessonAssistant"
+      :lesson-title="lessonTitle"
+      :lesson-outline="lessonOutline"
+      @insert="handleAiInsert"
+    />
+
     <ClassroomSelectorModal
       v-model="showPublishModal"
       :classrooms="availableClassrooms"
@@ -373,14 +392,16 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
 import Sortable from 'sortablejs'
-import type { Cell } from '../../types/cell'
+import type { Cell, ReferenceMaterialCell } from '../../types/cell'
 import { CellType } from '../../types/cell'
+import type { LessonRelatedMaterial } from '../../types/lesson'
 import CellToolbar from '../../components/Lesson/CellToolbar.vue'
 import CellContainer from '../../components/Cell/CellContainer.vue'
 import AddCellMenu from '../../components/Lesson/AddCellMenu.vue'
 import ReferenceResourcePanel from '../../components/Resource/ReferenceResourcePanel.vue'
 import PDFViewerModal from '../../components/Resource/PDFViewerModal.vue'
 import ClassroomSelectorModal from '../../components/Lesson/ClassroomSelectorModal.vue'
+import LessonAiAssistantDrawer from '@/components/Teacher/LessonAiAssistantDrawer.vue'
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
@@ -408,6 +429,7 @@ const showPDFViewer = ref(false)
 const showPublishModal = ref(false)
 const selectedClassroomIds = ref<number[]>([])
 const publishError = ref<string | null>(null)
+const showLessonAssistant = ref(false)
 
 // Toast 提示
 const toast = ref({
@@ -426,6 +448,19 @@ const classroomsError = computed(() => lessonStore.classroomsError)
 const publishModalError = computed(
   () => publishError.value || classroomsError.value || null
 )
+
+const lessonOutline = computed(() => {
+  if (!currentLesson.value || !Array.isArray(currentLesson.value.content)) {
+    return ''
+  }
+
+  const items = currentLesson.value.content
+    .slice(0, 6)
+    .map((cell, index) => summarizeCell(cell as Cell, index))
+    .filter((item): item is string => Boolean(item))
+
+  return items.join('\n')
+})
 
 // 标记是否最近从未发布状态切换的
 const isRecentlyUnpublished = ref(false)
@@ -610,6 +645,31 @@ function getDefaultCell(cellType: CellType, order: number): Cell {
   }
 }
 
+function createReferenceMaterialCell(
+  material: LessonRelatedMaterial,
+  order: number
+): ReferenceMaterialCell {
+  return {
+    id: uuidv4(),
+    type: CellType.REFERENCE_MATERIAL,
+    order,
+    editable: true,
+    content: {
+      material_id: material.id,
+      title: material.title,
+      summary: material.summary,
+      resource_type: material.resource_type,
+      source_lesson_id: material.source_lesson_id,
+      source_lesson_title: material.source_lesson_title,
+      preview_url: material.preview_url,
+      download_url: material.download_url,
+      tags: material.tags ?? [],
+      updated_at: material.updated_at,
+      is_accessible: material.is_accessible,
+    },
+  }
+}
+
 // 添加 Cell 到末尾
 function handleAddCellToEnd(cellType: CellType) {
   const newCell = getDefaultCell(cellType, cells.value.length)
@@ -637,6 +697,14 @@ function handleAddCellAt(cellType: CellType, index: number) {
   nextTick(() => {
     scrollToNewCell(index)
   })
+}
+
+function insertReferenceMaterial(material: LessonRelatedMaterial): number | null {
+  if (!currentLesson.value) return null
+  const index = currentLesson.value.content.length
+  const newCell = createReferenceMaterialCell(material, index)
+  lessonStore.addCell(newCell)
+  return index
 }
 
 // 更新 Cell
@@ -880,6 +948,95 @@ function handleNotesUpdated(notes: string) {
   }
 }
 
+function stripHtmlTags(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function summarizeCell(cell: Cell, index: number): string | null {
+  const orderLabel = `第${index + 1}单元`
+  const typeMap: Record<string, string> = {
+    [CellType.TEXT]: '文本',
+    [CellType.CODE]: '代码',
+    [CellType.PARAM]: '参数',
+    [CellType.SIM]: '仿真',
+    [CellType.CHART]: '图表',
+    [CellType.CONTEST]: '竞赛',
+    [CellType.VIDEO]: '视频',
+    [CellType.ACTIVITY]: '活动',
+    [CellType.FLOWCHART]: '流程图',
+    [CellType.REFERENCE_MATERIAL]: '参考素材',
+  }
+
+  const typeLabel = typeMap[cell.type] || '单元'
+  let detail = ''
+
+  if (cell.type === CellType.TEXT && (cell as any).content?.html) {
+    const plain = stripHtmlTags((cell as any).content.html ?? '')
+    if (plain) {
+      detail = plain.slice(0, 28)
+      if (plain.length > 28) {
+        detail += '…'
+      }
+    }
+  } else if (cell.type === CellType.ACTIVITY && (cell as any).content?.title) {
+    detail = (cell as any).content.title
+  } else if (cell.type === CellType.VIDEO && (cell as any).content?.title) {
+    detail = (cell as any).content.title
+  } else if (cell.type === CellType.FLOWCHART) {
+    detail = '流程设计'
+  } else if (cell.type === CellType.SIM) {
+    detail = '仿真互动'
+  }
+
+  const parts = [orderLabel, typeLabel]
+  if (detail) {
+    parts.push(`：${detail}`)
+  }
+  return parts.join('')
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function markdownToHtml(markdown: string): string {
+  const trimmed = markdown.trim()
+  if (!trimmed) return ''
+
+  const blocks = trimmed.split(/\n{2,}/)
+  return blocks
+    .map((block) => {
+      const lines = block.split('\n')
+      const htmlLines = lines.map((line) => escapeHtml(line))
+      return `<p>${htmlLines.join('<br />')}</p>`
+    })
+    .join('')
+}
+
+function handleAiInsert(content: string) {
+  if (!currentLesson.value) return
+
+  const html = markdownToHtml(content)
+  if (!html) {
+    showToast('error', 'AI 返回内容为空，插入失败')
+    return
+  }
+
+  const newCell = getDefaultCell(CellType.TEXT, currentLesson.value.content.length)
+  ;(newCell.content as any).html = html
+  lessonStore.addCell(newCell)
+  showToast('success', 'AI 建议已插入到教案末尾')
+
+  nextTick(() => {
+    scrollToNewCell(cells.value.length - 1)
+  })
+}
+
 // 页面加载
 onMounted(async () => {
   window.addEventListener('flowchart-interaction-start', handleFlowInteractionStartEvent)
@@ -899,6 +1056,57 @@ onMounted(async () => {
     
     await lessonStore.loadLesson(lessonId)
     lessonTitle.value = currentLesson.value?.title || ''
+    
+    const consumeQueue =
+      typeof lessonStore.consumeReferenceQueue === 'function'
+        ? lessonStore.consumeReferenceQueue
+        : () => {
+            const pending = lessonStore.pendingReferenceMaterials
+            const items = Array.isArray((pending as any)?.value)
+              ? [...(pending as any).value]
+              : []
+            if ((pending as any)?.value) {
+              ;(pending as any).value = []
+            }
+            return items as LessonRelatedMaterial[]
+          }
+
+    const pendingMaterials = consumeQueue()
+    if (pendingMaterials.length > 0 && currentLesson.value) {
+      const insertedIndices: number[] = []
+      let skippedCount = 0
+
+      pendingMaterials.forEach((material) => {
+        if (!material.is_accessible) {
+          skippedCount += 1
+          return
+        }
+        const index = insertReferenceMaterial(material)
+        if (index !== null) {
+          insertedIndices.push(index)
+        }
+      })
+
+      currentLesson.value.content.forEach((cell, idx) => {
+        cell.order = idx
+      })
+
+      if (insertedIndices.length > 0) {
+        await nextTick()
+        scrollToNewCell(insertedIndices[0])
+      }
+
+      if (insertedIndices.length > 0 || skippedCount > 0) {
+        const parts: string[] = []
+        if (insertedIndices.length > 0) {
+          parts.push(`已插入 ${insertedIndices.length} 个参考素材`)
+        }
+        if (skippedCount > 0) {
+          parts.push(`${skippedCount} 个素材因权限限制未能插入`)
+        }
+        showToast(insertedIndices.length > 0 ? 'success' : 'error', parts.join('，'))
+      }
+    }
     
     // 如果这个教案刚刚从未发布状态切换，显示提示
     if (wasPublished && currentLesson.value?.status === 'draft') {

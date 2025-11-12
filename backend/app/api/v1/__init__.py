@@ -2,35 +2,49 @@
 API v1 路由包
 """
 
+from typing import cast
+
 from fastapi import APIRouter
 
 from app.api.v1 import (
-    auth,
-    lessons,
-    cells,
-    questions,
-    users,
-    curriculum,
-    chapters,
-    resources,
-    researcher_curriculum,
-    admin_dashboard,
-    admin_users,
-    admin_organization,
-    favorites,
-    reviews,
-    learning_paths,
-    course_export,
     activities,
+    admin_dashboard,
+    admin_organization,
+    admin_users,
+    auth,
+    cells,
+    chapters,
+    course_export,
+    curriculum,
+    favorites,
+    learning_paths,
+    lessons,
+    public_curriculum,
+    questions,
+    researcher_curriculum,
+    resources,
+    reviews,
     subject_groups,
+    student_ai_assistant,
+    teacher_ai_assistant,
+    users,
 )
 
 api_router = APIRouter()
+
+public_curriculum_router = cast(
+    APIRouter, getattr(public_curriculum, "router", None)
+)
+if public_curriculum_router is None:
+    raise RuntimeError("public_curriculum router is not defined")
 
 # 注册子路由
 api_router.include_router(auth.router, prefix="/auth", tags=["认证"])
 api_router.include_router(users.router, prefix="/users", tags=["用户"])
 api_router.include_router(curriculum.router, prefix="/curriculum", tags=["课程体系"])
+api_router.include_router(
+    public_curriculum_router, prefix="/public/curriculum", tags=["公开-课程体系"]
+)
 api_router.include_router(chapters.router, prefix="/chapters", tags=["章节"])
 api_router.include_router(resources.router, prefix="/resources", tags=["资源"])
 api_router.include_router(lessons.router, prefix="/lessons", tags=["教案"])
@@ -48,6 +62,16 @@ api_router.include_router(
 # 教师协作功能路由
 api_router.include_router(
     subject_groups.router, prefix="/subject-groups", tags=["学科教研组"]
+)
+api_router.include_router(
+    teacher_ai_assistant.router,
+    prefix="/teacher/assistant",
+    tags=["教师-智能助手"],
+)
+api_router.include_router(
+    student_ai_assistant.router,
+    prefix="/student/assistant",
+    tags=["学生-智能助手"],
 )
 
 # 角色专用路由

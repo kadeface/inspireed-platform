@@ -144,36 +144,79 @@
         </div>
       </div>
 
-      <!-- 右侧：笔记面板 -->
+      <!-- 右侧：学习空间 -->
       <div class="w-96 bg-white shadow-lg border-l border-gray-200 flex flex-col">
-        <!-- 笔记头部 -->
         <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            学习笔记
-          </h2>
-        </div>
-
-        <!-- 笔记内容 -->
-        <div class="flex-1 overflow-y-auto px-6 py-4">
-          <textarea
-            v-model="notes"
-            @input="autoSaveNotes"
-            placeholder="在这里记录学习笔记..."
-            class="w-full h-full resize-none border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          ></textarea>
-        </div>
-
-        <!-- 笔记底部：保存状态 -->
-        <div class="px-6 py-3 border-t border-gray-200 bg-gray-50">
-          <div class="flex items-center justify-between text-xs text-gray-500">
-            <span v-if="notesSaving">保存中...</span>
-            <span v-else-if="notesSaved" class="text-green-600">✓ 已保存</span>
-            <span v-else>未保存</span>
-            <span>{{ notes.length }} 字符</span>
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              学习空间
+            </h2>
+            <span class="text-xs text-gray-500">当前进度 {{ progress }}%</span>
           </div>
+          <div class="mt-3 flex gap-2">
+            <button
+              type="button"
+              @click="activeSidebarTab = 'notes'"
+              :class="[
+                'rounded-md px-3 py-1.5 text-sm font-medium transition',
+                activeSidebarTab === 'notes'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+              ]"
+            >
+              学习笔记
+            </button>
+            <button
+              type="button"
+              @click="activeSidebarTab = 'assistant'"
+              :class="[
+                'rounded-md px-3 py-1.5 text-sm font-medium transition flex items-center gap-2',
+                activeSidebarTab === 'assistant'
+                  ? 'bg-gradient-to-r from-[#4C6EF5] to-[#6C8DFF] text-white shadow'
+                  : 'bg-white text-[#4C6EF5] border border-[#4C6EF5] hover:bg-[#ECF0FF]'
+              ]"
+            >
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2a6 6 0 00-6 6v1.586l-.707.707A1 1 0 004 12h1v1a4 4 0 004 4v1h2v-1a4 4 0 004-4v-1h1a1 1 0 00.707-1.707L16 9.586V8a6 6 0 00-6-6z" />
+              </svg>
+              AI 助手
+            </button>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-hidden">
+          <div
+            v-if="activeSidebarTab === 'notes'"
+            class="flex h-full flex-col"
+          >
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+              <textarea
+                v-model="notes"
+                @input="autoSaveNotes"
+                placeholder="在这里记录学习笔记..."
+                class="w-full h-full resize-none border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              ></textarea>
+            </div>
+            <div class="px-6 py-3 border-t border-gray-200 bg-gray-50">
+              <div class="flex items-center justify-between text-xs text-gray-500">
+                <span v-if="notesSaving">保存中...</span>
+                <span v-else-if="notesSaved" class="text-green-600">✓ 已保存</span>
+                <span v-else>未保存</span>
+                <span>{{ notes.length }} 字符</span>
+              </div>
+            </div>
+          </div>
+          <StudentAiAssistantPanel
+            v-else
+            :lesson-title="lesson?.title || ''"
+            :lesson-outline="lessonOutline"
+            :progress="progress"
+            :lesson-id="lesson?.id"
+            @append-note="appendNoteFromAssistant"
+          />
         </div>
       </div>
     </div>
@@ -213,6 +256,7 @@ import type { QuestionListItem } from '@/types/question'
 // 🎓 学习科学优化：导入认知脚手架组件
 import CellWrapper from '@/components/Cell/CellWrapper.vue'
 import FlowchartStudentCell from '@/components/Cell/FlowchartStudentCell.vue'
+import StudentAiAssistantPanel from '@/components/Student/StudentAiAssistantPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -225,6 +269,7 @@ const completedCells = ref<Set<string>>(new Set())
 const notes = ref('')
 const notesSaving = ref(false)
 const notesSaved = ref(false)
+const activeSidebarTab = ref<'notes' | 'assistant'>('notes')
 
 // 问答相关状态
 const showQuestionForm = ref(false)
@@ -246,6 +291,15 @@ const progress = computed(() => {
   const completed = completedCells.value.size
   const total = lesson.value.content.length
   return Math.round((completed / total) * 100)
+})
+
+const lessonOutline = computed(() => {
+  if (!lesson.value?.content) return ''
+  return lesson.value.content
+    .slice(0, 6)
+    .map((cell, index) => summarizeCell(cell, index))
+    .filter((item): item is string => Boolean(item))
+    .join('\n')
 })
 
 // 方法
@@ -363,6 +417,52 @@ const updateLessonProgress = () => {
   
   progressData[lessonId.value] = progress.value
   localStorage.setItem(key, JSON.stringify(progressData))
+}
+
+const stripHtmlTags = (html: string) =>
+  html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
+const summarizeCell = (cell: any, index: number): string | null => {
+  const orderLabel = `第${index + 1}单元`
+  const typeMap: Record<string, string> = {
+    text: '文本',
+    code: '代码',
+    param: '参数',
+    sim: '仿真',
+    chart: '图表',
+    contest: '竞赛',
+    video: '视频',
+    activity: '活动',
+    flowchart: '流程图',
+    reference_material: '参考素材',
+  }
+  const typeLabel = typeMap[cell.type] || '单元'
+  let detail = ''
+
+  if (cell.type === 'text' && cell.content?.html) {
+    const plain = stripHtmlTags(cell.content.html)
+    if (plain) {
+      detail = plain.slice(0, 28)
+      if (plain.length > 28) detail += '…'
+    }
+  } else if (cell.type === 'activity' && cell.content?.title) {
+    detail = cell.content.title
+  } else if (cell.type === 'video' && cell.content?.title) {
+    detail = cell.content.title
+  }
+
+  const parts = [orderLabel, typeLabel]
+  if (detail) {
+    parts.push(`：${detail}`)
+  }
+  return parts.join('')
+}
+
+const appendNoteFromAssistant = (content: string) => {
+  const cleaned = content.trim()
+  if (!cleaned) return
+  notes.value = notes.value ? `${notes.value.trim()}\n\n${cleaned}` : cleaned
+  autoSaveNotes()
 }
 
 const loadNotes = () => {

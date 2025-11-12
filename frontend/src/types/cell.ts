@@ -1,4 +1,5 @@
 import type { ActivityCellContent } from './activity'
+import type { ResourceType } from './resource'
 
 export const CellType = {
   TEXT: 'text',
@@ -11,6 +12,7 @@ export const CellType = {
   PARAM: 'param',
   ACTIVITY: 'activity',  // 教学活动（测验、问卷、作业、评价）
   FLOWCHART: 'flowchart',  // 流程图
+  REFERENCE_MATERIAL: 'reference_material',
 } as const
 
 export type CellType = typeof CellType[keyof typeof CellType]
@@ -20,6 +22,7 @@ export interface CellBase {
   type: CellType
   order: number
   title?: string
+  stage_label?: string
   editable: boolean
   
   // 🎓 学习科学字段
@@ -188,6 +191,25 @@ export interface FlowchartCell extends CellBase {
   }
 }
 
+export interface ReferenceMaterialCellContent {
+  material_id: number
+  title: string
+  summary?: string
+  resource_type: ResourceType | string
+  source_lesson_id?: number
+  source_lesson_title?: string
+  preview_url?: string
+  download_url?: string
+  tags?: string[]
+  updated_at?: string
+  is_accessible?: boolean
+}
+
+export interface ReferenceMaterialCell extends CellBase {
+  type: typeof CellType.REFERENCE_MATERIAL
+  content: ReferenceMaterialCellContent
+}
+
 export type Cell =
   | TextCell
   | CodeCell
@@ -198,3 +220,4 @@ export type Cell =
   | VideoCell
   | ActivityCell
   | FlowchartCell
+  | ReferenceMaterialCell

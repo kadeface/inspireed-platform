@@ -1,34 +1,62 @@
 <template>
   <div
-    class="group bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden cursor-pointer"
+    class="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
     @click="handleView"
   >
     <!-- 封面图 -->
-    <div class="h-40 bg-gradient-to-br from-blue-500 to-purple-600 relative">
+    <div class="relative h-44 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600">
       <img
         v-if="lesson.cover_image_url"
         :src="lesson.cover_image_url"
         :alt="lesson.title"
-        class="w-full h-full object-cover"
+        class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
       />
-      <div v-else class="absolute inset-0 flex items-center justify-center">
-        <svg
-          class="w-16 h-16 text-white opacity-50"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-          />
-        </svg>
+      <div
+        v-else
+        class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/80"
+      >
+        <div class="rounded-2xl bg-white/10 p-4 ring-1 ring-inset ring-white/15 backdrop-blur">
+          <svg class="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.6"
+              d="M4.75 5.75A2.75 2.75 0 0 1 7.5 3h9a2.75 2.75 0 0 1 2.75 2.75v14.5l-5.5-3.083L8.25 20.25V5.75"
+            />
+          </svg>
+        </div>
+        <span class="text-sm font-medium tracking-wide text-white/80">教案封面</span>
       </div>
-      
+
+      <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-slate-900/20 to-slate-900/0"></div>
+
+      <!-- 顶部徽标 -->
+      <div class="absolute top-3 left-3 flex flex-wrap gap-2">
+        <span
+          v-for="tag in displayTags"
+          :key="tag"
+          class="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium text-white shadow-sm backdrop-blur"
+        >
+          <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              d="m3.75 4.5 8.25 8.25L20.25 4.5"
+            />
+          </svg>
+          {{ tag }}
+        </span>
+        <span
+          v-if="extraTagCount > 0"
+          class="inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium text-white shadow-sm backdrop-blur"
+        >
+          +{{ extraTagCount }}
+        </span>
+      </div>
+
       <!-- 状态标签 -->
-      <div class="absolute top-2 right-2">
+      <div class="absolute top-3 right-3">
         <span :class="statusBadgeClass">
           {{ statusLabel }}
         </span>
@@ -36,59 +64,110 @@
     </div>
 
     <!-- 内容区域 -->
-    <div class="p-4">
-      <!-- 标题 -->
-      <h3 class="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-        {{ lesson.title }}
-      </h3>
+    <div class="flex flex-1 flex-col gap-4 p-5">
+      <div class="flex items-start justify-between gap-3">
+        <div class="space-y-2">
+          <!-- 标题 -->
+          <h3 class="text-lg font-semibold text-slate-900 transition-colors duration-200 group-hover:text-blue-600 line-clamp-2">
+            {{ lesson.title }}
+          </h3>
 
-      <!-- 描述 -->
-      <p class="text-sm text-gray-600 mb-4 line-clamp-2 min-h-[2.5rem]">
-        {{ lesson.description || '暂无描述' }}
-      </p>
+          <!-- 描述 -->
+          <p class="text-sm leading-relaxed text-slate-600 line-clamp-2 min-h-[2.75rem]">
+            {{ displayDescription }}
+          </p>
+        </div>
 
-      <!-- 标签 -->
-      <div v-if="lesson.tags && lesson.tags.length > 0" class="flex flex-wrap gap-2 mb-4">
-        <span
-          v-for="tag in lesson.tags.slice(0, 3)"
-          :key="tag"
-          class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded"
+        <button
+          v-if="showActions"
+          class="hidden shrink-0 rounded-full border border-white/80 bg-white px-3 py-1 text-xs font-medium text-slate-500 transition-all duration-200 hover:border-blue-200 hover:text-blue-600 group-hover:flex"
+          @click.stop="handleEdit"
+          :title="lesson.status === 'published' ? '编辑已发布教案' : '编辑教案'"
         >
-          {{ tag }}
-        </span>
-        <span
-          v-if="lesson.tags.length > 3"
-          class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-100 text-gray-500 rounded"
-        >
-          +{{ lesson.tags.length - 3 }}
-        </span>
+          快速编辑
+        </button>
       </div>
 
       <!-- 课程和章节信息 -->
-      <div v-if="lesson.course || lesson.chapter" class="mb-3">
-        <div v-if="lesson.course" class="text-xs text-blue-600 mb-1">
-          📚 {{ lesson.course.name }}
-        </div>
-        <div v-if="lesson.chapter" class="text-xs text-purple-600">
-          📖 {{ lesson.chapter.name }}
-        </div>
+      <div v-if="lesson.course || lesson.chapter" class="flex flex-wrap items-center gap-2 text-xs font-medium">
+        <span
+          v-if="lesson.course"
+          class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-blue-600"
+        >
+          <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              d="M4.5 6.75A2.25 2.25 0 0 1 6.75 4.5h10.5A2.25 2.25 0 0 1 19.5 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 17.25V6.75Z"
+            />
+            <path stroke-linecap="round" stroke-width="1.5" d="M8.25 9h7.5m-7.5 3h4.5m-4.5 3H12" />
+          </svg>
+          {{ lesson.course.name }}
+        </span>
+        <span
+          v-if="lesson.chapter"
+          class="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-1 text-purple-600"
+        >
+          <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              d="M8.25 7.5v9"
+            />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              d="M18.75 7.5v9M12 7.5v9M4.5 6.75A2.25 2.25 0 0 1 6.75 4.5h10.5a2.25 2.25 0 0 1 2.25 2.25v10.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 17.25V6.75Z"
+            />
+          </svg>
+          {{ lesson.chapter.name }}
+        </span>
       </div>
 
-      <!-- 底部信息 -->
-      <div class="flex items-center justify-between text-xs text-gray-500 mb-3">
-        <span>更新于 {{ formattedDate }}</span>
-        <span>{{ lesson.content.length }} 个单元</span>
+      <!-- 元信息 -->
+      <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <span class="inline-flex items-center gap-2">
+          <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          更新 {{ formattedDate }}
+        </span>
+        <span v-for="item in metaItems" :key="item.id" class="inline-flex items-center gap-2" :title="item.tooltip">
+          <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              v-for="(path, index) in metaIconPaths[item.icon]"
+              :key="`${item.id}-${index}`"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              :d="path"
+            />
+          </svg>
+          {{ item.label }}
+        </span>
       </div>
 
       <!-- 操作按钮 -->
-      <div v-if="showActions" class="flex gap-2 pt-3 border-t border-gray-100" @click.stop>
+      <div
+        v-if="showActions"
+        class="mt-auto flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/80 p-2 transition group-hover:border-blue-100 group-hover:bg-blue-50/60"
+        @click.stop
+      >
         <button
           @click="handleEdit"
           :class="[
-            'flex-1 px-3 py-1.5 text-sm font-medium rounded transition-colors',
-            lesson.status === 'published' 
-              ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' 
-              : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+            'flex-1 min-w-[90px] rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+            lesson.status === 'published'
+              ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
           ]"
           :title="lesson.status === 'published' ? '编辑已发布教案' : '编辑教案'"
         >
@@ -96,44 +175,44 @@
         </button>
         <button
           @click="handleDuplicate"
-          class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:text-blue-600 hover:ring-blue-200"
           title="复制"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
-              stroke-width="2"
-              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+              stroke-width="1.5"
+              d="M8 16H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2m-6 12h8a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z"
             />
           </svg>
         </button>
         <button
           v-if="lesson.status === 'draft'"
           @click="handlePublish"
-          class="px-3 py-1.5 text-sm font-medium text-green-600 bg-green-50 rounded hover:bg-green-100 transition-colors"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-green-600 ring-1 ring-inset ring-green-200 transition hover:bg-green-50"
           title="发布"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
-              stroke-width="2"
+              stroke-width="1.5"
               d="M5 13l4 4L19 7"
             />
           </svg>
         </button>
         <button
           @click="handleDelete"
-          class="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-red-600 ring-1 ring-inset ring-red-200 transition hover:bg-red-50"
           title="删除"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              stroke-width="1.5"
+              d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16"
             />
           </svg>
         </button>
@@ -178,15 +257,84 @@ const statusLabel = computed(() => {
 
 const statusBadgeClass = computed(() => {
   const classMap = {
-    [LessonStatus.DRAFT]: 'px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded',
-    [LessonStatus.PUBLISHED]: 'px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded',
-    [LessonStatus.ARCHIVED]: 'px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded',
+    [LessonStatus.DRAFT]:
+      'inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur',
+    [LessonStatus.PUBLISHED]:
+      'inline-flex items-center gap-1 rounded-full bg-green-100/90 px-2.5 py-1 text-xs font-semibold text-green-700 shadow-sm',
+    [LessonStatus.ARCHIVED]:
+      'inline-flex items-center gap-1 rounded-full bg-amber-100/90 px-2.5 py-1 text-xs font-semibold text-amber-700 shadow-sm',
   }
   return classMap[props.lesson.status]
 })
 
 const formattedDate = computed(() => {
   return dayjs(props.lesson.updated_at).format('YYYY-MM-DD HH:mm')
+})
+
+const displayDescription = computed(() => {
+  const desc = props.lesson.description?.trim()
+  return desc && desc.length > 0 ? desc : '暂无描述'
+})
+
+const cellCount = computed(() => {
+  if (typeof props.lesson.cell_count === 'number') {
+    return props.lesson.cell_count
+  }
+  return props.lesson.content?.length ?? 0
+})
+
+const displayTags = computed(() => {
+  return props.lesson.tags ? props.lesson.tags.slice(0, 2) : []
+})
+
+const extraTagCount = computed(() => {
+  return props.lesson.tags && props.lesson.tags.length > 2 ? props.lesson.tags.length - 2 : 0
+})
+
+const metaIconPaths = {
+  clock: ['M12 6v6l3 3', 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
+  grid: ['M4 4h6v6H4z', 'M14 4h6v6h-6z', 'M4 14h6v6H4z', 'M14 14h6v6h-6z'],
+  eye: ['M1.5 12s4.5-7.5 10.5-7.5S22.5 12 22.5 12 18 19.5 12 19.5 1.5 12 1.5 12z', 'M12 14.25a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5z'],
+} as const
+
+type MetaIcon = keyof typeof metaIconPaths
+
+interface MetaItem {
+  id: string
+  icon: MetaIcon
+  label: string
+  tooltip: string
+}
+
+const metaItems = computed<MetaItem[]>(() => {
+  const items: MetaItem[] = []
+
+  if (props.lesson.estimated_duration) {
+    items.push({
+      id: 'duration',
+      icon: 'clock',
+      label: `${props.lesson.estimated_duration} 分钟`,
+      tooltip: '预计时长',
+    })
+  }
+
+  items.push({
+    id: 'cells',
+    icon: 'grid',
+    label: `${cellCount.value} 个单元`,
+    tooltip: '单元数量',
+  })
+
+  if (props.lesson.view_count) {
+    items.push({
+      id: 'views',
+      icon: 'eye',
+      label: `${props.lesson.view_count} 浏览`,
+      tooltip: '浏览次数',
+    })
+  }
+
+  return items.slice(0, 3)
 })
 
 function handleEdit() {

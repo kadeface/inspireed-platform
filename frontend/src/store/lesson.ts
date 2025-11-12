@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Lesson, LessonCreate, LessonClassroom } from '../types/lesson'
+import type {
+  Lesson,
+  LessonCreate,
+  LessonClassroom,
+  LessonRelatedMaterial
+} from '../types/lesson'
 import type { Cell } from '../types/cell'
 import type { LessonListParams } from '../types/api'
 import { lessonService } from '../services/lesson'
@@ -17,6 +22,7 @@ export const useLessonStore = defineStore('lesson', () => {
   const currentPage = ref(1)
   const pageSize = ref(20)
   const availableClassrooms = ref<LessonClassroom[]>([])
+  const pendingReferenceMaterials = ref<LessonRelatedMaterial[]>([])
 
   const cells = computed(() => currentLesson.value?.content || [])
 
@@ -69,10 +75,30 @@ export const useLessonStore = defineStore('lesson', () => {
     }
   }
 
+  function queueReferenceMaterial(material: LessonRelatedMaterial) {
+    const exists = pendingReferenceMaterials.value.some((item) => item.id === material.id)
+    if (!exists) {
+      pendingReferenceMaterials.value.push(material)
+    }
+  }
+
+  function removeQueuedReference(materialId: number) {
+    pendingReferenceMaterials.value = pendingReferenceMaterials.value.filter(
+      (item) => item.id !== materialId
+    )
+  }
+
+  function consumeReferenceQueue() {
+    const queue = [...pendingReferenceMaterials.value]
+    pendingReferenceMaterials.value = []
+    return queue
+  }
+
   function clear() {
     currentLesson.value = null
     lessons.value = []
     error.value = null
+    pendingReferenceMaterials.value = []
   }
 
   // ========== 异步操作方法 ==========
@@ -364,6 +390,7 @@ export const useLessonStore = defineStore('lesson', () => {
     currentPage,
     pageSize,
     availableClassrooms,
+    pendingReferenceMaterials,
     
     // 本地操作方法
     setCurrentLesson,
@@ -372,6 +399,9 @@ export const useLessonStore = defineStore('lesson', () => {
     updateCell,
     deleteCell,
     reorderCells,
+    queueReferenceMaterial,
+    removeQueuedReference,
+    consumeReferenceQueue,
     clear,
     unpublishCurrentLesson,
     

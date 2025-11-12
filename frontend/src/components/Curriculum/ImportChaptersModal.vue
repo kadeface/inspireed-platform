@@ -90,6 +90,18 @@
             </select>
           </div>
 
+          <!-- 导入选项 -->
+          <div class="mb-6">
+            <label class="inline-flex items-center text-sm text-gray-700">
+              <input
+                v-model="overwriteExisting"
+                type="checkbox"
+                class="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              覆盖已有章节（勾选后，同名章节将更新而不是报错）
+            </label>
+          </div>
+
           <!-- 下载模板 -->
           <div class="mb-6">
             <button
@@ -135,7 +147,7 @@
                 <p class="mt-2 text-sm text-gray-600">
                   拖拽文件到此处，或
                   <button
-                    @click="$refs.fileInput.click()"
+                    @click="($refs.fileInput as HTMLInputElement | undefined)?.click()"
                     class="text-blue-600 hover:text-blue-700 font-medium"
                   >
                     点击选择文件
@@ -306,6 +318,7 @@ const selectedFile = ref<File | null>(null)
 const isDragging = ref(false)
 const loading = ref(false)
 const downloading = ref(false)
+const overwriteExisting = ref(true)
 const error = ref<string | null>(null)
 const importResult = ref<ImportResult | null>(null)
 const fileInput = ref<HTMLInputElement>()
@@ -349,6 +362,7 @@ function handleClose() {
 function resetForm() {
   selectedCourseId.value = null
   selectedFile.value = null
+  overwriteExisting.value = true
   error.value = null
   importResult.value = null
   isDragging.value = false
@@ -433,7 +447,8 @@ async function handleImport() {
   try {
     const result = await curriculumService.batchImportChapters(
       selectedCourseId.value,
-      selectedFile.value
+      selectedFile.value,
+      overwriteExisting.value
     )
     
     importResult.value = {
@@ -448,11 +463,16 @@ async function handleImport() {
       handleClose()
     }, 1500)
   } catch (err: any) {
-    error.value = err.message || '导入失败，请检查文件格式和内容'
+    const detail =
+      err?.response?.data?.detail ||
+      err?.response?.data?.message ||
+      err?.message ||
+      '导入失败，请检查文件格式和内容'
+    error.value = detail
     importResult.value = {
       success: false,
       message: '导入失败',
-      details: err.message
+      details: detail
     }
   } finally {
     loading.value = false

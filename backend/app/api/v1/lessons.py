@@ -4,7 +4,7 @@
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union, cast
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -29,6 +29,8 @@ from app.schemas.lesson import (
     LessonListResponse,
     LessonClassroomInfo,
     LessonPublishRequest,
+    LessonRelatedMaterial,
+    LessonRelatedMaterialListResponse,
 )
 from app.api.v1.auth import get_current_active_user
 from app.api.deps import get_current_user_optional
@@ -100,7 +102,8 @@ async def create_lesson(
     if course is None:
         raise HTTPException(status_code=404, detail="课程不存在")
 
-    if course.is_active is False:
+    is_course_active = cast(Optional[bool], course.is_active)
+    if is_course_active is False:
         raise HTTPException(status_code=400, detail="该课程已被禁用")
 
     # 验证章节存在（如果提供了章节ID）
@@ -213,7 +216,10 @@ async def list_lessons(
     count_query = select(func.count()).select_from(count_subquery)
     total = (await db.execute(count_query)).scalar() or 0
 
-    ordered_query = base_query.order_by(Lesson.updated_at.desc())
+    if user_role == UserRole.STUDENT:
+        ordered_query = base_query.order_by(Lesson.id, Lesson.updated_at.desc())
+    else:
+        ordered_query = base_query.order_by(Lesson.updated_at.desc())
     paginated_query = ordered_query.offset((page - 1) * page_size).limit(page_size)
 
     lessons = (await db.execute(paginated_query)).scalars().all()
@@ -221,6 +227,179 @@ async def list_lessons(
 
     return LessonListResponse(
         items=serialized_lessons,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/recommended", response_model=LessonListResponse)
+async def get_recommended_lessons(
+    limit: int = Query(10, ge=1, le=50, description="推荐课程数量"),
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+) -> Any:
+    """
+    获取推荐课程（公开接口，无需登录）
+    基于以下因素推荐：
+    1. 热门课程（评分高、查看多）
+    2. 新发布的课程
+    """
+    query = (
+        select(Lesson)
+        .options(
+            selectinload(Lesson.course).selectinload(Course.subject),
+            selectinload(Lesson.course).selectinload(Course.grade),
+            selectinload(Lesson.creator),
+            selectinload(Lesson.lesson_classrooms).selectinload(
+                LessonClassroom.classroom
+            ),
+            selectinload(Lesson.reference_resource),
+        )
+        .where(Lesson.status == LessonStatus.PUBLISHED)
+        .order_by(
+            func.coalesce(Lesson.average_rating, 0).desc(),
+            func.coalesce(Lesson.published_at, Lesson.created_at).desc(),
+        )
+        .limit(limit)
+    )
+
+    result = await db.execute(query)
+    lessons = result.scalars().all()
+
+    lesson_responses = [_lesson_to_response(lesson) for lesson in lessons]
+
+    if (
+        current_user
+        and isinstance(current_user.role, UserRole)
+        and cast(UserRole, current_user.role) == UserRole.STUDENT
+    ):
+        classroom_id = current_user.classroom_id
+        if classroom_id is not None:
+            lesson_responses = [
+                lesson
+                for lesson in lesson_responses
+                if classroom_id in lesson.classroom_ids
+            ]
+
+    return LessonListResponse(
+        items=lesson_responses,
+        total=len(lesson_responses),
+        page=1,
+        page_size=limit,
+    )
+
+
+@router.get(
+    "/courses/{course_id}/related-materials",
+    response_model=LessonRelatedMaterialListResponse,
+)
+async def get_course_related_materials(
+    course_id: int,
+    request: Request,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None, description="按标题搜索关联素材"),
+    resource_type: Optional[str] = Query(None, description="按资源类型筛选"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """获取课程关联素材列表"""
+
+    course = await db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    is_course_active = cast(Optional[bool], course.is_active)
+    if is_course_active is False:
+        raise HTTPException(status_code=400, detail="该课程已被禁用")
+
+    role_value = cast(str, getattr(current_user.role, "value", current_user.role))
+    try:
+        user_role = UserRole(role_value)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="当前用户角色无效")
+
+    if user_role == UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="学生无权访问课程素材")
+
+    resource_query = (
+        select(Resource)
+        .join(Chapter, Resource.chapter_id == Chapter.id)
+        .where(Chapter.course_id == course_id, Resource.is_active.is_(True))
+    )
+
+    if search:
+        resource_query = resource_query.where(Resource.title.ilike(f"%{search}%"))
+
+    if resource_type and resource_type.lower() != "all":
+        resource_query = resource_query.where(Resource.resource_type == resource_type)
+
+    count_query = resource_query.with_only_columns(func.count()).order_by(None)
+    total = (await db.execute(count_query)).scalar() or 0
+
+    ordered_query = resource_query.order_by(Resource.updated_at.desc())
+    paginated_query = ordered_query.offset((page - 1) * page_size).limit(page_size)
+    resources = (await db.execute(paginated_query)).scalars().unique().all()
+
+    resource_ids = [cast(int, resource.id) for resource in resources]
+    lesson_map: Dict[int, Lesson] = {}
+
+    if resource_ids:
+        lessons_result = await db.execute(
+            select(Lesson)
+                .where(Lesson.reference_resource_id.in_(resource_ids))
+                .order_by(Lesson.updated_at.desc())
+        )
+        for lesson in lessons_result.scalars().all():
+            resource_id_value = cast(Optional[int], lesson.reference_resource_id)
+            if resource_id_value and resource_id_value not in lesson_map:
+                lesson_map[resource_id_value] = lesson
+
+    base_url = str(request.base_url).rstrip("/")
+
+    def build_absolute_url(url: Optional[str]) -> Optional[str]:
+        if not url:
+            return None
+        if url.startswith("http://") or url.startswith("https://"):
+            return url
+        normalized = url.lstrip("/")
+        return f"{base_url}/{normalized}"
+
+    items: List[LessonRelatedMaterial] = []
+    for resource in resources:
+        resource_id_value = cast(int, resource.id)
+        linked_lesson = lesson_map.get(resource_id_value)
+        file_url = cast(Optional[str], resource.file_url)
+        preview_url = build_absolute_url(file_url)
+        is_resource_downloadable = cast(Optional[bool], resource.is_downloadable)
+        download_url = (
+            build_absolute_url(file_url) if is_resource_downloadable else None
+        )
+
+        items.append(
+            LessonRelatedMaterial(
+                id=resource_id_value,
+                title=cast(str, resource.title),
+                summary=cast(Optional[str], resource.description),
+                resource_type=cast(str, resource.resource_type),
+                source_lesson_id=(
+                    cast(Optional[int], linked_lesson.id) if linked_lesson else None
+                ),
+                source_lesson_title=(
+                    cast(Optional[str], linked_lesson.title)
+                    if linked_lesson
+                    else None
+                ),
+                preview_url=preview_url,
+                download_url=download_url,
+                is_accessible=bool(resource.is_active),
+                tags=[],
+                updated_at=cast(Optional[datetime], resource.updated_at),
+            )
+        )
+
+    return LessonRelatedMaterialListResponse(
+        items=items,
         total=total,
         page=page,
         page_size=page_size,
@@ -734,58 +913,4 @@ async def get_chapter_lessons(
         total=total,
         page=page,
         page_size=page_size,
-    )
-
-
-@router.get("/recommended", response_model=LessonListResponse)
-async def get_recommended_lessons(
-    limit: int = Query(10, ge=1, le=50, description="推荐课程数量"),
-    db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
-) -> Any:
-    """
-    获取推荐课程（公开接口，无需登录）
-    基于以下因素推荐：
-    1. 热门课程（评分高、查看多）
-    2. 新发布的课程
-    """
-    # 获取已发布的课程，按评分和发布时间排序
-    query = (
-        select(Lesson)
-        .options(
-            selectinload(Lesson.course).selectinload(Course.subject),
-            selectinload(Lesson.course).selectinload(Course.grade),
-            selectinload(Lesson.creator),
-            selectinload(Lesson.lesson_classrooms).selectinload(
-                LessonClassroom.classroom
-            ),
-            selectinload(Lesson.reference_resource),
-        )
-        .where(Lesson.status == LessonStatus.PUBLISHED)
-        .order_by(
-            func.coalesce(Lesson.average_rating, 0).desc(),
-            func.coalesce(Lesson.published_at, Lesson.created_at).desc(),
-        )
-        .limit(limit)
-    )
-
-    result = await db.execute(query)
-    lessons = result.scalars().all()
-
-    lesson_responses = [_lesson_to_response(lesson) for lesson in lessons]
-
-    if current_user and isinstance(current_user.role, UserRole) and cast(UserRole, current_user.role) == UserRole.STUDENT:
-        classroom_id = current_user.classroom_id
-        if classroom_id is not None:
-            lesson_responses = [
-                lesson
-                for lesson in lesson_responses
-                if classroom_id in lesson.classroom_ids
-            ]
-
-    return LessonListResponse(
-        items=lesson_responses,
-        total=len(lesson_responses),
-        page=1,
-        page_size=limit,
     )

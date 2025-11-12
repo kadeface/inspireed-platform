@@ -106,3 +106,31 @@ class LessonPublishRequest(BaseModel):
     classroom_ids: List[int] = Field(
         ..., min_length=1, description="教案发布的目标班级ID列表"
     )
+
+
+class LessonRelatedMaterial(BaseModel):
+    """课程关联素材信息"""
+
+    id: int
+    title: str
+    summary: Optional[str] = None
+    resource_type: str
+    source_lesson_id: Optional[int] = None
+    source_lesson_title: Optional[str] = None
+    preview_url: Optional[str] = None
+    download_url: Optional[str] = None
+    is_accessible: bool = True
+    tags: List[str] = Field(default_factory=list)
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class LessonRelatedMaterialListResponse(BaseModel):
+    """课程关联素材列表响应"""
+
+    items: List[LessonRelatedMaterial]
+    total: int
+    page: int
+    page_size: int

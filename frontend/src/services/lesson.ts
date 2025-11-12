@@ -4,7 +4,13 @@
  */
 
 import { api } from './api'
-import type { Lesson, LessonCreate, LessonUpdate, LessonClassroom } from '../types/lesson'
+import type {
+  Lesson,
+  LessonCreate,
+  LessonUpdate,
+  LessonClassroom,
+  LessonRelatedMaterialListResponse
+} from '../types/lesson'
 import type { LessonListParams, LessonListResponse } from '../types/api'
 import type { 
   Resource, 
@@ -245,6 +251,39 @@ class LessonService {
     } catch (error: any) {
       console.error('Failed to fetch recommended lessons:', error)
       throw new Error(error.response?.data?.detail || '获取推荐课程失败')
+    }
+  }
+
+  /**
+   * 获取课程关联素材列表
+   * @param courseId 课程 ID
+   * @param params 查询参数
+   */
+  async fetchRelatedMaterials(
+    courseId: number,
+    params?: {
+      search?: string
+      resource_type?: string
+      page?: number
+      page_size?: number
+    }
+  ): Promise<LessonRelatedMaterialListResponse> {
+    try {
+      const response = await api.get<LessonRelatedMaterialListResponse>(
+        `${this.basePath}/courses/${courseId}/related-materials`,
+        {
+          params: {
+            search: params?.search,
+            resource_type: params?.resource_type,
+            page: params?.page || 1,
+            page_size: params?.page_size || 10,
+          },
+        }
+      )
+      return response
+    } catch (error: any) {
+      console.error(`Failed to fetch related materials for course ${courseId}:`, error)
+      throw new Error(error.response?.data?.detail || '获取关联素材失败')
     }
   }
 

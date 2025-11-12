@@ -227,16 +227,6 @@ async def create_course(
     if not grade:
         raise HTTPException(status_code=404, detail="年级不存在")
 
-    # 检查是否已存在相同的学科+年级组合
-    existing_result = await db.execute(
-        select(Course).where(
-            Course.subject_id == course_in.subject_id,
-            Course.grade_id == course_in.grade_id,
-        )
-    )
-    if existing_result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="该学科和年级的课程已存在")
-
     # 创建课程
     course = Course(
         subject_id=course_in.subject_id,
@@ -342,7 +332,7 @@ async def get_curriculum_tree(
     grades = grade_result.scalars().all()
 
     # 获取所有课程
-    course_query = select(Course)
+    course_query = select(Course).order_by(Course.display_order, Course.id)
     if not include_inactive:
         course_query = course_query.where(Course.is_active == True)
     course_result = await db.execute(course_query)
@@ -363,8 +353,8 @@ async def get_curriculum_tree(
             count_value = count_value()
         lesson_counts[course_id_val] = _safe_int(count_value, 0)
 
-    # 构建课程字典 {(subject_id, grade_id): course}
-    course_map = {}
+    # 构建课程字典 {(subject_id, grade_id): [courses]}
+    course_map: dict[tuple[int, int], list[tuple[int, CourseTreeNode]]] = {}
     for course in courses:
         subject_id = _safe_optional_int(getattr(course, "subject_id", None))
         grade_id = _safe_optional_int(getattr(course, "grade_id", None))
@@ -373,7 +363,7 @@ async def get_curriculum_tree(
             continue
 
         key = (subject_id, grade_id)
-        course_map[key] = CourseTreeNode(
+        course_node = CourseTreeNode(
             id=course_id,
             name=_safe_str(getattr(course, "name", "")),
             code=_safe_optional_str(getattr(course, "code", None)),
@@ -381,6 +371,14 @@ async def get_curriculum_tree(
             is_active=bool(getattr(course, "is_active", True)),
             lesson_count=lesson_counts.get(course_id, 0),
         )
+        display_order = _safe_int(getattr(course, "display_order", 0))
+        course_map.setdefault(key, []).append((display_order, course_node))
+
+    # 对每个年级下的课程按显示顺序排序
+    sorted_course_map: dict[tuple[int, int], list[CourseTreeNode]] = {}
+    for key, nodes in course_map.items():
+        nodes.sort(key=lambda item: (item[0], item[1].id))
+        sorted_course_map[key] = [node for _, node in nodes]
 
     # 构建树形结构
     subject_nodes = []
@@ -398,21 +396,22 @@ async def get_curriculum_tree(
                 continue
 
             key = (subject_id_val, grade_id_val)
-            if key in course_map:
-                course_node = course_map[key]
+            course_nodes = sorted_course_map.get(key)
+            if course_nodes:
+                grade_lesson_count = sum(node.lesson_count for node in course_nodes)
                 grade_nodes.append(
                     GradeTreeNode(
                         id=grade_id_val,
                         name=_safe_str(getattr(grade, "name", "")),
                         level=_safe_int(getattr(grade, "level", 0)),
                         is_active=bool(getattr(grade, "is_active", True)),
-                        courses=[course_node],
-                        lesson_count=course_node.lesson_count,
+                        courses=course_nodes,
+                        lesson_count=grade_lesson_count,
                     )
                 )
-                subject_lesson_count += course_node.lesson_count
-                total_courses += 1
-                total_lessons += course_node.lesson_count
+                subject_lesson_count += grade_lesson_count
+                total_courses += len(course_nodes)
+                total_lessons += grade_lesson_count
 
         if grade_nodes or include_inactive:
             subject_id_val = _safe_optional_int(getattr(subject, "id", None))

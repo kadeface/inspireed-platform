@@ -66,6 +66,37 @@
               加载中...
             </div>
           </router-link>
+
+          <!-- AI 教学助理卡片 -->
+          <button
+            type="button"
+            @click="openAssistantModal"
+            class="bg-gradient-to-br from-purple-500 via-indigo-500 to-purple-600 rounded-lg shadow-lg p-6 text-left text-white hover:shadow-xl transition-shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-300"
+          >
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold">🤖 AI 教学助理</h3>
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+            <p class="text-sm text-purple-100 mb-3">
+              基于课堂数据的智能建议，快速制定教学行动。
+            </p>
+            <ul class="space-y-1 text-xs text-purple-100 opacity-90">
+              <li class="flex items-center gap-2">
+                <span class="inline-flex h-1.5 w-1.5 rounded-full bg-purple-200"></span>
+                即时总结课堂表现
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="inline-flex h-1.5 w-1.5 rounded-full bg-purple-200"></span>
+                生成教学改进建议
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="inline-flex h-1.5 w-1.5 rounded-full bg-purple-200"></span>
+                一键草拟课堂答疑
+              </li>
+            </ul>
+          </button>
           </div>
         </section>
 
@@ -443,6 +474,7 @@
       :initial-chapter-id="pendingChapterId"
       :initial-course-id="pendingCourseId"
       @create="handleCreate"
+      @insert-material="handleInsertMaterial"
     />
 
     <ClassroomSelectorModal
@@ -464,6 +496,16 @@
       cancel-text="取消"
       danger
       @confirm="handleDeleteConfirm"
+    />
+
+    <TeacherAiAssistantModal
+      v-model="showAssistantModal"
+      :lesson-summary="lessonStatusSummary"
+      :question-stats="questionStats"
+      :subject-group-stats="subjectGroupStats"
+      :latest-lessons="lessonStore.lessons"
+      :is-loading="isPdcaLoading || lessonStore.isLoading"
+      @close="showAssistantModal = false"
     />
 
     <!-- Toast 提示 -->
@@ -523,7 +565,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { useUserStore } from '../../store/user'
 import { useLessonStore } from '../../store/lesson'
 import { LessonStatus } from '../../types/lesson'
-import type { LessonCreate } from '../../types/lesson'
+import type { LessonCreate, LessonRelatedMaterial } from '../../types/lesson'
 import LessonCard from '../../components/Lesson/LessonCard.vue'
 import CreateLessonModal from '../../components/Lesson/CreateLessonModal.vue'
 import ClassroomSelectorModal from '../../components/Lesson/ClassroomSelectorModal.vue'
@@ -531,6 +573,7 @@ import ConfirmDialog from '../../components/Common/ConfirmDialog.vue'
 import CurriculumWithResources from '../../components/Curriculum/CurriculumWithResources.vue'
 import CurriculumTreeView from '../../components/Curriculum/CurriculumTreeView.vue'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
+import TeacherAiAssistantModal from '@/components/Teacher/TeacherAiAssistantModal.vue'
 import questionService from '@/services/question'
 import { lessonService } from '@/services/lesson'
 import curriculumService from '@/services/curriculum'
@@ -583,6 +626,7 @@ const showPublishModal = ref(false)
 const publishError = ref<string | null>(null)
 const publishTargetLessonId = ref<number | null>(null)
 const selectedClassroomIds = ref<number[]>([])
+const showAssistantModal = ref(false)
 
 // Toast 提示
 const toast = ref({
@@ -634,6 +678,10 @@ function navigateToQuestions() {
 
 function navigateToSubjectGroups() {
   router.push('/teacher/subject-groups')
+}
+
+function openAssistantModal() {
+  showAssistantModal.value = true
 }
 
 const pdcaStages = computed(() => {
@@ -905,6 +953,10 @@ async function handleCreate(lessonData: LessonCreate) {
   } catch (error: any) {
     showToast('error', error.message || '创建教案失败')
   }
+}
+
+function handleInsertMaterial(material: LessonRelatedMaterial) {
+  lessonStore.queueReferenceMaterial(material)
 }
 
 // 编辑教案

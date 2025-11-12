@@ -147,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { Course, Subject, Grade, CourseCreate, CourseUpdate } from '@/types/curriculum'
 import curriculumService from '@/services/curriculum'
 
@@ -170,17 +170,9 @@ const emit = defineEmits<{
   save: [data: CourseCreate | CourseUpdate]
 }>()
 
-const formData = ref<{
-  subject_id: number | string
-  grade_id: number | string
-  name: string
-  code: string
-  description: string
-  display_order: number
-  is_active: boolean
-}>({
-  subject_id: '',
-  grade_id: '',
+const emptyForm = () => ({
+  subject_id: '' as number | string,
+  grade_id: '' as number | string,
   name: '',
   code: '',
   description: '',
@@ -188,28 +180,68 @@ const formData = ref<{
   is_active: true
 })
 
+const formData = ref(emptyForm())
+
 const activeSubjects = computed(() => 
-  props.subjects?.filter(s => s.is_active) || []
+  (props.subjects || []).filter((s) => {
+    if (s.is_active) return true
+    const currentSubjectId =
+      props.course?.subject?.id ??
+      (props.course?.course as any)?.subject_id ??
+      null
+    return currentSubjectId !== null && s.id === currentSubjectId
+  })
 )
 
 const activeGrades = computed(() => 
-  props.grades?.filter(g => g.is_active) || []
+  (props.grades || []).filter((g) => {
+    if (g.is_active) return true
+    const currentGradeId =
+      props.course?.grade?.id ??
+      (props.course?.course as any)?.grade_id ??
+      null
+    return currentGradeId !== null && g.id === currentGradeId
+  })
 )
 
-onMounted(() => {
-  if (props.course?.course) {
-    const c = props.course.course
-    formData.value = {
-      subject_id: c.subject_id,
-      grade_id: c.grade_id,
-      name: c.name,
-      code: c.code || '',
-      description: c.description || '',
-      display_order: c.display_order,
-      is_active: c.is_active
-    }
-  }
+const selectedSubjectName = computed(() => {
+  const id = Number(formData.value.subject_id)
+  const subject = (props.subjects || []).find((s) => s.id === id) || props.course?.subject
+  return subject?.name ?? ''
 })
+
+const selectedGradeName = computed(() => {
+  const id = Number(formData.value.grade_id)
+  const grade = (props.grades || []).find((g) => g.id === id) || props.course?.grade
+  return grade?.name ?? ''
+})
+
+watch(
+  () => props.course,
+  (courseInfo) => {
+    if (courseInfo?.course) {
+      const course = courseInfo.course as Partial<Course> & Record<string, any>
+      formData.value = {
+        subject_id:
+          course.subject_id ??
+          courseInfo.subject?.id ??
+          '',
+        grade_id:
+          course.grade_id ??
+          courseInfo.grade?.id ??
+          '',
+        name: course.name ?? '',
+        code: course.code ?? '',
+        description: course.description ?? '',
+        display_order: course.display_order ?? 0,
+        is_active: course.is_active ?? true
+      }
+    } else {
+      formData.value = emptyForm()
+    }
+  },
+  { immediate: true }
+)
 
 function autoGenerateName() {
   const subject = props.subjects.find(s => s.id === formData.value.subject_id)
@@ -221,7 +253,7 @@ function autoGenerateName() {
 }
 
 function handleSubmit() {
-  if (!formData.value.subject_id || !formData.value.grade_id) {
+  if (!props.course?.course && (!formData.value.subject_id || !formData.value.grade_id)) {
     alert('请选择学科和年级')
     return
   }

@@ -1,0 +1,105 @@
+export interface SubjectTheme {
+  emoji: string
+  headerFrom: string
+  headerTo: string
+  badgeFrom: string
+  badgeTo: string
+  accentText: string
+  cardFrom: string
+  cardTo: string
+  focusRing: string
+}
+
+export const subjectThemes: Record<string, SubjectTheme> = {
+  computer: {
+    emoji: '🤖',
+    headerFrom: 'from-orange-500',
+    headerTo: 'to-orange-600',
+    badgeFrom: 'from-orange-500',
+    badgeTo: 'to-orange-600',
+    accentText: 'text-orange-100',
+    cardFrom: 'from-orange-500',
+    cardTo: 'to-orange-600',
+    focusRing: 'focus-visible:ring-4 focus-visible:ring-orange-200'
+  },
+  math: {
+    emoji: '📐',
+    headerFrom: 'from-emerald-500',
+    headerTo: 'to-emerald-600',
+    badgeFrom: 'from-emerald-500',
+    badgeTo: 'to-emerald-600',
+    accentText: 'text-emerald-100',
+    cardFrom: 'from-emerald-500',
+    cardTo: 'to-emerald-600',
+    focusRing: 'focus-visible:ring-4 focus-visible:ring-emerald-200'
+  },
+  physics: {
+    emoji: '⚛️',
+    headerFrom: 'from-sky-500',
+    headerTo: 'to-sky-600',
+    badgeFrom: 'from-sky-500',
+    badgeTo: 'to-sky-600',
+    accentText: 'text-sky-100',
+    cardFrom: 'from-sky-500',
+    cardTo: 'to-sky-600',
+    focusRing: 'focus-visible:ring-4 focus-visible:ring-sky-200'
+  },
+  chemistry: {
+    emoji: '🧪',
+    headerFrom: 'from-purple-500',
+    headerTo: 'to-purple-600',
+    badgeFrom: 'from-purple-500',
+    badgeTo: 'to-purple-600',
+    accentText: 'text-purple-100',
+    cardFrom: 'from-purple-500',
+    cardTo: 'to-purple-600',
+    focusRing: 'focus-visible:ring-4 focus-visible:ring-purple-200'
+  },
+  biology: {
+    emoji: '🧬',
+    headerFrom: 'from-pink-500',
+    headerTo: 'to-pink-600',
+    badgeFrom: 'from-pink-500',
+    badgeTo: 'to-pink-600',
+    accentText: 'text-pink-100',
+    cardFrom: 'from-pink-500',
+    cardTo: 'to-pink-600',
+    focusRing: 'focus-visible:ring-4 focus-visible:ring-pink-200'
+  },
+  earth: {
+    emoji: '🌍',
+    headerFrom: 'from-amber-500',
+    headerTo: 'to-amber-600',
+    badgeFrom: 'from-amber-500',
+    badgeTo: 'to-amber-600',
+    accentText: 'text-amber-100',
+    cardFrom: 'from-amber-500',
+    cardTo: 'to-amber-600',
+    focusRing: 'focus-visible:ring-4 focus-visible:ring-amber-200'
+  }
+}
+
+export const defaultSubjectTheme: SubjectTheme = {
+  emoji: '📚',
+  headerFrom: 'from-slate-600',
+  headerTo: 'to-slate-700',
+  badgeFrom: 'from-slate-500',
+  badgeTo: 'to-slate-600',
+  accentText: 'text-slate-100',
+  cardFrom: 'from-slate-600',
+  cardTo: 'to-slate-700',
+  focusRing: 'focus-visible:ring-4 focus-visible:ring-slate-200'
+}
+
+export const subjectIntros: Record<string, string> = {
+  computer: '从智能农业到物联网实训，系统掌握未来核心数字能力。',
+  math: '以真实问题驱动的数学建模与推理实践。',
+  physics: '通过实验与仿真探究自然规律，理解能量与运动。',
+  chemistry: '兼具实验安全与数据分析的化学探究课程。',
+  biology: '从生命现象出发，走向跨学科的综合研究。',
+  earth: '聚焦地球系统与环境变迁，培养可持续发展的视角。'
+}
+
+export const defaultCourseDescription =
+  '面向真实场景的综合实践课程，帮助学生构建系统化知识体系。'
+

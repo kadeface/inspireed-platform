@@ -12,27 +12,45 @@
 
     <!-- 主要内容区域 -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- PhET 模拟实验横幅 -->
-      <div class="mb-8 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 rounded-2xl shadow-2xl overflow-hidden">
+      <!-- 5E 学习活动循环横幅 -->
+      <div class="mb-8 rounded-2xl bg-gradient-to-r from-[#4C6EF5] via-[#7B5CF7] to-[#E056FD] shadow-2xl overflow-hidden">
         <div class="p-8 md:p-10 text-white">
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <div class="flex items-center mb-3">
-                <span class="text-4xl mr-3">🔬</span>
-                <h2 class="text-3xl font-bold">探索 PhET 互动模拟实验</h2>
+          <div class="flex flex-col gap-6">
+            <div class="flex items-center gap-3">
+              <span class="text-4xl">🔄</span>
+              <div>
+                <h2 class="text-3xl font-bold">5E 科学学习活动循环</h2>
+                <p class="text-sm text-white/80 mt-1">
+                  按照 5E 步骤推进课堂，逐步点亮探究、表达与反思能力。
+                </p>
               </div>
-              <p class="text-lg text-white opacity-90 mb-6 max-w-2xl">
-                来自科罗拉多大学的优质教育资源，涵盖物理、化学、生物、数学等多学科的互动学习体验
-              </p>
-              <button
-                @click="router.push('/student/browse')"
-                class="px-8 py-3 bg-white text-orange-600 rounded-xl font-bold hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                立即探索 →
-              </button>
             </div>
-            <div class="hidden lg:block">
-              <div class="text-8xl opacity-20">⚛️🧪📐</div>
+            <div class="grid grid-cols-1 sm:grid-cols-5 gap-3 text-sm text-white/90">
+              <div class="rounded-xl bg-white/10 px-3 py-4 flex flex-col items-center text-center">
+                <span class="text-2xl mb-2">💡</span>
+                <p class="font-semibold text-white">Engage</p>
+                <p class="text-xs mt-1">激发问题</p>
+              </div>
+              <div class="rounded-xl bg-white/10 px-3 py-4 flex flex-col items-center text-center">
+                <span class="text-2xl mb-2">🧪</span>
+                <p class="font-semibold text-white">Explore</p>
+                <p class="text-xs mt-1">动手探索</p>
+              </div>
+              <div class="rounded-xl bg-white/10 px-3 py-4 flex flex-col items-center text-center">
+                <span class="text-2xl mb-2">🧠</span>
+                <p class="font-semibold text-white">Explain</p>
+                <p class="text-xs mt-1">表达理解</p>
+              </div>
+              <div class="rounded-xl bg-white/10 px-3 py-4 flex flex-col items-center text-center">
+                <span class="text-2xl mb-2">🚀</span>
+                <p class="font-semibold text-white">Elaborate</p>
+                <p class="text-xs mt-1">拓展应用</p>
+              </div>
+              <div class="rounded-xl bg-white/10 px-3 py-4 flex flex-col items-center text-center">
+                <span class="text-2xl mb-2">📊</span>
+                <p class="font-semibold text-white">Evaluate</p>
+                <p class="text-xs mt-1">自我检核</p>
+              </div>
             </div>
           </div>
         </div>

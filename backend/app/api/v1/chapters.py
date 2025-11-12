@@ -2,7 +2,7 @@
 章节管理 API
 """
 
-from typing import List, Optional, cast
+from typing import Any, Dict, List, Optional, Set, cast
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -97,6 +97,7 @@ async def get_import_template():
 async def batch_import_chapters(
     course_id: int = Form(...),
     file: UploadFile = File(...),
+    overwrite_existing: bool = Form(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_researcher),
 ):
@@ -136,8 +137,16 @@ async def batch_import_chapters(
             raise HTTPException(400, f"Missing required columns: {missing_columns}")
 
         # 处理数据
-        chapters_to_create = []
-        chapter_code_map = {}  # 用于处理父子关系
+        chapters_to_process: List[Dict[str, Any]] = []
+        seen_codes: Set[str] = set()
+        existing_result = await db.execute(
+            select(Chapter.id, Chapter.code).where(Chapter.course_id == course_id)
+        )
+        existing_codes: Dict[str, int] = {
+            str(code).strip(): cast(int, chapter_id)
+            for chapter_id, code in existing_result
+            if code
+        }
 
         for index, row in df.iterrows():
             # 基本验证
@@ -146,69 +155,148 @@ async def batch_import_chapters(
             if name_is_na or code_is_na:
                 continue
 
-            chapter_data = {
-                "course_id": course_id,
-                "name": str(row["name"]).strip(),
-                "code": str(row["code"]).strip(),
-                "display_order": (
-                    int(row["display_order"])
-                    if not cast(bool, pd.isna(row["display_order"]))
-                    else 0
-                ),
-                "description": (
-                    str(row.get("description", "")).strip()
-                    if not cast(bool, pd.isna(row.get("description")))
-                    else None
-                ),
-                "parent_code": (
-                    str(row.get("parent_code", "")).strip()
-                    if not cast(bool, pd.isna(row.get("parent_code")))
-                    else None
-                ),
-                "is_active": (
-                    bool(row.get("is_active", True))
-                    if not cast(bool, pd.isna(row.get("is_active")))
-                    else True
-                ),
-            }
+            code_value = str(row["code"]).strip()
+            if code_value in seen_codes:
+                raise HTTPException(
+                    400, f"Duplicate chapter code '{code_value}' found in import file"
+                )
+            seen_codes.add(code_value)
+            if not overwrite_existing and code_value in existing_codes:
+                raise HTTPException(
+                    400,
+                    f"Chapter code '{code_value}' already exists for this course",
+                )
 
-            chapters_to_create.append(chapter_data)
-
-        # 创建章节
-        created_chapters = []
-        for chapter_data in chapters_to_create:
-            # 处理父章节关系
-            parent_id = None
-            if chapter_data["parent_code"]:
-                parent_id = chapter_code_map.get(chapter_data["parent_code"])
-                if not parent_id:
-                    raise HTTPException(
-                        400,
-                        f"Parent chapter with code '{chapter_data['parent_code']}' not found or not yet created",
-                    )
-
-            # 创建章节
-            chapter = Chapter(
-                course_id=chapter_data["course_id"],
-                parent_id=parent_id,
-                name=chapter_data["name"],
-                code=chapter_data["code"],
-                description=chapter_data["description"],
-                display_order=chapter_data["display_order"],
-                is_active=chapter_data["is_active"],
+            parent_code_value = (
+                str(row.get("parent_code", "")).strip()
+                if not cast(bool, pd.isna(row.get("parent_code")))
+                else None
             )
 
-            db.add(chapter)
-            await db.commit()
+            chapters_to_process.append(
+                {
+                    "course_id": course_id,
+                    "name": str(row["name"]).strip(),
+                    "code": code_value,
+                    "display_order": (
+                        int(row["display_order"])
+                        if not cast(bool, pd.isna(row["display_order"]))
+                        else 0
+                    ),
+                    "description": (
+                        str(row.get("description", "")).strip()
+                        if not cast(bool, pd.isna(row.get("description")))
+                        else None
+                    ),
+                    "parent_code": parent_code_value,
+                    "is_active": (
+                        bool(row.get("is_active", True))
+                        if not cast(bool, pd.isna(row.get("is_active")))
+                        else True
+                    ),
+                }
+            )
+
+        chapter_code_map: Dict[str, int] = existing_codes.copy()
+        created_chapters: List[Chapter] = []
+        updated_chapters: List[Chapter] = []
+
+        pending: List[Dict[str, Any]] = chapters_to_process
+        while pending:
+            progress = False
+            next_pending: List[Dict[str, Any]] = []
+
+            for chapter_data in pending:
+                parent_code = chapter_data["parent_code"]
+                parent_id: Optional[int] = None
+                if parent_code:
+                    parent_id = chapter_code_map.get(parent_code)
+                    if parent_id is None:
+                        next_pending.append(chapter_data)
+                        continue
+
+                code_value = cast(str, chapter_data["code"])
+                if code_value in existing_codes:
+                    if not overwrite_existing:
+                        raise HTTPException(
+                            400,
+                            f"Chapter code '{code_value}' already exists for this course",
+                        )
+
+                    chapter_id = existing_codes[code_value]
+                    chapter = await db.get(Chapter, chapter_id)
+                    if not chapter:
+                        raise HTTPException(
+                            400, f"Existing chapter with code '{code_value}' not found"
+                        )
+                    if parent_id and parent_id == chapter_id:
+                        raise HTTPException(
+                            400, "Chapter cannot be set as its own parent"
+                        )
+
+                    setattr(chapter, "parent_id", parent_id)
+                    setattr(chapter, "name", cast(str, chapter_data["name"]))
+                    setattr(chapter, "code", code_value)
+                    setattr(
+                        chapter,
+                        "description",
+                        cast(Optional[str], chapter_data["description"]),
+                    )
+                    setattr(
+                        chapter,
+                        "display_order",
+                        cast(int, chapter_data["display_order"]),
+                    )
+                    setattr(
+                        chapter,
+                        "is_active",
+                        cast(bool, chapter_data["is_active"]),
+                    )
+
+                    chapter_code_map[code_value] = chapter_id
+                    updated_chapters.append(chapter)
+                    progress = True
+                else:
+                    chapter = Chapter(
+                        course_id=cast(int, chapter_data["course_id"]),
+                        parent_id=parent_id,
+                        name=cast(str, chapter_data["name"]),
+                        code=code_value,
+                        description=cast(Optional[str], chapter_data["description"]),
+                        display_order=cast(int, chapter_data["display_order"]),
+                        is_active=cast(bool, chapter_data["is_active"]),
+                    )
+
+                    db.add(chapter)
+                    await db.flush()
+                    chapter_id = cast(int, chapter.id)
+                    chapter_code_map[code_value] = chapter_id
+                    created_chapters.append(chapter)
+                    progress = True
+
+            if not progress:
+                unresolved = next_pending[0]
+                raise HTTPException(
+                    400,
+                    f"Parent chapter with code '{unresolved['parent_code']}' not found or not yet created",
+                )
+
+            pending = next_pending
+
+        await db.commit()
+
+        for chapter in created_chapters + updated_chapters:
             await db.refresh(chapter)
 
-            # 记录章节代码映射
-            chapter_code_map[chapter.code] = chapter.id
-            created_chapters.append(chapter)
-
         return {
-            "message": f"Successfully imported {len(created_chapters)} chapters",
-            "chapters": [ChapterResponse.from_orm(ch) for ch in created_chapters],
+            "message": (
+                f"Successfully created {len(created_chapters)} chapters "
+                f"and updated {len(updated_chapters)} chapters"
+            ),
+            "chapters": [
+                ChapterResponse.from_orm(ch)
+                for ch in created_chapters + updated_chapters
+            ],
         }
 
     except Exception as e:

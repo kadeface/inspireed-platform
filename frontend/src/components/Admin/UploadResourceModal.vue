@@ -56,6 +56,24 @@
                 </div>
               </div>
 
+              <div v-if="availableCourses.length > 0" class="form-group">
+                <label class="form-label">课程 <span class="required">*</span></label>
+                <select
+                  v-model="selectedCourseId"
+                  class="form-select"
+                  required
+                >
+                  <option value="">请选择课程</option>
+                  <option
+                    v-for="courseOption in availableCourses"
+                    :key="courseOption.id"
+                    :value="courseOption.id"
+                  >
+                    {{ courseOption.name }}
+                  </option>
+                </select>
+              </div>
+
               <div v-if="selectedCourse" class="course-display">
                 <div class="course-badge">
                   <span class="badge-icon">📚</span>
@@ -261,6 +279,8 @@ const grades = ref<Grade[]>([])
 const selectedSubjectId = ref<number | string>('')
 const selectedGradeId = ref<number | string>('')
 const selectedCourse = ref<Course | null>(null)
+const selectedCourseId = ref<number | ''>('')
+const availableCourses = ref<Course[]>([])
 const chapters = ref<ChapterWithChildren[]>([])
 const selectedChapterId = ref<number | string>('')
 
@@ -307,30 +327,65 @@ onMounted(async () => {
 async function handleSubjectChange() {
   selectedGradeId.value = ''
   selectedCourse.value = null
+  selectedCourseId.value = ''
+  availableCourses.value = []
   chapters.value = []
   selectedChapterId.value = ''
 }
 
 // 年级变更
 async function handleGradeChange() {
-  if (!selectedSubjectId.value || !selectedGradeId.value) return
+  if (!selectedSubjectId.value || !selectedGradeId.value) {
+    selectedCourse.value = null
+    selectedCourseId.value = ''
+    availableCourses.value = []
+    chapters.value = []
+    selectedChapterId.value = ''
+    return
+  }
   
   try {
-    const course = await curriculumService.getCourseBySubjectAndGrade(
+    availableCourses.value = await curriculumService.getCourseBySubjectAndGrade(
       Number(selectedSubjectId.value),
       Number(selectedGradeId.value)
     )
-    selectedCourse.value = course
+    selectedCourse.value = availableCourses.value[0] ?? null
+    selectedCourseId.value = selectedCourse.value?.id ?? ''
     
-    // 加载章节
-    const chaptersData = await chapterService.getCourseChapters(course.id, true)
-    chapters.value = chaptersData
+    if (selectedCourse.value) {
+      const chaptersData = await chapterService.getCourseChapters(selectedCourse.value.id, true)
+      chapters.value = chaptersData
+    } else {
+      chapters.value = []
+    }
   } catch (error) {
     console.error('Failed to load course or chapters:', error)
     selectedCourse.value = null
+    selectedCourseId.value = ''
+    availableCourses.value = []
     chapters.value = []
   }
 }
+
+watch(selectedCourseId, async value => {
+  if (!value) {
+    selectedCourse.value = null
+    chapters.value = []
+    selectedChapterId.value = ''
+    return
+  }
+
+  const courseId = typeof value === 'string' ? Number(value) : value
+  const course = availableCourses.value.find(courseItem => courseItem.id === courseId) ?? null
+  selectedCourse.value = course
+
+  if (course) {
+    const chaptersData = await chapterService.getCourseChapters(course.id, true)
+    chapters.value = chaptersData
+  } else {
+    chapters.value = []
+  }
+})
 
 // 触发文件选择
 function triggerFileSelect() {
@@ -457,6 +512,8 @@ function resetForm() {
   selectedSubjectId.value = ''
   selectedGradeId.value = ''
   selectedCourse.value = null
+  selectedCourseId.value = ''
+  availableCourses.value = []
   chapters.value = []
   selectedChapterId.value = ''
   

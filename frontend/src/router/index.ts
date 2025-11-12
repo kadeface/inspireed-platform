@@ -13,6 +13,20 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/Login.vue'),
   },
   {
+    path: '/subjects/:subjectCode/courses',
+    name: 'SubjectCourses',
+    component: () => import('../pages/InfoTechCourses.vue'),
+  },
+  {
+    path: '/courses/info-tech',
+    redirect: { name: 'SubjectCourses', params: { subjectCode: 'computer' } },
+  },
+  {
+    path: '/courses/:courseId',
+    name: 'CourseOverview',
+    component: () => import('../pages/CourseOverview.vue'),
+  },
+  {
     path: '/teacher',
     name: 'Teacher',
     component: () => import('../pages/Teacher/Dashboard.vue'),
@@ -187,4 +201,5 @@ router.beforeEach((to, from, next) => {
 })
 
 export default router
+
 

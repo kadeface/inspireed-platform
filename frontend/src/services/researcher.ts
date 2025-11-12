@@ -109,9 +109,8 @@ export const researcherService = {
   async getCourseBySubjectAndGrade(
     subjectId: number,
     gradeId: number
-  ): Promise<Course | null> {
-    const courses = await this.getCourses({ subject_id: subjectId, grade_id: gradeId })
-    return courses.length > 0 ? courses[0] : null
+  ): Promise<Course[]> {
+    return await this.getCourses({ subject_id: subjectId, grade_id: gradeId })
   },
 
   /**
@@ -163,10 +162,15 @@ export const researcherService = {
   /**
    * 批量导入章节
    */
-  async batchImportChapters(courseId: number, file: File): Promise<{ message: string; chapters: Chapter[] }> {
+  async batchImportChapters(
+    courseId: number,
+    file: File,
+    overwriteExisting = false
+  ): Promise<{ message: string; chapters: Chapter[] }> {
     const formData = new FormData()
     formData.append('course_id', courseId.toString())
     formData.append('file', file)
+    formData.append('overwrite_existing', overwriteExisting ? 'true' : 'false')
     
     return await api.post('/chapters/batch-import', formData)
   },

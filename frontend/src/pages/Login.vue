@@ -52,11 +52,11 @@
             <div class="text-lg md:text-xl text-blue-100">结构化学习单元</div>
           </div>
           <div class="text-center">
-            <div class="text-5xl md:text-6xl font-bold mb-2">30+</div>
+            <div class="text-5xl md:text-6xl font-bold mb-2">300+</div>
             <div class="text-lg md:text-xl text-blue-100">交互式仿真实验</div>
           </div>
           <div class="text-center">
-            <div class="text-5xl md:text-6xl font-bold mb-2">10K+</div>
+            <div class="text-5xl md:text-6xl font-bold mb-2">5K+</div>
             <div class="text-lg md:text-xl text-blue-100">教学实践案例</div>
           </div>
         </div>
@@ -70,16 +70,30 @@
         
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
           <!-- 人工智能 -->
-          <div class="group cursor-pointer">
-            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 p-8 text-white shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+          <RouterLink
+            :to="{ name: 'SubjectCourses', params: { subjectCode: 'computer' } }"
+            class="group block rounded-2xl focus:outline-none focus-visible:ring-4 focus-visible:ring-orange-200"
+          >
+            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 p-8 text-white shadow-lg transition-all duration-300 transform group-hover:shadow-2xl group-hover:scale-105">
               <div class="text-center">
                 <div class="w-16 h-16 mx-auto mb-4 flex items-center justify-center text-5xl leading-none">🤖</div>
                 <h4 class="text-xl font-bold mb-2">人工智能</h4>
                 <p class="text-sm text-orange-100">AI</p>
               </div>
             </div>
+          </RouterLink>
+          <!-- 数学 -->
+          <div class="group cursor-pointer">
+            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-500 to-green-600 p-8 text-white shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+              <div class="text-center">
+                <div class="w-16 h-16 mx-auto mb-4 flex items-center justify-center text-5xl leading-none">📐</div>
+                <h4 class="text-xl font-bold mb-2">数学</h4>
+                <p class="text-sm text-green-100">Math</p>
+              </div>
+            </div>
           </div>
 
+          
           <!-- 物理 -->
           <div class="group cursor-pointer">
             <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-8 text-white shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
@@ -91,16 +105,7 @@
             </div>
           </div>
 
-          <!-- 数学 -->
-          <div class="group cursor-pointer">
-            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-500 to-green-600 p-8 text-white shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
-              <div class="text-center">
-                <div class="w-16 h-16 mx-auto mb-4 flex items-center justify-center text-5xl leading-none">📐</div>
-                <h4 class="text-xl font-bold mb-2">数学</h4>
-                <p class="text-sm text-green-100">Math</p>
-              </div>
-            </div>
-          </div>
+
 
           <!-- 化学 -->
           <div class="group cursor-pointer">

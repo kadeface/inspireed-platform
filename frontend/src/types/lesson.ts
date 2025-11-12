@@ -1,6 +1,6 @@
 import type { Cell } from './cell'
 import type { Course, Chapter } from './curriculum'
-import type { Resource } from './resource'
+import type { Resource, ResourceType } from './resource'
 
 export interface LessonClassroom {
   id: number
@@ -66,6 +66,7 @@ export interface LessonCreate {
   chapter_id?: number  // 所属章节ID
   content?: Cell[]
   tags?: string[]
+  reference_materials?: LessonReferenceMaterialInput[]
 }
 
 export interface LessonUpdate {
@@ -75,5 +76,31 @@ export interface LessonUpdate {
   content?: Cell[]
   tags?: string[]
   status?: LessonStatus
+}
+
+export interface LessonRelatedMaterial {
+  id: number
+  title: string
+  summary?: string
+  resource_type: ResourceType | string
+  source_lesson_id?: number
+  source_lesson_title?: string
+  preview_url?: string
+  download_url?: string
+  is_accessible: boolean
+  tags?: string[]
+  updated_at?: string
+}
+
+export interface LessonRelatedMaterialListResponse {
+  items: LessonRelatedMaterial[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface LessonReferenceMaterialInput {
+  material_id: number
+  note?: string
 }
 
