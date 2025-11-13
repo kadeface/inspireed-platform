@@ -184,11 +184,12 @@
             <div ref="cellListRef" class="space-y-4">
               <template v-for="(cell, index) in cells" :key="cell.id">
                 <!-- 顶部添加按钮（第一个 Cell 前） -->
-                <AddCellMenu
-                  v-if="index === 0 && !isPreviewMode"
-                  :insert-index="0"
-                  @add="handleAddCellAt"
-                />
+                <div v-if="index === 0 && !isPreviewMode" class="add-cell-menu-container">
+                  <AddCellMenu
+                    :insert-index="0"
+                    @add="handleAddCellAt"
+                  />
+                </div>
 
                 <!-- Cell 容器 -->
                 <CellContainer
@@ -204,11 +205,12 @@
                 />
 
                 <!-- Cell 之间的添加按钮 -->
-                <AddCellMenu
-                  v-if="!isPreviewMode"
-                  :insert-index="index + 1"
-                  @add="handleAddCellAt"
-                />
+                <div v-if="!isPreviewMode" class="add-cell-menu-container">
+                  <AddCellMenu
+                    :insert-index="index + 1"
+                    @add="handleAddCellAt"
+                  />
+                </div>
               </template>
             </div>
           </div>
@@ -869,13 +871,32 @@ let sortableInstance: Sortable | null = null
 
 function initSortable() {
   if (cellListRef.value && !isPreviewMode.value) {
+    // 先销毁已存在的实例
+    destroySortable()
+    
     sortableInstance = Sortable.create(cellListRef.value, {
-      animation: 150,
-      handle: '.drag-handle',
-      ghostClass: 'opacity-50',
+      animation: 200,
+      handle: '.drag-handle, .cell-drag-area',
+      filter: '.add-cell-menu-container',
+      preventOnFilter: false,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      dragClass: 'sortable-drag',
+      forceFallback: true,
+      fallbackOnBody: true,
+      swapThreshold: 0.65,
+      onStart: (evt) => {
+        // 拖拽开始时添加视觉反馈
+        evt.item.style.cursor = 'grabbing'
+      },
       onEnd: (evt) => {
-        if (evt.oldIndex !== undefined && evt.newIndex !== undefined) {
+        // 恢复光标样式
+        if (evt.item) {
+          evt.item.style.cursor = ''
+        }
+        if (evt.oldIndex !== undefined && evt.newIndex !== undefined && evt.oldIndex !== evt.newIndex) {
           lessonStore.reorderCells(evt.oldIndex, evt.newIndex)
+          showToast('success', '顺序已调整')
         }
       },
     })
@@ -894,7 +915,19 @@ watch(isPreviewMode, (newValue) => {
   if (newValue) {
     destroySortable()
   } else {
-    setTimeout(initSortable, 100)
+    nextTick(() => {
+      setTimeout(initSortable, 100)
+    })
+  }
+})
+
+// 监听 cells 变化，重新初始化拖拽（当 cells 数量变化时）
+watch(() => cells.value.length, () => {
+  if (!isPreviewMode.value && cellListRef.value) {
+    nextTick(() => {
+      destroySortable()
+      setTimeout(initSortable, 100)
+    })
   }
 })
 
@@ -1215,5 +1248,38 @@ onUnmounted(() => {
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* 拖拽相关样式 */
+.sortable-ghost {
+  opacity: 0.5;
+  background: #eff6ff;
+  border: 2px dashed #3b82f6;
+}
+
+.sortable-chosen {
+  transform: scale(1.02);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.sortable-drag {
+  opacity: 0.75;
+}
+
+/* 拖拽手柄悬停效果 */
+.drag-handle:hover {
+  transform: scale(1.1);
+}
+
+/* 可拖拽区域样式 */
+.cell-drag-area {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cell-drag-area:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+  border-radius: 0.375rem;
+  transition: background-color 0.2s;
 }
 </style>

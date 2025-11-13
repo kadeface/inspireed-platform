@@ -182,13 +182,28 @@ async def update_resource(
 async def delete_resource(
     resource_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
-    """删除资源（管理员）"""
+    """删除资源（管理员或教研员可删除自己创建的资源）"""
 
     resource = await db.get(Resource, resource_id)
     if not resource:
         raise HTTPException(404, "Resource not found")
+
+    # 权限检查：管理员可以删除任何资源，教研员只能删除自己创建的资源
+    role_value = cast(str, current_user.role)
+    is_admin = role_value == UserRole.ADMIN.value
+    is_researcher = role_value == UserRole.RESEARCHER.value
+    
+    if not is_admin:
+        if not is_researcher:
+            raise HTTPException(403, "需要管理员或教研员权限")
+        
+        # 教研员只能删除自己创建的资源
+        resource_creator_id = cast(Optional[int], getattr(resource, "created_by", None))
+        current_user_id = cast(int, current_user.id)
+        if resource_creator_id != current_user_id:
+            raise HTTPException(403, "只能删除自己创建的资源")
 
     # 检查是否有教案引用此资源
     lessons_query = (

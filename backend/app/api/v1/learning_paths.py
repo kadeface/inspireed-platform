@@ -6,9 +6,11 @@ from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, desc, func
+from sqlalchemy.orm import selectinload
 
+from app.core.database import get_db
 from app.api import deps
 from app.models import User, UserRole, LearningPath, LearningPathLesson, Lesson
 from app.schemas.learning_path import (
@@ -104,9 +106,9 @@ def _get_role_value(role: Any) -> str:
 @router.post(
     "/", response_model=LearningPathResponse, status_code=status.HTTP_201_CREATED
 )
-def create_learning_path(
+async def create_learning_path(
     *,
-    db: Session = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
     path_in: LearningPathCreate,
 ):
@@ -128,14 +130,15 @@ def create_learning_path(
         estimated_hours=path_in.estimated_hours,
     )
     db.add(learning_path)
-    db.flush()
+    await db.flush()
 
     # 添加课程
     for lesson_data in path_in.lessons:
         # 检查课程是否存在
-        lesson = db.query(Lesson).filter(Lesson.id == lesson_data.lesson_id).first()
+        result = await db.execute(select(Lesson).where(Lesson.id == lesson_data.lesson_id))
+        lesson = result.scalar_one_or_none()
         if not lesson:
-            db.rollback()
+            await db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"课程 {lesson_data.lesson_id} 不存在",
@@ -149,16 +152,16 @@ def create_learning_path(
         )
         db.add(path_lesson)
 
-    db.commit()
-    db.refresh(learning_path)
+    await db.commit()
+    await db.refresh(learning_path)
 
     return learning_path
 
 
 @router.put("/{path_id}", response_model=LearningPathResponse)
-def update_learning_path(
+async def update_learning_path(
     *,
-    db: Session = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
     path_id: int,
     path_in: LearningPathUpdate,
@@ -166,7 +169,8 @@ def update_learning_path(
     """
     更新学习路径
     """
-    learning_path = db.query(LearningPath).filter(LearningPath.id == path_id).first()
+    result = await db.execute(select(LearningPath).where(LearningPath.id == path_id))
+    learning_path = result.scalar_one_or_none()
     if not learning_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="学习路径不存在")
 
@@ -184,23 +188,24 @@ def update_learning_path(
     for field, value in update_data.items():
         setattr(learning_path, field, value)
 
-    db.commit()
-    db.refresh(learning_path)
+    await db.commit()
+    await db.refresh(learning_path)
 
     return learning_path
 
 
 @router.delete("/{path_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_learning_path(
+async def delete_learning_path(
     *,
-    db: Session = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
     path_id: int,
 ):
     """
     删除学习路径
     """
-    learning_path = db.query(LearningPath).filter(LearningPath.id == path_id).first()
+    result = await db.execute(select(LearningPath).where(LearningPath.id == path_id))
+    learning_path = result.scalar_one_or_none()
     if not learning_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="学习路径不存在")
 
@@ -213,16 +218,16 @@ def delete_learning_path(
     if creator_id != current_user_id and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权删除此学习路径")
 
-    db.delete(learning_path)
-    db.commit()
+    await db.delete(learning_path)
+    await db.commit()
 
     return None
 
 
 @router.get("/", response_model=list[LearningPathListItem])
-def get_learning_paths(
+async def get_learning_paths(
     *,
-    db: Session = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
     published_only: bool = True,
@@ -230,28 +235,36 @@ def get_learning_paths(
     """
     获取学习路径列表
     """
-    query = db.query(LearningPath)
+    query = select(LearningPath)
 
     if published_only:
-        query = query.filter(LearningPath.is_published == True)
+        query = query.where(LearningPath.is_published == True)
 
-    paths = (
-        query.order_by(desc(LearningPath.created_at)).offset(skip).limit(limit).all()
-    )
+    query = query.order_by(desc(LearningPath.created_at)).offset(skip).limit(limit)
+
+    result_paths = await db.execute(query)
+    paths = result_paths.scalars().all()
 
     # 组装返回数据
     result = []
     for path in paths:
         path_id = _safe_int(getattr(path, "id", None))
-        lesson_count = (
-            db.query(LearningPathLesson)
-            .filter(LearningPathLesson.learning_path_id == path_id)
-            .count()
+        
+        # 获取课程数量
+        count_result = await db.execute(
+            select(func.count(LearningPathLesson.id)).where(
+                LearningPathLesson.learning_path_id == path_id
+            )
         )
+        lesson_count = count_result.scalar() or 0
 
-        creator = (
-            db.query(User).filter(User.id == getattr(path, "creator_id", None)).first()
-        )
+        # 获取创建者信息
+        creator_id = getattr(path, "creator_id", None)
+        creator = None
+        if creator_id:
+            creator_result = await db.execute(select(User).where(User.id == creator_id))
+            creator = creator_result.scalar_one_or_none()
+        
         creator_full_name = (
             _safe_optional_str(getattr(creator, "full_name", None)) if creator else None
         )
@@ -298,27 +311,31 @@ def get_learning_paths(
 
 
 @router.get("/{path_id}", response_model=LearningPathWithLessons)
-def get_learning_path(*, db: Session = Depends(deps.get_db), path_id: int):
+async def get_learning_path(*, db: AsyncSession = Depends(get_db), path_id: int):
     """
     获取学习路径详情
     """
-    learning_path = db.query(LearningPath).filter(LearningPath.id == path_id).first()
+    result = await db.execute(select(LearningPath).where(LearningPath.id == path_id))
+    learning_path = result.scalar_one_or_none()
     if not learning_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="学习路径不存在")
 
     # 获取路径中的课程
-    path_lessons = (
-        db.query(LearningPathLesson)
-        .filter(LearningPathLesson.learning_path_id == path_id)
+    path_lessons_result = await db.execute(
+        select(LearningPathLesson)
+        .where(LearningPathLesson.learning_path_id == path_id)
         .order_by(LearningPathLesson.order_index)
-        .all()
     )
+    path_lessons = path_lessons_result.scalars().all()
 
     lessons_details = []
     for pl in path_lessons:
-        lesson = (
-            db.query(Lesson).filter(Lesson.id == getattr(pl, "lesson_id", None)).first()
-        )
+        lesson_id = getattr(pl, "lesson_id", None)
+        if not lesson_id:
+            continue
+            
+        lesson_result = await db.execute(select(Lesson).where(Lesson.id == lesson_id))
+        lesson = lesson_result.scalar_one_or_none()
         if not lesson:
             continue
 
@@ -353,11 +370,12 @@ def get_learning_path(*, db: Session = Depends(deps.get_db), path_id: int):
         )
 
     # 获取创建者信息
-    creator = (
-        db.query(User)
-        .filter(User.id == getattr(learning_path, "creator_id", None))
-        .first()
-    )
+    creator_id = getattr(learning_path, "creator_id", None)
+    creator = None
+    if creator_id:
+        creator_result = await db.execute(select(User).where(User.id == creator_id))
+        creator = creator_result.scalar_one_or_none()
+    
     creator_full_name = (
         _safe_optional_str(getattr(creator, "full_name", None)) if creator else None
     )
@@ -402,9 +420,9 @@ def get_learning_path(*, db: Session = Depends(deps.get_db), path_id: int):
     response_model=LearningPathLessonWithDetails,
     status_code=status.HTTP_201_CREATED,
 )
-def add_lesson_to_path(
+async def add_lesson_to_path(
     *,
-    db: Session = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
     path_id: int,
     lesson_data: LearningPathLessonCreate,
@@ -412,7 +430,8 @@ def add_lesson_to_path(
     """
     向学习路径添加课程
     """
-    learning_path = db.query(LearningPath).filter(LearningPath.id == path_id).first()
+    result = await db.execute(select(LearningPath).where(LearningPath.id == path_id))
+    learning_path = result.scalar_one_or_none()
     if not learning_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="学习路径不存在")
 
@@ -426,7 +445,8 @@ def add_lesson_to_path(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权修改此学习路径")
 
     # 检查课程是否存在
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_data.lesson_id).first()
+    lesson_result = await db.execute(select(Lesson).where(Lesson.id == lesson_data.lesson_id))
+    lesson = lesson_result.scalar_one_or_none()
     if not lesson:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="课程不存在")
 
@@ -438,8 +458,8 @@ def add_lesson_to_path(
         is_required=lesson_data.is_required,
     )
     db.add(path_lesson)
-    db.commit()
-    db.refresh(path_lesson)
+    await db.commit()
+    await db.refresh(path_lesson)
 
     # 返回详细信息
     difficulty_attr = getattr(lesson, "difficulty_level", None)
@@ -466,9 +486,9 @@ def add_lesson_to_path(
 
 
 @router.delete("/{path_id}/lessons/{lesson_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_lesson_from_path(
+async def remove_lesson_from_path(
     *,
-    db: Session = Depends(deps.get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
     path_id: int,
     lesson_id: int,
@@ -476,7 +496,8 @@ def remove_lesson_from_path(
     """
     从学习路径移除课程
     """
-    learning_path = db.query(LearningPath).filter(LearningPath.id == path_id).first()
+    result = await db.execute(select(LearningPath).where(LearningPath.id == path_id))
+    learning_path = result.scalar_one_or_none()
     if not learning_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="学习路径不存在")
 
@@ -489,19 +510,18 @@ def remove_lesson_from_path(
     if creator_id != current_user_id and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权修改此学习路径")
 
-    path_lesson = (
-        db.query(LearningPathLesson)
-        .filter(
+    path_lesson_result = await db.execute(
+        select(LearningPathLesson).where(
             LearningPathLesson.learning_path_id == path_id,
             LearningPathLesson.lesson_id == lesson_id,
         )
-        .first()
     )
+    path_lesson = path_lesson_result.scalar_one_or_none()
 
     if not path_lesson:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="该课程不在此学习路径中")
 
-    db.delete(path_lesson)
-    db.commit()
+    await db.delete(path_lesson)
+    await db.commit()
 
     return None

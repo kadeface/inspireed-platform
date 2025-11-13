@@ -267,7 +267,12 @@ function handleClose() {
 function handleFileSelect(event: Event) {
   const target = event.target as HTMLInputElement
   if (target.files && target.files.length > 0) {
-    selectedFile.value = target.files[0]
+    const file = target.files[0]
+    selectedFile.value = file
+    // 自动使用文件名（去掉扩展名）作为资源标题
+    if (!formData.value.title.trim()) {
+      formData.value.title = file.name.replace(/\.[^/.]+$/, '')
+    }
   }
 }
 
@@ -275,7 +280,12 @@ function handleFileDrop(event: DragEvent) {
   isDragging.value = false
   const files = event.dataTransfer?.files
   if (files && files.length > 0) {
-    selectedFile.value = files[0]
+    const file = files[0]
+    selectedFile.value = file
+    // 自动使用文件名（去掉扩展名）作为资源标题
+    if (!formData.value.title.trim()) {
+      formData.value.title = file.name.replace(/\.[^/.]+$/, '')
+    }
   }
 }
 

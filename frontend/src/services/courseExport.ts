@@ -85,12 +85,13 @@ class CourseExportService {
     formData.append('file', file)
     formData.append('overwrite_existing', options.overwrite_existing?.toString() || 'false')
 
-    const response = await api.post('/course-export/import', formData, {
+    // api.post 已经返回了 response.data，所以直接返回 response 即可
+    const response = await api.post<ImportResult>('/course-export/import', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     })
-    return response.data
+    return response
   }
 
   /**

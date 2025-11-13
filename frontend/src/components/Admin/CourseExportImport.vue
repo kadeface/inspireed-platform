@@ -190,25 +190,25 @@
         </div>
 
         <!-- 导入结果 -->
-        <div v-if="importResult" class="mb-4">
+        <div v-if="importResult && importResult.summary && importResult.result" class="mb-4">
           <h4 class="text-md font-medium text-gray-800 mb-2">导入结果</h4>
           <div class="bg-gray-50 rounded-md p-4">
             <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
               <div class="text-center">
-                <div class="text-2xl font-bold text-green-600">{{ importResult.summary.total_created }}</div>
+                <div class="text-2xl font-bold text-green-600">{{ importResult.summary?.total_created ?? 0 }}</div>
                 <div class="text-sm text-gray-600">成功创建</div>
               </div>
               <div class="text-center">
-                <div class="text-2xl font-bold text-yellow-600">{{ importResult.summary.total_skipped }}</div>
+                <div class="text-2xl font-bold text-yellow-600">{{ importResult.summary?.total_skipped ?? 0 }}</div>
                 <div class="text-sm text-gray-600">跳过重复</div>
               </div>
               <div class="text-center">
-                <div class="text-2xl font-bold text-red-600">{{ importResult.summary.total_errors }}</div>
+                <div class="text-2xl font-bold text-red-600">{{ importResult.summary?.total_errors ?? 0 }}</div>
                 <div class="text-sm text-gray-600">错误数量</div>
               </div>
             </div>
             
-            <div v-if="importResult.result.errors.length > 0" class="mt-4">
+            <div v-if="importResult.result?.errors && importResult.result.errors.length > 0" class="mt-4">
               <h5 class="text-sm font-medium text-red-600 mb-2">错误详情:</h5>
               <ul class="text-sm text-red-600 space-y-1">
                 <li v-for="error in importResult.result.errors" :key="error" class="flex items-start">
@@ -354,6 +354,20 @@ const importCourses = async () => {
   importing.value = true
   try {
     const result = await courseExportService.importCourses(selectedFile.value, importOptions.value)
+    
+    // 检查返回结果是否有效
+    if (!result) {
+      toast.error('导入失败：未收到服务器响应')
+      return
+    }
+    
+    // 检查是否有 summary 字段
+    if (!result.summary) {
+      console.error('Invalid import result:', result)
+      toast.error('导入失败：服务器返回格式错误')
+      return
+    }
+    
     importResult.value = result
     
     if (result.summary.total_errors === 0) {
@@ -364,9 +378,10 @@ const importCourses = async () => {
     
     // 重新加载课程列表
     await loadCourses()
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to import courses:', error)
-    toast.error('课程导入失败')
+    const errorMessage = error.response?.data?.detail || error.message || '课程导入失败'
+    toast.error(errorMessage)
   } finally {
     importing.value = false
   }

@@ -292,10 +292,10 @@ async def get_curriculum_tree(
     course_result = await db.execute(course_query)
     courses = course_result.scalars().all()
 
-    # 获取每个课程的教案数量
+    # 获取每个课程的教案数量（包括所有状态的教案，不区分创建者）
     lesson_count_query = select(
         Lesson.course_id, func.count(Lesson.id).label("count")
-    ).group_by(Lesson.course_id)
+    ).where(Lesson.course_id.isnot(None)).group_by(Lesson.course_id)
     lesson_count_result = await db.execute(lesson_count_query)
     lesson_counts = {
         cast(int, course_id): cast(int, count)

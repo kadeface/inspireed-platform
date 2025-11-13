@@ -245,7 +245,7 @@
                         </div>
                         
                         <!-- 主章节资源列表 -->
-                        <div v-if="expandedResources.has(chapter.id)" class="ml-8 mt-1">
+                        <div v-if="expandedResources.has(chapter.id)" class="ml-8 mt-1" :data-chapter-id="chapter.id">
                           <ChapterResourceList
                             :chapter-id="chapter.id"
                             :can-delete="true"
@@ -302,7 +302,7 @@
                             </div>
                             
                             <!-- 子章节资源列表 -->
-                            <div v-if="expandedResources.has(child.id)" class="ml-8 mt-1">
+                            <div v-if="expandedResources.has(child.id)" class="ml-8 mt-1" :data-chapter-id="child.id">
                               <ChapterResourceList
                                 :chapter-id="child.id"
                                 :can-delete="true"

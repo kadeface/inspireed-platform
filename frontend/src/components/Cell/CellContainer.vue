@@ -41,10 +41,10 @@
             <!-- 拖拽手柄 -->
             <button
               v-if="draggable"
-              class="drag-handle cursor-move p-1 text-gray-400 hover:text-gray-600"
+              class="drag-handle flex-shrink-0 cursor-grab active:cursor-grabbing p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200"
               title="拖拽排序"
             >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
               </svg>
             </button>
@@ -53,13 +53,14 @@
             </span>
 
             <!-- 可编辑标题 -->
-            <div class="flex-1" v-if="editable">
+            <div class="flex-1 cell-drag-area" :class="{ 'cursor-move': draggable }" v-if="editable">
               <input
                 v-if="isEditingTitle"
                 v-model="localTitle"
                 @blur="saveTitle"
                 @keyup.enter="saveTitle"
                 @keyup.esc="cancelEditTitle"
+                @mousedown.stop
                 class="w-full rounded border border-blue-300 px-3 py-1 text-base font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="输入模块标题..."
                 ref="titleInputRef"
@@ -67,6 +68,7 @@
               <div
                 v-else
                 @click="startEditTitle"
+                @mousedown.stop
                 class="flex cursor-pointer items-center rounded px-3 py-1 text-base font-medium transition-colors hover:bg-gray-100"
                 :title="cell.title || '点击添加标题'"
               >
@@ -77,9 +79,10 @@
                 </svg>
               </div>
             </div>
-            <div v-else-if="cell.title" class="flex-1 font-medium text-gray-700">
+            <div v-else-if="cell.title" class="flex-1 font-medium text-gray-700 cell-drag-area" :class="{ 'cursor-move': draggable }">
               {{ cell.title }}
             </div>
+            <div v-else class="flex-1 cell-drag-area" :class="{ 'cursor-move': draggable }"></div>
           </div>
 
           <div class="flex gap-2" v-if="editable">

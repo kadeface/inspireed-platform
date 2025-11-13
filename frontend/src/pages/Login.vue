@@ -212,7 +212,7 @@
           <h3 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4 text-center">5E科学学习活动循环</h3>
           <p class="text-center text-gray-600 mb-12 text-lg">基于建构主义的探究式学习模型，引导学生主动构建知识</p>
           
-          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 w-full">
             <!-- 1. Engage - 参与投入 -->
             <div class="bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-shadow border-t-4 border-pink-500">
               <div class="w-14 h-14 bg-gradient-to-br from-pink-500 to-pink-600 rounded-xl flex items-center justify-center mb-4 mx-auto">
@@ -362,25 +362,28 @@
     <footer class="bg-gray-900 text-white py-12">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-          <div>
+          <div class="text-center">
             <h4 class="text-lg font-bold mb-4">关于 InspireEd</h4>
             <p class="text-gray-400 text-sm">
               基于建构主义学习理论与循证教育理念的交互式STEM教学平台。整合探究式学习、计算思维培养与学习分析技术，构建PDCA教学质量管理循环。
             </p>
           </div>
-          <div>
-            <h4 class="text-lg font-bold mb-4">合作伙伴</h4>
+          <div class="text-center">
+            <h4 class="text-lg font-bold mb-4">相关链接</h4>
             <ul class="space-y-2 text-sm">
+              <li><a href="https://basic.smartedu.cn" target="_blank" class="text-gray-400 hover:text-white transition-colors">国家中小学智慧教育平台</a></li>
               <li><a href="https://phet.colorado.edu" target="_blank" class="text-gray-400 hover:text-white transition-colors">PhET 交互式模拟</a></li>
               <li><span class="text-gray-400">更多教育资源</span></li>
             </ul>
           </div>
-          <div>
+          <div class="text-center">
             <h4 class="text-lg font-bold mb-4">语言</h4>
-            <select class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm border border-gray-700">
-              <option>简体中文</option>
-              <option>English</option>
-            </select>
+            <div class="flex justify-center">
+              <select class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm border border-gray-700">
+                <option>简体中文</option>
+                <option>English</option>
+              </select>
+            </div>
           </div>
         </div>
         

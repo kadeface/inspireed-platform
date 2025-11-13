@@ -11,11 +11,13 @@ const routes: RouteRecordRaw[] = [
     path: '/login',
     name: 'Login',
     component: () => import('../pages/Login.vue'),
+    meta: { title: '登录 - InspireEd' },
   },
   {
     path: '/subjects/:subjectCode/courses',
     name: 'SubjectCourses',
     component: () => import('../pages/InfoTechCourses.vue'),
+    meta: { title: '学科课程 - InspireEd' },
   },
   {
     path: '/courses/info-tech',
@@ -25,129 +27,130 @@ const routes: RouteRecordRaw[] = [
     path: '/courses/:courseId',
     name: 'CourseOverview',
     component: () => import('../pages/CourseOverview.vue'),
+    meta: { title: '课程详情 - InspireEd' },
   },
   {
     path: '/teacher',
     name: 'Teacher',
     component: () => import('../pages/Teacher/Dashboard.vue'),
-    meta: { requiresAuth: true, role: 'teacher' },
+    meta: { requiresAuth: true, role: 'teacher', title: '教师工作台 - InspireEd' },
   },
   {
     path: '/teacher/lesson/:id',
     name: 'TeacherLessonEdit',
     component: () => import('../pages/Teacher/LessonEditor.vue'),
-    meta: { requiresAuth: true, role: 'teacher' },
+    meta: { requiresAuth: true, role: 'teacher', title: '编辑教案 - InspireEd' },
   },
   // 教师端 - 问答系统
   {
     path: '/teacher/questions',
     name: 'TeacherQuestions',
     component: () => import('../pages/Teacher/Questions.vue'),
-    meta: { requiresAuth: true, role: 'teacher' },
+    meta: { requiresAuth: true, role: 'teacher', title: '问答系统 - InspireEd' },
   },
   {
     path: '/teacher/questions/:id',
     name: 'TeacherQuestionDetail',
     component: () => import('../pages/Student/QuestionDetail.vue'),
-    meta: { requiresAuth: true, role: 'teacher' },
+    meta: { requiresAuth: true, role: 'teacher', title: '问题详情 - InspireEd' },
   },
   {
     path: '/teacher/questions/:id/answer',
     name: 'TeacherAnswerEditor',
     component: () => import('../pages/Teacher/AnswerEditor.vue'),
-    meta: { requiresAuth: true, role: 'teacher' },
+    meta: { requiresAuth: true, role: 'teacher', title: '编辑回答 - InspireEd' },
   },
   // 教师端 - 学科教研组
   {
     path: '/teacher/subject-groups',
     name: 'TeacherSubjectGroups',
     component: () => import('../pages/Teacher/SubjectGroups.vue'),
-    meta: { requiresAuth: true, role: 'teacher' },
+    meta: { requiresAuth: true, role: 'teacher', title: '学科教研组 - InspireEd' },
   },
   {
     path: '/teacher/subject-groups/:id',
     name: 'TeacherSubjectGroupDetail',
     component: () => import('../pages/Teacher/SubjectGroupDetail.vue'),
-    meta: { requiresAuth: true, role: 'teacher' },
+    meta: { requiresAuth: true, role: 'teacher', title: '教研组详情 - InspireEd' },
   },
   {
     path: '/student',
     name: 'Student',
     component: () => import('../pages/Student/Dashboard.vue'),
-    meta: { requiresAuth: true, role: 'student' },
+    meta: { requiresAuth: true, role: 'student', title: '学生工作台 - InspireEd' },
   },
   {
     path: '/student/browse',
     name: 'StudentBrowse',
     component: () => import('../pages/Student/BrowseSimulations.vue'),
-    meta: { requiresAuth: true, role: 'student' },
+    meta: { requiresAuth: true, role: 'student', title: '浏览仿真实验 - InspireEd' },
   },
   {
     path: '/student/lesson/:id',
     name: 'StudentLessonView',
     component: () => import('../pages/Student/LessonView.vue'),
-    meta: { requiresAuth: true, role: 'student' },
+    meta: { requiresAuth: true, role: 'student', title: '学习课程 - InspireEd' },
   },
   {
     path: '/student/profile',
     name: 'StudentProfile',
     component: () => import('../pages/Student/Profile.vue'),
-    meta: { requiresAuth: true, role: 'student' },
+    meta: { requiresAuth: true, role: 'student', title: '个人资料 - InspireEd' },
   },
   {
     path: '/student/favorites',
     name: 'StudentFavorites',
     component: () => import('../pages/Student/Favorites.vue'),
-    meta: { requiresAuth: true, role: 'student' },
+    meta: { requiresAuth: true, role: 'student', title: '我的收藏 - InspireEd' },
   },
   {
     path: '/student/learning-paths',
     name: 'StudentLearningPaths',
     component: () => import('../pages/Student/LearningPaths.vue'),
-    meta: { requiresAuth: true, role: 'student' },
+    meta: { requiresAuth: true, role: 'student', title: '学习路径 - InspireEd' },
   },
   // 学生端 - 问答系统
   {
     path: '/student/question/:id',
     name: 'StudentQuestionDetail',
     component: () => import('../pages/Student/QuestionDetail.vue'),
-    meta: { requiresAuth: true, role: 'student' },
+    meta: { requiresAuth: true, role: 'student', title: '问题详情 - InspireEd' },
   },
   {
     path: '/researcher',
     name: 'Researcher',
     component: () => import('../pages/Researcher/Dashboard.vue'),
-    meta: { requiresAuth: true, role: 'researcher' },
+    meta: { requiresAuth: true, role: 'researcher', title: '研究员工作台 - InspireEd' },
   },
   {
     path: '/researcher/curriculum',
     name: 'ResearcherCurriculum',
     component: () => import('../pages/Researcher/CurriculumManagement.vue'),
-    meta: { requiresAuth: true, role: 'researcher' },
+    meta: { requiresAuth: true, role: 'researcher', title: '课程管理 - InspireEd' },
   },
   {
     path: '/admin',
     name: 'Admin',
     component: () => import('../pages/Admin/Dashboard.vue'),
-    meta: { requiresAuth: true, role: 'admin' },
+    meta: { requiresAuth: true, role: 'admin', title: '管理员工作台 - InspireEd' },
   },
   {
     path: '/admin/curriculum',
     name: 'AdminCurriculum',
     component: () => import('../pages/Admin/CurriculumManagement.vue'),
-    meta: { requiresAuth: true, role: 'admin' },
+    meta: { requiresAuth: true, role: 'admin', title: '课程管理 - InspireEd' },
   },
   {
     path: '/admin/users',
     name: 'AdminUsers',
     component: () => import('../pages/Admin/UserManagement.vue'),
-    meta: { requiresAuth: true, role: 'admin' },
+    meta: { requiresAuth: true, role: 'admin', title: '用户管理 - InspireEd' },
   },
   {
     path: '/admin/organization',
     name: 'AdminOrganization',
     component: () => import('../pages/Admin/OrganizationManagement.vue'),
-    meta: { requiresAuth: true, role: 'admin' },
+    meta: { requiresAuth: true, role: 'admin', title: '组织管理 - InspireEd' },
   },
 ]
 
@@ -159,6 +162,14 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('access_token')
+  
+  // 设置页面标题
+  const title = to.meta.title as string
+  if (title) {
+    document.title = title
+  } else {
+    document.title = 'InspireEd - 探究式STEM教学系统'
+  }
   
   // 检查是否需要认证
   if (to.meta.requiresAuth && !token) {

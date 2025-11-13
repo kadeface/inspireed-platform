@@ -309,13 +309,15 @@ async def create_user(
         grade_id=user_data.grade_id,
         classroom_id=user_data.classroom_id,
     )
+    # 确保 is_active 有默认值，如果为 None 则设为 True
+    is_active = user_data.is_active if user_data.is_active is not None else True
     user = User(
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed_password,
         full_name=user_data.full_name,
         role=user_data.role,
-        is_active=user_data.is_active,
+        is_active=is_active,
         **scope_ids,
     )
 
@@ -509,13 +511,15 @@ async def batch_import_users(
                 grade_id=user_data.grade_id,
                 classroom_id=user_data.classroom_id,
             )
+            # 确保 is_active 有默认值，如果为 None 则设为 True
+            is_active = user_data.is_active if user_data.is_active is not None else True
             user = User(
                 username=user_data.username,
                 email=user_data.email,
                 hashed_password=hashed_password,
                 full_name=user_data.full_name,
                 role=user_data.role,
-                is_active=user_data.is_active,
+                is_active=is_active,
                 **scope_ids,
             )
 

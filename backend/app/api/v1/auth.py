@@ -119,17 +119,27 @@ async def login(
     )
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(
-        form_data.password, cast(str, user.hashed_password)
-    ):
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if not cast(bool, user.is_active):
-        raise HTTPException(status_code=400, detail="用户未激活")
+    if not verify_password(form_data.password, cast(str, user.hashed_password)):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名或密码错误",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 检查用户激活状态
+    is_active = cast(bool, user.is_active)
+    if not is_active:
+        raise HTTPException(
+            status_code=400,
+            detail=f"用户未激活，请联系管理员。用户ID: {user.id}, 用户名: {user.username}, 角色: {user.role}",
+        )
 
     # 创建访问令牌
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
