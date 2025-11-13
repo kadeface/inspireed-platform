@@ -529,9 +529,25 @@ async def import_courses(
         # 2. 导入年级
         for grade_data in data.get("grades", []):
             try:
+                # 验证必需字段
+                if "level" not in grade_data:
+                    import_result["errors"].append(
+                        f"导入年级失败 {grade_data.get('name', '未知')}: 缺少必需字段 'level'"
+                    )
+                    continue
+                
+                # 确保 level 是整数类型
+                try:
+                    grade_level = int(grade_data["level"])
+                except (ValueError, TypeError):
+                    import_result["errors"].append(
+                        f"导入年级失败 {grade_data.get('name', '未知')}: 'level' 必须是整数，当前值为 {grade_data['level']}"
+                    )
+                    continue
+                
                 # 检查是否已存在
                 existing = await db.execute(
-                    select(Grade).where(Grade.level == grade_data["level"])
+                    select(Grade).where(Grade.level == grade_level)
                 )
                 existing_grade = existing.scalar_one_or_none()
 
@@ -549,8 +565,10 @@ async def import_courses(
                         import_result["grades"]["skipped"] += 1
                     grade_id_value = existing_grade.id
                 else:
-                    # 创建新年级
-                    grade = Grade(**grade_data)
+                    # 创建新年级，确保使用转换后的整数 level
+                    grade_data_copy = grade_data.copy()
+                    grade_data_copy["level"] = grade_level
+                    grade = Grade(**grade_data_copy)
                     db.add(grade)
                     await db.commit()
                     await db.refresh(grade)
@@ -558,41 +576,84 @@ async def import_courses(
                     grade_id_value = grade.id
 
                 if grade_id_value is not None:
-                    grade_level_map[grade_data["level"]] = grade_id_value
+                    grade_level_map[grade_level] = grade_id_value
 
             except Exception as e:
                 import_result["errors"].append(
-                    f"导入年级失败 {grade_data.get('name', '')}: {str(e)}"
+                    f"导入年级失败 {grade_data.get('name', '未知')}: {str(e)}"
                 )
 
         # 3. 导入课程
         for course_data in data.get("courses", []):
             try:
+                # 验证必需字段
+                if "subject_code" not in course_data:
+                    import_result["errors"].append(
+                        f"导入课程失败 {course_data.get('name', '未知')}: 缺少必需字段 'subject_code'"
+                    )
+                    continue
+                
+                if "grade_level" not in course_data:
+                    import_result["errors"].append(
+                        f"导入课程失败 {course_data.get('name', '未知')}: 缺少必需字段 'grade_level'"
+                    )
+                    continue
+                
+                # 确保 grade_level 是整数类型，以便正确匹配
+                try:
+                    course_grade_level = int(course_data["grade_level"])
+                except (ValueError, TypeError):
+                    import_result["errors"].append(
+                        f"导入课程失败 {course_data.get('name', '未知')}: 'grade_level' 必须是整数，当前值为 {course_data['grade_level']}"
+                    )
+                    continue
+                
                 # 获取学科和年级ID
                 subject_id = subject_code_map.get(course_data["subject_code"])
-                grade_id = grade_level_map.get(course_data["grade_level"])
+                grade_id = grade_level_map.get(course_grade_level)
 
-                if not subject_id or not grade_id:
+                if not subject_id:
                     import_result["errors"].append(
-                        f"课程 {course_data.get('name', '')} 的学科或年级不存在"
+                        f"导入课程失败 {course_data.get('name', '未知')}: 学科代码 '{course_data['subject_code']}' 不存在（请确保在导入文件中包含该学科）"
+                    )
+                    continue
+                
+                if not grade_id:
+                    import_result["errors"].append(
+                        f"导入课程失败 {course_data.get('name', '未知')}: 年级级别 {course_grade_level} 不存在（请确保在导入文件中包含该年级，且 level 值为 {course_grade_level}）"
                     )
                     continue
 
-                # 检查是否已存在
-                existing = await db.execute(
-                    select(Course).where(
-                        Course.subject_id == subject_id, Course.grade_id == grade_id
+                # 验证 course_code 字段
+                if "code" not in course_data or not course_data["code"]:
+                    import_result["errors"].append(
+                        f"导入课程失败 {course_data.get('name', '未知')}: 缺少必需字段 'code'（课程代码）"
                     )
+                    continue
+
+                course_code = course_data["code"]
+
+                # 优先使用 course_code 来检查课程是否已存在
+                # 这样可以区分同一学科和年级的不同课程（如"智慧农业"和"信息科技"）
+                existing = await db.execute(
+                    select(Course).where(Course.code == course_code)
                 )
                 existing_course = existing.scalar_one_or_none()
 
                 course_id_value = None
 
                 if existing_course:
+                    # 如果找到相同 code 的课程，检查学科和年级是否匹配
+                    if existing_course.subject_id != subject_id or existing_course.grade_id != grade_id:
+                        import_result["errors"].append(
+                            f"导入课程失败 {course_data.get('name', '未知')}: 课程代码 '{course_code}' 已存在，但属于不同的学科或年级（现有：学科ID={existing_course.subject_id}, 年级ID={existing_course.grade_id}；导入：学科ID={subject_id}, 年级ID={grade_id}）"
+                        )
+                        continue
+
                     if overwrite_existing:
                         # 更新现有课程
                         for key, value in course_data.items():
-                            if key not in ["subject_code", "grade_level"]:
+                            if key not in ["subject_code", "grade_level", "code"]:
                                 setattr(existing_course, key, value)
                         await db.commit()
                         import_result["courses"]["skipped"] += 1
@@ -600,12 +661,30 @@ async def import_courses(
                         import_result["courses"]["skipped"] += 1
                     course_id_value = existing_course.id
                 else:
+                    # 检查是否已有相同学科和年级的课程（但 code 不同）
+                    # 如果存在，给出警告但允许创建（因为可能是不同的课程）
+                    duplicate_check = await db.execute(
+                        select(Course).where(
+                            Course.subject_id == subject_id,
+                            Course.grade_id == grade_id,
+                            Course.name == course_data.get("name", "")
+                        )
+                    )
+                    duplicate_course = duplicate_check.scalar_one_or_none()
+                    
+                    if duplicate_course:
+                        # 如果名称也相同，则认为是重复课程
+                        import_result["errors"].append(
+                            f"导入课程失败 {course_data.get('name', '未知')}: 已存在相同名称、学科和年级的课程（代码：{duplicate_course.code}）。如需更新，请使用相同的课程代码或启用覆盖选项。"
+                        )
+                        continue
+
                     # 创建新课程
                     course = Course(
                         subject_id=subject_id,
                         grade_id=grade_id,
                         name=course_data["name"],
-                        code=course_data["code"],
+                        code=course_code,
                         description=course_data.get("description"),
                         is_active=course_data.get("is_active", True),
                         display_order=course_data.get("display_order", 0),
@@ -618,7 +697,7 @@ async def import_courses(
                     course_id_value = course.id
 
                 if course_id_value is not None:
-                    course_code_map[course_data["code"]] = course_id_value
+                    course_code_map[course_code] = course_id_value
 
             except Exception as e:
                 import_result["errors"].append(
