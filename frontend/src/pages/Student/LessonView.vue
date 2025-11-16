@@ -77,12 +77,39 @@
           <p class="text-gray-700">{{ lesson.description }}</p>
         </div>
 
+        <!-- 课堂模式提示 -->
+        <StudentClassroomSync 
+          v-if="classroomSession"
+          :lesson-id="lessonId"
+          :session="classroomSession"
+        />
+
         <!-- Cell 内容 -->
         <div class="px-6 py-8 max-w-5xl">
-          <div v-if="lesson.content && lesson.content.length > 0" class="space-y-6">
+          <!-- 课堂模式：等待教师切换内容 -->
+          <div 
+            v-if="isInClassroomMode && !hasDisplayableContent && lesson.content && lesson.content.length > 0" 
+            class="text-center py-16 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300"
+          >
+            <div class="max-w-md mx-auto">
+              <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 class="text-lg font-medium text-gray-900 mb-2">等待教师切换内容</h3>
+              <p class="text-sm text-gray-600">
+                教师正在准备课程内容，请稍候...
+              </p>
+              <p class="text-xs text-gray-500 mt-2">
+                教师切换内容后，这里将显示相应的学习模块
+              </p>
+            </div>
+          </div>
+          
+          <!-- 正常内容显示 -->
+          <div v-else-if="filteredCells.length > 0" class="space-y-6">
             <!-- 🎓 学习科学优化：使用 CellWrapper 组件实现认知脚手架 -->
             <CellWrapper
-              v-for="(cell, index) in lesson.content"
+              v-for="(cell, index) in filteredCells"
               :key="cell.id"
               :cell="cell"
               :cellIndex="index"
@@ -95,12 +122,13 @@
                 :is="getCellComponent(cell.type)"
                 :cell="cell as any"
                 :editable="false"
+                :session-id="classroomSession?.id"
               />
             </CellWrapper>
           </div>
 
           <!-- 空状态 -->
-          <div v-else class="text-center py-12">
+          <div v-else-if="!isInClassroomMode || (isInClassroomMode && hasDisplayableContent && filteredCells.length === 0)" class="text-center py-12">
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
@@ -192,13 +220,12 @@
             v-if="activeSidebarTab === 'notes'"
             class="flex h-full flex-col"
           >
-            <div class="flex-1 overflow-y-auto px-6 py-4">
-              <textarea
+            <div class="flex-1 overflow-hidden px-6 py-4">
+              <MarkdownEditor
                 v-model="notes"
-                @input="autoSaveNotes"
-                placeholder="在这里记录学习笔记..."
-                class="w-full h-full resize-none border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              ></textarea>
+                @update:modelValue="handleNotesUpdate"
+                placeholder="支持 Markdown 格式，使用工具栏快速插入格式..."
+              />
             </div>
             <div class="px-6 py-3 border-t border-gray-200 bg-gray-50">
               <div class="flex items-center justify-between text-xs text-gray-500">
@@ -236,6 +263,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { lessonService } from '@/services/lesson'
+import { api } from '@/services/api'
 import type { Lesson } from '@/types/lesson'
 import type { CellType } from '@/types/cell'
 
@@ -257,9 +285,17 @@ import type { QuestionListItem } from '@/types/question'
 import CellWrapper from '@/components/Cell/CellWrapper.vue'
 import FlowchartStudentCell from '@/components/Cell/FlowchartStudentCell.vue'
 import StudentAiAssistantPanel from '@/components/Student/StudentAiAssistantPanel.vue'
+import MarkdownEditor from '@/components/Editor/MarkdownEditor.vue'
+import StudentClassroomSync from '@/components/Classroom/StudentClassroomSync.vue'
+import { useClassroomSession } from '@/composables/useClassroomSession'
+import classroomSessionService from '@/services/classroomSession'
+import type { ClassSession } from '@/types/classroomSession'
 
 const route = useRoute()
 const router = useRouter()
+
+// 计算属性（需要在使用前定义）
+const lessonId = computed(() => Number(route.params.id))
 
 // 状态
 const loading = ref(false)
@@ -278,11 +314,20 @@ const questionsLoading = ref(false)
 const hasMoreQuestions = ref(false)
 const questionsPage = ref(1)
 
+// 课堂会话相关状态
+const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录
+const {
+  session: classroomSession,  // 直接使用 composable 返回的 session（会通过轮询自动更新）
+  isInClassroomMode,
+  displayCellId,
+  shouldSyncDisplay,
+  hasDisplayableContent,
+  findAndJoinSession,
+  leaveSession,
+} = useClassroomSession(lessonId.value)
+
 // 自动保存定时器
 let notesAutoSaveTimer: ReturnType<typeof setTimeout> | null = null
-
-// 计算属性
-const lessonId = computed(() => Number(route.params.id))
 
 const progress = computed(() => {
   if (!lesson.value?.content || lesson.value.content.length === 0) {
@@ -300,6 +345,245 @@ const lessonOutline = computed(() => {
     .map((cell, index) => summarizeCell(cell, index))
     .filter((item): item is string => Boolean(item))
     .join('\n')
+})
+
+// 过滤Cells：在课堂模式下只显示教师指定的Cell
+const filteredCells = computed(() => {
+  if (!lesson.value?.content) return []
+  
+  console.log('🔍 过滤 Cells:', {
+    totalCells: lesson.value.content.length,
+    isInClassroomMode: isInClassroomMode.value,
+    shouldSyncDisplay: shouldSyncDisplay.value,
+    displayCellId: displayCellId.value,
+    sessionStatus: classroomSession.value?.status,
+  })
+  
+  // 如果不在课堂模式，显示所有Cell
+  if (!isInClassroomMode.value) {
+    console.log('📚 非课堂模式，显示所有 Cell')
+    return lesson.value.content
+  }
+  
+  // 课堂模式：严格同步，只显示教师指定的Cell
+  if (shouldSyncDisplay.value) {
+    // 检查多选模式：从 session.settings 获取 display_cell_ids
+    const settings = classroomSession.value?.settings
+    const displayCellIdsFromSession = settings?.display_cell_ids || 
+                                      settings?.displayCellIds || []
+    const multiSelectIds = Array.isArray(displayCellIdsFromSession) ? displayCellIdsFromSession : []
+    
+    console.log('🔍 多选模式检查:', {
+      hasSession: !!classroomSession.value,
+      sessionId: classroomSession.value?.id,
+      settings: settings,
+      settingsType: typeof settings,
+      displayCellIdsFromSession: displayCellIdsFromSession,
+      displayCellIdsFromSessionType: typeof displayCellIdsFromSession,
+      multiSelectIds: multiSelectIds,
+      multiSelectIdsLength: multiSelectIds.length,
+      dbCellsCount: dbCells.value.length,
+    })
+    
+    // 多选模式：只要有 display_cell_ids 数组（即使只有1个），也应该使用多选逻辑
+    // 这样可以确保一致性，并且当数组中有多个ID时能正确显示
+    if (multiSelectIds.length > 0) {
+      console.log('🎯 多选模式，查找匹配的 Cell，目标 IDs:', multiSelectIds, '数组长度:', multiSelectIds.length)
+      
+      // 先通过数据库 Cell 记录，将数字 ID 映射到 order
+      const idToOrderMap = new Map<number, number>()
+      dbCells.value.forEach((dbCell: any) => {
+        if (dbCell.id && dbCell.order !== undefined) {
+          idToOrderMap.set(dbCell.id, dbCell.order)
+        }
+      })
+      
+      // 获取所有对应的 order 列表
+      const targetOrders = new Set<number>()
+      multiSelectIds.forEach((id: number) => {
+        const order = idToOrderMap.get(id)
+        if (order !== undefined) {
+          targetOrders.add(order)
+        }
+        // 如果 ID 本身是 order（fallback），也添加
+        if (!idToOrderMap.has(id) && id < lesson.value.content.length) {
+          targetOrders.add(id)
+        }
+      })
+      
+      console.log('📋 目标 orders:', Array.from(targetOrders), 'ID 到 order 映射:', Object.fromEntries(idToOrderMap))
+      console.log('📋 lesson.content:', lesson.value.content.map((c: any, i: number) => ({ index: i, id: c.id, order: c.order, type: c.type })))
+      
+      const matchedCells = lesson.value.content.filter((cell, index) => {
+        const cellOrder = cell.order !== undefined ? cell.order : index
+        const cellId = cell.id
+        
+        // 1. 通过 order 匹配（最可靠）
+        if (targetOrders.has(cellOrder)) {
+          console.log(`✅ 匹配成功 (order): index=${index}, order=${cellOrder}, id=${cellId}`)
+          return true
+        }
+        
+        // 2. 通过数据库 ID 匹配（如果前端 cell.id 是数字）
+        const numericId = typeof cellId === 'number' ? cellId : 
+                         typeof cellId === 'string' ? parseInt(cellId, 10) : null
+        
+        if (numericId && !isNaN(numericId) && multiSelectIds.includes(numericId)) {
+          console.log(`✅ 匹配成功 (numeric ID): index=${index}, id=${numericId}`)
+          return true
+        }
+        
+        // 3. 通过数据库查询：如果 cell.id 是 UUID，通过 order 查找对应的数据库 ID
+        if (typeof cellId === 'string' && cellId.includes('-')) {
+          // 可能是 UUID，通过 order 匹配
+          const dbCell = dbCells.value.find((c: any) => c.order === cellOrder)
+          if (dbCell && dbCell.id && multiSelectIds.includes(dbCell.id)) {
+            console.log(`✅ 匹配成功 (UUID -> DB ID): index=${index}, order=${cellOrder}, dbId=${dbCell.id}`)
+            return true
+          }
+        }
+        
+        // 4. 额外的匹配：如果 multiSelectIds 包含的是数据库 ID，但 cell.id 是 UUID
+        // 需要通过 dbCells 来匹配
+        const dbCellByOrder = dbCells.value.find((c: any) => c.order === cellOrder)
+        if (dbCellByOrder && dbCellByOrder.id && multiSelectIds.includes(dbCellByOrder.id)) {
+          console.log(`✅ 匹配成功 (order -> DB ID): index=${index}, order=${cellOrder}, dbId=${dbCellByOrder.id}`)
+          return true
+        }
+        
+        return false
+      })
+      
+      // 确保按 order 排序，保持原始顺序
+      const sortedCells = matchedCells.sort((a, b) => {
+        const orderA = a.order !== undefined ? a.order : lesson.value.content.indexOf(a)
+        const orderB = b.order !== undefined ? b.order : lesson.value.content.indexOf(b)
+        return orderA - orderB
+      })
+      
+      console.log(`📋 多选匹配结果: ${sortedCells.length} 个 Cell (目标: ${multiSelectIds.length} 个)`, {
+        matched: sortedCells.map(c => ({ id: c.id, type: c.type, order: c.order })),
+        targetIds: multiSelectIds,
+        dbCellsMapping: Object.fromEntries(idToOrderMap),
+        targetOrders: Array.from(targetOrders),
+      })
+      
+      // 如果匹配结果少于目标数量，记录警告并尝试详细诊断
+      if (sortedCells.length < multiSelectIds.length) {
+        console.warn(`⚠️ 匹配结果不完整: 只匹配到 ${sortedCells.length}/${multiSelectIds.length} 个 Cell`)
+        console.warn('🔍 详细诊断信息:')
+        console.warn('  - 目标 IDs:', multiSelectIds)
+        console.warn('  - ID 到 order 映射:', Object.fromEntries(idToOrderMap))
+        console.warn('  - 目标 orders:', Array.from(targetOrders))
+        console.warn('  - 匹配到的 Cells:', sortedCells.map(c => ({ 
+          id: c.id, 
+          type: c.type, 
+          order: c.order !== undefined ? c.order : lesson.value.content.indexOf(c) 
+        })))
+        console.warn('  - 所有 lesson.content:', lesson.value.content.map((c: any, i: number) => ({ 
+          index: i, 
+          id: c.id, 
+          order: c.order !== undefined ? c.order : i, 
+          type: c.type 
+        })))
+        console.warn('  - 数据库 Cell 记录:', dbCells.value)
+        
+        const unmatchedIds = multiSelectIds.filter(id => {
+          const order = idToOrderMap.get(id)
+          if (order !== undefined) {
+            return !sortedCells.some(c => {
+              const cellOrder = c.order !== undefined ? c.order : lesson.value.content.indexOf(c)
+              return cellOrder === order
+            })
+          }
+          return true
+        })
+        console.warn('  - 未匹配的 IDs:', unmatchedIds)
+      }
+      
+      // 重要：返回所有匹配的 Cell，确保多个单元都能显示
+      if (sortedCells.length === 0 && multiSelectIds.length > 0) {
+        console.error('❌ 严重错误：多选模式有选中模块，但没有匹配到任何 Cell！')
+        console.error('这可能是因为：')
+        console.error('1. dbCells 未正确加载')
+        console.error('2. ID 到 order 的映射失败')
+        console.error('3. lesson.content 中的 order 与数据库不一致')
+      }
+      
+      return sortedCells
+    }
+    
+    // 单选模式：如果教师还未切换到任何Cell，不显示任何内容
+    // 注意：只有在 display_cell_ids 为空或不存在时，才使用单选模式
+    if (!displayCellId.value) {
+      console.log('⏳ 等待教师切换内容，当前 displayCellId 为 null')
+      return []
+    }
+    
+    // 查找匹配的Cell
+    const currentId = displayCellId.value
+    console.log('🎯 单选模式，查找匹配的 Cell，目标 ID:', currentId, '类型:', typeof currentId)
+    
+    // 先尝试通过数字 ID 查找匹配的 Cell（后端返回的是数据库 ID）
+    // 然后通过 order 或索引匹配（当 ID 不匹配时使用）
+    const matchedCells = lesson.value.content.filter((cell, index) => {
+      // 1. 直接匹配 cell.id（数字或字符串）
+      if (cell.id === currentId) return true
+      
+      // 2. 如果 cell.id 是字符串（UUID），尝试转换为数字后匹配
+      if (typeof cell.id === 'string') {
+        const numId = parseInt(cell.id, 10)
+        if (!isNaN(numId) && numId === currentId) return true
+      }
+      
+      // 3. 如果 currentId 是字符串，尝试与 cell.id 字符串匹配
+      if (typeof currentId === 'string' && String(cell.id) === currentId) return true
+      
+      // 4. 通过 order 匹配（最可靠的方式，因为后端通过 cellOrder 创建/查找 Cell）
+      // 如果后端返回的 current_cell_id 是通过 cellOrder 创建的，那么该 Cell 的 order 应该匹配
+      if (cell.order !== undefined && typeof currentId === 'number') {
+        // 需要从后端获取当前 Cell 的 order 来匹配
+        // 但我们可以通过数据库 ID 反向查找：如果后端返回了数据库 ID，
+        // 说明该 Cell 已经存在于数据库中，可能通过 order 创建
+        // 暂时跳过，因为我们没有直接的 order 信息
+      }
+      
+      // 5. 通过索引匹配（如果 currentId 是顺序索引）
+      // 注意：如果后端返回的是数据库 ID（不是索引），这个匹配可能会失败
+      if (typeof currentId === 'number') {
+        // 如果 currentId 小于 lesson.content.length，可能是索引
+        if (index === currentId && currentId < lesson.value.content.length) {
+          // 但需要确认这不是数据库 ID
+          // 如果 currentId 很大（大于内容数量），应该是数据库 ID，不是索引
+          return true
+        }
+      }
+      
+      return false
+    })
+    
+    // 如果通过 ID 没有匹配到，尝试通过数据库查询获取 Cell 信息
+    // 但这里我们无法直接查询，所以如果匹配失败，返回空数组（显示等待提示）
+    if (matchedCells.length === 0 && typeof currentId === 'number') {
+      console.warn('⚠️ 无法通过 ID 匹配 Cell，可能需要从数据库获取 Cell 信息')
+      // 尝试使用索引作为 fallback（不推荐，但可以临时使用）
+      if (currentId >= 0 && currentId < lesson.value.content.length) {
+        const cellByIndex = lesson.value.content[currentId]
+        if (cellByIndex) {
+          console.log('✅ 使用索引作为 fallback，返回 Cell:', cellByIndex)
+          return [cellByIndex]
+        }
+      }
+    }
+    
+    console.log(`📋 匹配结果: ${matchedCells.length} 个 Cell`, matchedCells.map(c => ({ id: c.id, type: c.type, order: c.order })))
+    
+    return matchedCells
+  }
+  
+  // 如果sync_mode不是strict，显示所有Cell（允许学生自由浏览）
+  console.log('📖 非严格同步模式，显示所有 Cell')
+  return lesson.value.content
 })
 
 // 方法
@@ -326,17 +610,35 @@ const loadLesson = async () => {
     // 从服务器获取最新教案数据（不使用缓存）
     lesson.value = await lessonService.fetchLessonById(lessonId.value)
     
+    // 加载数据库中的 Cell 记录（用于 ID 匹配）
+    await loadDbCells()
+    
     // 检查教案版本是否更新
     checkLessonVersionUpdate()
     
     // 加载该课程的完成状态
     loadCompletedCells()
     loadNotes()
+    
+    // 尝试查找并加入课堂会话（session 会自动更新到 classroomSession）
+    await findAndJoinSession()
   } catch (e: any) {
     error.value = e.message || '加载课程失败'
     console.error('Failed to load lesson:', e)
   } finally {
     loading.value = false
+  }
+}
+
+// 加载数据库中的 Cell 记录
+const loadDbCells = async () => {
+  try {
+    const response = await api.get(`/cells/lesson/${lessonId.value}`)
+    dbCells.value = Array.isArray(response) ? response : (response.data || [])
+    console.log('📦 加载数据库 Cell 记录:', dbCells.value.length, '个', dbCells.value)
+  } catch (error: any) {
+    console.warn('⚠️ 加载数据库 Cell 记录失败:', error)
+    dbCells.value = []
   }
 }
 
@@ -456,6 +758,11 @@ const summarizeCell = (cell: any, index: number): string | null => {
     parts.push(`：${detail}`)
   }
   return parts.join('')
+}
+
+const handleNotesUpdate = (value: string) => {
+  notes.value = value
+  autoSaveNotes()
 }
 
 const appendNoteFromAssistant = (content: string) => {

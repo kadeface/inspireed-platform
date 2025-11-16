@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import LessonView from '../pages/Student/LessonView.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -88,7 +89,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/student/lesson/:id',
     name: 'StudentLessonView',
-    component: () => import('../pages/Student/LessonView.vue'),
+    component: LessonView,
     meta: { requiresAuth: true, role: 'student', title: '学习课程 - InspireEd' },
   },
   {
@@ -160,7 +161,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const token = localStorage.getItem('access_token')
   
   // 设置页面标题
@@ -208,7 +209,28 @@ router.beforeEach((to, from, next) => {
     }
   }
   
-  next()
+  // 添加错误处理，捕获动态导入失败
+  try {
+    next()
+  } catch (error) {
+    console.error('Route navigation error:', error)
+    // 如果路由加载失败，尝试重定向到登录页
+    if (to.path !== '/login') {
+      next('/login')
+    } else {
+      next(false) // 阻止导航
+    }
+  }
+})
+
+// 添加路由错误处理
+router.onError((error) => {
+  console.error('Router error:', error)
+  // 如果是模块加载失败，尝试刷新页面
+  if (error.message && error.message.includes('Failed to fetch dynamically imported module')) {
+    console.warn('Module import failed, this might be a network issue or build problem')
+    // 可以在这里添加重试逻辑或错误提示
+  }
 })
 
 export default router

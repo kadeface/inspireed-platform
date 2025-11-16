@@ -51,6 +51,9 @@ class ActivitySubmission(Base):
     cell_id = Column(Integer, ForeignKey("cells.id"), nullable=False, index=True)
     lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    session_id = Column(
+        Integer, ForeignKey("class_sessions.id"), nullable=True, index=True
+    )  # 课堂会话ID，NULL表示课后提交
 
     # 提交内容（JSON格式，包含所有题目的答案）
     # 示例：
@@ -107,6 +110,7 @@ class ActivitySubmission(Base):
     student = relationship("User", foreign_keys=[student_id])
     grader = relationship("User", foreign_keys=[graded_by])
     lesson = relationship("Lesson", foreign_keys=[lesson_id])
+    class_session = relationship("ClassSession", foreign_keys=[session_id])
     peer_reviews_received = relationship(
         "PeerReview",
         foreign_keys="PeerReview.submission_id",

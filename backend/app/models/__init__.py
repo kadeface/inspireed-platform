@@ -29,6 +29,11 @@ from app.models.activity import (
     FlowchartSnapshot,
     FormativeAssessment,
 )
+from app.models.classroom_session import (
+    ClassSession,
+    ClassSessionStatus,
+    StudentSessionParticipation,
+)
 from app.models.subject_group import (
     SubjectGroup,
     GroupMembership,
@@ -81,4 +86,7 @@ __all__ = [
     "SharedLesson",
     "GroupScope",
     "MemberRole",
+    "ClassSession",
+    "ClassSessionStatus",
+    "StudentSessionParticipation",
 ]

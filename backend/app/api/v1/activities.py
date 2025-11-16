@@ -23,7 +23,7 @@ from app.models.activity import (
     FormativeAssessment,
 )
 from app.models.lesson import Lesson
-from app.models.cell import Cell
+from app.models.cell import Cell, CellType
 from app.schemas.activity import (
     ActivitySubmissionCreate,
     ActivitySubmissionUpdate,
@@ -63,64 +63,143 @@ async def create_submission(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     """创建活动提交（或草稿）"""
+    
+    try:
+        # 验证 Lesson 存在
+        lesson = await db.get(Lesson, data.lesson_id)
+        if not lesson:
+            raise HTTPException(status_code=404, detail="教案不存在")
 
-    # 验证 Cell 存在
-    cell = await db.get(Cell, data.cell_id)
-    if not cell:
-        raise HTTPException(status_code=404, detail="Cell 不存在")
-
-    # 验证 Lesson 存在
-    lesson = await db.get(Lesson, data.lesson_id)
-    if not lesson:
-        raise HTTPException(status_code=404, detail="教案不存在")
-
-    # 检查是否已有提交（草稿）
-    result = await db.execute(
-        select(ActivitySubmission).where(
-            and_(
-                ActivitySubmission.cell_id == data.cell_id,
-                ActivitySubmission.student_id == current_user.id,
-                ActivitySubmission.status == ActivitySubmissionStatus.DRAFT,
+        # 处理 cell_id：可能是 int 或 UUID 字符串
+        cell_id_value = data.cell_id
+        cell: Optional[Cell] = None
+        
+        # 如果 cell_id 是字符串（UUID），需要从 lesson.content 中查找并创建
+        if isinstance(cell_id_value, str):
+            # UUID 格式，需要从 lesson.content 中查找对应的 cell
+            lesson_content = cast(Optional[List[Dict[str, Any]]], getattr(lesson, "content", None))
+            if lesson_content:
+                # 在 lesson.content 中查找匹配的 cell（通过 UUID）
+                matched_cell_data = None
+                for cell_data in lesson_content:
+                    cell_id_in_content = cell_data.get("id")
+                    if str(cell_id_in_content) == cell_id_value:
+                        # 找到了匹配的 cell 数据
+                        matched_cell_data = cell_data
+                        break
+                
+                if matched_cell_data:
+                    cell_order = matched_cell_data.get("order")
+                    cell_type = matched_cell_data.get("type") or matched_cell_data.get("cell_type")
+                    
+                    # 检查是否已经有相同 order 和 type 的 cell
+                    if cell_order is not None:
+                        existing_cell_query = select(Cell).where(
+                            and_(
+                                Cell.lesson_id == data.lesson_id,
+                                Cell.order == cell_order,
+                                Cell.cell_type == CellType.ACTIVITY,
+                            )
+                        )
+                        existing_result = await db.execute(existing_cell_query)
+                        existing_cell = existing_result.scalar_one_or_none()
+                        
+                        if existing_cell:
+                            # 使用已存在的 cell
+                            cell = existing_cell
+                            cell_id_value = cast(int, cell.id)
+                        else:
+                            # 创建新的 cell 记录
+                            new_cell = Cell(
+                                lesson_id=data.lesson_id,
+                                cell_type=CellType.ACTIVITY,
+                                title=matched_cell_data.get("title", ""),
+                                content=matched_cell_data.get("content", {}),
+                                config=matched_cell_data.get("config", {}),
+                                order=cell_order,
+                                editable=matched_cell_data.get("editable", False),
+                            )
+                            db.add(new_cell)
+                            await db.flush()  # 获取 ID 但不提交
+                            cell = new_cell
+                            cell_id_value = cast(int, cell.id)
+        else:
+            # cell_id 是数字，直接查询
+            cell = await db.get(Cell, cell_id_value)
+        
+        # 如果仍然没有 cell，返回错误
+        if not cell:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Cell 不存在 (cell_id: {cell_id_value})"
+            )
+        
+        # 更新 data.cell_id 为数字 ID（用于后续操作）
+        data.cell_id = cast(int, cell.id)
+        
+        # 确保 cell_id 是整数类型（用于后续操作）
+        final_cell_id = cast(int, data.cell_id)
+        
+        # 检查是否已有提交（草稿）
+        result = await db.execute(
+            select(ActivitySubmission).where(
+                and_(
+                    ActivitySubmission.cell_id == final_cell_id,
+                    ActivitySubmission.student_id == current_user.id,
+                    ActivitySubmission.status == ActivitySubmissionStatus.DRAFT,
+                )
             )
         )
-    )
-    existing = result.scalar_one_or_none()
+        existing = result.scalar_one_or_none()
 
-    if existing:
-        # 更新现有草稿
-        setattr(existing, "responses", cast(dict[str, Any], data.responses))
-        if data.process_trace is not None:
-            setattr(existing, "process_trace", cast(List[Dict[str, Any]], data.process_trace))
-        if data.context is not None:
-            setattr(existing, "context", cast(Dict[str, Any], data.context))
-        if data.activity_phase is not None:
-            setattr(existing, "activity_phase", data.activity_phase)
-        if data.attempt_no is not None:
-            setattr(existing, "attempt_no", cast(int, data.attempt_no))
-        setattr(existing, "updated_at", datetime.utcnow())
+        if existing:
+            # 更新现有草稿
+            setattr(existing, "responses", cast(dict[str, Any], data.responses or {}))
+            if data.process_trace is not None:
+                setattr(existing, "process_trace", cast(List[Dict[str, Any]], data.process_trace))
+            if data.context is not None:
+                setattr(existing, "context", cast(Dict[str, Any], data.context))
+            if data.activity_phase is not None:
+                setattr(existing, "activity_phase", data.activity_phase)
+            if data.attempt_no is not None:
+                setattr(existing, "attempt_no", cast(int, data.attempt_no))
+            setattr(existing, "updated_at", datetime.utcnow())
+            await db.commit()
+            await db.refresh(existing)
+            return existing
+
+        # 创建新提交
+        # 注意：session_id 应该从请求上下文或参数中获取，暂时先不处理
+        submission = ActivitySubmission(
+            cell_id=final_cell_id,
+            lesson_id=data.lesson_id,
+            student_id=cast(int, current_user.id),
+            responses=data.responses or {},
+            status=ActivitySubmissionStatus.DRAFT,
+            started_at=data.started_at or datetime.utcnow(),
+            process_trace=data.process_trace or [],
+            context=data.context or {},
+            activity_phase=data.activity_phase,
+            attempt_no=data.attempt_no or 1,
+            session_id=None,  # 暂时为None，后续可以从请求中获取
+        )
+
+        db.add(submission)
         await db.commit()
-        await db.refresh(existing)
-        return existing
+        await db.refresh(submission)
 
-    # 创建新提交
-    submission = ActivitySubmission(
-        cell_id=data.cell_id,
-        lesson_id=data.lesson_id,
-        student_id=cast(int, current_user.id),
-        responses=data.responses,
-        status=ActivitySubmissionStatus.DRAFT,
-        started_at=data.started_at or datetime.utcnow(),
-        process_trace=data.process_trace or [],
-        context=data.context or {},
-        activity_phase=data.activity_phase,
-        attempt_no=data.attempt_no or 1,
-    )
-
-    db.add(submission)
-    await db.commit()
-    await db.refresh(submission)
-
-    return submission
+        return submission
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in create_submission: {e}")
+        import traceback
+        traceback.print_exc()
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"创建提交失败: {str(e)}"
+        )
 
 
 @router.get("/submissions/{submission_id}", response_model=ActivitySubmissionResponse)
@@ -243,10 +322,29 @@ async def submit_activity(
     if data.attempt_no is not None:
         setattr(submission, "attempt_no", cast(int, data.attempt_no))
 
-    # TODO: 实现自动评分逻辑
-    # 如果是选择题等可自动评分的题型，这里自动计算分数
-    # submission.score = calculate_auto_score(submission.responses, cell_content)
-    # submission.auto_graded = True
+    # 获取 Cell 内容以进行自动评分
+    cell = await db.get(Cell, cast(int, submission.cell_id))
+    if not cell:
+        raise HTTPException(status_code=404, detail="Cell 不存在")
+    
+    # 实现自动评分逻辑
+    cell_content = cast(Dict[str, Any], cell.content)
+    auto_graded, total_score, max_score, graded_responses = _auto_grade_submission(
+        cast(dict[str, Any], data.responses),
+        cell_content
+    )
+    
+    # 更新 responses（包含正确性判断）
+    setattr(submission, "responses", graded_responses)
+    
+    # 如果启用了自动评分，更新分数
+    grading_config = cell_content.get("grading", {})
+    if auto_graded and grading_config.get("autoGrade", False):
+        setattr(submission, "score", total_score)
+        setattr(submission, "max_score", max_score)
+        setattr(submission, "auto_graded", True)
+    else:
+        setattr(submission, "auto_graded", False)
 
     await db.commit()
     await db.refresh(submission)
@@ -357,6 +455,33 @@ async def get_cell_flowchart_snapshots(
 
     result = await db.execute(query)
     return result.scalars().all()
+
+
+@router.get(
+    "/cells/{cell_id}/my-submission",
+    response_model=ActivitySubmissionResponse,
+)
+async def get_my_cell_submission(
+    cell_id: int,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """获取我在某个 Cell 的提交（学生端）"""
+
+    result = await db.execute(
+        select(ActivitySubmission).where(
+            and_(
+                ActivitySubmission.cell_id == cell_id,
+                ActivitySubmission.student_id == current_user.id,
+            )
+        ).order_by(ActivitySubmission.created_at.desc())
+    )
+    submission = result.scalar_one_or_none()
+
+    if not submission:
+        raise HTTPException(status_code=404, detail="提交不存在")
+
+    return submission
 
 
 @router.get(
@@ -893,6 +1018,153 @@ async def sync_offline_submissions(
 
 
 # ========== 辅助函数 ==========
+
+
+def _auto_grade_submission(
+    responses: Dict[str, Any],
+    cell_content: Dict[str, Any]
+) -> tuple[bool, float, float, Dict[str, Any]]:
+    """
+    自动评分函数
+    
+    参数:
+        responses: 学生答案字典 {item_id: answer}
+        cell_content: Cell 内容，包含题目配置
+    
+    返回:
+        (auto_graded, total_score, max_score, graded_responses)
+        - auto_graded: 是否可以进行自动评分
+        - total_score: 总分
+        - max_score: 满分
+        - graded_responses: 包含正确性判断的答案字典
+    """
+    items = cell_content.get("items", [])
+    graded_responses: Dict[str, Any] = {}
+    total_score = 0.0
+    max_score = 0.0
+    has_auto_gradable_items = False
+    
+    for item in items:
+        item_id = str(item.get("id", ""))
+        item_type = item.get("type", "")
+        item_config = item.get("config", {})
+        item_points = item.get("points", 0)
+        max_score += float(item_points) if item_points else 0.0
+        
+        # 获取学生答案
+        student_answer = responses.get(item_id)
+        if student_answer is None:
+            # 未作答，跳过
+            if item_id in responses:
+                graded_responses[item_id] = responses[item_id]
+            continue
+        
+        # 初始化答案对象（如果还不是字典）
+        if not isinstance(student_answer, dict):
+            graded_answer: Dict[str, Any] = {}
+            if item_type == "single-choice":
+                graded_answer["answer"] = student_answer
+            elif item_type == "multiple-choice":
+                graded_answer["answer"] = student_answer if isinstance(student_answer, list) else [student_answer]
+            elif item_type == "true-false":
+                graded_answer["answer"] = student_answer
+            else:
+                graded_answer = {"text": student_answer} if isinstance(student_answer, str) else student_answer
+        else:
+            graded_answer = student_answer.copy()
+        
+        # 判断选择题的正确性
+        is_correct = None
+        correct_answer = None
+        
+        if item_type == "single-choice":
+            has_auto_gradable_items = True
+            correct_answer_id = item_config.get("correctAnswer")
+            student_answer_id = graded_answer.get("answer") or student_answer
+            
+            if correct_answer_id is not None:
+                is_correct = str(student_answer_id) == str(correct_answer_id)
+                # 找到正确答案的文本和ID（都保存以便前端使用）
+                options = item_config.get("options", [])
+                correct_answer_text = None
+                for opt in options:
+                    if str(opt.get("id", "")) == str(correct_answer_id):
+                        correct_answer_text = opt.get("text", correct_answer_id)
+                        break
+                if not correct_answer_text:
+                    correct_answer_text = correct_answer_id
+                
+                # 保存正确答案（文本形式，方便显示）
+                correct_answer = correct_answer_text
+                # 同时保存正确答案ID（用于前端比较）
+                graded_answer["correctAnswerId"] = correct_answer_id
+                
+                # 计算分数
+                if is_correct and item_points:
+                    graded_answer["score"] = float(item_points)
+                    total_score += float(item_points)
+                else:
+                    graded_answer["score"] = 0.0
+                
+                graded_answer["correct"] = is_correct
+                graded_answer["correctAnswer"] = correct_answer
+        
+        elif item_type == "multiple-choice":
+            has_auto_gradable_items = True
+            correct_answer_ids = item_config.get("correctAnswers", [])
+            student_answer_ids = graded_answer.get("answer") or (student_answer if isinstance(student_answer, list) else [student_answer])
+            
+            if correct_answer_ids:
+                # 转换为字符串列表以便比较
+                correct_set = set(str(id) for id in correct_answer_ids)
+                student_set = set(str(id) for id in student_answer_ids)
+                
+                is_correct = correct_set == student_set
+                
+                # 找到正确答案的文本
+                options = item_config.get("options", [])
+                correct_texts = []
+                for opt in options:
+                    if str(opt.get("id", "")) in correct_set:
+                        correct_texts.append(opt.get("text", opt.get("id", "")))
+                correct_answer = ", ".join(correct_texts) if correct_texts else ", ".join(correct_answer_ids)
+                
+                # 计算分数
+                if is_correct and item_points:
+                    graded_answer["score"] = float(item_points)
+                    total_score += float(item_points)
+                else:
+                    graded_answer["score"] = 0.0
+                
+                graded_answer["correct"] = is_correct
+                graded_answer["correctAnswer"] = correct_answer
+        
+        elif item_type == "true-false":
+            has_auto_gradable_items = True
+            correct_answer_value = item_config.get("correctAnswer")
+            student_answer_value = graded_answer.get("answer")
+            
+            if student_answer_value is None:
+                student_answer_value = student_answer
+            
+            if correct_answer_value is not None:
+                is_correct = bool(student_answer_value) == bool(correct_answer_value)
+                correct_answer = "正确" if correct_answer_value else "错误"
+                
+                # 计算分数
+                if is_correct and item_points:
+                    graded_answer["score"] = float(item_points)
+                    total_score += float(item_points)
+                else:
+                    graded_answer["score"] = 0.0
+                
+                graded_answer["correct"] = is_correct
+                graded_answer["correctAnswer"] = correct_answer
+        
+        # 保存评分后的答案
+        graded_responses[item_id] = graded_answer
+    
+    return has_auto_gradable_items, total_score, max_score, graded_responses
 
 
 async def _save_flowchart_snapshot(

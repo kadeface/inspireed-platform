@@ -29,8 +29,54 @@ export const activityService = {
   async createSubmission(
     data: CreateActivitySubmissionRequest
   ): Promise<ActivitySubmission> {
-    const response = await api.post('/activities/submissions', data)
-    return response.data
+    // 转换驼峰命名为蛇形命名以匹配后端API
+    // 注意：cellId 可能是数字或 UUID 字符串，后端现在都支持
+    const requestData: any = {
+      cell_id: data.cellId,  // 可以是数字或 UUID 字符串
+      lesson_id: data.lessonId,
+      responses: data.responses || {}, // 确保 responses 始终存在
+    }
+    
+    // started_at 需要是 ISO 字符串格式，Pydantic 会自动转换为 datetime
+    if (data.startedAt !== undefined) {
+      // 确保是有效的 ISO 字符串
+      const startedAt = data.startedAt instanceof Date 
+        ? data.startedAt.toISOString() 
+        : data.startedAt
+      requestData.started_at = startedAt
+    }
+    
+    if (data.processTrace !== undefined) {
+      requestData.process_trace = data.processTrace
+    }
+    if (data.context !== undefined) {
+      requestData.context = data.context
+    }
+    if (data.activityPhase !== undefined) {
+      requestData.activity_phase = data.activityPhase
+    }
+    if (data.attemptNo !== undefined) {
+      requestData.attempt_no = data.attemptNo
+    }
+    
+    console.log('📤 Creating submission:', {
+      cell_id: requestData.cell_id,
+      lesson_id: requestData.lesson_id,
+      responses_count: Object.keys(requestData.responses).length,
+      started_at: requestData.started_at,
+    })
+    
+    try {
+      const response = await api.post('/activities/submissions', requestData)
+      return response.data
+    } catch (error: any) {
+      console.error('❌ Create submission failed:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        request: requestData,
+      })
+      throw error
+    }
   },
 
   /**
@@ -48,7 +94,31 @@ export const activityService = {
     submissionId: number,
     data: UpdateActivitySubmissionRequest
   ): Promise<ActivitySubmission> {
-    const response = await api.patch(`/activities/submissions/${submissionId}`, data)
+    // 转换驼峰命名为蛇形命名以匹配后端API
+    const requestData: any = {}
+    if (data.responses !== undefined) {
+      requestData.responses = data.responses
+    }
+    if (data.status !== undefined) {
+      requestData.status = data.status
+    }
+    if (data.timeSpent !== undefined) {
+      requestData.time_spent = data.timeSpent
+    }
+    if (data.processTrace !== undefined) {
+      requestData.process_trace = data.processTrace
+    }
+    if (data.context !== undefined) {
+      requestData.context = data.context
+    }
+    if (data.activityPhase !== undefined) {
+      requestData.activity_phase = data.activityPhase
+    }
+    if (data.attemptNo !== undefined) {
+      requestData.attempt_no = data.attemptNo
+    }
+    
+    const response = await api.patch(`/activities/submissions/${submissionId}`, requestData)
     return response.data
   },
 
@@ -59,9 +129,29 @@ export const activityService = {
     submissionId: number,
     data: SubmitActivityRequest
   ): Promise<ActivitySubmission> {
+    // 转换驼峰命名为蛇形命名以匹配后端API
+    const requestData: any = {
+      responses: data.responses,
+    }
+    if (data.timeSpent !== undefined) {
+      requestData.time_spent = data.timeSpent
+    }
+    if (data.processTrace !== undefined) {
+      requestData.process_trace = data.processTrace
+    }
+    if (data.context !== undefined) {
+      requestData.context = data.context
+    }
+    if (data.activityPhase !== undefined) {
+      requestData.activity_phase = data.activityPhase
+    }
+    if (data.attemptNo !== undefined) {
+      requestData.attempt_no = data.attemptNo
+    }
+    
     const response = await api.post(
       `/activities/submissions/${submissionId}/submit`,
-      data
+      requestData
     )
     return response.data
   },

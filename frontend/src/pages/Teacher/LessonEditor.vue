@@ -91,6 +91,27 @@
               发布
             </button>
 
+            <!-- 课堂模式按钮 -->
+            <button
+              v-if="currentLesson?.status === 'published'"
+              @click="handleClassroomButtonClick"
+              :disabled="!isPreviewMode"
+              :class="[
+                'px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2',
+                !isPreviewMode
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : showClassroomPanel
+                  ? 'bg-green-600 text-white'
+                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+              ]"
+              :title="!isPreviewMode ? '请先进入预览模式以使用课堂控制' : '课堂控制'"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              {{ showClassroomPanel ? '隐藏控制面板' : '课堂控制' }}
+            </button>
+
             <!-- 预览模式切换 -->
             <button
               @click="isPreviewMode = !isPreviewMode"
@@ -157,6 +178,14 @@
 
           <!-- Cell 列表 -->
           <div v-else-if="currentLesson" class="space-y-4">
+            <!-- 课堂控制面板（预览模式下） -->
+            <TeacherClassroomControlPanel
+              v-if="isPreviewMode && showClassroomPanel && currentLesson"
+              :lesson-id="currentLesson.id"
+              :lesson="currentLesson"
+              class="mb-6"
+            />
+
             <!-- MVP: 参考资源面板 -->
             <ReferenceResourcePanel
               v-if="showReferencePanel && referenceResource && !isPreviewMode"
@@ -404,6 +433,7 @@ import ReferenceResourcePanel from '../../components/Resource/ReferenceResourceP
 import PDFViewerModal from '../../components/Resource/PDFViewerModal.vue'
 import ClassroomSelectorModal from '../../components/Lesson/ClassroomSelectorModal.vue'
 import LessonAiAssistantDrawer from '@/components/Teacher/LessonAiAssistantDrawer.vue'
+import TeacherClassroomControlPanel from '@/components/Classroom/TeacherControlPanel.vue'
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
@@ -432,6 +462,7 @@ const showPublishModal = ref(false)
 const selectedClassroomIds = ref<number[]>([])
 const publishError = ref<string | null>(null)
 const showLessonAssistant = ref(false)
+const showClassroomPanel = ref(false)
 
 // Toast 提示
 const toast = ref({
@@ -443,6 +474,17 @@ const toast = ref({
 // 计算属性
 const currentLesson = computed(() => lessonStore.currentLesson)
 const cells = computed(() => lessonStore.cells)
+
+// 调试：输出课堂控制按钮的显示条件
+watch([isPreviewMode, () => currentLesson.value?.status], ([preview, status]) => {
+  if (preview) {
+    console.log('🔍 课堂控制按钮显示条件:', {
+      isPreviewMode: preview,
+      lessonStatus: status,
+      shouldShow: preview && status === 'published'
+    })
+  }
+}, { immediate: true })
 const isSaving = computed(() => lessonStore.isSaving)
 const availableClassrooms = computed(() => lessonStore.availableClassrooms)
 const isLoadingClassrooms = computed(() => lessonStore.isLoadingClassrooms)
@@ -795,6 +837,18 @@ function handlePublishCancel() {
 // 返回
 function handleBack() {
   router.push('/teacher')
+}
+
+// 处理课堂控制按钮点击
+function handleClassroomButtonClick() {
+  if (!isPreviewMode.value) {
+    // 如果不在预览模式，自动切换到预览模式并打开课堂控制面板
+    isPreviewMode.value = true
+    showClassroomPanel.value = true
+    showToast('success', '已进入预览模式，课堂控制面板已打开')
+    return
+  }
+  showClassroomPanel.value = !showClassroomPanel.value
 }
 
 // 切换全屏预览

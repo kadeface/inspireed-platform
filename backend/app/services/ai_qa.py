@@ -81,13 +81,28 @@ class AIQAService:
             )
 
         except Exception as e:
+            # 如果出现任何异常，回退到模拟回答
+            print(f"AI服务处理异常，使用模拟回答: {str(e)}")
             response_time = (time.time() - start_time) * 1000
-            return AIResponse(
-                answer=f"抱歉，AI服务暂时不可用：{str(e)}",
-                confidence=0.0,
-                response_time=response_time,
-                model_used=model,
-            )
+            try:
+                # 尝试生成模拟回答
+                mock_response = await self._get_mock_response(question)
+                return AIResponse(
+                    answer=mock_response["answer"],
+                    confidence=mock_response.get("confidence", 0.75),
+                    response_time=response_time,
+                    model_used="mock",
+                    tokens_used=mock_response.get("tokens_used"),
+                )
+            except Exception as fallback_error:
+                # 如果连模拟回答都失败，返回错误消息
+                response_time = (time.time() - start_time) * 1000
+                return AIResponse(
+                    answer=f"抱歉，AI服务暂时不可用。请稍后重试或联系管理员。",
+                    confidence=0.0,
+                    response_time=response_time,
+                    model_used=model,
+                )
 
     def _build_prompt(
         self,
@@ -133,8 +148,8 @@ class AIQAService:
         return "\n\n".join(prompt_parts)
 
     async def _call_openai(self, prompt: str, model: str) -> Dict[str, Any]:
-        """调用OpenAI API"""
-        if not self.openai_api_key or self.openai_api_key == "sk-your-openai-api-key":
+        """调用OpenAI API，失败时自动回退到模拟回答"""
+        if not self.openai_api_key or self.openai_api_key == "sk-your-openai-api-key" or not self.openai_api_key.strip():
             # 如果没有API密钥或使用默认密钥，返回模拟回答
             return await self._get_mock_response(prompt)
 
@@ -150,25 +165,35 @@ class AIQAService:
             "temperature": self.temperature,
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{self.openai_base_url}/chat/completions", headers=headers, json=data
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                choice = result["choices"][0]
-                usage = result.get("usage", {})
-
-                return {
-                    "answer": choice["message"]["content"],
-                    "confidence": 0.9,
-                    "tokens_used": usage.get("total_tokens", 0),
-                }
-            else:
-                raise Exception(
-                    f"OpenAI API错误: {response.status_code} - {response.text}"
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.openai_base_url}/chat/completions", headers=headers, json=data
                 )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    choice = result["choices"][0]
+                    usage = result.get("usage", {})
+
+                    return {
+                        "answer": choice["message"]["content"],
+                        "confidence": 0.9,
+                        "tokens_used": usage.get("total_tokens", 0),
+                    }
+                else:
+                    # API返回错误状态码，回退到模拟回答
+                    error_msg = f"OpenAI API错误: {response.status_code}"
+                    print(f"AI服务调用失败，使用模拟回答: {error_msg}")
+                    return await self._get_mock_response(prompt)
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError) as e:
+            # 网络错误或超时，回退到模拟回答
+            print(f"AI服务连接失败，使用模拟回答: {str(e)}")
+            return await self._get_mock_response(prompt)
+        except Exception as e:
+            # 其他异常，回退到模拟回答
+            print(f"AI服务调用异常，使用模拟回答: {str(e)}")
+            return await self._get_mock_response(prompt)
 
     async def _get_mock_response(self, prompt: str) -> Dict[str, Any]:
         """获取模拟回答（用于测试或API密钥不可用时）"""

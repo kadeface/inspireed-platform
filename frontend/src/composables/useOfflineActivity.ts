@@ -13,6 +13,7 @@ interface SubmissionData {
   cellId: number
   lessonId: number
   studentId: number
+  submissionId?: number  // 服务器返回的提交ID
   responses: Record<string, any>
   status: string
   startedAt: string
@@ -56,7 +57,8 @@ async function initDB() {
 /**
  * 离线活动 Composable
  */
-export function useOfflineActivity(cellId: number, lessonId: number, studentId: number) {
+// 支持 cellId 为数字或 UUID 字符串
+export function useOfflineActivity(cellId: number | string, lessonId: number, studentId: number) {
   const isOnline = ref(navigator.onLine)
   const isSyncing = ref(false)
   const lastSyncTime = ref<Date | null>(null)
@@ -78,20 +80,59 @@ export function useOfflineActivity(cellId: number, lessonId: number, studentId: 
     return `${cellId}-${studentId}`
   }
 
+  // 清理数据，确保可序列化
+  function sanitizeForStorage(data: any): any {
+    if (data === null || data === undefined) {
+      return data
+    }
+    
+    if (typeof data === 'function') {
+      return undefined  // 移除函数
+    }
+    
+    if (data instanceof Date) {
+      return data.toISOString()
+    }
+    
+    if (Array.isArray(data)) {
+      return data.map(item => sanitizeForStorage(item)).filter(item => item !== undefined)
+    }
+    
+    if (typeof data === 'object') {
+      const sanitized: any = {}
+      for (const [key, value] of Object.entries(data)) {
+        const cleaned = sanitizeForStorage(value)
+        if (cleaned !== undefined) {
+          sanitized[key] = cleaned
+        }
+      }
+      return sanitized
+    }
+    
+    return data
+  }
+
   // 保存到 IndexedDB
-  async function saveToIndexedDB(responses: Record<string, any>, status: string = 'draft') {
+  async function saveToIndexedDB(responses: Record<string, any>, status: string = 'draft', submissionId?: number) {
     try {
       const database = await initDB()
       const key = getStorageKey()
+      
+      // 获取现有数据以保留 submissionId
+      const existing = await database.get('submissions', key).catch(() => null)
+
+      // 清理 responses 数据，确保可序列化
+      const sanitizedResponses = sanitizeForStorage(responses)
 
       const data = {
         key,
         cellId,
         lessonId,
         studentId,
-        responses,
+        submissionId: submissionId || existing?.submissionId,
+        responses: sanitizedResponses,
         status,
-        startedAt: new Date().toISOString(),
+        startedAt: existing?.startedAt || new Date().toISOString(),
         version: Date.now(),
         lastModified: new Date().toISOString(),
         synced: false,
@@ -103,6 +144,7 @@ export function useOfflineActivity(cellId: number, lessonId: number, studentId: 
       console.log('💾 Saved to IndexedDB:', key)
     } catch (error) {
       console.error('❌ Failed to save to IndexedDB:', error)
+      throw error
     }
   }
 
@@ -155,34 +197,57 @@ export function useOfflineActivity(cellId: number, lessonId: number, studentId: 
       // 尝试同步到服务器
       const database = await initDB()
       const key = getStorageKey()
-      const localData = await database.get('submissions', key)
+      const localData = await database.get('submissions', key).catch(() => null)
 
       let submission
 
-      if (localData && localData.version) {
+      // 清理 responses 数据，确保是对象格式
+      let sanitizedResponses: Record<string, any> = sanitizeForStorage(responses) || {}
+      
+      // 确保 responses 是对象而不是数组或其他类型
+      if (!sanitizedResponses || typeof sanitizedResponses !== 'object' || Array.isArray(sanitizedResponses)) {
+        console.warn('⚠️ Invalid responses format, using empty object')
+        sanitizedResponses = {}
+      }
+
+      if (localData?.submissionId) {
         // 更新现有提交
-        submission = await activityService.updateSubmission(cellId, {
-          responses,
+        console.log('🔄 Updating existing submission:', localData.submissionId)
+        submission = await activityService.updateSubmission(localData.submissionId, {
+          responses: sanitizedResponses,
           status: status as any,
         })
       } else {
         // 创建新提交
+        // 如果 cellId 是 0（表示 UUID），需要从调用方传递实际的 UUID
+        // 这里我们假设 cellId 可能是数字或已经是正确的值
+        console.log('🆕 Creating new submission:', { cellId, lessonId, responsesCount: Object.keys(sanitizedResponses).length })
+        const startedAt = localData?.startedAt || new Date().toISOString()
         submission = await activityService.createSubmission({
-          cellId,
+          cellId,  // 后端现在支持数字或 UUID 字符串
           lessonId,
-          responses,
-          startedAt: new Date().toISOString(),
+          responses: sanitizedResponses,
+          startedAt,
         })
       }
 
-      // 标记为已同步
+      // 标记为已同步，保存 submissionId
       if (localData) {
         await database.put('submissions', {
           ...localData,
-          responses,
+          submissionId: submission.id,
+          responses: sanitizedResponses,
           status,
           synced: true,
           lastModified: new Date().toISOString(),
+        })
+      } else {
+        // 如果没有本地数据，创建新的
+        await saveToIndexedDB(sanitizedResponses, status, submission.id)
+        const saved = await database.get('submissions', key)
+        await database.put('submissions', {
+          ...saved,
+          synced: true,
         })
       }
 
@@ -191,8 +256,19 @@ export function useOfflineActivity(cellId: number, lessonId: number, studentId: 
 
       console.log('✅ Synced to server')
       return submission
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Sync failed, saving locally:', error)
+      // 记录详细的错误信息
+      if (error.response) {
+        console.error('Response status:', error.response.status)
+        console.error('Response data:', error.response.data)
+        console.error('Request data:', {
+          cellId,
+          lessonId,
+          hasSubmissionId: !!localData?.submissionId,
+          responsesKeys: Object.keys(responses || {}),
+        })
+      }
       await saveToIndexedDB(responses, status)
       throw error
     } finally {
@@ -209,7 +285,7 @@ export function useOfflineActivity(cellId: number, lessonId: number, studentId: 
     try {
       const database = await initDB()
       const key = getStorageKey()
-      const localData = await database.get('submissions', key)
+      const localData = await database.get('submissions', key).catch(() => null)
 
       if (localData && !localData.synced) {
         await syncToServer(localData.responses, localData.status)

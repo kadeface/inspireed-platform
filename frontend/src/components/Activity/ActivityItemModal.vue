@@ -72,18 +72,23 @@
           <!-- 单选题 -->
           <div v-if="itemData.type === 'single-choice'" class="space-y-4">
             <div class="form-group">
-              <label class="form-label">选项</label>
+              <label class="form-label">
+                选项 <span class="text-red-500">*</span>
+                <span class="text-sm text-gray-500 ml-2">（点击左侧单选按钮设置正确答案）</span>
+              </label>
               <div class="space-y-2">
                 <div
                   v-for="(option, index) in singleChoiceConfig.options"
                   :key="option.id"
                   class="option-row"
+                  :class="{ 'border-green-300 bg-green-50': singleChoiceConfig.correctAnswer === option.id }"
                 >
                   <input
                     type="radio"
                     :name="'correct-answer'"
                     :checked="singleChoiceConfig.correctAnswer === option.id"
                     @change="singleChoiceConfig.correctAnswer = option.id"
+                    class="w-5 h-5 text-blue-600"
                   />
                   <input
                     v-model="option.text"
@@ -91,6 +96,9 @@
                     class="flex-1 form-input"
                     :placeholder="`选项 ${String.fromCharCode(65 + index)}`"
                   />
+                  <span v-if="singleChoiceConfig.correctAnswer === option.id" class="text-green-600 font-semibold text-sm">
+                    ✓ 正确答案
+                  </span>
                   <button @click="removeOption(index)" class="btn-icon text-red-600" type="button">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -101,6 +109,9 @@
               <button @click="addOption" class="btn-secondary mt-2" type="button">
                 + 添加选项
               </button>
+              <p v-if="!singleChoiceConfig.correctAnswer" class="text-sm text-red-600 mt-2">
+                ⚠️ 请选择一个选项作为正确答案
+              </p>
             </div>
 
             <div class="form-group">
@@ -117,17 +128,22 @@
           <!-- 多选题 -->
           <div v-if="itemData.type === 'multiple-choice'" class="space-y-4">
             <div class="form-group">
-              <label class="form-label">选项（勾选正确答案）</label>
+              <label class="form-label">
+                选项 <span class="text-red-500">*</span>
+                <span class="text-sm text-gray-500 ml-2">（勾选左侧复选框设置正确答案）</span>
+              </label>
               <div class="space-y-2">
                 <div
                   v-for="(option, index) in multipleChoiceConfig.options"
                   :key="option.id"
                   class="option-row"
+                  :class="{ 'border-green-300 bg-green-50': multipleChoiceConfig.correctAnswers?.includes(option.id) }"
                 >
                   <input
                     type="checkbox"
                     :checked="multipleChoiceConfig.correctAnswers?.includes(option.id)"
                     @change="toggleMultipleAnswer(option.id)"
+                    class="w-5 h-5 text-blue-600"
                   />
                   <input
                     v-model="option.text"
@@ -135,6 +151,9 @@
                     class="flex-1 form-input"
                     :placeholder="`选项 ${String.fromCharCode(65 + index)}`"
                   />
+                  <span v-if="multipleChoiceConfig.correctAnswers?.includes(option.id)" class="text-green-600 font-semibold text-sm">
+                    ✓ 正确答案
+                  </span>
                   <button @click="removeOption(index)" class="btn-icon text-red-600" type="button">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -145,6 +164,9 @@
               <button @click="addOption" class="btn-secondary mt-2" type="button">
                 + 添加选项
               </button>
+              <p v-if="!multipleChoiceConfig.correctAnswers || multipleChoiceConfig.correctAnswers.length === 0" class="text-sm text-red-600 mt-2">
+                ⚠️ 请至少选择一个选项作为正确答案
+              </p>
             </div>
 
             <div class="form-group">
@@ -502,15 +524,73 @@ function handleSubmit() {
     return
   }
 
+  // 验证选项是否填写
+  if (itemData.type === 'single-choice') {
+    // 检查选项是否为空
+    if (singleChoiceConfig.options.length < 2) {
+      alert('单选题至少需要2个选项')
+      return
+    }
+    // 检查选项文本是否填写
+    const emptyOptions = singleChoiceConfig.options.filter(opt => !opt.text || opt.text.trim() === '')
+    if (emptyOptions.length > 0) {
+      alert('请填写所有选项的内容')
+      return
+    }
+    // 检查是否设置了正确答案
+    if (!singleChoiceConfig.correctAnswer) {
+      alert('请选择正确答案（点击选项前的单选按钮）')
+      return
+    }
+  } else if (itemData.type === 'multiple-choice') {
+    // 检查选项是否为空
+    if (multipleChoiceConfig.options.length < 2) {
+      alert('多选题至少需要2个选项')
+      return
+    }
+    // 检查选项文本是否填写
+    const emptyOptions = multipleChoiceConfig.options.filter(opt => !opt.text || opt.text.trim() === '')
+    if (emptyOptions.length > 0) {
+      alert('请填写所有选项的内容')
+      return
+    }
+    // 检查是否设置了正确答案
+    if (!multipleChoiceConfig.correctAnswers || multipleChoiceConfig.correctAnswers.length === 0) {
+      alert('请至少选择一个正确答案（勾选选项前的复选框）')
+      return
+    }
+  } else if (itemData.type === 'true-false') {
+    // 判断题的正确答案总是有默认值，不需要验证
+  }
+
   // 组装配置
   let config: any = {}
   
   if (itemData.type === 'single-choice') {
-    config = singleChoiceConfig
+    // 确保保存完整的配置，包括选项和正确答案
+    config = {
+      options: singleChoiceConfig.options.map(opt => ({
+        id: opt.id,
+        text: opt.text,
+      })),
+      correctAnswer: singleChoiceConfig.correctAnswer,
+      explanation: singleChoiceConfig.explanation || '',
+    }
   } else if (itemData.type === 'multiple-choice') {
-    config = multipleChoiceConfig
+    // 确保保存完整的配置，包括选项和正确答案
+    config = {
+      options: multipleChoiceConfig.options.map(opt => ({
+        id: opt.id,
+        text: opt.text,
+      })),
+      correctAnswers: multipleChoiceConfig.correctAnswers || [],
+      explanation: multipleChoiceConfig.explanation || '',
+    }
   } else if (itemData.type === 'true-false') {
-    config = trueFalseConfig
+    config = {
+      correctAnswer: trueFalseConfig.correctAnswer,
+      explanation: trueFalseConfig.explanation || '',
+    }
   } else if (itemData.type === 'short-answer' || itemData.type === 'long-answer') {
     config = textConfig
   } else if (itemData.type === 'file-upload') {

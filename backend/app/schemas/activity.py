@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from pydantic import BaseModel, Field
 
 from app.models.activity import ActivitySubmissionStatus, PeerReviewStatus
@@ -15,7 +15,7 @@ from app.models.activity import ActivitySubmissionStatus, PeerReviewStatus
 class ActivitySubmissionBase(BaseModel):
     """活动提交基础Schema"""
 
-    cell_id: int
+    cell_id: Union[int, str]  # 支持数字 ID 或 UUID 字符串
     lesson_id: int
     responses: Dict[str, Any] = Field(default_factory=dict)
 

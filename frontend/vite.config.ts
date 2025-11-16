@@ -21,5 +21,22 @@ export default defineConfig({
     //     changeOrigin: true,
     //   }
     // }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // 优化代码分割，避免模块导入问题
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          'ui-vendor': ['axios']
+        }
+      }
+    },
+    // 增加 chunk 大小警告限制
+    chunkSizeWarningLimit: 1000
+  },
+  optimizeDeps: {
+    // 预构建依赖，避免动态导入问题
+    include: ['vue', 'vue-router', 'pinia', 'axios']
   }
 })

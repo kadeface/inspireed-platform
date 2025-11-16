@@ -14,6 +14,7 @@ from app.api.v1 import (
     auth,
     cells,
     chapters,
+    classroom_sessions,
     course_export,
     curriculum,
     favorites,
@@ -50,6 +51,7 @@ api_router.include_router(resources.router, prefix="/resources", tags=["资源"]
 api_router.include_router(lessons.router, prefix="/lessons", tags=["教案"])
 api_router.include_router(cells.router, prefix="/cells", tags=["单元"])
 api_router.include_router(activities.router, prefix="/activities", tags=["教学活动"])
+api_router.include_router(classroom_sessions.router, prefix="/classroom-sessions", tags=["课堂会话"])
 api_router.include_router(questions.router, prefix="/questions", tags=["问答系统"])
 
 # 学生端增强功能路由

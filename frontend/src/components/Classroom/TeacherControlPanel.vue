@@ -1,0 +1,1194 @@
+<template>
+  <div class="teacher-control-panel">
+    <!-- 会话状态栏 -->
+    <div class="session-status-bar" :class="statusClass">
+      <div class="status-content">
+        <div class="status-indicator">
+          <span v-if="session?.status === 'active'" class="pulse-dot"></span>
+          <span v-else-if="session?.status === 'paused'" class="pause-icon">⏸️</span>
+          <span v-else class="pending-icon">⏸️</span>
+        </div>
+        <div class="status-text">
+          <h3 class="status-title">{{ statusTitle }}</h3>
+          <p v-if="session?.status === 'active' && sessionDuration" class="duration">
+            已进行: {{ formatDuration(sessionDuration) }}
+          </p>
+          <p v-else-if="session?.status === 'pending'" class="pending-text">
+            准备开始上课
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 控制按钮组 -->
+    <div class="control-actions">
+      <button 
+        v-if="!session || session.status === 'pending'"
+        @click="handleStart"
+        :disabled="loading"
+        class="btn btn-primary btn-lg"
+      >
+        ▶️ 开始上课
+      </button>
+      
+      <template v-if="session">
+        <button 
+          v-if="session.status === 'active'"
+          @click="handlePause"
+          :disabled="loading"
+          class="btn btn-secondary"
+        >
+          ⏸️ 暂停
+        </button>
+        
+        <button 
+          v-if="session.status === 'paused'"
+          @click="handleResume"
+          :disabled="loading"
+          class="btn btn-primary"
+        >
+          ▶️ 继续
+        </button>
+        
+        <button 
+          v-if="session.status !== 'ended'"
+          @click="handleEnd"
+          :disabled="loading"
+          class="btn btn-danger"
+        >
+          ⏹️ 结束课程
+        </button>
+      </template>
+    </div>
+
+    <!-- 在线学生列表 -->
+    <div v-if="session" class="students-panel">
+      <div class="panel-header">
+        <h4>在线学生</h4>
+        <span class="student-count">{{ activeStudents.length }} / {{ totalStudents }}</span>
+      </div>
+      
+      <div v-if="loadingStudents" class="loading-state">
+        <div class="spinner"></div>
+        <p>加载学生列表...</p>
+      </div>
+      
+      <div v-else-if="activeStudents.length > 0" class="students-grid">
+        <div 
+          v-for="student in activeStudents" 
+          :key="student.id"
+          class="student-card"
+          :class="{ 
+            'at-current-cell': (student.currentCellId || student.current_cell_id) === (session.currentCellId || session.current_cell_id)
+          }"
+        >
+          <div class="student-avatar">
+            {{ (student.studentName || student.student_name)?.[0] || 'S' }}
+          </div>
+          <div class="student-info">
+            <div class="student-name">{{ student.studentName || student.student_name }}</div>
+            <div class="student-progress">
+              <div class="progress-bar-mini">
+                <div 
+                  class="progress-fill" 
+                  :style="{ width: `${student.progressPercentage || student.progress_percentage || 0}%` }"
+                ></div>
+              </div>
+              <span class="progress-text">{{ Math.round(student.progressPercentage || student.progress_percentage || 0) }}%</span>
+            </div>
+          </div>
+          <div v-if="(student.currentCellId || student.current_cell_id) === (session.currentCellId || session.current_cell_id)" class="sync-indicator">
+            ✓
+          </div>
+        </div>
+      </div>
+      
+      <div v-else class="empty-students">
+        <p>暂无学生在线</p>
+      </div>
+    </div>
+
+    <!-- 导播台 -->
+    <div v-if="lesson && lesson.content && lesson.content.length > 0" class="content-control">
+      <!-- 调试信息（开发时可见） -->
+      <div v-if="!session" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div class="flex items-center gap-2 text-yellow-800">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="text-sm font-medium">请先开始上课以使用导播台</span>
+        </div>
+        <p class="text-xs text-yellow-600 mt-1">点击"开始上课"按钮创建课堂会话</p>
+      </div>
+      
+      <ClassroomControlBoard
+        v-if="session"
+        :cells="lesson.content"
+        :current-cell-id="session.current_cell_id"
+        :current-cell-index="selectedCellIndex"
+        :display-cell-ids="displayCellIds"
+        :current-activity-id="session.current_activity_id"
+        :db-cells="dbCells"
+        :loading="loading"
+        @navigate-to-cell="handleControlBoardNavigate"
+        @navigateToCell="handleControlBoardNavigate"
+        @start-activity="handleStartActivity"
+        @end-activity="handleEndActivity"
+      />
+      
+      <!-- 如果没有session，显示预览模式（只读） -->
+      <div v-else class="control-board-preview">
+        <div class="board-header">
+          <h4 class="board-title">📺 导播台（预览）</h4>
+          <div class="board-stats">
+            <span class="stat-item">共 {{ lesson.content.length }} 个模块</span>
+          </div>
+        </div>
+        <div class="control-chain">
+          <template v-for="(cell, index) in lesson.content" :key="cell.id || index">
+            <div class="chain-node chain-node-preview">
+              <div class="node-number">{{ index + 1 }}</div>
+              <div class="node-icon">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </div>
+              <div class="node-label">{{ cell.title || cell.type || `模块 ${index + 1}` }}</div>
+            </div>
+            <div v-if="index < lesson.content.length - 1" class="chain-connector"></div>
+          </template>
+        </div>
+        <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+          💡 开始上课后，点击节点即可切换模块显示给学生
+        </div>
+      </div>
+    </div>
+    
+    <!-- 会话统计（简化版） -->
+    <div v-if="session && sessionStatistics" class="session-statistics">
+      <div class="panel-header">
+        <h4>会话统计</h4>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value">{{ sessionStatistics.total_students }}</div>
+          <div class="stat-label">总学生</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">{{ sessionStatistics.active_students }}</div>
+          <div class="stat-label">在线</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">{{ sessionStatistics.completed_students }}</div>
+          <div class="stat-label">已完成</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">{{ Math.round(sessionStatistics.average_progress) }}%</div>
+          <div class="stat-label">平均进度</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import type { Lesson } from '../../types/lesson'
+import type { Cell } from '../../types/cell'
+import classroomSessionService from '../../services/classroomSession'
+import ClassroomSwitcher from './ClassroomSwitcher.vue'
+import ClassroomControlBoard from './ClassroomControlBoard.vue'
+import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId } from '../../utils/cellId'
+
+interface Props {
+  lessonId: number
+  lesson?: Lesson
+}
+
+const props = defineProps<Props>()
+
+const route = useRoute()
+const session = ref<any>(null)
+const loading = ref(false)
+const activeStudents = ref<any[]>([])
+const loadingStudents = ref(false)
+const sessionStatistics = ref<any>(null)
+const selectedCellIndex = ref(-1)  // -1表示隐藏所有内容
+const displayCellIds = ref<number[]>([])  // 多选模式下显示的 Cell ID 列表
+const sessionDuration = ref(0)
+const durationInterval = ref<NodeJS.Timeout | null>(null)
+const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录（用于 ID 匹配）
+
+// 计算属性
+const statusTitle = computed(() => {
+  if (!session.value) return '未创建会话'
+  const statusMap: Record<string, string> = {
+    pending: '准备中',
+    active: '上课中',
+    paused: '已暂停',
+    ended: '已结束',
+  }
+  return statusMap[session.value.status] || '未知状态'
+})
+
+const statusClass = computed(() => {
+  if (!session.value) return 'status-pending'
+  return `status-${session.value.status}`
+})
+
+const totalStudents = computed(() => {
+  return session.value?.total_students || 0
+})
+
+const currentCell = computed(() => {
+  if (!props.lesson?.content || !session.value) return null
+  
+  // 如果current_cell_id为null或0，表示没有显示任何内容
+  const currentId = session.value.current_cell_id
+  if (!currentId || currentId === 0) return null
+  
+  // 查找匹配的Cell
+  return props.lesson.content.find((cell, index) => {
+    const cellId = getCellId(cell)
+    // 尝试匹配数字ID
+    if (typeof cellId === 'number' && cellId === currentId) return true
+    // 尝试匹配字符串ID（转换为数字）
+    if (typeof cellId === 'string') {
+      const numId = parseInt(cellId)
+      if (!isNaN(numId) && numId === currentId) return true
+    }
+    // 尝试通过索引匹配（如果currentId是顺序索引）
+    if (index === currentId) return true
+    // 尝试通过order匹配
+    if (cell.order !== undefined && cell.order === currentId) return true
+    return false
+  }) || null
+})
+
+
+// 方法
+// 使用工具函数获取 Cell ID（保留此函数名以兼容现有代码）
+function getCellId(cell: Cell): number | string | null {
+  return getCellIdUtil(cell)
+}
+
+function getCellTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    text: '文本',
+    code: '代码',
+    activity: '活动',
+    video: '视频',
+    flowchart: '流程图',
+  }
+  return labels[type] || type
+}
+
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+  return `${minutes}:${secs.toString().padStart(2, '0')}`
+}
+
+// 会话操作
+async function handleStart() {
+  loading.value = true
+  try {
+    // 首先需要创建会话，这里需要classroom_id
+    // 暂时从路由或props中获取，或者提示用户选择班级
+    const classroomId = route.params.classroomId as string || '1'
+    
+    try {
+      console.log('🚀 Starting to create session...')
+      // 尝试创建会话
+      const newSession = await classroomSessionService.createSession(props.lessonId, {
+        classroom_id: parseInt(classroomId),
+      })
+      
+      console.log('✅ Session created, received:', newSession)
+      
+      // 检查响应
+      if (!newSession || !newSession.id) {
+        console.error('❌ Invalid session response:', newSession)
+        throw new Error('创建会话失败：服务器返回的数据格式不正确')
+      }
+      
+      console.log('🎬 Starting session with id:', newSession.id)
+      // 开始会话
+      session.value = await classroomSessionService.startSession(newSession.id)
+      console.log('✅ Session started successfully:', session.value)
+      
+      // 检查开始会话的响应
+      if (!session.value) {
+        throw new Error('开始会话失败：服务器返回的数据格式不正确')
+      }
+    } catch (createError: any) {
+      // 如果创建失败，检查是否是因为已有活跃会话
+      const errorDetail = createError.response?.data?.detail || createError.message || ''
+      
+      if (errorDetail.includes('已有活跃的课堂会话') || createError.response?.status === 400) {
+        // 尝试查找并加载现有会话
+        console.log('检测到已有活跃会话，尝试加载...')
+        
+        // 首先尝试从错误信息中提取会话ID
+        const sessionIdMatch = errorDetail.match(/ID:\s*(\d+)/)
+        let activeSessions: any[] = []
+        
+        if (sessionIdMatch) {
+          // 如果错误信息中包含会话ID，直接使用它
+          const sessionId = parseInt(sessionIdMatch[1])
+          console.log(`从错误信息中提取到会话ID: ${sessionId}`)
+          try {
+            const existingSession = await classroomSessionService.getSession(sessionId)
+            if (existingSession) {
+              activeSessions = [existingSession]
+              console.log(`成功通过ID获取会话:`, existingSession)
+            }
+          } catch (getError: any) {
+            console.error('通过ID获取会话失败:', getError)
+            // 如果通过ID获取失败，尝试查询列表
+          }
+        }
+        
+        // 如果通过ID获取失败或没有提取到ID，尝试查询列表
+        if (activeSessions.length === 0) {
+          try {
+            const allSessions = await classroomSessionService.listSessions(props.lessonId)
+            console.log(`📋 查询到 ${allSessions.length} 个会话`)
+            // 过滤活跃会话，并且如果知道classroomId，也按classroomId过滤
+            activeSessions = allSessions.filter(s => {
+              const isActive = s.status === 'active' || s.status === 'paused' || s.status === 'pending'
+              if (!isActive) return false
+              // 尝试匹配 classroomId（如果有的话）
+              const sessionClassroomId = s.classroomId || (s as any).classroom_id
+              const targetClassroomId = parseInt(classroomId)
+              if (sessionClassroomId && targetClassroomId) {
+                return sessionClassroomId === targetClassroomId
+              }
+              // 如果没有 classroomId，匹配所有活跃会话
+              return true
+            })
+            console.log(`✅ 通过列表查询找到 ${activeSessions.length} 个活跃会话（classroom_id=${classroomId}）`)
+          } catch (e: any) {
+            console.error('查询会话列表失败:', e)
+            const listErrorDetail = e.response?.data?.detail || e.message || ''
+            console.error('查询失败详情:', listErrorDetail)
+            // 如果列表查询也失败，尝试再次从错误信息中提取ID
+            if (!sessionIdMatch) {
+              const fallbackIdMatch = listErrorDetail.match(/ID:\s*(\d+)/) || errorDetail.match(/ID:\s*(\d+)/)
+              if (fallbackIdMatch) {
+                const fallbackSessionId = parseInt(fallbackIdMatch[1])
+                try {
+                  const existingSession = await classroomSessionService.getSession(fallbackSessionId)
+                  if (existingSession) {
+                    activeSessions = [existingSession]
+                    console.log(`通过备用方法获取会话成功`)
+                  }
+                } catch (fallbackError: any) {
+                  console.error('备用方法也失败:', fallbackError)
+                  // 检查是否是权限问题
+                  if (fallbackError.response?.status === 403) {
+                    console.warn('⚠️ 无权限访问该会话，可能是会话不属于当前用户')
+                  } else if (fallbackError.response?.status === 404) {
+                    console.warn('⚠️ 会话不存在，可能已被删除')
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        if (activeSessions.length > 0) {
+          // 找到现有会话，直接使用
+          const existingSession = activeSessions[0]
+          session.value = existingSession
+          
+          // 如果会话是pending状态，尝试开始它
+          if (existingSession.status === 'pending') {
+            try {
+              session.value = await classroomSessionService.startSession(existingSession.id)
+            } catch (startError: any) {
+              console.warn('启动现有会话失败，但继续使用:', startError)
+              // 即使启动失败，也继续使用现有会话
+            }
+          }
+          
+          // 开始计时和加载数据
+          if (session.value.status === 'active') {
+            startDurationTimer()
+          }
+          loadParticipants()
+          loadStatistics()
+          
+          // 提示用户已加载现有会话
+          const statusText = {
+            'active': '进行中',
+            'paused': '已暂停',
+            'pending': '待开始'
+          }[existingSession.status] || '未知'
+          console.log(`✅ 已自动加载现有会话 (ID: ${existingSession.id}, 状态: ${statusText})`)
+          
+          // 如果会话是暂停状态，提示用户
+          if (existingSession.status === 'paused') {
+            // 不显示alert，让用户看到界面状态即可
+            console.log('💡 会话当前处于暂停状态，可以点击"继续"按钮恢复')
+          }
+          
+          return // 成功加载，退出函数
+        } else {
+          // 没有找到活跃会话
+          console.warn('⚠️ 虽然检测到已有活跃会话，但无法加载会话详情')
+          console.warn('原始错误:', createError.response?.data || createError.message)
+          
+          // 尝试最后一次：直接从错误信息中提取ID
+          const finalIdMatch = errorDetail.match(/ID:\s*(\d+)/)
+          if (finalIdMatch) {
+            const finalSessionId = parseInt(finalIdMatch[1])
+            console.log(`🔄 最后尝试：直接使用会话ID ${finalSessionId}`)
+            try {
+              const finalSession = await classroomSessionService.getSession(finalSessionId)
+              if (finalSession) {
+                session.value = finalSession
+                
+                // 如果会话是pending状态，尝试开始它
+                if (finalSession.status === 'pending') {
+                  try {
+                    session.value = await classroomSessionService.startSession(finalSession.id)
+                  } catch (startError: any) {
+                    console.warn('启动现有会话失败，但继续使用:', startError)
+                    // 即使启动失败，也继续使用现有会话
+                  }
+                }
+                
+                // 开始计时和加载数据
+                if (session.value.status === 'active') {
+                  startDurationTimer()
+                }
+                loadParticipants()
+                loadStatistics()
+                console.log(`✅ 成功！已加载会话 ID: ${finalSessionId}`)
+                return
+              }
+            } catch (finalError: any) {
+              console.error('❌ 最后尝试也失败:', finalError)
+              console.error('❌ 错误详情:', {
+                message: finalError.message,
+                response: finalError.response,
+                status: finalError.response?.status,
+                data: finalError.response?.data,
+              })
+              // 检查具体错误类型
+              if (finalError.response?.status === 403) {
+                console.error('⚠️ 无权限访问该会话，可能是会话不属于当前用户')
+                throw new Error('无权限访问该会话。会话可能属于其他教师，请确保您是该会话的创建者。')
+              } else if (finalError.response?.status === 404) {
+                console.error('⚠️ 会话不存在，可能已被删除')
+                throw new Error('会话不存在，可能已被删除。请刷新页面重试。')
+              } else if (finalError.response?.status === 400) {
+                // 400 错误可能包含详细信息
+                const errorDetail = finalError.response?.data?.detail || finalError.message || '无法加载会话'
+                console.error('⚠️ 请求错误 (400):', errorDetail)
+                throw new Error(`无法加载现有会话：${errorDetail}`)
+              } else {
+                // 其他错误，抛出更友好的错误信息
+                const finalErrorMessage = finalError.response?.data?.detail || finalError.message || '无法加载会话'
+                console.error('⚠️ 未知错误:', finalErrorMessage)
+                throw new Error(`无法加载现有会话：${finalErrorMessage}`)
+              }
+            }
+          }
+          
+          // 如果所有方法都失败，抛出更友好的错误信息
+          const friendlyError = new Error(
+            '无法加载现有活跃会话。请尝试刷新页面，或联系管理员检查会话状态。'
+          )
+          throw friendlyError
+        }
+      } else {
+        // 其他错误，直接抛出
+        throw createError
+      }
+    }
+    
+    // 开始计时
+    if (session.value?.status === 'active') {
+      startDurationTimer()
+    }
+    
+    // 加载学生列表
+    loadParticipants()
+    loadStatistics()
+  } catch (error: any) {
+    console.error('Failed to start session:', error)
+    // 提取更友好的错误信息
+    let errorMessage = error.message || error.response?.data?.detail || '开始课程失败'
+    
+    // 如果是已知的错误类型，显示更友好的提示
+    if (errorMessage.includes('无权限')) {
+      errorMessage = '无法访问该会话。请确保您是该会话的创建者。'
+    } else if (errorMessage.includes('不存在')) {
+      errorMessage = '会话不存在，请刷新页面重试。'
+    } else if (errorMessage.includes('已有活跃的课堂会话')) {
+      // 这种情况应该已经被处理了，但如果仍然出现，说明加载失败
+      errorMessage = '检测到已有活跃会话，但无法自动加载。请刷新页面重试。'
+    }
+    
+    alert(errorMessage)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handlePause() {
+  if (!session.value) return
+  loading.value = true
+  try {
+    session.value = await classroomSessionService.pauseSession(session.value.id)
+    stopDurationTimer()
+  } catch (error: any) {
+    console.error('Failed to pause session:', error)
+    alert('暂停失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleResume() {
+  if (!session.value) return
+  loading.value = true
+  try {
+    session.value = await classroomSessionService.resumeSession(session.value.id)
+    startDurationTimer()
+  } catch (error: any) {
+    console.error('Failed to resume session:', error)
+    alert('继续失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleEnd() {
+  if (!session.value) return
+  if (!confirm('确定要结束课程吗？')) return
+  
+  loading.value = true
+  try {
+    session.value = await classroomSessionService.endSession(session.value.id)
+    stopDurationTimer()
+  } catch (error: any) {
+    console.error('Failed to end session:', error)
+    alert('结束课程失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 隐藏所有内容（通过导播台的"隐藏"节点调用）
+async function handleHideAll() {
+  if (!session.value) return
+  
+  loading.value = true
+  try {
+    // 使用cell_id=0来隐藏所有内容（后端已支持）
+    session.value = await classroomSessionService.navigateToCell(session.value.id, {
+      cellId: 0,
+    })
+    selectedCellIndex.value = -1
+  } catch (error: any) {
+    console.error('Failed to hide content:', error)
+    const errorMessage = error.response?.data?.detail || error.message || '隐藏内容失败'
+    alert(errorMessage)
+  } finally {
+    loading.value = false
+  }
+}
+
+
+// 活动控制
+async function handleStartActivity() {
+  if (!session.value || !currentCell.value) return
+  
+  // 使用session中的current_cell_id，这是当前显示的Cell
+  const currentCellId = session.value.current_cell_id
+  if (!currentCellId) {
+    alert('无法开始活动：当前没有显示任何Cell')
+    return
+  }
+  
+  loading.value = true
+  try {
+    session.value = await classroomSessionService.startActivity(session.value.id, {
+      cellId: currentCellId,
+    })
+  } catch (error: any) {
+    console.error('Failed to start activity:', error)
+    const errorMessage = error.response?.data?.detail || error.message || '开始活动失败'
+    alert(errorMessage)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleEndActivity() {
+  if (!session.value) return
+  
+  loading.value = true
+  try {
+    session.value = await classroomSessionService.endActivity(session.value.id)
+  } catch (error: any) {
+    console.error('Failed to end activity:', error)
+    alert('结束活动失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 导播台导航处理
+async function handleControlBoardNavigate(
+  cellId: number | string | null, 
+  cellOrder: number | null,
+  action: 'toggle' | 'add' | 'remove' = 'toggle',
+  multiSelect: boolean = false
+) {
+  console.log('📬 收到导播台导航事件:', { cellId, cellOrder, action, multiSelect })
+  
+  if (!session.value) {
+    console.warn('⚠️ 无法导航：会话不存在')
+    return
+  }
+  
+  console.log('🎯 导播台导航请求:', { 
+    cellId, 
+    cellOrder, 
+    cellIdType: typeof cellId, 
+    action, 
+    multiSelect,
+    sessionId: session.value.id,
+  })
+  
+  loading.value = true
+  try {
+    // 使用工具函数构建导航请求数据
+    const requestData = buildNavigateRequest(cellId, cellOrder)
+    // 添加多选相关参数
+    requestData.action = action
+    requestData.multiSelect = multiSelect
+    console.log('📤 发送导航请求:', requestData)
+    const updatedSession = await classroomSessionService.navigateToCell(session.value.id, requestData)
+    
+    // 确保更新后的会话状态正确（不要丢失状态）
+    if (updatedSession) {
+      session.value = {
+        ...session.value,
+        ...updatedSession,
+        status: session.value.status, // 保持原有状态，导航不应该改变会话状态
+        id: session.value.id,
+      }
+      
+      // 更新多选列表
+      const displayCellIdsFromSession = (updatedSession.settings as any)?.display_cell_ids || 
+                                       (updatedSession.settings as any)?.displayCellIds || []
+      displayCellIds.value = Array.isArray(displayCellIdsFromSession) ? displayCellIdsFromSession : []
+      console.log('✅ 更新显示 Cell 列表:', displayCellIds.value, 'settings:', updatedSession.settings)
+    }
+    
+    // 导航后立即刷新学生列表
+    loadParticipants()
+    
+    // 更新selectedCellIndex
+    if (requestData.cellId === 0) {
+      selectedCellIndex.value = -1
+    } else if (cellOrder !== null && cellOrder !== undefined && props.lesson?.content) {
+      // 使用 cellOrder 直接设置索引
+      selectedCellIndex.value = cellOrder
+      console.log('✅ 更新 selectedCellIndex 为:', cellOrder)
+    } else if (requestData.cellId && props.lesson?.content) {
+      // 通过 cellId 查找索引
+      const index = props.lesson.content.findIndex((cell) => {
+        const id = getCellId(cell)
+        if (typeof id === 'number' && id === requestData.cellId) return true
+        if (typeof id === 'string') {
+          const numId = parseInt(id, 10)
+          if (!isNaN(numId) && numId === requestData.cellId) return true
+        }
+        return false
+      })
+      if (index >= 0) {
+        selectedCellIndex.value = index
+        console.log('✅ 通过 cellId 找到索引:', index)
+      } else {
+        console.warn('⚠️ 未找到匹配的 cell，使用 cellOrder 作为 fallback')
+        // 如果找不到，尝试使用返回的 currentCellId 对应的索引
+        if (updatedSession?.currentCellId || updatedSession?.current_cell_id) {
+          const currentId = updatedSession.currentCellId || updatedSession.current_cell_id
+          const foundIndex = props.lesson.content.findIndex((cell) => {
+            const id = getCellId(cell)
+            return id === currentId || (typeof id === 'string' && String(id) === String(currentId))
+          })
+          if (foundIndex >= 0) {
+            selectedCellIndex.value = foundIndex
+          }
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error('Failed to navigate from control board:', error)
+    const errorMessage = error.response?.data?.detail || error.message || '切换内容失败'
+    alert(errorMessage)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 加载数据
+async function loadParticipants() {
+  if (!session.value) {
+    console.warn('⚠️ 无法加载学生列表：会话不存在')
+    return
+  }
+  
+  console.log('🔄 开始加载在线学生列表，会话ID:', session.value.id)
+  loadingStudents.value = true
+  try {
+    // 获取所有在线学生（is_active=true）
+    const participants = await classroomSessionService.getParticipants(session.value.id, true)
+    
+    // 确保是数组且只包含在线学生
+    const activeParticipants = Array.isArray(participants) 
+      ? participants.filter(p => p.isActive !== false && (p.is_active !== false))
+      : []
+    
+    activeStudents.value = activeParticipants
+    console.log(`👥 加载在线学生完成: ${activeStudents.value.length} 人`, activeStudents.value.map(s => ({
+      id: s.id,
+      name: s.studentName || s.student_name,
+      isActive: s.isActive || s.is_active,
+    })))
+    
+    // 更新会话统计中的在线学生数
+    if (session.value) {
+      session.value.activeStudents = activeStudents.value.length
+      console.log('📊 更新会话统计，在线学生数:', session.value.activeStudents)
+    }
+  } catch (error: any) {
+    console.error('❌ 加载学生列表失败:', error)
+    console.error('❌ 错误详情:', {
+      message: error.message,
+      response: error.response,
+      status: error.response?.status,
+      data: error.response?.data,
+    })
+    activeStudents.value = []
+  } finally {
+    loadingStudents.value = false
+  }
+}
+
+async function loadStatistics() {
+  if (!session.value) return
+  
+  try {
+    sessionStatistics.value = await classroomSessionService.getStatistics(session.value.id)
+  } catch (error) {
+    console.error('Failed to load statistics:', error)
+  }
+}
+
+// 定时器
+function startDurationTimer() {
+  if (durationInterval.value) return
+  
+  durationInterval.value = setInterval(() => {
+    if (session.value?.actual_start) {
+      const now = new Date()
+      const start = new Date(session.value.actual_start)
+      sessionDuration.value = Math.floor((now.getTime() - start.getTime()) / 1000)
+    }
+  }, 1000)
+}
+
+function stopDurationTimer() {
+  if (durationInterval.value) {
+    clearInterval(durationInterval.value)
+    durationInterval.value = null
+  }
+}
+
+// 监听session变化，更新selectedCellIndex和displayCellIds
+watch(() => session.value, (newSession) => {
+  if (!props.lesson?.content || !newSession) return
+  
+  // 更新多选列表
+  const displayCellIdsFromSession = (newSession.settings as any)?.display_cell_ids || 
+                                   (newSession.settings as any)?.displayCellIds || []
+  displayCellIds.value = Array.isArray(displayCellIdsFromSession) ? displayCellIdsFromSession : []
+  
+  // 如果有多个选中的 Cell，使用第一个的索引（或最后一个）
+  if (displayCellIds.value.length > 0) {
+    const firstCellId = displayCellIds.value[0]
+    const index = props.lesson.content.findIndex(cell => {
+      const id = getCellId(cell)
+      const numericId = toNumericId(id)
+      return numericId === firstCellId
+    })
+    if (index >= 0) {
+      selectedCellIndex.value = index
+      return
+    }
+  }
+  
+  // 单选模式：更新 selectedCellIndex
+  const cellId = newSession.current_cell_id
+  if (!cellId || cellId === 0) {
+    selectedCellIndex.value = -1
+    return
+  }
+  
+  // 查找匹配的Cell
+  const index = props.lesson.content.findIndex(cell => {
+    const id = getCellId(cell)
+    // 尝试匹配数字ID
+    if (typeof id === 'number' && id === cellId) return true
+    // 尝试匹配字符串ID（转换为数字）
+    if (typeof id === 'string') {
+      const numId = parseInt(id)
+      if (!isNaN(numId) && numId === cellId) return true
+    }
+    return false
+  })
+  
+  if (index >= 0) {
+    selectedCellIndex.value = index
+  } else {
+    // 如果没找到，设置为-1（隐藏状态）
+    selectedCellIndex.value = -1
+  }
+}, { immediate: true, deep: true })
+
+// 加载数据库中的 Cell 记录
+async function loadDbCells() {
+  try {
+    const { api } = await import('../../services/api')
+    const response = await api.get(`/cells/lesson/${props.lessonId}`)
+    dbCells.value = Array.isArray(response) ? response : (response.data || [])
+    console.log('📦 加载数据库 Cell 记录:', dbCells.value.length, '个', dbCells.value)
+  } catch (error: any) {
+    console.warn('⚠️ 加载数据库 Cell 记录失败:', error)
+    dbCells.value = []
+  }
+}
+
+// 初始化
+onMounted(async () => {
+  // 加载数据库 Cell 记录（用于 ID 匹配）
+  await loadDbCells()
+  
+  // 检查是否有现有的活跃会话
+  try {
+    // 查询所有会话，然后过滤出活跃的
+    const allSessions = await classroomSessionService.listSessions(props.lessonId)
+    const activeSessions = allSessions.filter(s => 
+      s.status === 'active' || s.status === 'paused' || s.status === 'pending'
+    )
+    
+    console.log('🔍 检查现有会话:', { total: allSessions.length, active: activeSessions.length })
+    
+    // 添加空值检查
+    if (activeSessions && Array.isArray(activeSessions) && activeSessions.length > 0) {
+      session.value = activeSessions[0]
+      console.log('✅ 加载现有会话:', session.value)
+      
+      if (session.value.status === 'active') {
+        startDurationTimer()
+      }
+      
+      // 加载学生列表和统计
+      loadParticipants()
+      loadStatistics()
+      
+      // 设置定时刷新学生列表（每5秒）
+      const refreshInterval = setInterval(() => {
+        if (session.value && (session.value.status === 'active' || session.value.status === 'paused')) {
+          loadParticipants()
+          loadStatistics()
+        } else {
+          clearInterval(refreshInterval)
+        }
+      }, 5000)
+      
+      // 组件卸载时清除定时器
+      onUnmounted(() => {
+        clearInterval(refreshInterval)
+      })
+    } else {
+      console.log('ℹ️ 没有找到现有会话')
+    }
+  } catch (error: any) {
+    console.error('❌ 加载现有会话失败:', error)
+    // 如果是404或其他错误，不显示错误提示（可能是正常的，没有现有会话）
+    if (error.response?.status !== 404) {
+      console.warn('加载现有会话时出错，但可以继续创建新会话')
+    }
+  }
+})
+
+onUnmounted(() => {
+  stopDurationTimer()
+})
+</script>
+
+<style scoped>
+.teacher-control-panel {
+  @apply bg-white rounded-lg border border-gray-200 p-6 space-y-6;
+}
+
+.session-status-bar {
+  @apply rounded-lg p-4 border-2;
+}
+
+.session-status-bar.status-active {
+  @apply bg-green-50 border-green-300;
+}
+
+.session-status-bar.status-paused {
+  @apply bg-yellow-50 border-yellow-300;
+}
+
+.session-status-bar.status-pending {
+  @apply bg-gray-50 border-gray-300;
+}
+
+.status-content {
+  @apply flex items-center gap-4;
+}
+
+.status-indicator {
+  @apply flex items-center justify-center w-12 h-12 rounded-full;
+}
+
+.pulse-dot {
+  @apply w-4 h-4 bg-green-600 rounded-full animate-pulse;
+}
+
+.status-text {
+  @apply flex-1;
+}
+
+.status-title {
+  @apply text-xl font-bold text-gray-900;
+}
+
+.duration {
+  @apply text-sm text-gray-600 mt-1;
+}
+
+.control-actions {
+  @apply flex gap-3;
+}
+
+.btn {
+  @apply px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700;
+}
+
+.btn-secondary {
+  @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white hover:bg-red-700;
+}
+
+.btn-lg {
+  @apply px-6 py-3 text-lg;
+}
+
+.btn-sm {
+  @apply px-3 py-1 text-sm;
+}
+
+.students-panel,
+.content-control,
+.session-statistics {
+  @apply border border-gray-200 rounded-lg p-4;
+}
+
+.panel-header {
+  @apply flex items-center justify-between mb-4 pb-2 border-b border-gray-200;
+}
+
+.panel-header h4 {
+  @apply text-lg font-semibold text-gray-900;
+}
+
+.student-count {
+  @apply text-sm text-gray-600;
+}
+
+.loading-state {
+  @apply flex flex-col items-center justify-center py-8;
+}
+
+.spinner {
+  @apply w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-2;
+}
+
+.students-grid {
+  @apply grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3;
+}
+
+.student-card {
+  @apply flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-white hover:shadow-md transition-shadow;
+}
+
+.student-card.at-current-cell {
+  @apply border-blue-400 bg-blue-50;
+}
+
+.student-avatar {
+  @apply w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-semibold;
+}
+
+.student-info {
+  @apply flex-1 min-w-0;
+}
+
+.student-name {
+  @apply text-sm font-medium text-gray-900 truncate;
+}
+
+.student-progress {
+  @apply flex items-center gap-2 mt-1;
+}
+
+.progress-bar-mini {
+  @apply flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden;
+}
+
+.progress-fill {
+  @apply h-full bg-blue-500 transition-all duration-300;
+}
+
+.progress-text {
+  @apply text-xs text-gray-600 whitespace-nowrap;
+}
+
+.sync-indicator {
+  @apply text-green-600 font-bold;
+}
+
+.empty-students {
+  @apply text-center py-8 text-gray-500;
+}
+
+.content-control {
+  @apply space-y-4;
+}
+
+.control-board-preview {
+  @apply bg-white rounded-lg border border-gray-200 p-6;
+}
+
+.control-board-preview .board-header {
+  @apply flex items-center justify-between mb-6 pb-4 border-b border-gray-200;
+}
+
+.control-board-preview .board-title {
+  @apply text-lg font-semibold text-gray-900;
+}
+
+.control-board-preview .board-stats {
+  @apply flex items-center gap-4 text-sm text-gray-600;
+}
+
+.control-board-preview .stat-item {
+  @apply px-2 py-1 bg-gray-100 rounded;
+}
+
+.control-board-preview .control-chain {
+  @apply flex items-center;
+  overflow-x: auto;
+  padding: 1rem 0;
+}
+
+.control-board-preview .chain-node {
+  @apply flex flex-col items-center justify-center relative;
+  @apply min-w-[80px] w-[80px] p-3 rounded-lg;
+  @apply bg-gray-50 border-2 border-gray-200;
+  flex-shrink: 0;
+}
+
+.chain-node-preview {
+  @apply opacity-60 cursor-default;
+  pointer-events: none;
+}
+
+.control-board-preview .node-number {
+  @apply absolute -top-2 -left-2 w-6 h-6 bg-gray-600 text-white rounded-full;
+  @apply flex items-center justify-center text-xs font-bold;
+}
+
+.control-board-preview .node-icon {
+  @apply w-10 h-10 flex items-center justify-center;
+  @apply text-gray-600 mb-2;
+}
+
+.control-board-preview .node-label {
+  @apply text-xs text-center text-gray-700 font-medium;
+  @apply line-clamp-2;
+  max-width: 100%;
+}
+
+.control-board-preview .chain-connector {
+  @apply flex-shrink-0;
+  width: 2rem;
+  height: 2px;
+  background: linear-gradient(to right, #e5e7eb, #9ca3af);
+  margin: 0 0.5rem;
+}
+
+.current-cell-info {
+  @apply mt-4 p-3 bg-gray-50 rounded-lg;
+}
+
+.cell-header {
+  @apply flex items-center gap-2 mb-2;
+}
+
+.cell-type-badge {
+  @apply px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded;
+}
+
+.cell-title {
+  @apply text-sm font-medium text-gray-900;
+}
+
+.activity-control {
+  @apply mt-3;
+}
+
+.stats-grid {
+  @apply grid grid-cols-4 gap-4;
+}
+
+.stat-item {
+  @apply text-center;
+}
+
+.stat-value {
+  @apply text-2xl font-bold text-gray-900 mb-1;
+}
+
+.stat-label {
+  @apply text-sm text-gray-600;
+}
+</style>
+
