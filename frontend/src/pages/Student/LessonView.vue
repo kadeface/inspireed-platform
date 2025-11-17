@@ -48,6 +48,11 @@
                 </div>
               </div>
               <div class="flex items-center gap-4">
+                <!-- WebSocket 连接状态指示器 -->
+                <div v-if="isInClassroomMode" class="flex items-center gap-2 px-3 py-1.5 rounded-lg" :class="isWebSocketConnected ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'">
+                  <div class="w-2 h-2 rounded-full" :class="isWebSocketConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'"></div>
+                  <span class="text-xs font-medium">{{ isWebSocketConnected ? '实时同步' : '轮询模式' }}</span>
+                </div>
                 <!-- 学习进度 -->
                 <div class="flex items-center gap-2">
                   <span class="text-sm text-gray-600">学习进度:</span>
@@ -260,7 +265,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { lessonService } from '@/services/lesson'
 import { api } from '@/services/api'
@@ -317,8 +322,9 @@ const questionsPage = ref(1)
 // 课堂会话相关状态
 const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录
 const {
-  session: classroomSession,  // 直接使用 composable 返回的 session（会通过轮询自动更新）
+  session: classroomSession,  // 直接使用 composable 返回的 session（会通过 WebSocket 实时更新）
   isInClassroomMode,
+  isWebSocketConnected,  // WebSocket 连接状态
   displayCellId,
   shouldSyncDisplay,
   hasDisplayableContent,
@@ -328,6 +334,11 @@ const {
 
 // 自动保存定时器
 let notesAutoSaveTimer: ReturnType<typeof setTimeout> | null = null
+// Watch停止函数
+let stopWatchDisplayCellIds: (() => void) | null = null
+// 上次日志输出的时间戳（用于防抖）
+let lastErrorLogTime = 0
+const ERROR_LOG_DEBOUNCE = 5000 // 5秒内不重复输出相同错误
 
 const progress = computed(() => {
   if (!lesson.value?.content || lesson.value.content.length === 0) {
@@ -347,182 +358,198 @@ const lessonOutline = computed(() => {
     .join('\n')
 })
 
+// 上次过滤状态（用于检测变化）
+let lastFilterState = ''
+
 // 过滤Cells：在课堂模式下只显示教师指定的Cell
 const filteredCells = computed(() => {
   if (!lesson.value?.content) return []
   
-  console.log('🔍 过滤 Cells:', {
-    totalCells: lesson.value.content.length,
+  // 只在状态变化时输出日志
+  const currentState = JSON.stringify({
     isInClassroomMode: isInClassroomMode.value,
-    shouldSyncDisplay: shouldSyncDisplay.value,
     displayCellId: displayCellId.value,
-    sessionStatus: classroomSession.value?.status,
+    displayCellOrders: classroomSession.value?.settings?.display_cell_orders,
   })
+  
+  if (currentState !== lastFilterState) {
+    lastFilterState = currentState
+    console.log('🔍 过滤 Cells (状态变化):', {
+      totalCells: lesson.value.content.length,
+      isInClassroomMode: isInClassroomMode.value,
+      shouldSyncDisplay: shouldSyncDisplay.value,
+      displayCellId: displayCellId.value,
+      sessionStatus: classroomSession.value?.status,
+    })
+  }
   
   // 如果不在课堂模式，显示所有Cell
   if (!isInClassroomMode.value) {
-    console.log('📚 非课堂模式，显示所有 Cell')
     return lesson.value.content
   }
   
   // 课堂模式：严格同步，只显示教师指定的Cell
   if (shouldSyncDisplay.value) {
-    // 检查多选模式：从 session.settings 获取 display_cell_ids
     const settings = classroomSession.value?.settings
-    const displayCellIdsFromSession = settings?.display_cell_ids || 
-                                      settings?.displayCellIds || []
-    const multiSelectIds = Array.isArray(displayCellIdsFromSession) ? displayCellIdsFromSession : []
     
-    console.log('🔍 多选模式检查:', {
-      hasSession: !!classroomSession.value,
-      sessionId: classroomSession.value?.id,
-      settings: settings,
-      settingsType: typeof settings,
-      displayCellIdsFromSession: displayCellIdsFromSession,
-      displayCellIdsFromSessionType: typeof displayCellIdsFromSession,
-      multiSelectIds: multiSelectIds,
-      multiSelectIdsLength: multiSelectIds.length,
-      dbCellsCount: dbCells.value.length,
-    })
-    
-    // 多选模式：只要有 display_cell_ids 数组（即使只有1个），也应该使用多选逻辑
-    // 这样可以确保一致性，并且当数组中有多个ID时能正确显示
-    if (multiSelectIds.length > 0) {
-      console.log('🎯 多选模式，查找匹配的 Cell，目标 IDs:', multiSelectIds, '数组长度:', multiSelectIds.length)
+    // 🆕 新方式：优先使用 display_cell_orders（推荐）
+    const displayOrders = settings?.display_cell_orders
+    if (displayOrders && Array.isArray(displayOrders) && displayOrders.length > 0) {
+      console.log('✅ 学生端使用新方式 display_cell_orders:', displayOrders)
       
-      // 先通过数据库 Cell 记录，将数字 ID 映射到 order
-      const idToOrderMap = new Map<number, number>()
+      // 直接根据索引过滤，无需映射，无需 dbCells
+      const filteredByOrders = lesson.value.content.filter((cell, index) => {
+        const cellOrder = cell.order !== undefined ? cell.order : index
+        return displayOrders.includes(cellOrder)
+      })
+      
+      console.log('✅ 过滤结果（新方式）:', {
+        totalCells: lesson.value.content.length,
+        displayOrders: displayOrders,
+        filteredCount: filteredByOrders.length,
+      })
+      
+      return filteredByOrders
+    }
+    
+    // 如果没有 display_cell_orders，返回空数组（隐藏所有Cell）
+    return []
+  }
+  
+  // 非严格同步模式，显示所有Cell
+  return lesson.value.content
+})
+
+// ========== 旧代码（已废弃）==========
+// 以下代码用于兼容旧的 display_cell_ids 方式，已废弃
+/*
+      const idToIndexMap = new Map<number, number>()
       dbCells.value.forEach((dbCell: any) => {
         if (dbCell.id && dbCell.order !== undefined) {
-          idToOrderMap.set(dbCell.id, dbCell.order)
+          // 通过 order 在 lesson.content 中查找对应的索引
+          const index = lesson.value.content.findIndex((cell: any, idx: number) => {
+            const cellOrder = cell.order !== undefined ? cell.order : idx
+            return cellOrder === dbCell.order
+          })
+          if (index !== -1) {
+            idToIndexMap.set(dbCell.id, index)
+          }
         }
       })
       
-      // 获取所有对应的 order 列表
-      const targetOrders = new Set<number>()
+      // 如果 dbCells 为空，发出详细警告
+      if (dbCells.value.length === 0) {
+        console.warn('⚠️ dbCells 为空！无法进行 ID 到索引的映射。')
+        console.warn('当前状态:', {
+          lessonId: lessonId.value,
+          lessonContentCount: lesson.value.content.length,
+          multiSelectIds: multiSelectIds,
+          sessionId: classroomSession.value?.id,
+        })
+        console.warn('建议：刷新页面重新加载 dbCells，或检查后端 API /cells/lesson/' + lessonId.value)
+      }
+      
+      // 获取所有对应的索引列表
+      const targetIndices = new Set<number>()
       multiSelectIds.forEach((id: number) => {
-        const order = idToOrderMap.get(id)
-        if (order !== undefined) {
-          targetOrders.add(order)
-        }
-        // 如果 ID 本身是 order（fallback），也添加
-        if (!idToOrderMap.has(id) && id < lesson.value.content.length) {
-          targetOrders.add(id)
-        }
-      })
-      
-      console.log('📋 目标 orders:', Array.from(targetOrders), 'ID 到 order 映射:', Object.fromEntries(idToOrderMap))
-      console.log('📋 lesson.content:', lesson.value.content.map((c: any, i: number) => ({ index: i, id: c.id, order: c.order, type: c.type })))
+        const index = idToIndexMap.get(id)
+        if (index !== undefined && index >= 0) {
+          targetIndices.add(index)
+        } else {
+          // 如果 dbCells 为空，尝试通过 cell.order 直接匹配
+          // 假设 lesson.content 中的 order 值与数据库中的 order 值一致
+          if (dbCells.value.length === 0) {
+              // 遍历 lesson.content，查找 order 值对应的索引
+              lesson.value.content.forEach((cell: any, idx: number) => {
+                const cellOrder = cell.order !== undefined ? cell.order : idx
+                // 如果这个 cell 的 order 值在某个范围内，尝试匹配
+                // 注意：这个 fallback 假设 order 值与索引一致，可能不准确
+              })
+            }
+          }
+        })
       
       const matchedCells = lesson.value.content.filter((cell, index) => {
-        const cellOrder = cell.order !== undefined ? cell.order : index
-        const cellId = cell.id
-        
-        // 1. 通过 order 匹配（最可靠）
-        if (targetOrders.has(cellOrder)) {
-          console.log(`✅ 匹配成功 (order): index=${index}, order=${cellOrder}, id=${cellId}`)
+        // 优先使用索引匹配（最可靠，与导播台一致）
+        if (targetIndices.has(index)) {
           return true
         }
         
-        // 2. 通过数据库 ID 匹配（如果前端 cell.id 是数字）
+        // Fallback 2: 通过数据库 ID 匹配（如果 cell.id 是数字）
+        const cellId = cell.id
         const numericId = typeof cellId === 'number' ? cellId : 
                          typeof cellId === 'string' ? parseInt(cellId, 10) : null
         
         if (numericId && !isNaN(numericId) && multiSelectIds.includes(numericId)) {
-          console.log(`✅ 匹配成功 (numeric ID): index=${index}, id=${numericId}`)
           return true
         }
         
-        // 3. 通过数据库查询：如果 cell.id 是 UUID，通过 order 查找对应的数据库 ID
-        if (typeof cellId === 'string' && cellId.includes('-')) {
-          // 可能是 UUID，通过 order 匹配
+        // Fallback 3: 通过 order 匹配（如果 dbCells 可用）
+        if (dbCells.value.length > 0) {
+          const cellOrder = cell.order !== undefined ? cell.order : index
           const dbCell = dbCells.value.find((c: any) => c.order === cellOrder)
           if (dbCell && dbCell.id && multiSelectIds.includes(dbCell.id)) {
-            console.log(`✅ 匹配成功 (UUID -> DB ID): index=${index}, order=${cellOrder}, dbId=${dbCell.id}`)
             return true
           }
-        }
-        
-        // 4. 额外的匹配：如果 multiSelectIds 包含的是数据库 ID，但 cell.id 是 UUID
-        // 需要通过 dbCells 来匹配
-        const dbCellByOrder = dbCells.value.find((c: any) => c.order === cellOrder)
-        if (dbCellByOrder && dbCellByOrder.id && multiSelectIds.includes(dbCellByOrder.id)) {
-          console.log(`✅ 匹配成功 (order -> DB ID): index=${index}, order=${cellOrder}, dbId=${dbCellByOrder.id}`)
-          return true
         }
         
         return false
       })
       
-      // 确保按 order 排序，保持原始顺序
+      // 确保按 lesson.content 的索引顺序排序（与导播台一致）
       const sortedCells = matchedCells.sort((a, b) => {
-        const orderA = a.order !== undefined ? a.order : lesson.value.content.indexOf(a)
-        const orderB = b.order !== undefined ? b.order : lesson.value.content.indexOf(b)
-        return orderA - orderB
+        const indexA = lesson.value.content.indexOf(a)
+        const indexB = lesson.value.content.indexOf(b)
+        return indexA - indexB
       })
       
-      console.log(`📋 多选匹配结果: ${sortedCells.length} 个 Cell (目标: ${multiSelectIds.length} 个)`, {
-        matched: sortedCells.map(c => ({ id: c.id, type: c.type, order: c.order })),
-        targetIds: multiSelectIds,
-        dbCellsMapping: Object.fromEntries(idToOrderMap),
-        targetOrders: Array.from(targetOrders),
-      })
-      
-      // 如果匹配结果少于目标数量，记录警告并尝试详细诊断
+      // 如果匹配结果少于目标数量，记录警告（使用防抖）
       if (sortedCells.length < multiSelectIds.length) {
-        console.warn(`⚠️ 匹配结果不完整: 只匹配到 ${sortedCells.length}/${multiSelectIds.length} 个 Cell`)
-        console.warn('🔍 详细诊断信息:')
-        console.warn('  - 目标 IDs:', multiSelectIds)
-        console.warn('  - ID 到 order 映射:', Object.fromEntries(idToOrderMap))
-        console.warn('  - 目标 orders:', Array.from(targetOrders))
-        console.warn('  - 匹配到的 Cells:', sortedCells.map(c => ({ 
-          id: c.id, 
-          type: c.type, 
-          order: c.order !== undefined ? c.order : lesson.value.content.indexOf(c) 
-        })))
-        console.warn('  - 所有 lesson.content:', lesson.value.content.map((c: any, i: number) => ({ 
-          index: i, 
-          id: c.id, 
-          order: c.order !== undefined ? c.order : i, 
-          type: c.type 
-        })))
-        console.warn('  - 数据库 Cell 记录:', dbCells.value)
-        
-        const unmatchedIds = multiSelectIds.filter(id => {
-          const order = idToOrderMap.get(id)
-          if (order !== undefined) {
-            return !sortedCells.some(c => {
-              const cellOrder = c.order !== undefined ? c.order : lesson.value.content.indexOf(c)
-              return cellOrder === order
-            })
-          }
-          return true
-        })
-        console.warn('  - 未匹配的 IDs:', unmatchedIds)
+        const now = Date.now()
+        if (now - lastErrorLogTime > ERROR_LOG_DEBOUNCE) {
+          lastErrorLogTime = now
+          console.warn(`⚠️ 匹配结果不完整: 只匹配到 ${sortedCells.length}/${multiSelectIds.length} 个 Cell`)
+          console.warn('调试信息:', {
+            targetIds: multiSelectIds,
+            matchedCount: sortedCells.length,
+            dbCellsCount: dbCells.value.length,
+          })
+        }
       }
       
       // 重要：返回所有匹配的 Cell，确保多个单元都能显示
       if (sortedCells.length === 0 && multiSelectIds.length > 0) {
-        console.error('❌ 严重错误：多选模式有选中模块，但没有匹配到任何 Cell！')
-        console.error('这可能是因为：')
-        console.error('1. dbCells 未正确加载')
-        console.error('2. ID 到 order 的映射失败')
-        console.error('3. lesson.content 中的 order 与数据库不一致')
+        // 使用防抖机制避免频繁输出相同错误
+        const now = Date.now()
+        if (now - lastErrorLogTime > ERROR_LOG_DEBOUNCE) {
+          lastErrorLogTime = now
+          console.error('❌ 严重错误：多选模式有选中模块，但没有匹配到任何 Cell！')
+          console.error('这可能是因为：')
+          console.error('1. dbCells 未正确加载 (当前数量:', dbCells.value.length, ')')
+          console.error('2. ID 到 order 的映射失败')
+          console.error('3. lesson.content 中的 order 与数据库不一致')
+          console.error('调试信息:', {
+            multiSelectIds,
+            dbCellsCount: dbCells.value.length,
+            lessonContentCount: lesson.value?.content?.length || 0,
+            idToIndexMap: Object.fromEntries(idToIndexMap),
+          })
+        }
       }
       
       return sortedCells
-    }
-    
+*/
+// ========== 旧代码结束 ==========
+
+/*
     // 单选模式：如果教师还未切换到任何Cell，不显示任何内容
     // 注意：只有在 display_cell_ids 为空或不存在时，才使用单选模式
     if (!displayCellId.value) {
-      console.log('⏳ 等待教师切换内容，当前 displayCellId 为 null')
       return []
     }
     
     // 查找匹配的Cell
     const currentId = displayCellId.value
-    console.log('🎯 单选模式，查找匹配的 Cell，目标 ID:', currentId, '类型:', typeof currentId)
     
     // 先尝试通过数字 ID 查找匹配的 Cell（后端返回的是数据库 ID）
     // 然后通过 order 或索引匹配（当 ID 不匹配时使用）
@@ -562,29 +589,23 @@ const filteredCells = computed(() => {
       return false
     })
     
-    // 如果通过 ID 没有匹配到，尝试通过数据库查询获取 Cell 信息
-    // 但这里我们无法直接查询，所以如果匹配失败，返回空数组（显示等待提示）
+    // 如果通过 ID 没有匹配到，尝试使用索引作为 fallback
     if (matchedCells.length === 0 && typeof currentId === 'number') {
-      console.warn('⚠️ 无法通过 ID 匹配 Cell，可能需要从数据库获取 Cell 信息')
-      // 尝试使用索引作为 fallback（不推荐，但可以临时使用）
       if (currentId >= 0 && currentId < lesson.value.content.length) {
         const cellByIndex = lesson.value.content[currentId]
         if (cellByIndex) {
-          console.log('✅ 使用索引作为 fallback，返回 Cell:', cellByIndex)
           return [cellByIndex]
         }
       }
     }
     
-    console.log(`📋 匹配结果: ${matchedCells.length} 个 Cell`, matchedCells.map(c => ({ id: c.id, type: c.type, order: c.order })))
-    
     return matchedCells
   }
   
   // 如果sync_mode不是strict，显示所有Cell（允许学生自由浏览）
-  console.log('📖 非严格同步模式，显示所有 Cell')
   return lesson.value.content
-})
+*/
+// ========== 旧代码全部结束 ==========
 
 // 方法
 const getCellComponent = (type: CellType) => {
@@ -630,14 +651,53 @@ const loadLesson = async () => {
   }
 }
 
+// 初始化 display_cell_ids 监听器（只创建一次）
+const initDisplayCellIdsWatcher = () => {
+  // 清理旧的监听器（如果存在）
+  if (stopWatchDisplayCellIds) {
+    stopWatchDisplayCellIds()
+    stopWatchDisplayCellIds = null
+  }
+  
+  // 创建新的监听器
+  stopWatchDisplayCellIds = watch(
+    () => classroomSession.value?.settings?.display_cell_ids, 
+    async (newIds, oldIds) => {
+      if (newIds && newIds.length > 0 && JSON.stringify(newIds) !== JSON.stringify(oldIds)) {
+        console.log('🔄 display_cell_ids 更新，重新加载 dbCells', { newIds, oldIds })
+        await loadDbCells()
+        console.log('✅ dbCells 重新加载完成，当前记录数:', dbCells.value.length)
+      }
+    }, 
+    { deep: true, immediate: false }
+  )
+}
+
 // 加载数据库中的 Cell 记录
 const loadDbCells = async () => {
   try {
+    console.log('🔄 开始加载数据库 Cell 记录，lessonId:', lessonId.value)
     const response = await api.get(`/cells/lesson/${lessonId.value}`)
-    dbCells.value = Array.isArray(response) ? response : (response.data || [])
-    console.log('📦 加载数据库 Cell 记录:', dbCells.value.length, '个', dbCells.value)
+    dbCells.value = Array.isArray(response) ? response : ((response as any)?.data || [])
+    console.log('📦 加载数据库 Cell 记录成功:', {
+      count: dbCells.value.length,
+      cells: dbCells.value.map(c => ({ id: c.id, order: c.order, cell_type: c.cell_type }))
+    })
+    
+    // 如果加载成功但为空数组，发出警告
+    if (dbCells.value.length === 0) {
+      console.warn('⚠️ 数据库返回了空的 Cell 列表，可能原因：')
+      console.warn('  - 教案中的 Cell 还未保存到数据库')
+      console.warn('  - API 权限问题')
+      console.warn('  - 教案 ID 不正确')
+    }
   } catch (error: any) {
-    console.warn('⚠️ 加载数据库 Cell 记录失败:', error)
+    console.error('❌ 加载数据库 Cell 记录失败:', {
+      lessonId: lessonId.value,
+      error: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    })
     dbCells.value = []
   }
 }
@@ -871,6 +931,8 @@ const handleQuestionSuccess = (_questionId: number) => {
 onMounted(() => {
   loadLesson()
   loadQuestions()
+  // 初始化 display_cell_ids 监听器
+  initDisplayCellIdsWatcher()
 })
 
 onUnmounted(() => {
@@ -882,6 +944,12 @@ onUnmounted(() => {
   // 清理定时器
   if (notesAutoSaveTimer) {
     clearTimeout(notesAutoSaveTimer)
+  }
+  
+  // 清理 watch 监听器
+  if (stopWatchDisplayCellIds) {
+    stopWatchDisplayCellIds()
+    stopWatchDisplayCellIds = null
   }
 })
 </script>

@@ -147,6 +147,52 @@ def get_current_student(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+async def get_current_user_from_token(
+    token: str,
+    db: AsyncSession,
+) -> Optional[User]:
+    """从 JWT Token 获取当前用户（用于 WebSocket 认证）"""
+    
+    try:
+        # 解码 Token
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+        )
+        
+        user_id: Optional[str] = payload.get("sub")
+        if user_id is None:
+            return None
+        
+        # 查询用户
+        result = await db.execute(
+            select(User)
+            .options(
+                selectinload(User.region),
+                selectinload(User.school),
+                selectinload(User.grade),
+            )
+            .where(User.id == int(user_id))
+        )
+        user = result.scalar_one_or_none()
+        
+        if user is None:
+            return None
+        
+        if not isinstance(user.is_active, bool) or not cast(bool, user.is_active):
+            return None
+        
+        user.region_name = user.region.name if user.region else None  # type: ignore[attr-defined]
+        user.school_name = user.school.name if user.school else None  # type: ignore[attr-defined]
+        user.grade_name = user.grade.name if user.grade else None  # type: ignore[attr-defined]
+        
+        return user
+    
+    except JWTError:
+        return None
+
+
 # 别名，方便使用
 get_current_active_user = get_current_user
 require_admin = get_current_admin

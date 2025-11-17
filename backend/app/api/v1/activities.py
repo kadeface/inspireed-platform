@@ -94,11 +94,12 @@ async def create_submission(
                     
                     # 检查是否已经有相同 order 和 type 的 cell
                     if cell_order is not None:
+                        # 使用字符串比较避免枚举类型问题
                         existing_cell_query = select(Cell).where(
                             and_(
                                 Cell.lesson_id == data.lesson_id,
                                 Cell.order == cell_order,
-                                Cell.cell_type == CellType.ACTIVITY,
+                                Cell.cell_type == CellType.ACTIVITY,  # type: ignore[comparison-overlap]
                             )
                         )
                         existing_result = await db.execute(existing_cell_query)

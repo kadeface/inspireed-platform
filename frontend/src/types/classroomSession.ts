@@ -64,6 +64,9 @@ export interface NavigateToCellRequest {
   cellOrder?: number  // Cell的order（作为备选方案，用于UUID的情况）
   action?: 'toggle' | 'add' | 'remove'  // 操作类型：toggle（切换，默认）/ add（添加）/ remove（移除）
   multiSelect?: boolean  // 是否多选模式
+  
+  // 🆕 新增：直接传递 order 数组（推荐方式）
+  displayCellOrders?: number[]
 }
 
 export interface StartActivityRequest {

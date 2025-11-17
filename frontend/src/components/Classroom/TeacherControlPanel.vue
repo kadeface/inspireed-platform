@@ -10,8 +10,15 @@
         </div>
         <div class="status-text">
           <h3 class="status-title">{{ statusTitle }}</h3>
-          <p v-if="session?.status === 'active' && sessionDuration" class="duration">
-            已进行: {{ formatDuration(sessionDuration) }}
+          <p v-if="session?.status === 'active' && sessionDuration !== null && sessionDuration !== undefined" class="duration">
+            <span class="duration-label">剩余时间:</span>
+            <span class="duration-value" :class="{ 'duration-warning': remainingTime <= 300, 'duration-danger': remainingTime <= 60 }">
+              {{ formatRemainingTime(remainingTime) }}
+            </span>
+          </p>
+          <p v-else-if="session?.status === 'paused' && sessionDuration !== null && sessionDuration !== undefined" class="duration">
+            <span class="duration-label">剩余时间:</span>
+            <span class="duration-value">{{ formatRemainingTime(remainingTime) }}</span>
           </p>
           <p v-else-if="session?.status === 'pending'" class="pending-text">
             准备开始上课
@@ -65,7 +72,20 @@
     <div v-if="session" class="students-panel">
       <div class="panel-header">
         <h4>在线学生</h4>
-        <span class="student-count">{{ activeStudents.length }} / {{ totalStudents }}</span>
+        <div class="panel-stats">
+          <span class="stat-badge">
+            <span class="stat-label">在线:</span>
+            <span class="stat-value">{{ activeStudents.length }} / {{ totalStudents }}</span>
+          </span>
+          <span v-if="sessionStatistics" class="stat-badge">
+            <span class="stat-label">已完成:</span>
+            <span class="stat-value">{{ sessionStatistics.completed_students }}</span>
+          </span>
+          <span v-if="sessionStatistics" class="stat-badge">
+            <span class="stat-label">平均进度:</span>
+            <span class="stat-value">{{ Math.round(sessionStatistics.average_progress) }}%</span>
+          </span>
+        </div>
       </div>
       
       <div v-if="loadingStudents" class="loading-state">
@@ -126,7 +146,6 @@
         :cells="lesson.content"
         :current-cell-id="session.current_cell_id"
         :current-cell-index="selectedCellIndex"
-        :display-cell-ids="displayCellIds"
         :current-activity-id="session.current_activity_id"
         :db-cells="dbCells"
         :loading="loading"
@@ -163,31 +182,6 @@
         </div>
       </div>
     </div>
-    
-    <!-- 会话统计（简化版） -->
-    <div v-if="session && sessionStatistics" class="session-statistics">
-      <div class="panel-header">
-        <h4>会话统计</h4>
-      </div>
-      <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-value">{{ sessionStatistics.total_students }}</div>
-          <div class="stat-label">总学生</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ sessionStatistics.active_students }}</div>
-          <div class="stat-label">在线</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ sessionStatistics.completed_students }}</div>
-          <div class="stat-label">已完成</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ Math.round(sessionStatistics.average_progress) }}%</div>
-          <div class="stat-label">平均进度</div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -215,10 +209,19 @@ const activeStudents = ref<any[]>([])
 const loadingStudents = ref(false)
 const sessionStatistics = ref<any>(null)
 const selectedCellIndex = ref(-1)  // -1表示隐藏所有内容
-const displayCellIds = ref<number[]>([])  // 多选模式下显示的 Cell ID 列表
 const sessionDuration = ref(0)
 const durationInterval = ref<NodeJS.Timeout | null>(null)
 const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录（用于 ID 匹配）
+
+// 一节课的标准时长（40分钟 = 2400秒）
+const LESSON_DURATION = 40 * 60
+
+// 计算剩余时间
+const remainingTime = computed(() => {
+  if (sessionDuration.value === null || sessionDuration.value === undefined) return LESSON_DURATION
+  const remaining = LESSON_DURATION - sessionDuration.value
+  return remaining > 0 ? remaining : 0
+})
 
 // 计算属性
 const statusTitle = computed(() => {
@@ -293,6 +296,12 @@ function formatDuration(seconds: number): string {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
   return `${minutes}:${secs.toString().padStart(2, '0')}`
+}
+
+function formatRemainingTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
 }
 
 // 会话操作
@@ -515,8 +524,9 @@ async function handleStart() {
       }
     }
     
-    // 开始计时
+    // 开始计时（新会话从0开始）
     if (session.value?.status === 'active') {
+      sessionDuration.value = 0  // 新会话从0开始
       startDurationTimer()
     }
     
@@ -673,12 +683,48 @@ async function handleControlBoardNavigate(
   
   loading.value = true
   try {
-    // 使用工具函数构建导航请求数据
-    const requestData = buildNavigateRequest(cellId, cellOrder)
-    // 添加多选相关参数
-    requestData.action = action
-    requestData.multiSelect = multiSelect
-    console.log('📤 发送导航请求:', requestData)
+    // 🆕 新方式：使用 display_cell_orders（推荐）
+    // 获取当前选中的 orders（从 settings 中获取，如果有的话）
+    let displayOrders: number[] = []
+    const currentSettings = session.value.settings as any
+    if (currentSettings?.display_cell_orders) {
+      displayOrders = [...currentSettings.display_cell_orders]
+    } else if (currentSettings?.display_cell_ids && props.lesson?.content) {
+      // 向后兼容：如果只有 display_cell_ids，转换成 orders
+      displayOrders = currentSettings.display_cell_ids
+        .map((id: number) => {
+          const cell = props.lesson!.content.find((c: any) => getCellId(c) === id)
+          return cell ? (cell.order !== undefined ? cell.order : props.lesson!.content.indexOf(cell)) : -1
+        })
+        .filter((order: number) => order >= 0)
+    }
+    
+    // 如果是隐藏所有（cellId === 0 或 null）且不是多选模式
+    if ((cellId === 0 || cellId === null) && cellOrder === null && !multiSelect) {
+      displayOrders = []
+    } else if (cellOrder !== null) {
+      // 根据 action 更新 displayOrders
+      if (action === 'add') {
+        if (!displayOrders.includes(cellOrder)) {
+          displayOrders.push(cellOrder)
+        }
+      } else if (action === 'remove') {
+        displayOrders = displayOrders.filter(o => o !== cellOrder)
+      } else if (action === 'toggle') {
+        if (displayOrders.includes(cellOrder)) {
+          displayOrders = displayOrders.filter(o => o !== cellOrder)
+        } else {
+          displayOrders = multiSelect ? [...displayOrders, cellOrder] : [cellOrder]
+        }
+      }
+    }
+    
+    // 发送新方式的请求
+    const requestData = {
+      displayCellOrders: displayOrders,
+      action,
+    }
+    console.log('📤 发送导航请求（新方式）:', requestData)
     const updatedSession = await classroomSessionService.navigateToCell(session.value.id, requestData)
     
     // 确保更新后的会话状态正确（不要丢失状态）
@@ -690,11 +736,13 @@ async function handleControlBoardNavigate(
         id: session.value.id,
       }
       
-      // 更新多选列表
-      const displayCellIdsFromSession = (updatedSession.settings as any)?.display_cell_ids || 
-                                       (updatedSession.settings as any)?.displayCellIds || []
-      displayCellIds.value = Array.isArray(displayCellIdsFromSession) ? displayCellIdsFromSession : []
-      console.log('✅ 更新显示 Cell 列表:', displayCellIds.value, 'settings:', updatedSession.settings)
+      // 使用 display_cell_orders
+      const updatedSettings = updatedSession.settings as any
+      if (updatedSettings?.display_cell_orders) {
+        const orders = updatedSettings.display_cell_orders
+        console.log('✅ 使用 display_cell_orders:', orders)
+      }
+      console.log('✅ 更新显示 Cell 列表, settings:', updatedSession.settings)
     }
     
     // 导航后立即刷新学生列表
@@ -803,12 +851,15 @@ async function loadStatistics() {
 function startDurationTimer() {
   if (durationInterval.value) return
   
+  // 如果还没有开始计时（值为0或未定义），从0开始
+  // 如果已经有值（比如暂停后继续），保持当前值继续计时
+  if (sessionDuration.value === 0 || sessionDuration.value === null || sessionDuration.value === undefined) {
+    sessionDuration.value = 0
+  }
+  
+  // 每秒递增，直到达到课程时长
   durationInterval.value = setInterval(() => {
-    if (session.value?.actual_start) {
-      const now = new Date()
-      const start = new Date(session.value.actual_start)
-      sessionDuration.value = Math.floor((now.getTime() - start.getTime()) / 1000)
-    }
+    sessionDuration.value = Math.min(sessionDuration.value + 1, LESSON_DURATION)
   }, 1000)
 }
 
@@ -823,21 +874,15 @@ function stopDurationTimer() {
 watch(() => session.value, (newSession) => {
   if (!props.lesson?.content || !newSession) return
   
-  // 更新多选列表
-  const displayCellIdsFromSession = (newSession.settings as any)?.display_cell_ids || 
-                                   (newSession.settings as any)?.displayCellIds || []
-  displayCellIds.value = Array.isArray(displayCellIdsFromSession) ? displayCellIdsFromSession : []
-  
-  // 如果有多个选中的 Cell，使用第一个的索引（或最后一个）
-  if (displayCellIds.value.length > 0) {
-    const firstCellId = displayCellIds.value[0]
-    const index = props.lesson.content.findIndex(cell => {
-      const id = getCellId(cell)
-      const numericId = toNumericId(id)
-      return numericId === firstCellId
-    })
-    if (index >= 0) {
-      selectedCellIndex.value = index
+  // 使用 display_cell_orders
+  const settings = newSession.settings as any
+  if (settings?.display_cell_orders && Array.isArray(settings.display_cell_orders)) {
+    const orders = settings.display_cell_orders
+    console.log('✅ watch: 使用 display_cell_orders:', orders)
+    
+    // 如果有选中的 orders，使用第一个的索引
+    if (orders.length > 0) {
+      selectedCellIndex.value = orders[0]
       return
     }
   }
@@ -948,7 +993,7 @@ onUnmounted(() => {
 }
 
 .session-status-bar {
-  @apply rounded-lg p-4 border-2;
+  @apply rounded-lg p-5 border-2 shadow-sm;
 }
 
 .session-status-bar.status-active {
@@ -964,7 +1009,7 @@ onUnmounted(() => {
 }
 
 .status-content {
-  @apply flex items-center gap-4;
+  @apply flex items-center gap-5;
 }
 
 .status-indicator {
@@ -976,15 +1021,31 @@ onUnmounted(() => {
 }
 
 .status-text {
-  @apply flex-1;
+  @apply flex-1 flex flex-col gap-1.5;
 }
 
 .status-title {
-  @apply text-xl font-bold text-gray-900;
+  @apply text-lg font-semibold text-gray-900 leading-tight;
 }
 
 .duration {
-  @apply text-sm text-gray-600 mt-1;
+  @apply flex items-center gap-2 text-sm;
+}
+
+.duration-label {
+  @apply text-gray-600;
+}
+
+.duration-value {
+  @apply font-mono font-semibold text-gray-900 text-base;
+}
+
+.duration-value.duration-warning {
+  @apply text-orange-600;
+}
+
+.duration-value.duration-danger {
+  @apply text-red-600 animate-pulse;
 }
 
 .control-actions {
@@ -1016,8 +1077,7 @@ onUnmounted(() => {
 }
 
 .students-panel,
-.content-control,
-.session-statistics {
+.content-control {
   @apply border border-gray-200 rounded-lg p-4;
 }
 
@@ -1029,8 +1089,20 @@ onUnmounted(() => {
   @apply text-lg font-semibold text-gray-900;
 }
 
-.student-count {
-  @apply text-sm text-gray-600;
+.panel-stats {
+  @apply flex items-center gap-3;
+}
+
+.stat-badge {
+  @apply flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-md text-sm;
+}
+
+.stat-label {
+  @apply text-gray-600;
+}
+
+.stat-value {
+  @apply font-semibold text-gray-900;
 }
 
 .loading-state {
@@ -1175,20 +1247,5 @@ onUnmounted(() => {
   @apply mt-3;
 }
 
-.stats-grid {
-  @apply grid grid-cols-4 gap-4;
-}
-
-.stat-item {
-  @apply text-center;
-}
-
-.stat-value {
-  @apply text-2xl font-bold text-gray-900 mb-1;
-}
-
-.stat-label {
-  @apply text-sm text-gray-600;
-}
 </style>
 

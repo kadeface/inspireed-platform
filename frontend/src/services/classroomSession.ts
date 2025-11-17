@@ -127,17 +127,13 @@ export const classroomSessionService = {
         throw new Error('获取会话失败：服务器未返回数据')
       }
       
-      // 确保 settings 对象存在，并检查 display_cell_ids
+      // 确保 settings 对象存在
       const rawSettings = (response as any).settings || {}
-      const displayCellIds = rawSettings.display_cell_ids || rawSettings.displayCellIds || []
       
       console.log('📥 Get session - settings 详情:', {
         hasSettings: !!rawSettings,
         settingsKeys: Object.keys(rawSettings),
-        displayCellIds: displayCellIds,
-        displayCellIdsType: typeof displayCellIds,
-        displayCellIdsLength: Array.isArray(displayCellIds) ? displayCellIds.length : 0,
-        isArray: Array.isArray(displayCellIds),
+        displayCellOrders: rawSettings.display_cell_orders,
         rawSettings: rawSettings,
       })
       
@@ -236,34 +232,34 @@ export const classroomSessionService = {
    * 开始会话
    */
   async startSession(sessionId: number): Promise<ClassSession> {
-    const response = await api.post(`/classroom-sessions/sessions/${sessionId}/start`)
-    return response.data
+    const response = await api.post<ClassSession>(`/classroom-sessions/sessions/${sessionId}/start`)
+    return response
   },
 
   /**
    * 暂停会话
    */
   async pauseSession(sessionId: number): Promise<ClassSession> {
-    const response = await api.post(`/classroom-sessions/sessions/${sessionId}/pause`)
-    return response.data
+    const response = await api.post<ClassSession>(`/classroom-sessions/sessions/${sessionId}/pause`)
+    return response
   },
 
   /**
    * 继续会话
    */
   async resumeSession(sessionId: number): Promise<ClassSession> {
-    const response = await api.post(`/classroom-sessions/sessions/${sessionId}/resume`)
-    return response.data
+    const response = await api.post<ClassSession>(`/classroom-sessions/sessions/${sessionId}/resume`)
+    return response
   },
 
   /**
    * 结束会话
    */
   async endSession(sessionId: number, notes?: string): Promise<ClassSession> {
-    const response = await api.post(`/classroom-sessions/sessions/${sessionId}/end`, {
+    const response = await api.post<ClassSession>(`/classroom-sessions/sessions/${sessionId}/end`, {
       notes,
     })
-    return response.data
+    return response
   },
 
   /**
@@ -285,6 +281,10 @@ export const classroomSessionService = {
       if (data.multiSelect !== undefined) {
         requestData.multi_select = data.multiSelect
       }
+      // 🆕 新增：支持 display_cell_orders（推荐方式）
+      if (data.displayCellOrders !== undefined) {
+        requestData.display_cell_orders = data.displayCellOrders
+      }
       const response = await api.post(`/classroom-sessions/sessions/${sessionId}/navigate`, requestData)
       console.log('✅ 导航响应:', response)
       
@@ -296,16 +296,12 @@ export const classroomSessionService = {
       
       // 处理字段映射（snake_case 到 camelCase）
       const settings = (response as any).settings || {}
-      const displayCellIds = settings.display_cell_ids || settings.displayCellIds || []
       
-      // 调试日志：检查 settings 和 display_cell_ids
-      console.log('📥 Get session response data:', {
+      // 调试日志：检查 settings
+      console.log('📥 Navigate response data:', {
         hasSettings: !!settings,
         settingsKeys: Object.keys(settings),
-        displayCellIds: displayCellIds,
-        displayCellIdsType: typeof displayCellIds,
-        displayCellIdsLength: Array.isArray(displayCellIds) ? displayCellIds.length : 0,
-        isArray: Array.isArray(displayCellIds),
+        displayCellOrders: settings.display_cell_orders,
       })
       
       const session = {
@@ -357,16 +353,16 @@ export const classroomSessionService = {
    * 开始活动
    */
   async startActivity(sessionId: number, data: StartActivityRequest): Promise<ClassSession> {
-    const response = await api.post(`/classroom-sessions/sessions/${sessionId}/start-activity`, data)
-    return response.data
+    const response = await api.post<ClassSession>(`/classroom-sessions/sessions/${sessionId}/start-activity`, data)
+    return response
   },
 
   /**
    * 结束活动
    */
   async endActivity(sessionId: number): Promise<ClassSession> {
-    const response = await api.post(`/classroom-sessions/sessions/${sessionId}/end-activity`)
-    return response.data
+    const response = await api.post<ClassSession>(`/classroom-sessions/sessions/${sessionId}/end-activity`)
+    return response
   },
 
   /**
@@ -477,8 +473,8 @@ export const classroomSessionService = {
    * 获取会话统计
    */
   async getStatistics(sessionId: number): Promise<SessionStatistics> {
-    const response = await api.get(`/classroom-sessions/sessions/${sessionId}/statistics`)
-    return response.data
+    const response = await api.get<SessionStatistics>(`/classroom-sessions/sessions/${sessionId}/statistics`)
+    return response
   },
 }
 

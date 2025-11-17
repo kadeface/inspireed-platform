@@ -183,7 +183,30 @@ async def get_lesson_cells(
     result = await db.execute(query)
     cells = result.scalars().all()
 
-    return [CellResponse.model_validate(cell_obj) for cell_obj in cells]
+    # 手动构建响应，确保枚举值被正确序列化
+    cell_responses = []
+    for cell in cells:
+        try:
+            cell_response = CellResponse.model_validate(cell)
+            cell_responses.append(cell_response)
+        except Exception as e:
+            # 如果序列化失败，手动构建响应字典
+            print(f"⚠️ Cell 序列化失败 (ID={cell.id}): {e}")
+            cell_dict = {
+                "id": cell.id,
+                "lesson_id": cell.lesson_id,
+                "cell_type": str(cell.cell_type),  # 确保转换为字符串
+                "title": cell.title,
+                "content": cell.content or {},
+                "config": cell.config or {},
+                "order": cell.order,
+                "editable": cell.editable,
+                "created_at": cell.created_at,
+                "updated_at": cell.updated_at,
+            }
+            cell_responses.append(CellResponse(**cell_dict))
+    
+    return cell_responses
 
 
 @router.get("/{cell_id}", response_model=CellResponse)

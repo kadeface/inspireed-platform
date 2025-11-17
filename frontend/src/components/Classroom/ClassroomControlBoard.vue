@@ -39,7 +39,7 @@
           class="chain-node"
           :class="{
             'node-active': isActive(cell, index),
-            'node-activity': cell.type === 'activity',
+            [`node-type-${cell.type}`]: true,
             'node-completed': isCompleted(cell, index),
             'node-disabled': loading,
           }"
@@ -60,6 +60,11 @@
           <!-- 节点序号 -->
           <div class="node-number">{{ index + 1 }}</div>
           
+          <!-- 模块类型标签 -->
+          <div class="node-type-badge" :class="`badge-${cell.type}`">
+            {{ getCellTypeEmoji(cell.type) }}
+          </div>
+          
           <!-- 节点图标 -->
           <div class="node-icon" :class="`icon-${cell.type}`" @click="!loading && handleNodeClick(cell, index)">
             <CellTypeIcon :type="cell.type" />
@@ -67,15 +72,13 @@
           
           <!-- 节点标题 -->
           <div class="node-label" @click="!loading && handleNodeClick(cell, index)">
-            {{ cell.title || getCellTypeLabel(cell.type) || `模块 ${index + 1}` }}
+            <div class="node-title">{{ cell.title || getCellTypeLabel(cell.type) || `模块 ${index + 1}` }}</div>
+            <div class="node-subtitle">{{ getCellTypeLabel(cell.type) }}</div>
           </div>
-          
-          <!-- 节点状态指示器 -->
-          <div v-if="isActive(cell, index)" class="node-indicator"></div>
           
           <!-- 活动状态标记 -->
           <div v-if="cell.type === 'activity' && isActivityActive(cell, index)" class="node-activity-badge">
-            🎯
+            🎯 进行中
           </div>
         </div>
 
@@ -148,7 +151,6 @@ interface Props {
   cells: Cell[]
   currentCellId?: number | null
   currentCellIndex?: number | null  // 当前选中的 Cell 索引（-1 表示隐藏）
-  displayCellIds?: number[]  // 多选模式下显示的 Cell ID 列表
   currentActivityId?: number | null
   completedCellIds?: number[]
   dbCells?: Array<{ id: number; order: number; cell_type: string }>  // 数据库中的 Cell 记录（用于 ID 匹配）
@@ -159,7 +161,6 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   currentCellId: null,
   currentCellIndex: null,
-  displayCellIds: () => [],
   currentActivityId: null,
   completedCellIds: () => [],
   dbCells: () => [],
@@ -309,6 +310,18 @@ function getCellTypeLabel(type: string): string {
     qa: '问答',
   }
   return labels[type] || type
+}
+
+function getCellTypeEmoji(type: string): string {
+  const emojis: Record<string, string> = {
+    text: '📄',
+    code: '💻',
+    activity: '📝',
+    video: '📹',
+    flowchart: '📊',
+    qa: '❓',
+  }
+  return emojis[type] || '📦'
 }
 
 
@@ -495,34 +508,57 @@ function handleEndActivity() {
 /* 连接线 */
 .chain-connector {
   @apply flex-shrink-0;
-  width: 2rem;
-  height: 2px;
-  background: linear-gradient(to right, #e5e7eb, #9ca3af);
-  margin: 0 0.5rem;
+  width: 3rem;
+  height: 3px;
+  background: linear-gradient(to right, #d1d5db, #9ca3af, #d1d5db);
+  margin: 0 0.75rem;
   position: relative;
+  border-radius: 2px;
+}
+
+.chain-connector::before {
+  content: '';
+  @apply absolute right-0 top-1/2 transform -translate-y-1/2;
+  width: 0;
+  height: 0;
+  border-left: 6px solid #9ca3af;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
 }
 
 .chain-vertical .chain-connector {
-  width: 2px;
-  height: 2rem;
-  background: linear-gradient(to bottom, #e5e7eb, #9ca3af);
-  margin: 0.5rem 0;
+  width: 3px;
+  height: 3rem;
+  background: linear-gradient(to bottom, #d1d5db, #9ca3af, #d1d5db);
+  margin: 0.75rem 0;
+}
+
+.chain-vertical .chain-connector::before {
+  @apply left-1/2 bottom-0 transform -translate-x-1/2;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 6px solid #9ca3af;
+  border-bottom: none;
 }
 
 /* 节点 */
 .chain-node {
   @apply flex flex-col items-center justify-center relative;
-  @apply min-w-[80px] w-[80px] p-3 rounded-lg;
-  @apply bg-gray-50 border-2 border-gray-200;
-  @apply cursor-pointer transition-all duration-200;
-  @apply hover:bg-gray-100 hover:border-gray-300;
-  @apply hover:shadow-md;
+  @apply min-w-[140px] w-[140px] p-4 rounded-xl;
+  @apply bg-white border-2 border-gray-200;
+  @apply cursor-pointer transition-all duration-300;
+  @apply hover:shadow-lg hover:border-gray-300;
   flex-shrink: 0;
   user-select: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.chain-node:hover {
+  transform: translateY(-2px);
 }
 
 .chain-node:active {
-  transform: scale(0.95);
+  transform: translateY(0) scale(0.98);
 }
 
 .chain-node:disabled {
@@ -534,30 +570,101 @@ function handleEndActivity() {
 }
 
 .node-hidden:hover {
-  @apply bg-orange-100 border-orange-300;
+  @apply bg-orange-100 border-orange-300 shadow-lg;
 }
 
+/* 不同类型模块的颜色主题 */
+.node-type-video {
+  @apply border-blue-200 bg-blue-50;
+}
+
+.node-type-video:hover {
+  @apply border-blue-300 bg-blue-100;
+}
+
+.node-type-text {
+  @apply border-gray-200 bg-gray-50;
+}
+
+.node-type-text:hover {
+  @apply border-gray-300 bg-gray-100;
+}
+
+.node-type-activity {
+  @apply border-purple-200 bg-purple-50;
+}
+
+.node-type-activity:hover {
+  @apply border-purple-300 bg-purple-100;
+}
+
+.node-type-code {
+  @apply border-green-200 bg-green-50;
+}
+
+.node-type-code:hover {
+  @apply border-green-300 bg-green-100;
+}
+
+.node-type-flowchart {
+  @apply border-indigo-200 bg-indigo-50;
+}
+
+.node-type-flowchart:hover {
+  @apply border-indigo-300 bg-indigo-100;
+}
+
+.node-type-qa {
+  @apply border-yellow-200 bg-yellow-50;
+}
+
+.node-type-qa:hover {
+  @apply border-yellow-300 bg-yellow-100;
+}
+
+/* 激活状态 */
 .node-active {
-  @apply bg-blue-500 border-blue-600 shadow-lg;
-  @apply ring-2 ring-blue-300 ring-offset-2;
-  transform: scale(1.05);
+  @apply shadow-xl;
+  @apply ring-4 ring-offset-2;
+  transform: translateY(-4px) scale(1.02);
+  z-index: 10;
 }
 
-.node-active .node-number,
-.node-active .node-label {
+.node-type-video.node-active {
+  @apply bg-blue-500 border-blue-600 ring-blue-300;
+}
+
+.node-type-text.node-active {
+  @apply bg-gray-600 border-gray-700 ring-gray-300;
+}
+
+.node-type-activity.node-active {
+  @apply bg-purple-500 border-purple-600 ring-purple-300;
+}
+
+.node-type-code.node-active {
+  @apply bg-green-500 border-green-600 ring-green-300;
+}
+
+.node-type-flowchart.node-active {
+  @apply bg-indigo-500 border-indigo-600 ring-indigo-300;
+}
+
+.node-type-qa.node-active {
+  @apply bg-yellow-500 border-yellow-600 ring-yellow-300;
+}
+
+.node-active .node-number {
+  @apply bg-white scale-110;
+}
+
+.node-active .node-title,
+.node-active .node-subtitle {
   @apply text-white font-semibold;
 }
 
 .node-active .node-icon {
-  @apply text-white;
-}
-
-.node-activity {
-  @apply border-purple-300;
-}
-
-.node-activity.node-active {
-  @apply border-purple-500 bg-purple-50;
+  @apply text-white scale-110;
 }
 
 .node-completed {
@@ -582,14 +689,40 @@ function handleEndActivity() {
 
 /* 复选框 */
 .node-checkbox {
-  @apply absolute top-1 right-1 z-10;
+  @apply absolute top-2 right-2 z-10;
+  @apply bg-white rounded-md shadow-sm p-0.5;
+  transition: all 0.3s ease;
+}
+
+.node-checkbox:hover {
+  @apply shadow-md scale-110;
 }
 
 .checkbox-input {
   @apply w-5 h-5 cursor-pointer;
-  @apply text-blue-600 border-gray-300 rounded;
+  @apply border-2 border-gray-300 rounded;
   @apply focus:ring-2 focus:ring-blue-500 focus:ring-offset-1;
+  transition: all 0.2s ease;
+}
+
+.node-type-video .checkbox-input:checked {
   accent-color: #3b82f6;
+}
+
+.node-type-activity .checkbox-input:checked {
+  accent-color: #a855f7;
+}
+
+.node-type-code .checkbox-input:checked {
+  accent-color: #22c55e;
+}
+
+.node-type-flowchart .checkbox-input:checked {
+  accent-color: #6366f1;
+}
+
+.node-type-qa .checkbox-input:checked {
+  accent-color: #eab308;
 }
 
 .checkbox-input:disabled {
@@ -598,68 +731,133 @@ function handleEndActivity() {
 
 /* 节点内容 */
 .node-number {
-  @apply absolute -top-2 -left-2 w-6 h-6 bg-gray-600 text-white rounded-full;
+  @apply absolute -top-3 -left-3 w-7 h-7 rounded-full;
   @apply flex items-center justify-center text-xs font-bold;
-  z-index: 1;
+  @apply bg-white border-2 border-gray-300 text-gray-700;
+  @apply shadow-md;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.node-type-video .node-number {
+  @apply border-blue-400 text-blue-600;
+}
+
+.node-type-activity .node-number {
+  @apply border-purple-400 text-purple-600;
+}
+
+.node-type-code .node-number {
+  @apply border-green-400 text-green-600;
+}
+
+.node-type-flowchart .node-number {
+  @apply border-indigo-400 text-indigo-600;
+}
+
+.node-type-qa .node-number {
+  @apply border-yellow-400 text-yellow-600;
 }
 
 .node-active .node-number {
-  @apply bg-white text-blue-600;
+  @apply bg-white shadow-lg;
+}
+
+/* 类型标签 */
+.node-type-badge {
+  @apply absolute -top-2 -right-2 w-8 h-8 rounded-full;
+  @apply flex items-center justify-center text-lg;
+  @apply bg-white border-2 shadow-md;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.badge-video {
+  @apply border-blue-300;
+}
+
+.badge-activity {
+  @apply border-purple-300;
+}
+
+.badge-code {
+  @apply border-green-300;
+}
+
+.badge-flowchart {
+  @apply border-indigo-300;
+}
+
+.badge-qa {
+  @apply border-yellow-300;
+}
+
+.badge-text {
+  @apply border-gray-300;
+}
+
+.node-active .node-type-badge {
+  @apply scale-110;
 }
 
 .node-icon {
-  @apply w-10 h-10 flex items-center justify-center;
+  @apply w-12 h-12 flex items-center justify-center;
   @apply text-gray-600 mb-2;
+  transition: all 0.3s ease;
 }
 
+.icon-video {
+  @apply text-blue-600;
+}
 
 .icon-activity {
   @apply text-purple-600;
 }
 
+.icon-code {
+  @apply text-green-600;
+}
+
+.icon-flowchart {
+  @apply text-indigo-600;
+}
+
+.icon-qa {
+  @apply text-yellow-600;
+}
+
 .node-label {
-  @apply text-xs text-center text-gray-700 font-medium;
+  @apply w-full text-center;
+}
+
+.node-title {
+  @apply text-sm font-semibold text-gray-800 mb-1;
   @apply line-clamp-2;
-  max-width: 100%;
+  transition: all 0.3s ease;
 }
 
-
-/* 节点指示器 */
-.node-indicator {
-  @apply absolute -top-1 -right-1 w-5 h-5 bg-white rounded-full;
-  @apply border-2 border-blue-500;
-  @apply flex items-center justify-center;
-  animation: pulse 2s infinite;
-}
-
-.node-indicator::before {
-  content: '';
-  @apply w-2 h-2 bg-blue-500 rounded-full;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.1);
-  }
+.node-subtitle {
+  @apply text-xs text-gray-500;
+  transition: all 0.3s ease;
 }
 
 /* 活动标记 */
 .node-activity-badge {
-  @apply absolute -top-1 -right-1 text-lg;
-  animation: bounce 1s infinite;
+  @apply absolute -bottom-2 left-1/2 transform -translate-x-1/2;
+  @apply px-2 py-0.5 rounded-full text-xs font-medium;
+  @apply bg-purple-500 text-white shadow-md;
+  white-space: nowrap;
+  animation: pulse-badge 2s infinite;
 }
 
-@keyframes bounce {
+@keyframes pulse-badge {
   0%, 100% {
-    transform: translateY(0);
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
   }
   50% {
-    transform: translateY(-4px);
+    opacity: 0.8;
+    transform: translateX(-50%) scale(1.05);
   }
 }
 
@@ -686,17 +884,72 @@ function handleEndActivity() {
 }
 
 /* 响应式 */
+@media (max-width: 1024px) {
+  .chain-node {
+    @apply min-w-[120px] w-[120px] p-3;
+  }
+  
+  .node-title {
+    @apply text-xs;
+  }
+  
+  .node-icon {
+    @apply w-10 h-10;
+  }
+}
+
 @media (max-width: 768px) {
   .control-chain {
-    @apply overflow-x-auto;
+    @apply overflow-x-auto pb-4;
+    -webkit-overflow-scrolling: touch;
   }
   
   .chain-node {
-    @apply min-w-[70px] w-[70px] p-2;
+    @apply min-w-[100px] w-[100px] p-2.5;
   }
   
-  .node-label {
+  .node-title {
+    @apply text-[11px];
+  }
+  
+  .node-subtitle {
+    @apply text-[9px];
+  }
+  
+  .node-icon {
+    @apply w-8 h-8;
+  }
+  
+  .node-number {
+    @apply w-6 h-6 text-[10px];
+  }
+  
+  .node-type-badge {
+    @apply w-7 h-7 text-base;
+  }
+  
+  .chain-connector {
+    width: 2rem;
+    margin: 0 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .chain-node {
+    @apply min-w-[85px] w-[85px] p-2;
+  }
+  
+  .node-title {
     @apply text-[10px];
+  }
+  
+  .node-subtitle {
+    @apply hidden;
+  }
+  
+  .chain-connector {
+    width: 1.5rem;
+    margin: 0 0.25rem;
   }
 }
 </style>

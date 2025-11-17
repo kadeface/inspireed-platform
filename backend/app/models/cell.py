@@ -57,7 +57,7 @@ class Cell(Base):
     lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False)
 
     # Cell类型
-    cell_type = Column(SQLEnum(CellType), nullable=False)
+    cell_type = Column(SQLEnum(CellType, name="celltype"), nullable=False)
 
     # Cell标题
     title = Column(String(200), nullable=True)

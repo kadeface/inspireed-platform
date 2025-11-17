@@ -5,6 +5,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import classroomSessionService from '../services/classroomSession'
+import { websocketService, type WebSocketMessage } from '../services/websocket'
+import { getAuthToken } from '../utils/auth'
 import type { ClassSession, StudentParticipation } from '../types/classroomSession'
 
 export function useClassroomSession(lessonId: number) {
@@ -16,12 +18,13 @@ export function useClassroomSession(lessonId: number) {
     return session.value?.status === 'active'
   })
   
-  // 轮询定时器（用于定期获取会话状态）
+  // 轮询定时器（用于定期获取会话状态）- 降级方案
   let pollingInterval: ReturnType<typeof setInterval> | null = null
-  const POLLING_INTERVAL = 1000 // 每1秒轮询一次，减少延迟
+  const POLLING_INTERVAL = 5000 // 降级时使用5秒轮询（减少负载）
   
-  // WebSocket连接（未来实现）
-  // const ws = ref<WebSocket | null>(null)
+  // WebSocket连接状态
+  const isWebSocketConnected = ref<boolean>(false)
+  const useWebSocket = ref<boolean>(true) // 默认启用 WebSocket
   
   /**
    * 查找并加入会话
@@ -72,8 +75,18 @@ export function useClassroomSession(lessonId: number) {
           }
         }
         
-        // 开始轮询会话状态（实时获取教师切换的内容）
-        startPolling()
+        // 尝试建立 WebSocket 连接
+        if (useWebSocket.value) {
+          try {
+            await connectWebSocket(activeSession.id)
+          } catch (error) {
+            console.warn('⚠️ WebSocket 连接失败，降级到轮询模式')
+            startPolling()
+          }
+        } else {
+          // 不使用 WebSocket，直接使用轮询
+          startPolling()
+        }
         
         return activeSession
       } else {
@@ -177,10 +190,126 @@ export function useClassroomSession(lessonId: number) {
   }
   
   /**
+   * 连接 WebSocket
+   */
+  async function connectWebSocket(sessionId: number) {
+    try {
+      // 获取认证 Token
+      const token = getAuthToken()
+      if (!token) {
+        console.error('❌ 未找到认证 Token')
+        throw new Error('No auth token')
+      }
+      
+      // 连接 WebSocket
+      await websocketService.connect(sessionId, token)
+      isWebSocketConnected.value = true
+      
+      // 监听消息
+      setupWebSocketListeners()
+      
+      console.log('✅ WebSocket 连接已建立')
+    } catch (error) {
+      console.error('❌ WebSocket 连接失败:', error)
+      isWebSocketConnected.value = false
+      throw error
+    }
+  }
+  
+  /**
+   * 设置 WebSocket 消息监听器
+   */
+  function setupWebSocketListeners() {
+    // 1. 监听连接成功消息
+    websocketService.on('connected', (message: WebSocketMessage) => {
+      console.log('🎉 WebSocket 已连接，接收初始状态:', message.data)
+      
+      // 更新会话状态
+      if (message.data.current_state && session.value) {
+        session.value.status = message.data.current_state.status
+        session.value.settings = {
+          ...session.value.settings,
+          display_cell_orders: message.data.current_state.display_cell_orders,
+        }
+        currentCellId.value = message.data.current_state.current_cell_id
+      }
+    })
+    
+    // 2. 监听内容切换消息（核心）
+    websocketService.on('cell_changed', (message: WebSocketMessage) => {
+      console.log('🔄 收到内容切换消息:', message.data)
+      
+      if (session.value) {
+        // 更新 display_cell_orders
+        if (message.data.display_cell_orders !== undefined) {
+          session.value.settings = {
+            ...session.value.settings,
+            display_cell_orders: message.data.display_cell_orders,
+          }
+        }
+        
+        // 更新 current_cell_id
+        if (message.data.current_cell_id !== undefined) {
+          currentCellId.value = message.data.current_cell_id
+        }
+        
+        console.log('✅ 内容已同步:', {
+          displayCellOrders: session.value.settings?.display_cell_orders,
+          currentCellId: currentCellId.value,
+        })
+      }
+    })
+    
+    // 3. 监听会话状态变化
+    websocketService.on('session_status_changed', (message: WebSocketMessage) => {
+      console.log('📊 会话状态变化:', message.data)
+      
+      if (session.value) {
+        session.value.status = message.data.status
+        
+        // 如果会话结束，断开连接
+        if (message.data.status === 'ended') {
+          console.log('⏹️ 会话已结束')
+          disconnectWebSocket()
+        }
+      }
+    })
+    
+    // 4. 监听活动开始
+    websocketService.on('activity_started', (message: WebSocketMessage) => {
+      console.log('🎯 活动开始:', message.data)
+      // TODO: 触发活动界面显示
+    })
+    
+    // 5. 监听活动结束
+    websocketService.on('activity_ended', (message: WebSocketMessage) => {
+      console.log('✅ 活动结束:', message.data)
+      // TODO: 显示活动结果
+    })
+    
+    // 6. 监听错误消息
+    websocketService.on('error', (message: WebSocketMessage) => {
+      console.error('❌ 服务器错误:', message.data)
+      // TODO: 显示错误提示
+    })
+  }
+  
+  /**
+   * 断开 WebSocket 连接
+   */
+  function disconnectWebSocket() {
+    websocketService.disconnect()
+    isWebSocketConnected.value = false
+  }
+  
+  /**
    * 离开会话
    */
   async function leaveSession() {
-    stopPolling() // 停止轮询
+    // 断开 WebSocket
+    disconnectWebSocket()
+    // 停止轮询
+    stopPolling()
     
     if (session.value) {
       try {
@@ -194,15 +323,31 @@ export function useClassroomSession(lessonId: number) {
   }
   
   /**
-   * 更新进度
+   * 更新进度（通过 WebSocket）
    */
-  async function updateProgress(completedCellIds: number[], currentCellId?: number) {
-    if (!participation.value) return
+  async function updateProgress(completedCellIds: number[], currentCellIdParam?: number) {
+    if (!participation.value || !session.value) return
     
-    // 这里应该通过WebSocket或API更新进度
-    // 暂时先不实现，后续可以通过WebSocket实时更新
-    if (currentCellId) {
-      currentCellId.value = currentCellId
+    // 计算进度百分比
+    const totalCells = 10 // TODO: 从 lesson.content.length 获取
+    const progressPercentage = (completedCellIds.length / totalCells) * 100
+    
+    // 如果 WebSocket 已连接，通过 WebSocket 发送进度更新
+    if (isWebSocketConnected.value) {
+      websocketService.send({
+        type: 'update_progress',
+        timestamp: new Date().toISOString(),
+        data: {
+          current_cell_id: currentCellIdParam || currentCellId.value,
+          completed_cells: completedCellIds,
+          progress_percentage: progressPercentage,
+        },
+      })
+    }
+    
+    // 更新本地状态
+    if (currentCellIdParam) {
+      currentCellId.value = currentCellIdParam
     }
   }
   
@@ -266,6 +411,8 @@ export function useClassroomSession(lessonId: number) {
   // })
   
   onUnmounted(() => {
+    // 断开 WebSocket
+    disconnectWebSocket()
     // 停止轮询
     stopPolling()
     // 离开会话
@@ -277,6 +424,7 @@ export function useClassroomSession(lessonId: number) {
     participation,
     currentCellId,
     isInClassroomMode,
+    isWebSocketConnected,
     displayCellId,
     shouldSyncDisplay,
     hasDisplayableContent,

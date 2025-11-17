@@ -67,8 +67,8 @@ export const activityService = {
     })
     
     try {
-      const response = await api.post('/activities/submissions', requestData)
-      return response.data
+      const response = await api.post<ActivitySubmission>('/activities/submissions', requestData)
+      return response
     } catch (error: any) {
       console.error('❌ Create submission failed:', {
         status: error.response?.status,
@@ -83,8 +83,8 @@ export const activityService = {
    * 获取提交详情
    */
   async getSubmission(submissionId: number): Promise<ActivitySubmission> {
-    const response = await api.get(`/activities/submissions/${submissionId}`)
-    return response.data
+    const response = await api.get<ActivitySubmission>(`/activities/submissions/${submissionId}`)
+    return response
   },
 
   /**
@@ -118,8 +118,8 @@ export const activityService = {
       requestData.attempt_no = data.attemptNo
     }
     
-    const response = await api.patch(`/activities/submissions/${submissionId}`, requestData)
-    return response.data
+    const response = await api.patch<ActivitySubmission>(`/activities/submissions/${submissionId}`, requestData)
+    return response
   },
 
   /**
@@ -149,19 +149,19 @@ export const activityService = {
       requestData.attempt_no = data.attemptNo
     }
     
-    const response = await api.post(
+    const response = await api.post<ActivitySubmission>(
       `/activities/submissions/${submissionId}/submit`,
       requestData
     )
-    return response.data
+    return response
   },
 
   /**
    * 获取我在某个教案中的所有提交
    */
   async getMyLessonSubmissions(lessonId: number): Promise<ActivitySubmission[]> {
-    const response = await api.get(`/activities/lessons/${lessonId}/my-submissions`)
-    return response.data
+    const response = await api.get<ActivitySubmission[]>(`/activities/lessons/${lessonId}/my-submissions`)
+    return response
   },
 
   /**
@@ -169,8 +169,8 @@ export const activityService = {
    */
   async getMyCellSubmission(cellId: number): Promise<ActivitySubmission | null> {
     try {
-      const response = await api.get(`/activities/cells/${cellId}/my-submission`)
-      return response.data
+      const response = await api.get<ActivitySubmission>(`/activities/cells/${cellId}/my-submission`)
+      return response
     } catch (error: any) {
       if (error.response?.status === 404) {
         return null
@@ -189,8 +189,8 @@ export const activityService = {
     status?: string
   ): Promise<ActivitySubmission[]> {
     const params = status ? { status } : {}
-    const response = await api.get(`/activities/cells/${cellId}/submissions`, { params })
-    return response.data
+    const response = await api.get<ActivitySubmission[]>(`/activities/cells/${cellId}/submissions`, { params })
+    return response
   },
 
   /**
@@ -200,34 +200,34 @@ export const activityService = {
     submissionId: number,
     data: GradeActivityRequest
   ): Promise<ActivitySubmission> {
-    const response = await api.post(
+    const response = await api.post<ActivitySubmission>(
       `/activities/submissions/${submissionId}/grade`,
       data
     )
-    return response.data
+    return response
   },
 
   /**
    * 批量评分
    */
   async bulkGrade(submissionIds: number[], score: number, feedback?: string): Promise<any> {
-    const response = await api.post('/activities/submissions/bulk-grade', {
+    const response = await api.post<any>('/activities/submissions/bulk-grade', {
       submission_ids: submissionIds,
       score,
       teacher_feedback: feedback,
     })
-    return response.data
+    return response
   },
 
   /**
    * 批量退回
    */
   async bulkReturn(submissionIds: number[], feedback: string): Promise<any> {
-    const response = await api.post('/activities/submissions/bulk-return', {
+    const response = await api.post<any>('/activities/submissions/bulk-return', {
       submission_ids: submissionIds,
       teacher_feedback: feedback,
     })
-    return response.data
+    return response
   },
 
   // ========== 互评 API ==========
@@ -241,21 +241,21 @@ export const activityService = {
     reviewsPerStudent: number
     isAnonymous: boolean
   }): Promise<any> {
-    const response = await api.post('/activities/peer-reviews/assign', {
+    const response = await api.post<any>('/activities/peer-reviews/assign', {
       cell_id: data.cellId,
       lesson_id: data.lessonId,
       reviews_per_student: data.reviewsPerStudent,
       is_anonymous: data.isAnonymous,
     })
-    return response.data
+    return response
   },
 
   /**
    * 获取某个提交收到的所有互评
    */
   async getSubmissionPeerReviews(submissionId: number): Promise<PeerReview[]> {
-    const response = await api.get(`/activities/submissions/${submissionId}/peer-reviews`)
-    return response.data
+    const response = await api.get<PeerReview[]>(`/activities/submissions/${submissionId}/peer-reviews`)
+    return response
   },
 
   /**
@@ -263,8 +263,8 @@ export const activityService = {
    */
   async getMyPeerReviewTasks(status?: string): Promise<PeerReview[]> {
     const params = status ? { status } : {}
-    const response = await api.get('/activities/my-peer-review-tasks', { params })
-    return response.data
+    const response = await api.get<PeerReview[]>('/activities/my-peer-review-tasks', { params })
+    return response
   },
 
   /**
@@ -274,8 +274,8 @@ export const activityService = {
     reviewId: number,
     data: CreatePeerReviewRequest
   ): Promise<PeerReview> {
-    const response = await api.post(`/activities/peer-reviews/${reviewId}/submit`, data)
-    return response.data
+    const response = await api.post<PeerReview>(`/activities/peer-reviews/${reviewId}/submit`, data)
+    return response
   },
 
   // ========== 统计 API ==========
@@ -284,18 +284,18 @@ export const activityService = {
    * 获取活动统计数据
    */
   async getStatistics(cellId: number): Promise<ActivityStatistics> {
-    const response = await api.get(`/activities/cells/${cellId}/statistics`)
-    return response.data
+    const response = await api.get<ActivityStatistics>(`/activities/cells/${cellId}/statistics`)
+    return response
   },
 
   /**
    * 获取题目级统计
    */
   async getItemStatistics(cellId: number): Promise<ActivityItemStatistic[]> {
-    const response = await api.get(
+    const response = await api.get<ActivityItemStatistic[]>(
       `/activities/cells/${cellId}/item-statistics`
     )
-    return response.data
+    return response
   },
 
   /**
@@ -306,11 +306,11 @@ export const activityService = {
     options: { studentId?: number } = {}
   ): Promise<FlowchartSnapshot[]> {
     const params = options.studentId ? { student_id: options.studentId } : undefined
-    const response = await api.get(
+    const response = await api.get<FlowchartSnapshot[]>(
       `/activities/cells/${cellId}/flowchart-snapshots`,
       { params }
     )
-    return response.data
+    return response
   },
 
   /**
@@ -324,11 +324,11 @@ export const activityService = {
     if (filters.studentId !== undefined) params.student_id = filters.studentId
     if (filters.phase) params.phase = filters.phase
     if (filters.riskLevel) params.risk_level = filters.riskLevel
-    const response = await api.get(
+    const response = await api.get<FormativeAssessmentRecord[]>(
       `/activities/lessons/${lessonId}/formative-assessments`,
       { params }
     )
-    return response.data
+    return response
   },
 
   /**
@@ -340,12 +340,12 @@ export const activityService = {
     phase?: string
   ): Promise<FormativeAssessmentRecord> {
     const params = phase ? { phase } : undefined
-    const response = await api.post(
+    const response = await api.post<FormativeAssessmentRecord>(
       `/activities/lessons/${lessonId}/formative-assessments/${studentId}/recompute`,
       undefined,
       { params }
     )
-    return response.data
+    return response
   },
 
   // ========== 离线同步 API ==========
@@ -354,10 +354,10 @@ export const activityService = {
    * 同步离线数据
    */
   async syncOfflineData(submissions: any[]): Promise<any> {
-    const response = await api.post('/activities/submissions/sync', {
+    const response = await api.post<any>('/activities/submissions/sync', {
       submissions,
     })
-    return response.data
+    return response
   },
 
   // ========== 导出数据 API ==========
@@ -366,11 +366,14 @@ export const activityService = {
    * 导出提交数据
    */
   async exportSubmissions(cellId: number, format: 'csv' | 'xlsx' | 'json' = 'csv'): Promise<Blob> {
-    const response = await api.get(`/activities/cells/${cellId}/export`, {
+    // 注意：这个方法比较特殊，api.get 内部会检查 responseType: 'blob'
+    // 并且在 api.ts 中 downloadFile 方法已经正确处理了 Blob 类型
+    // 但为了统一，我们仍然使用 api.downloadFile，但如果不存在这个方法，
+    // 就需要保留 response.data，因为 Blob 响应是特殊的
+    const response = await api.downloadFile(`/activities/cells/${cellId}/export`, {
       params: { format },
-      responseType: 'blob',
     })
-    return response.data
+    return response
   },
 }
 

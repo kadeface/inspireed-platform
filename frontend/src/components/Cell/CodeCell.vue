@@ -383,10 +383,11 @@ async function runCode() {
     else if (language === 'javascript') {
       const startTime = performance.now()
       
+      // 创建一个捕获 console.log 的函数
+      const logs: string[] = []
+      const originalLog = console.log
+      
       try {
-        // 创建一个捕获 console.log 的函数
-        const logs: string[] = []
-        const originalLog = console.log
         console.log = (...args: any[]) => {
           logs.push(args.map(String).join(' '))
         }

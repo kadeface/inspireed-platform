@@ -111,6 +111,9 @@ class NavigateToCellRequest(BaseModel):
     cell_order: Optional[int] = None  # Cell的order（作为备选方案，用于UUID的情况）
     action: Optional[str] = "toggle"  # 操作类型：toggle（切换，默认）/ add（添加）/ remove（移除）
     multi_select: Optional[bool] = False  # 是否多选模式
+    
+    # 新增：直接传递 order 数组（推荐方式）
+    display_cell_orders: Optional[List[int]] = None
 
 
 class StartActivityRequest(BaseModel):
