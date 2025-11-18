@@ -28,6 +28,17 @@
             <span class="teacher-name">授课教师：{{ session.teacherName }}</span>
           </div>
         </div>
+        <button
+          @click="handleExitClassroom"
+          class="exit-button"
+          :disabled="isExiting"
+          title="退出上课"
+        >
+          <svg v-if="!isExiting" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          <span v-else class="exit-loading">退出中...</span>
+        </button>
       </div>
       
       <!-- 同步状态 -->
@@ -58,6 +69,7 @@ import type { ClassSession } from '../../types/classroomSession'
 interface Props {
   lessonId: number
   session?: ClassSession | null
+  onLeaveSession?: () => Promise<void>
 }
 
 const props = defineProps<Props>()
@@ -65,6 +77,28 @@ const props = defineProps<Props>()
 const isSyncing = ref(false)
 const sessionDuration = ref(0)
 const durationInterval = ref<number | null>(null)
+const isExiting = ref(false)
+
+// 处理退出上课
+async function handleExitClassroom() {
+  if (!props.session || isExiting.value || !props.onLeaveSession) return
+  
+  if (!confirm('确定要退出上课吗？退出后您将无法继续接收教师的实时同步内容。')) {
+    return
+  }
+  
+  isExiting.value = true
+  try {
+    await props.onLeaveSession()
+    // 退出成功后，session 会被清空，组件会自动隐藏
+    console.log('✅ 已成功退出上课')
+  } catch (error: any) {
+    console.error('❌ 退出上课失败:', error)
+    alert('退出上课失败，请稍后重试')
+  } finally {
+    isExiting.value = false
+  }
+}
 
 const formatDuration = (seconds: number): string => {
   const hours = Math.floor(seconds / 3600)
@@ -132,6 +166,19 @@ onUnmounted(() => {
 
 .banner-content {
   @apply flex items-center gap-3;
+}
+
+.exit-button {
+  @apply px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors flex items-center gap-2 font-medium text-sm;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.exit-button:hover:not(:disabled) {
+  @apply bg-white/40;
+}
+
+.exit-loading {
+  @apply text-sm;
 }
 
 .live-indicator {

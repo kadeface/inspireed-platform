@@ -107,6 +107,7 @@
           v-if="classroomSession"
           :lesson-id="lessonId"
           :session="classroomSession"
+          :on-leave-session="leaveSession"
         />
 
         <!-- Cell 内容 -->
