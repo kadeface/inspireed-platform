@@ -99,9 +99,10 @@ const props = defineProps<{
   regionName?: string | null
   schoolName?: string | null
   gradeName?: string | null
+  classroomName?: string | null
 }>()
 
-const { title, subtitle, userName, showProfileButton, regionName, schoolName, gradeName } = toRefs(props)
+const { title, subtitle, userName, showProfileButton, regionName, schoolName, gradeName, classroomName } = toRefs(props)
 
 const organizationInfo = computed(() => {
   const info: string[] = []
@@ -113,6 +114,9 @@ const organizationInfo = computed(() => {
   }
   if (gradeName.value) {
     info.push(`年级：${gradeName.value}`)
+  }
+  if (classroomName.value) {
+    info.push(`班级：${classroomName.value}`)
   }
   return info
 })

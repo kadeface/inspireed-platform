@@ -28,6 +28,7 @@ from app.api.v1 import (
     subject_groups,
     student_ai_assistant,
     teacher_ai_assistant,
+    upload,
     users,
 )
 
@@ -92,3 +93,6 @@ api_router.include_router(
 api_router.include_router(
     course_export.router, prefix="/course-export", tags=["课程导出导入"]
 )
+
+# 文件上传路由
+api_router.include_router(upload.router, prefix="/upload", tags=["文件上传"])

@@ -21,6 +21,7 @@ export interface User {
   region_name?: string | null
   school_name?: string | null
   grade_name?: string | null
+  classroom_name?: string | null
   created_at: string
   updated_at: string
 }

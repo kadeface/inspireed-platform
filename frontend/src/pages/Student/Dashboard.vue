@@ -5,6 +5,10 @@
       title="学生工作台"
       subtitle="开始您的学习之旅"
       :user-name="userName"
+      :region-name="regionName"
+      :school-name="schoolName"
+      :grade-name="gradeName"
+      :classroom-name="classroomName"
       :show-profile-button="true"
       @profile="router.push('/student/profile')"
       @logout="handleLogout"
@@ -482,6 +486,10 @@ const progressData = ref<Record<number, number>>({})
 // 计算属性
 const currentUser = computed(() => userStore.user)
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '学生')
+const regionName = computed(() => userStore.user?.region_name || null)
+const schoolName = computed(() => userStore.user?.school_name || null)
+const gradeName = computed(() => userStore.user?.grade_name || null)
+const classroomName = computed(() => userStore.user?.classroom_name || null)
 
 const filteredLessons = computed(() => {
   let result = [...availableLessons.value]
