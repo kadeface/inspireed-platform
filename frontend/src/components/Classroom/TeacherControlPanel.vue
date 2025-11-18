@@ -21,7 +21,7 @@
             <span class="duration-value">{{ formatRemainingTime(remainingTime) }}</span>
           </p>
           <p v-else-if="session?.status === 'pending'" class="pending-text">
-            准备开始上课
+            等待学生加入（{{ activeStudents.length }} 人已加入）
           </p>
         </div>
       </div>
@@ -29,36 +29,63 @@
 
     <!-- 控制按钮组 -->
     <div class="control-actions">
+      <!-- 没有会话时，显示"创建课堂"按钮 -->
       <button 
-        v-if="!session || session.status === 'pending'"
-        @click="handleStart"
+        v-if="!session"
+        @click="handleCreateSession"
         :disabled="loading"
         class="btn btn-primary btn-lg"
       >
-        ▶️ 开始上课
+        📚 创建课堂
       </button>
       
-      <template v-if="session">
+      <!-- PENDING 状态：等待学生登录 -->
+      <template v-if="session && session.status === 'pending'">
         <button 
-          v-if="session.status === 'active'"
+          @click="handleBeginClass"
+          :disabled="loading || activeStudents.length === 0"
+          class="btn btn-primary btn-lg"
+          :title="activeStudents.length === 0 ? '请等待学生加入课堂' : '开始上课'"
+        >
+          ▶️ 开始上课
+        </button>
+        <button 
+          @click="handleCancelSession"
+          :disabled="loading"
+          class="btn btn-secondary"
+        >
+          ❌ 取消课堂
+        </button>
+      </template>
+      
+      <!-- ACTIVE 状态：上课中 -->
+      <template v-if="session && session.status === 'active'">
+        <button 
           @click="handlePause"
           :disabled="loading"
           class="btn btn-secondary"
         >
           ⏸️ 暂停
         </button>
-        
         <button 
-          v-if="session.status === 'paused'"
+          @click="handleEnd"
+          :disabled="loading"
+          class="btn btn-danger"
+        >
+          ⏹️ 结束课程
+        </button>
+      </template>
+      
+      <!-- PAUSED 状态：已暂停 -->
+      <template v-if="session && session.status === 'paused'">
+        <button 
           @click="handleResume"
           :disabled="loading"
           class="btn btn-primary"
         >
           ▶️ 继续
         </button>
-        
         <button 
-          v-if="session.status !== 'ended'"
           @click="handleEnd"
           :disabled="loading"
           class="btn btn-danger"
@@ -67,9 +94,31 @@
         </button>
       </template>
     </div>
+    
+    <!-- 等待学生登录界面（PENDING 状态） -->
+    <div v-if="session && session.status === 'pending'" class="waiting-students-panel">
+      <div class="waiting-header">
+        <div class="waiting-icon">⏳</div>
+        <div class="waiting-content">
+          <h3 class="waiting-title">等待学生加入课堂</h3>
+          <p class="waiting-subtitle">学生加入后，点击"开始上课"按钮开始授课</p>
+        </div>
+      </div>
+      
+      <div class="waiting-stats">
+        <div class="stat-item">
+          <span class="stat-label">已加入学生</span>
+          <span class="stat-value highlight">{{ activeStudents.length }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">总学生数</span>
+          <span class="stat-value">{{ totalStudents }}</span>
+        </div>
+      </div>
+    </div>
 
     <!-- 在线学生列表 -->
-    <div v-if="session" class="students-panel">
+    <div v-if="session && (session.status === 'pending' || session.status === 'active' || session.status === 'paused')" class="students-panel">
       <div class="panel-header">
         <h4>在线学生</h4>
         <div class="panel-stats">
@@ -141,21 +190,32 @@
         <p class="text-xs text-yellow-600 mt-1">点击"开始上课"按钮创建课堂会话</p>
       </div>
       
-      <ClassroomControlBoard
-        v-if="session"
-        :cells="lesson.content"
-        :current-cell-id="session.current_cell_id"
-        :current-cell-index="selectedCellIndex"
-        :current-activity-id="session.current_activity_id"
-        :db-cells="dbCells"
-        :loading="loading"
-        @navigate-to-cell="handleControlBoardNavigate"
-        @navigateToCell="handleControlBoardNavigate"
-        @start-activity="handleStartActivity"
-        @end-activity="handleEndActivity"
-      />
+      <!-- 有 session：显示实际控制板 -->
+      <template v-if="session">
+        <ClassroomControlBoard
+          :cells="lesson.content"
+          :current-cell-id="session.current_cell_id"
+          :current-cell-index="selectedCellIndex"
+          :current-activity-id="session.current_activity_id"
+          :db-cells="dbCells"
+          :loading="loading"
+          @navigate-to-cell="handleControlBoardNavigate"
+          @navigateToCell="handleControlBoardNavigate"
+          @start-activity="handleStartActivity"
+          @end-activity="handleEndActivity"
+        />
+        
+        <!-- 活动统计面板（当前 Cell 是 activity 类型时显示） -->
+        <div v-if="currentCell && currentCell.type === 'activity' && currentActivityDbCell" class="activity-panel mt-6">
+          <SubmissionStatistics
+            :cell-id="currentActivityDbCell.id"
+            :lesson-id="lesson?.id || lessonId"
+            :session-id="session.id"
+          />
+        </div>
+      </template>
       
-      <!-- 如果没有session，显示预览模式（只读） -->
+      <!-- 没有 session：显示预览模式（只读） -->
       <div v-else class="control-board-preview">
         <div class="board-header">
           <h4 class="board-title">📺 导播台（预览）</h4>
@@ -193,6 +253,7 @@ import type { Cell } from '../../types/cell'
 import classroomSessionService from '../../services/classroomSession'
 import ClassroomSwitcher from './ClassroomSwitcher.vue'
 import ClassroomControlBoard from './ClassroomControlBoard.vue'
+import SubmissionStatistics from '../Activity/SubmissionStatistics.vue'
 import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId } from '../../utils/cellId'
 
 interface Props {
@@ -210,7 +271,7 @@ const loadingStudents = ref(false)
 const sessionStatistics = ref<any>(null)
 const selectedCellIndex = ref(-1)  // -1表示隐藏所有内容
 const sessionDuration = ref(0)
-const durationInterval = ref<NodeJS.Timeout | null>(null)
+const durationInterval = ref<number | null>(null)
 const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录（用于 ID 匹配）
 
 // 一节课的标准时长（40分钟 = 2400秒）
@@ -245,11 +306,20 @@ const totalStudents = computed(() => {
 })
 
 const currentCell = computed(() => {
-  if (!props.lesson?.content || !session.value) return null
+  if (!props.lesson?.content || !session.value) {
+    return null
+  }
   
-  // 如果current_cell_id为null或0，表示没有显示任何内容
+  // 如果 selectedCellIndex 有效，优先使用它
+  if (selectedCellIndex.value >= 0 && selectedCellIndex.value < props.lesson.content.length) {
+    return props.lesson.content[selectedCellIndex.value]
+  }
+  
+  // 否则使用 current_cell_id 查找
   const currentId = session.value.current_cell_id
-  if (!currentId || currentId === 0) return null
+  if (!currentId || currentId === 0) {
+    return null
+  }
   
   // 查找匹配的Cell
   return props.lesson.content.find((cell, index) => {
@@ -267,6 +337,27 @@ const currentCell = computed(() => {
     if (cell.order !== undefined && cell.order === currentId) return true
     return false
   }) || null
+})
+
+// 获取当前活动 Cell 的数据库 ID（用于查询提交数据）
+const currentActivityDbCell = computed(() => {
+  if (!currentCell.value || currentCell.value.type !== 'activity') {
+    return null
+  }
+  
+  if (!dbCells.value || dbCells.value.length === 0) {
+    return null
+  }
+  
+  // 通过 order 查找对应的数据库 Cell
+  const order = currentCell.value.order
+  if (order === undefined) {
+    return null
+  }
+  
+  return dbCells.value.find(dbCell => 
+    dbCell.order === order && dbCell.cell_type === 'ACTIVITY'
+  ) || null
 })
 
 
@@ -305,7 +396,8 @@ function formatRemainingTime(seconds: number): string {
 }
 
 // 会话操作
-async function handleStart() {
+// 创建课堂会话（保持 PENDING 状态，等待学生加入）
+async function handleCreateSession() {
   loading.value = true
   try {
     // 首先需要创建会话，这里需要classroom_id
@@ -313,8 +405,8 @@ async function handleStart() {
     const classroomId = route.params.classroomId as string || '1'
     
     try {
-      console.log('🚀 Starting to create session...')
-      // 尝试创建会话
+      console.log('🚀 Creating session...')
+      // 创建会话（状态为 PENDING）
       const newSession = await classroomSessionService.createSession(props.lessonId, {
         classroom_id: parseInt(classroomId),
       })
@@ -327,15 +419,26 @@ async function handleStart() {
         throw new Error('创建会话失败：服务器返回的数据格式不正确')
       }
       
-      console.log('🎬 Starting session with id:', newSession.id)
-      // 开始会话
-      session.value = await classroomSessionService.startSession(newSession.id)
-      console.log('✅ Session started successfully:', session.value)
+      // 保持 PENDING 状态，不立即开始
+      session.value = newSession
+      console.log('✅ Session created in PENDING state, waiting for students...')
       
-      // 检查开始会话的响应
-      if (!session.value) {
-        throw new Error('开始会话失败：服务器返回的数据格式不正确')
-      }
+      // 加载学生列表（开始轮询）
+      loadParticipants()
+      
+      // 设置定时刷新学生列表（每3秒）
+      const refreshInterval = setInterval(() => {
+        if (session.value && session.value.status === 'pending') {
+          loadParticipants()
+        } else {
+          clearInterval(refreshInterval)
+        }
+      }, 3000)
+      
+      // 组件卸载时清除定时器
+      onUnmounted(() => {
+        clearInterval(refreshInterval)
+      })
     } catch (createError: any) {
       // 如果创建失败，检查是否是因为已有活跃会话
       const errorDetail = createError.response?.data?.detail || createError.message || ''
@@ -417,15 +520,8 @@ async function handleStart() {
           const existingSession = activeSessions[0]
           session.value = existingSession
           
-          // 如果会话是pending状态，尝试开始它
-          if (existingSession.status === 'pending') {
-            try {
-              session.value = await classroomSessionService.startSession(existingSession.id)
-            } catch (startError: any) {
-              console.warn('启动现有会话失败，但继续使用:', startError)
-              // 即使启动失败，也继续使用现有会话
-            }
-          }
+          // 如果会话是pending状态，不自动开始，保持等待状态
+          // 让教师手动点击"开始上课"按钮
           
           // 开始计时和加载数据
           if (session.value.status === 'active') {
@@ -434,11 +530,26 @@ async function handleStart() {
           loadParticipants()
           loadStatistics()
           
+          // 如果会话是 pending 状态，设置定时刷新学生列表
+          if (session.value.status === 'pending') {
+            const refreshInterval = setInterval(() => {
+              if (session.value && session.value.status === 'pending') {
+                loadParticipants()
+              } else {
+                clearInterval(refreshInterval)
+              }
+            }, 3000)
+            
+            onUnmounted(() => {
+              clearInterval(refreshInterval)
+            })
+          }
+          
           // 提示用户已加载现有会话
           const statusText = {
             'active': '进行中',
             'paused': '已暂停',
-            'pending': '待开始'
+            'pending': '等待学生加入'
           }[existingSession.status] || '未知'
           console.log(`✅ 已自动加载现有会话 (ID: ${existingSession.id}, 状态: ${statusText})`)
           
@@ -464,15 +575,7 @@ async function handleStart() {
               if (finalSession) {
                 session.value = finalSession
                 
-                // 如果会话是pending状态，尝试开始它
-                if (finalSession.status === 'pending') {
-                  try {
-                    session.value = await classroomSessionService.startSession(finalSession.id)
-                  } catch (startError: any) {
-                    console.warn('启动现有会话失败，但继续使用:', startError)
-                    // 即使启动失败，也继续使用现有会话
-                  }
-                }
+                // 如果会话是pending状态，不自动开始，保持等待状态
                 
                 // 开始计时和加载数据
                 if (session.value.status === 'active') {
@@ -480,6 +583,22 @@ async function handleStart() {
                 }
                 loadParticipants()
                 loadStatistics()
+                
+                // 如果会话是 pending 状态，设置定时刷新学生列表
+                if (session.value.status === 'pending') {
+                  const refreshInterval = setInterval(() => {
+                    if (session.value && session.value.status === 'pending') {
+                      loadParticipants()
+                    } else {
+                      clearInterval(refreshInterval)
+                    }
+                  }, 3000)
+                  
+                  onUnmounted(() => {
+                    clearInterval(refreshInterval)
+                  })
+                }
+                
                 console.log(`✅ 成功！已加载会话 ID: ${finalSessionId}`)
                 return
               }
@@ -523,20 +642,10 @@ async function handleStart() {
         throw createError
       }
     }
-    
-    // 开始计时（新会话从0开始）
-    if (session.value?.status === 'active') {
-      sessionDuration.value = 0  // 新会话从0开始
-      startDurationTimer()
-    }
-    
-    // 加载学生列表
-    loadParticipants()
-    loadStatistics()
   } catch (error: any) {
-    console.error('Failed to start session:', error)
+    console.error('Failed to create session:', error)
     // 提取更友好的错误信息
-    let errorMessage = error.message || error.response?.data?.detail || '开始课程失败'
+    let errorMessage = error.message || error.response?.data?.detail || '创建课堂失败'
     
     // 如果是已知的错误类型，显示更友好的提示
     if (errorMessage.includes('无权限')) {
@@ -549,6 +658,74 @@ async function handleStart() {
     }
     
     alert(errorMessage)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 开始上课（将 PENDING 状态变为 ACTIVE）
+async function handleBeginClass() {
+  if (!session.value || session.value.status !== 'pending') return
+  
+  loading.value = true
+  try {
+    console.log('🎬 Starting session with id:', session.value.id)
+    session.value = await classroomSessionService.startSession(session.value.id)
+    console.log('✅ Session started successfully:', session.value)
+    
+    // 检查开始会话的响应
+    if (!session.value) {
+      throw new Error('开始会话失败：服务器返回的数据格式不正确')
+    }
+    
+    // 开始计时（新会话从0开始）
+    if (session.value.status === 'active') {
+      sessionDuration.value = 0  // 新会话从0开始
+      startDurationTimer()
+    }
+    
+    // 加载统计信息
+    loadStatistics()
+    
+    // 设置定时刷新学生列表和统计（每5秒）
+    const refreshInterval = setInterval(() => {
+      if (session.value && (session.value.status === 'active' || session.value.status === 'paused')) {
+        loadParticipants()
+        loadStatistics()
+      } else {
+        clearInterval(refreshInterval)
+      }
+    }, 5000)
+    
+    // 组件卸载时清除定时器
+    onUnmounted(() => {
+      clearInterval(refreshInterval)
+    })
+  } catch (error: any) {
+    console.error('Failed to start session:', error)
+    const errorMessage = error.message || error.response?.data?.detail || '开始上课失败'
+    alert(errorMessage)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 取消课堂（删除 PENDING 状态的会话）
+async function handleCancelSession() {
+  if (!session.value || session.value.status !== 'pending') return
+  if (!confirm('确定要取消课堂吗？这将删除当前会话。')) return
+  
+  loading.value = true
+  try {
+    // 注意：这里可能需要一个删除会话的API，如果没有，可以结束会话
+    // 暂时先提示用户
+    alert('取消课堂功能需要后端支持删除会话API')
+    // TODO: 实现删除会话的逻辑
+    // await classroomSessionService.deleteSession(session.value.id)
+    // session.value = null
+  } catch (error: any) {
+    console.error('Failed to cancel session:', error)
+    alert('取消课堂失败')
   } finally {
     loading.value = false
   }
@@ -749,20 +926,20 @@ async function handleControlBoardNavigate(
     loadParticipants()
     
     // 更新selectedCellIndex
-    if (requestData.cellId === 0) {
+    if (cellId === 0) {
       selectedCellIndex.value = -1
     } else if (cellOrder !== null && cellOrder !== undefined && props.lesson?.content) {
       // 使用 cellOrder 直接设置索引
       selectedCellIndex.value = cellOrder
       console.log('✅ 更新 selectedCellIndex 为:', cellOrder)
-    } else if (requestData.cellId && props.lesson?.content) {
+    } else if (cellId && props.lesson?.content) {
       // 通过 cellId 查找索引
       const index = props.lesson.content.findIndex((cell) => {
         const id = getCellId(cell)
-        if (typeof id === 'number' && id === requestData.cellId) return true
+        if (typeof id === 'number' && id === cellId) return true
         if (typeof id === 'string') {
           const numId = parseInt(id, 10)
-          if (!isNaN(numId) && numId === requestData.cellId) return true
+          if (!isNaN(numId) && numId === cellId) return true
         }
         return false
       })
@@ -772,8 +949,8 @@ async function handleControlBoardNavigate(
       } else {
         console.warn('⚠️ 未找到匹配的 cell，使用 cellOrder 作为 fallback')
         // 如果找不到，尝试使用返回的 currentCellId 对应的索引
-        if (updatedSession?.currentCellId || updatedSession?.current_cell_id) {
-          const currentId = updatedSession.currentCellId || updatedSession.current_cell_id
+        if (updatedSession?.currentCellId) {
+          const currentId = updatedSession.currentCellId
           const foundIndex = props.lesson.content.findIndex((cell) => {
             const id = getCellId(cell)
             return id === currentId || (typeof id === 'string' && String(id) === String(currentId))
@@ -808,7 +985,7 @@ async function loadParticipants() {
     
     // 确保是数组且只包含在线学生
     const activeParticipants = Array.isArray(participants) 
-      ? participants.filter(p => p.isActive !== false && (p.is_active !== false))
+      ? participants.filter(p => p.isActive !== false)
       : []
     
     activeStudents.value = activeParticipants
@@ -920,7 +1097,7 @@ async function loadDbCells() {
   try {
     const { api } = await import('../../services/api')
     const response = await api.get(`/cells/lesson/${props.lessonId}`)
-    dbCells.value = Array.isArray(response) ? response : (response.data || [])
+    dbCells.value = Array.isArray(response) ? response : ([] as any)
     console.log('📦 加载数据库 Cell 记录:', dbCells.value.length, '个', dbCells.value)
   } catch (error: any) {
     console.warn('⚠️ 加载数据库 Cell 记录失败:', error)
@@ -966,6 +1143,21 @@ onMounted(async () => {
         }
       }, 5000)
       
+      // 如果会话是 pending 状态，也设置定时刷新
+      if (session.value.status === 'pending') {
+        const pendingRefreshInterval = setInterval(() => {
+          if (session.value && session.value.status === 'pending') {
+            loadParticipants()
+          } else {
+            clearInterval(pendingRefreshInterval)
+          }
+        }, 3000)
+        
+        onUnmounted(() => {
+          clearInterval(pendingRefreshInterval)
+        })
+      }
+      
       // 组件卸载时清除定时器
       onUnmounted(() => {
         clearInterval(refreshInterval)
@@ -988,6 +1180,14 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 活动统计面板样式 */
+.activity-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 .teacher-control-panel {
   @apply bg-white rounded-lg border border-gray-200 p-6 space-y-6;
 }
@@ -1159,6 +1359,50 @@ onUnmounted(() => {
 
 .empty-students {
   @apply text-center py-8 text-gray-500;
+}
+
+.waiting-students-panel {
+  @apply bg-blue-50 border-2 border-blue-200 rounded-lg p-6 space-y-4;
+}
+
+.waiting-header {
+  @apply flex items-start gap-4;
+}
+
+.waiting-icon {
+  @apply text-4xl;
+}
+
+.waiting-content {
+  @apply flex-1;
+}
+
+.waiting-title {
+  @apply text-xl font-bold text-gray-900 mb-1;
+}
+
+.waiting-subtitle {
+  @apply text-sm text-gray-600;
+}
+
+.waiting-stats {
+  @apply flex items-center gap-6 pt-4 border-t border-blue-200;
+}
+
+.stat-item {
+  @apply flex items-center gap-2;
+}
+
+.stat-label {
+  @apply text-sm text-gray-600;
+}
+
+.stat-value {
+  @apply text-lg font-semibold text-gray-900;
+}
+
+.stat-value.highlight {
+  @apply text-blue-600 text-2xl;
 }
 
 .content-control {

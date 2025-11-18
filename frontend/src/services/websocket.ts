@@ -30,7 +30,13 @@ export class WebSocketService {
     return new Promise((resolve, reject) => {
       // 构建 WebSocket URL
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+      
+      // 获取 API 基础 URL 并移除 /api/v1 后缀（如果存在）
+      let apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+      if (apiBase.endsWith('/api/v1')) {
+        apiBase = apiBase.replace('/api/v1', '')
+      }
+      
       const wsBase = apiBase.replace('http://', '').replace('https://', '')
       
       this.url = `${wsProtocol}//${wsBase}/api/v1/classroom-sessions/sessions/${sessionId}/ws?token=${token}`

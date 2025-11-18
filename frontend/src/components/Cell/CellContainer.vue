@@ -1,13 +1,14 @@
 <template>
   <div
-    class="mb-4 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+    class="mb-4 rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+    :class="{ 'overflow-hidden': cell.type !== 'flowchart' }"
     :data-cell-id="cell.id"
     :data-cell-index="props.index"
   >
     <div class="flex">
       <aside
         :class="[
-          'flex w-28 flex-col items-center justify-center gap-2 border-r border-gray-200 px-3 py-6 text-white',
+          'flex w-28 flex-shrink-0 flex-col items-center justify-center gap-2 border-r border-gray-200 px-3 py-6 text-white',
           stageStyles.bg
         ]"
       >
@@ -32,12 +33,12 @@
         </div>
       </aside>
 
-      <div class="flex-1">
+      <div class="flex-1 min-w-0">
         <div
           v-if="showHeader"
           class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3"
         >
-          <div class="flex flex-1 items-center gap-3">
+          <div class="flex flex-1 items-center gap-3 min-w-0">
             <!-- 拖拽手柄 -->
             <button
               v-if="draggable"
@@ -53,7 +54,7 @@
             </span>
 
             <!-- 可编辑标题 -->
-            <div class="flex-1 cell-drag-area" :class="{ 'cursor-move': draggable }" v-if="editable">
+            <div class="flex-1 cell-drag-area min-w-0" :class="{ 'cursor-move': draggable }" v-if="editable">
               <input
                 v-if="isEditingTitle"
                 v-model="localTitle"
@@ -69,23 +70,23 @@
                 v-else
                 @click="startEditTitle"
                 @mousedown.stop
-                class="flex cursor-pointer items-center rounded px-3 py-1 text-base font-medium transition-colors hover:bg-gray-100"
+                class="flex cursor-pointer items-center rounded px-3 py-1 text-base font-medium transition-colors hover:bg-gray-100 min-w-0"
                 :title="cell.title || '点击添加标题'"
               >
-                <span v-if="cell.title" class="text-gray-700">{{ cell.title }}</span>
+                <span v-if="cell.title" class="text-gray-700 truncate">{{ cell.title }}</span>
                 <span v-else class="italic text-gray-400">点击添加标题</span>
-                <svg class="ml-1 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="ml-1 h-4 w-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
               </div>
             </div>
-            <div v-else-if="cell.title" class="flex-1 font-medium text-gray-700 cell-drag-area" :class="{ 'cursor-move': draggable }">
+            <div v-else-if="cell.title" class="flex-1 font-medium text-gray-700 cell-drag-area min-w-0 truncate" :class="{ 'cursor-move': draggable }">
               {{ cell.title }}
             </div>
             <div v-else class="flex-1 cell-drag-area" :class="{ 'cursor-move': draggable }"></div>
           </div>
 
-          <div class="flex gap-2" v-if="editable">
+          <div class="flex gap-2 flex-shrink-0" v-if="editable">
             <!-- 上下移动按钮 -->
             <div v-if="showMoveButtons" class="mr-2 flex gap-1">
               <button
@@ -141,7 +142,9 @@ import ContestCell from './ContestCell.vue'
 import VideoCell from './VideoCell.vue'
 import ActivityCell from './ActivityCell.vue'
 import FlowchartCell from './FlowchartCell.vue'
+import FlowchartCellX6 from './FlowchartCellX6.vue'
 import ReferenceMaterialCell from '@/components/Cell/ReferenceMaterialCell.vue'
+import { useFeatureFlag } from '@/composables/useFeatureFlag'
 
 interface Props {
   cell: Cell
@@ -199,6 +202,10 @@ function cancelEditTitle() {
   localTitle.value = ''
 }
 
+// 特性开关
+const { isEnabled } = useFeatureFlag()
+const useX6Editor = isEnabled('use-x6-editor')
+
 const cellComponent = computed(() => {
   const componentMap = {
     [CellType.TEXT]: TextCell,
@@ -209,7 +216,8 @@ const cellComponent = computed(() => {
     [CellType.CONTEST]: ContestCell,
     [CellType.VIDEO]: VideoCell,
     [CellType.ACTIVITY]: ActivityCell,
-    [CellType.FLOWCHART]: FlowchartCell,
+    // 使用特性开关选择流程图编辑器
+    [CellType.FLOWCHART]: useX6Editor ? FlowchartCellX6 : FlowchartCell,
     [CellType.REFERENCE_MATERIAL]: ReferenceMaterialCell,
   }
   return componentMap[props.cell.type]

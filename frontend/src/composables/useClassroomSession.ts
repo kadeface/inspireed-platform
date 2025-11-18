@@ -15,7 +15,8 @@ export function useClassroomSession(lessonId: number) {
   const participation = ref<StudentParticipation | null>(null)
   const currentCellId = ref<number | null>(null)
   const isInClassroomMode = computed(() => {
-    return session.value?.status === 'active'
+    // 在 pending 和 active 状态下都认为是课堂模式
+    return session.value?.status === 'active' || session.value?.status === 'pending'
   })
   
   // 轮询定时器（用于定期获取会话状态）- 降级方案
@@ -31,12 +32,31 @@ export function useClassroomSession(lessonId: number) {
    */
   async function findAndJoinSession() {
     try {
-      // 获取该教案的所有活跃会话
-      const sessions = await classroomSessionService.listSessions(lessonId, 'active')
+      // 🆕 获取该教案的所有会话（包括 pending 和 active 状态）
+      // 先尝试查找 active 状态的会话
+      let sessions = await classroomSessionService.listSessions(lessonId, 'active')
+      
+      // 如果没有 active 状态的会话，尝试查找 pending 状态的会话
+      if (sessions.length === 0) {
+        const allSessions = await classroomSessionService.listSessions(lessonId)
+        sessions = allSessions.filter(s => s.status === 'pending' || s.status === 'active')
+      }
       
       if (sessions.length > 0) {
-        // 找到第一个活跃的会话
-        const activeSession = sessions[0]
+        // 找到第一个可加入的会话（优先 active，其次 pending）
+        const activeSession = sessions.find(s => s.status === 'active') || sessions[0]
+        
+        // 🆕 检查会话状态
+        if (activeSession.status === 'ended') {
+          console.log('⏹️ 会话已结束，无法加入')
+          alert('该课程已结束，无法加入')
+          return
+        }
+        
+        // 🆕 如果是 pending 状态，提示学生等待
+        if (activeSession.status === 'pending') {
+          console.log('⏳ 会话处于等待状态，等待教师开始上课')
+        }
         
         // 确保 settings 被正确设置
         if (!activeSession.settings) {
@@ -67,6 +87,14 @@ export function useClassroomSession(lessonId: number) {
           participation.value = await classroomSessionService.joinSession(activeSession.id)
           console.log('✅ 成功加入会话:', participation.value)
         } catch (error: any) {
+          // 🆕 检查是否因为会话已结束而失败
+          if (error.response?.status === 400 && error.response?.data?.detail?.includes('已结束')) {
+            console.log('⏹️ 会话已结束')
+            alert('该课程已结束，无法加入')
+            session.value = null
+            return
+          }
+          
           // 如果已经加入过（403或其他错误），继续使用会话
           if (error.response?.status === 403) {
             console.log('ℹ️ 已经加入过会话，继续使用')
@@ -226,12 +254,23 @@ export function useClassroomSession(lessonId: number) {
       
       // 更新会话状态
       if (message.data.current_state && session.value) {
-        session.value.status = message.data.current_state.status
-        session.value.settings = {
+        // 🔧 修复：创建新对象以触发 Vue 响应式更新
+        const newSession = { ...session.value }
+        newSession.status = message.data.current_state.status
+        newSession.settings = {
           ...session.value.settings,
           display_cell_orders: message.data.current_state.display_cell_orders,
         }
+        
+        // 🔧 重新赋值整个 session 对象
+        session.value = newSession
         currentCellId.value = message.data.current_state.current_cell_id
+        
+        console.log('🔧 初始状态已更新:', {
+          status: newSession.status,
+          displayCellOrders: newSession.settings?.display_cell_orders,
+          currentCellId: message.data.current_state.current_cell_id,
+        })
       }
     })
     
@@ -240,9 +279,12 @@ export function useClassroomSession(lessonId: number) {
       console.log('🔄 收到内容切换消息:', message.data)
       
       if (session.value) {
+        // 🔧 修复：创建新对象以触发 Vue 响应式更新
+        const newSession = { ...session.value }
+        
         // 更新 display_cell_orders
         if (message.data.display_cell_orders !== undefined) {
-          session.value.settings = {
+          newSession.settings = {
             ...session.value.settings,
             display_cell_orders: message.data.display_cell_orders,
           }
@@ -252,6 +294,9 @@ export function useClassroomSession(lessonId: number) {
         if (message.data.current_cell_id !== undefined) {
           currentCellId.value = message.data.current_cell_id
         }
+        
+        // 🔧 重新赋值整个 session 对象，确保响应式触发
+        session.value = newSession
         
         console.log('✅ 内容已同步:', {
           displayCellOrders: session.value.settings?.display_cell_orders,
@@ -272,6 +317,24 @@ export function useClassroomSession(lessonId: number) {
           console.log('⏹️ 会话已结束')
           disconnectWebSocket()
         }
+      }
+    })
+    
+    // 🆕 监听会话结束（教师主动结束课程）
+    websocketService.on('session_ended', (message: WebSocketMessage) => {
+      console.log('⏹️ 教师已结束课程:', message.data)
+      
+      if (session.value) {
+        session.value.status = 'ended'
+        
+        // 断开 WebSocket
+        disconnectWebSocket()
+        
+        // 显示提示
+        alert('教师已结束课程，感谢您的参与！')
+        
+        // 可选：重定向到学生主页
+        // router.push('/student')
       }
     })
     
@@ -383,21 +446,34 @@ export function useClassroomSession(lessonId: number) {
   /**
    * 是否有可显示的内容
    * 在课堂模式下，如果教师还未切换到任何Cell，则没有内容可显示
-   * 支持单选模式（displayCellId）和多选模式（display_cell_ids 数组）
+   * 支持新方式（display_cell_orders）和旧方式（display_cell_ids）
+   * 在 PENDING 状态下，学生不能看到内容（等待教师开始上课）
    */
   const hasDisplayableContent = computed(() => {
     if (!isInClassroomMode.value) {
       return true  // 非课堂模式，显示所有内容
     }
     
-    // 检查多选模式：如果有 display_cell_ids 数组且长度 > 0，有内容可显示
+    // 🆕 PENDING 状态下，学生不能看到内容
+    if (session.value?.status === 'pending') {
+      return false
+    }
+    
     const settings = session.value?.settings
+    
+    // 🆕 优先检查新方式：display_cell_orders
+    const displayOrders = settings?.display_cell_orders
+    if (displayOrders && Array.isArray(displayOrders) && displayOrders.length > 0) {
+      return true  // 新方式：有选中的模块
+    }
+    
+    // 🔄 向后兼容：检查旧方式 display_cell_ids
     const displayCellIdsFromSession = settings?.display_cell_ids || 
                                      settings?.displayCellIds || []
     const multiSelectIds = Array.isArray(displayCellIdsFromSession) ? displayCellIdsFromSession : []
     
     if (multiSelectIds.length > 0) {
-      return true  // 多选模式：有选中的模块
+      return true  // 旧方式：有选中的模块
     }
     
     // 单选模式：检查 displayCellId

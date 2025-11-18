@@ -7,7 +7,7 @@ from statistics import mean
 from typing import Any, Dict, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, Integer
+from sqlalchemy import select, func, and_, or_, Integer, cast as sql_cast
 from sqlalchemy.orm import selectinload
 
 from app.api import deps
@@ -94,12 +94,13 @@ async def create_submission(
                     
                     # 检查是否已经有相同 order 和 type 的 cell
                     if cell_order is not None:
-                        # 使用字符串比较避免枚举类型问题
+                        # 使用 cast 进行类型转换以避免 PostgreSQL 枚举类型比较问题
+                        from sqlalchemy import Text
                         existing_cell_query = select(Cell).where(
                             and_(
                                 Cell.lesson_id == data.lesson_id,
                                 Cell.order == cell_order,
-                                Cell.cell_type == CellType.ACTIVITY,  # type: ignore[comparison-overlap]
+                                sql_cast(Cell.cell_type, Text) == "ACTIVITY",
                             )
                         )
                         existing_result = await db.execute(existing_cell_query)
@@ -171,13 +172,19 @@ async def create_submission(
 
         # 创建新提交
         # 注意：session_id 应该从请求上下文或参数中获取，暂时先不处理
+        # 处理 started_at：如果带时区，转换为不带时区的 UTC 时间
+        started_at_value = data.started_at or datetime.utcnow()
+        if started_at_value and hasattr(started_at_value, 'tzinfo') and started_at_value.tzinfo is not None:
+            # 转换为 UTC 并移除时区信息
+            started_at_value = started_at_value.replace(tzinfo=None)
+        
         submission = ActivitySubmission(
             cell_id=final_cell_id,
             lesson_id=data.lesson_id,
             student_id=cast(int, current_user.id),
             responses=data.responses or {},
             status=ActivitySubmissionStatus.DRAFT,
-            started_at=data.started_at or datetime.utcnow(),
+            started_at=started_at_value,
             process_trace=data.process_trace or [],
             context=data.context or {},
             activity_phase=data.activity_phase,
@@ -365,6 +372,75 @@ async def submit_activity(
         cast(int, submission.student_id),
         phase=phase_value,
     )
+
+    # ===== WebSocket 实时通知 =====
+    # 发送通知给教师
+    try:
+        from app.services.realtime import (
+            resolve_teacher_targets,
+            build_event,
+            get_submission_statistics,
+            Channel
+        )
+        from app.services.websocket_manager import manager
+        
+        # 获取学生信息
+        student = await db.get(User, submission.student_id)
+        
+        # 解析教师目标
+        teacher_target = await resolve_teacher_targets(db, submission)
+        if teacher_target:
+            # 发送新提交通知
+            event = build_event(
+                type="new_submission",
+                channel=teacher_target.channel,
+                delivery_mode="cast" if teacher_target.is_broadcast else "unicast",
+                data={
+                    "submission_id": submission.id,
+                    "cell_id": submission.cell_id,
+                    "lesson_id": submission.lesson_id,
+                    "student_id": submission.student_id,
+                    "student_name": student.full_name or student.username if student else "Unknown",
+                    "student_email": student.email if student else "",
+                    "status": submission.status.value,
+                    "score": submission.score,
+                    "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at is not None else None,
+                    "time_spent": submission.time_spent,
+                },
+            )
+            
+            await manager.send_to_teacher(
+                event=event,
+                scope=teacher_target.channel.scope,
+                channel_id=teacher_target.channel.id,
+                teacher_ids=teacher_target.recipient_ids if not teacher_target.is_broadcast else []
+            )
+            
+            # 发送统计更新通知
+            stats = await get_submission_statistics(
+                db,
+                cell_id=cast(int, submission.cell_id),
+                lesson_id=cast(int, submission.lesson_id),
+                session_id=cast(Optional[int], submission.session_id)
+            )
+            
+            stats_event = build_event(
+                type="submission_statistics_updated",
+                channel=teacher_target.channel,
+                delivery_mode="cast",
+                data=stats
+            )
+            
+            await manager.broadcast(
+                event=stats_event,
+                scope=teacher_target.channel.scope,
+                channel_id=teacher_target.channel.id
+            )
+    except Exception as e:
+        # WebSocket 通知失败不影响主流程
+        print(f"❌ WebSocket 通知失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
     return submission
 
@@ -625,6 +701,48 @@ async def grade_submission(
         phase=phase_value,
     )
 
+    # ===== WebSocket 实时通知 =====
+    # 发送评分通知给学生
+    try:
+        from app.services.realtime import (
+            resolve_student_target,
+            build_event,
+        )
+        from app.services.websocket_manager import manager
+        
+        # 解析学生目标
+        student_target = await resolve_student_target(db, submission)
+        if student_target:
+            # 发送评分通知
+            event = build_event(
+                type="submission_graded",
+                channel=student_target.channel,
+                delivery_mode="unicast",
+                data={
+                    "submission_id": submission.id,
+                    "cell_id": submission.cell_id,
+                    "lesson_id": submission.lesson_id,
+                    "score": submission.score,
+                    "max_score": submission.max_score,
+                    "teacher_feedback": submission.teacher_feedback,
+                    "graded_at": submission.graded_at.isoformat() if submission.graded_at is not None else None,
+                    "graded_by": submission.graded_by,
+                    "graded_by_name": current_user.full_name or current_user.username,
+                },
+            )
+            
+            await manager.send_to_student(
+                event=event,
+                scope=student_target.channel.scope,
+                channel_id=student_target.channel.id,
+                student_ids=student_target.recipient_ids
+            )
+    except Exception as e:
+        # WebSocket 通知失败不影响主流程
+        print(f"❌ WebSocket 评分通知失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
     return submission
 
 
@@ -678,6 +796,44 @@ async def bulk_grade_submissions(
         await recompute_formative_assessment(
             db, lesson_id, student_id, phase=phase
         )
+
+    # ===== WebSocket 实时通知 =====
+    # 批量发送评分通知给学生
+    try:
+        from app.services.realtime import resolve_student_target, build_event
+        from app.services.websocket_manager import manager
+        
+        # 为每个学生发送通知
+        for submission_id in data.submission_ids:
+            submission = await db.get(ActivitySubmission, submission_id)
+            if submission and cast(ActivitySubmissionStatus, submission.status) == ActivitySubmissionStatus.GRADED:
+                student_target = await resolve_student_target(db, submission)
+                if student_target:
+                    event = build_event(
+                        type="submission_graded",
+                        channel=student_target.channel,
+                        delivery_mode="unicast",
+                        data={
+                            "submission_id": submission.id,
+                            "cell_id": submission.cell_id,
+                            "lesson_id": submission.lesson_id,
+                            "score": submission.score,
+                            "max_score": submission.max_score,
+                            "teacher_feedback": submission.teacher_feedback,
+                            "graded_at": submission.graded_at.isoformat() if submission.graded_at is not None else None,
+                            "graded_by": submission.graded_by,
+                            "graded_by_name": current_user.full_name or current_user.username,
+                        },
+                    )
+                    
+                    await manager.send_to_student(
+                        event=event,
+                        scope=student_target.channel.scope,
+                        channel_id=student_target.channel.id,
+                        student_ids=student_target.recipient_ids
+                    )
+    except Exception as e:
+        print(f"❌ 批量 WebSocket 评分通知失败: {str(e)}")
 
     return {"graded_count": graded_count}
 
@@ -1416,7 +1572,7 @@ async def _update_statistics(db: AsyncSession, cell_id: int, lesson_id: int):
 
         flowchart_metrics = {
             "snapshot_count": len(flowchart_snapshots),
-            "latest_updated_at": latest_updated.isoformat() if latest_updated else None,
+            "latest_updated_at": latest_updated.isoformat() if latest_updated is not None else None,
             "max_version": max_version,
         }
         numeric_aggregates: Dict[str, List[float]] = {}

@@ -12,6 +12,16 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@antv/x6": "^2.18.1",
+    "@antv/x6-plugin-clipboard": "^2.0.0",
+    "@antv/x6-plugin-dnd": "^2.1.1",
+    "@antv/x6-plugin-export": "^2.0.0",
+    "@antv/x6-plugin-history": "^2.0.0",
+    "@antv/x6-plugin-keyboard": "^2.0.0",
+    "@antv/x6-plugin-minimap": "^2.0.7",
+    "@antv/x6-plugin-scroller": "^2.0.0",
+    "@antv/x6-plugin-selection": "^2.0.0",
+    "@antv/x6-plugin-snapline": "^2.0.0",
     "@codemirror/lang-html": "^6.4.11",
     "@codemirror/lang-javascript": "^6.2.1",
     "@codemirror/lang-python": "^6.1.3",

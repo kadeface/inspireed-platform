@@ -25,6 +25,26 @@
     <div v-else-if="lesson" class="flex h-screen">
       <!-- 左侧：课程内容 -->
       <div class="flex-1 overflow-y-auto">
+        <!-- 🔧 临时调试面板 -->
+        <div v-if="isInClassroomMode" class="bg-yellow-50 border-b border-yellow-200 px-6 py-3 text-xs font-mono">
+          <div class="flex items-center justify-between">
+            <div class="flex gap-6">
+              <span>📊 课堂模式: <strong>{{ isInClassroomMode ? '是' : '否' }}</strong></span>
+              <span>🔒 严格同步: <strong>{{ shouldSyncDisplay ? '是' : '否' }}</strong></span>
+              <span>📝 总Cell数: <strong>{{ lesson.content?.length || 0 }}</strong></span>
+              <span>👁️ 显示Cell数: <strong>{{ filteredCells.length }}</strong></span>
+              <span>🎯 displayOrders: <strong>{{ JSON.stringify(classroomSession?.settings?.display_cell_orders) }}</strong></span>
+              <span>🔢 第一个Cell的order: <strong>{{ lesson.content?.[0]?.order }}</strong></span>
+            </div>
+            <button 
+              @click="() => { console.log('完整状态:', { lesson: lesson.content, session: classroomSession, filtered: filteredCells }) }"
+              class="px-2 py-1 bg-yellow-200 hover:bg-yellow-300 rounded text-xs"
+            >
+              打印完整状态
+            </button>
+          </div>
+        </div>
+        
         <!-- 顶部导航栏 -->
         <header class="bg-white shadow-sm sticky top-0 z-10">
           <div class="px-6 py-4">
@@ -392,6 +412,15 @@ const filteredCells = computed(() => {
   if (shouldSyncDisplay.value) {
     const settings = classroomSession.value?.settings
     
+    // 🔧 添加详细调试信息
+    console.log('🔍 shouldSyncDisplay = true, 检查 settings:', {
+      hasSettings: !!settings,
+      settings: settings,
+      display_cell_orders: settings?.display_cell_orders,
+      isArray: Array.isArray(settings?.display_cell_orders),
+      length: settings?.display_cell_orders?.length,
+    })
+    
     // 🆕 新方式：优先使用 display_cell_orders（推荐）
     const displayOrders = settings?.display_cell_orders
     if (displayOrders && Array.isArray(displayOrders) && displayOrders.length > 0) {
@@ -407,12 +436,14 @@ const filteredCells = computed(() => {
         totalCells: lesson.value.content.length,
         displayOrders: displayOrders,
         filteredCount: filteredByOrders.length,
+        firstCellOrder: lesson.value.content[0]?.order,
       })
       
       return filteredByOrders
     }
     
     // 如果没有 display_cell_orders，返回空数组（隐藏所有Cell）
+    console.log('⚠️ 没有 display_cell_orders，返回空数组')
     return []
   }
   

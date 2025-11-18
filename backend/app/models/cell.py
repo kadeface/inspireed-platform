@@ -23,16 +23,16 @@ from app.core.database import Base
 class CellType(str, Enum):
     """Cell类型枚举"""
 
-    TEXT = "text"  # 教学内容单元
-    VIDEO = "video"  # 视频教学单元
-    CODE = "code"  # 可执行代码单元
-    SIM = "sim"  # 仿真单元
-    QA = "qa"  # 问答交互单元
-    CHART = "chart"  # 数据可视化单元
-    CONTEST = "contest"  # 竞技任务单元
-    PARAM = "param"  # 参数设置单元
-    ACTIVITY = "activity"  # 教学活动单元（测验、问卷、作业、评价）
-    FLOWCHART = "flowchart"  # 流程图单元
+    TEXT = "TEXT"  # 教学内容单元
+    VIDEO = "VIDEO"  # 视频教学单元
+    CODE = "CODE"  # 可执行代码单元
+    SIM = "SIM"  # 仿真单元
+    QA = "QA"  # 问答交互单元
+    CHART = "CHART"  # 数据可视化单元
+    CONTEST = "CONTEST"  # 竞技任务单元
+    PARAM = "PARAM"  # 参数设置单元
+    ACTIVITY = "ACTIVITY"  # 教学活动单元（测验、问卷、作业、评价）
+    FLOWCHART = "FLOWCHART"  # 流程图单元
 
 
 class CognitiveLevel(str, Enum):

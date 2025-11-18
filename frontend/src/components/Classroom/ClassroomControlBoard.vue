@@ -13,7 +13,8 @@
     </div>
 
     <!-- 导播链条 -->
-    <div class="control-chain" :class="{ 'chain-horizontal': layout === 'horizontal', 'chain-vertical': layout === 'vertical' }">
+    <div class="control-chain-wrapper">
+      <div class="control-chain" :class="{ 'chain-horizontal': layout === 'horizontal', 'chain-vertical': layout === 'vertical' }">
       <!-- 隐藏所有内容节点 -->
       <div 
         class="chain-node node-hidden"
@@ -85,6 +86,7 @@
         <!-- 连接线（最后一个节点后不显示） -->
         <div v-if="index < cells.length - 1" class="chain-connector"></div>
       </template>
+      </div>
     </div>
 
     <!-- 当前模块详情 -->
@@ -153,6 +155,7 @@ interface Props {
   currentCellIndex?: number | null  // 当前选中的 Cell 索引（-1 表示隐藏）
   currentActivityId?: number | null
   completedCellIds?: number[]
+  displayCellIds?: number[]  // 多选模式下要显示的 Cell IDs（数据库 ID）
   dbCells?: Array<{ id: number; order: number; cell_type: string }>  // 数据库中的 Cell 记录（用于 ID 匹配）
   loading?: boolean
   layout?: 'horizontal' | 'vertical'
@@ -163,6 +166,7 @@ const props = withDefaults(defineProps<Props>(), {
   currentCellIndex: null,
   currentActivityId: null,
   completedCellIds: () => [],
+  displayCellIds: () => [],
   dbCells: () => [],
   loading: false,
   layout: 'horizontal',
@@ -490,15 +494,75 @@ function handleEndActivity() {
   @apply px-2 py-1 bg-gray-100 rounded;
 }
 
+/* 链条包装器 - 添加渐变阴影提示可滚动 */
+.control-chain-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.control-chain-wrapper::before,
+.control-chain-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 12px; /* 减去滚动条高度 */
+  width: 60px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.control-chain-wrapper::before {
+  left: 0;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.95), transparent);
+}
+
+.control-chain-wrapper::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(255, 255, 255, 0.95), transparent);
+}
+
+.control-chain-wrapper:hover::before,
+.control-chain-wrapper:hover::after {
+  opacity: 1;
+}
+
 /* 链条容器 */
 .control-chain {
   @apply flex items-center;
   overflow-x: auto;
   padding: 1rem 0;
+  scroll-behavior: smooth;
+  /* 确保滚动条可见 */
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #e5e7eb;
+}
+
+/* 自定义滚动条样式（Webkit 浏览器） */
+.control-chain::-webkit-scrollbar {
+  height: 12px;
+}
+
+.control-chain::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 6px;
+  margin: 0 1rem;
+}
+
+.control-chain::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 6px;
+  border: 2px solid #f3f4f6;
+}
+
+.control-chain::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 .chain-horizontal {
   @apply flex-row;
+  flex-wrap: nowrap; /* 防止换行 */
 }
 
 .chain-vertical {

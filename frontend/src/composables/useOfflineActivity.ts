@@ -191,13 +191,14 @@ export function useOfflineActivity(cellId: number | string, lessonId: number, st
       return null
     }
 
+    let localData: SubmissionData | null = null
     try {
       isSyncing.value = true
 
       // 尝试同步到服务器
       const database = await initDB()
       const key = getStorageKey()
-      const localData = await database.get('submissions', key).catch(() => null)
+      localData = await database.get('submissions', key).catch(() => null)
 
       let submission
 
@@ -224,7 +225,7 @@ export function useOfflineActivity(cellId: number | string, lessonId: number, st
         console.log('🆕 Creating new submission:', { cellId, lessonId, responsesCount: Object.keys(sanitizedResponses).length })
         const startedAt = localData?.startedAt || new Date().toISOString()
         submission = await activityService.createSubmission({
-          cellId,  // 后端现在支持数字或 UUID 字符串
+          cellId: cellId as number,  // 后端现在支持数字或 UUID 字符串
           lessonId,
           responses: sanitizedResponses,
           startedAt,

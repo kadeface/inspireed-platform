@@ -1,7 +1,24 @@
 <template>
-  <div v-if="session && session.status === 'active'" class="student-classroom-sync">
-    <!-- 课堂模式横幅 -->
-    <div class="classroom-banner">
+  <div v-if="session && (session.status === 'active' || session.status === 'pending')" class="student-classroom-sync">
+    <!-- PENDING 状态：等待教师开始上课 -->
+    <div v-if="session.status === 'pending'" class="waiting-banner">
+      <div class="banner-content">
+        <span class="waiting-indicator">⏳</span>
+        <div class="banner-text">
+          <div class="banner-title">等待教师开始上课</div>
+          <div class="banner-subtitle">
+            {{ session.lessonTitle || '课程' }} · 
+            <span class="teacher-name">授课教师：{{ session.teacherName }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="waiting-message">
+        <p>已成功加入课堂，请等待教师开始上课...</p>
+      </div>
+    </div>
+    
+    <!-- ACTIVE 状态：正在上课 -->
+    <div v-else-if="session.status === 'active'" class="classroom-banner">
       <div class="banner-content">
         <span class="live-indicator"></span>
         <div class="banner-text">
@@ -21,7 +38,7 @@
     </div>
 
     <!-- 课堂信息 -->
-    <div class="classroom-info">
+    <div v-if="session.status === 'active'" class="classroom-info">
       <div class="info-item">
         <span class="info-label">在线学生</span>
         <span class="info-value">{{ session.activeStudents }} / {{ session.totalStudents }}</span>
@@ -47,7 +64,7 @@ const props = defineProps<Props>()
 
 const isSyncing = ref(false)
 const sessionDuration = ref(0)
-const durationInterval = ref<NodeJS.Timeout | null>(null)
+const durationInterval = ref<number | null>(null)
 
 const formatDuration = (seconds: number): string => {
   const hours = Math.floor(seconds / 3600)
@@ -159,6 +176,18 @@ onUnmounted(() => {
 
 .info-value {
   @apply font-semibold text-gray-900;
+}
+
+.waiting-banner {
+  @apply bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-lg p-4 shadow-lg;
+}
+
+.waiting-indicator {
+  @apply text-2xl;
+}
+
+.waiting-message {
+  @apply mt-3 pt-3 border-t border-yellow-300 text-sm text-yellow-50;
 }
 </style>
 

@@ -1,22 +1,78 @@
 """
 WebSocket 连接管理器
+支持学生和教师的双角色连接管理
 """
 
 from typing import Dict, Optional, List
 from fastapi import WebSocket
+from starlette.websockets import WebSocketState
 import json
 from datetime import datetime
+
+from app.models.user import UserRole
 
 
 class ConnectionManager:
     """管理所有 WebSocket 连接"""
     
     def __init__(self):
-        # 存储结构：{session_id: {student_id: WebSocket}}
+        # 学生连接：{channel_key: {user_id: WebSocket}}
+        # channel_key 格式: "session:{session_id}" 或 "lesson:{lesson_id}"
+        self.student_connections: Dict[str, Dict[int, WebSocket]] = {}
+        
+        # 教师连接：{channel_key: {user_id: WebSocket}}
+        self.teacher_connections: Dict[str, Dict[int, WebSocket]] = {}
+        
+        # 旧版兼容：{session_id: {student_id: WebSocket}}
         self.active_connections: Dict[int, Dict[int, WebSocket]] = {}
     
+    def _make_channel_key(self, scope: str, id: int) -> str:
+        """生成通道键"""
+        return f"{scope}:{id}"
+    
+    async def connect_v2(
+        self,
+        *,
+        websocket: WebSocket,
+        scope: str,
+        channel_id: int,
+        user_id: int,
+        role: UserRole
+    ):
+        """
+        新版连接方法（支持双角色和双通道）
+        
+        参数:
+            websocket: WebSocket 连接
+            scope: 通道范围（'session' 或 'lesson'）
+            channel_id: 通道ID（session_id 或 lesson_id）
+            user_id: 用户ID
+            role: 用户角色（TEACHER 或 STUDENT）
+        """
+        channel_key = self._make_channel_key(scope, channel_id)
+        store = self.teacher_connections if role == UserRole.TEACHER else self.student_connections
+        
+        if channel_key not in store:
+            store[channel_key] = {}
+        
+        # 如果用户已有连接，先断开旧连接
+        if user_id in store[channel_key]:
+            old_ws = store[channel_key][user_id]
+            if old_ws.client_state == WebSocketState.CONNECTED:
+                try:
+                    await old_ws.close()
+                except:
+                    pass
+        
+        # 注册新连接
+        store[channel_key][user_id] = websocket
+        
+        role_name = "教师" if role == UserRole.TEACHER else "学生"
+        print(f"✅ {role_name} {user_id} 连接到 {scope} {channel_id}")
+        print(f"📊 {scope} {channel_id} 当前在线 {role_name}: {len(store[channel_key])} 人")
+    
     async def connect(self, websocket: WebSocket, session_id: int, student_id: int):
-        """接受并注册新连接"""
+        """旧版连接方法（兼容性保留）"""
         
         if session_id not in self.active_connections:
             self.active_connections[session_id] = {}
@@ -32,11 +88,51 @@ class ConnectionManager:
         # 注册新连接
         self.active_connections[session_id][student_id] = websocket
         
+        # 同时注册到新版存储
+        await self.connect_v2(
+            websocket=websocket,
+            scope="session",
+            channel_id=session_id,
+            user_id=student_id,
+            role=UserRole.STUDENT
+        )
+        
         print(f"✅ 学生 {student_id} 连接到会话 {session_id}")
         print(f"📊 会话 {session_id} 当前在线: {len(self.active_connections[session_id])} 人")
     
+    async def disconnect_v2(
+        self,
+        *,
+        scope: str,
+        channel_id: int,
+        user_id: int,
+        role: UserRole
+    ):
+        """
+        新版断开连接方法
+        
+        参数:
+            scope: 通道范围（'session' 或 'lesson'）
+            channel_id: 通道ID
+            user_id: 用户ID
+            role: 用户角色
+        """
+        channel_key = self._make_channel_key(scope, channel_id)
+        store = self.teacher_connections if role == UserRole.TEACHER else self.student_connections
+        
+        if channel_key in store:
+            store[channel_key].pop(user_id, None)
+            
+            role_name = "教师" if role == UserRole.TEACHER else "学生"
+            print(f"🔌 {role_name} {user_id} 断开连接（{scope} {channel_id}）")
+            
+            # 如果通道没有连接了，删除通道记录
+            if not store[channel_key]:
+                del store[channel_key]
+                print(f"🗑️ {scope} {channel_id} 已无在线{role_name}，清理记录")
+    
     async def disconnect(self, session_id: int, student_id: int):
-        """移除连接"""
+        """旧版断开连接方法（兼容性保留）"""
         
         if session_id in self.active_connections:
             if student_id in self.active_connections[session_id]:
@@ -47,6 +143,14 @@ class ConnectionManager:
             if not self.active_connections[session_id]:
                 del self.active_connections[session_id]
                 print(f"🗑️ 会话 {session_id} 已无在线学生，清理记录")
+        
+        # 同时从新版存储断开
+        await self.disconnect_v2(
+            scope="session",
+            channel_id=session_id,
+            user_id=student_id,
+            role=UserRole.STUDENT
+        )
     
     async def send_personal_message(
         self,
@@ -114,6 +218,104 @@ class ConnectionManager:
         """获取所有有在线学生的会话ID"""
         
         return list(self.active_connections.keys())
+    
+    async def send_to_teacher(self, event: dict, scope: str, channel_id: int, teacher_ids: List[int] = []):
+        """
+        发送消息给教师
+        
+        参数:
+            event: 事件消息
+            scope: 通道范围
+            channel_id: 通道ID
+            teacher_ids: 教师ID列表（None表示广播给所有教师）
+        """
+        await self._send_to_role(
+            event=event,
+            scope=scope,
+            channel_id=channel_id,
+            user_ids=teacher_ids,
+            role=UserRole.TEACHER
+        )
+    
+    async def send_to_student(self, event: dict, scope: str, channel_id: int, student_ids: List[int] = []):
+        """
+        发送消息给学生
+        
+        参数:
+            event: 事件消息
+            scope: 通道范围
+            channel_id: 通道ID
+            student_ids: 学生ID列表（None表示广播给所有学生）
+        """
+        await self._send_to_role(
+            event=event,
+            scope=scope,
+            channel_id=channel_id,
+            user_ids=student_ids,
+            role=UserRole.STUDENT
+        )
+    
+    async def broadcast(self, event: dict, scope: str, channel_id: int):
+        """
+        广播消息给通道内所有用户（学生+教师）
+        
+        参数:
+            event: 事件消息
+            scope: 通道范围
+            channel_id: 通道ID
+        """
+        await self.send_to_teacher(event, scope, channel_id, [])
+        await self.send_to_student(event, scope, channel_id, [])
+    
+    async def _send_to_role(
+        self,
+        event: dict,
+        scope: str,
+        channel_id: int,
+        user_ids: List[int],
+        role: UserRole
+    ):
+        """
+        内部方法：发送消息给指定角色的用户
+        
+        参数:
+            event: 事件消息
+            scope: 通道范围
+            channel_id: 通道ID
+            user_ids: 用户ID列表（None表示广播）
+            role: 用户角色
+        """
+        channel_key = self._make_channel_key(scope, channel_id)
+        store = self.teacher_connections if role == UserRole.TEACHER else self.student_connections
+        
+        if channel_key not in store:
+            return
+        
+        recipients = store[channel_key]
+        delivery_list = user_ids if user_ids else list(recipients.keys())
+        
+        message_text = json.dumps(event)
+        disconnected_users = []
+        
+        for user_id in delivery_list:
+            websocket = recipients.get(user_id)
+            if not websocket:
+                continue
+            
+            try:
+                await websocket.send_text(message_text)
+            except Exception as e:
+                print(f"❌ 发送消息失败（用户 {user_id}）: {str(e)}")
+                disconnected_users.append(user_id)
+        
+        # 清理断开的连接
+        for user_id in disconnected_users:
+            await self.disconnect_v2(
+                scope=scope,
+                channel_id=channel_id,
+                user_id=user_id,
+                role=role
+            )
 
 
 # 全局单例

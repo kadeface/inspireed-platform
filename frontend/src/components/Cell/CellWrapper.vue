@@ -250,7 +250,7 @@ const getMasteryBarClass = (score: number): string => {
 const markAsCompleted = () => {
   if (masteryScore.value >= 80) {
     isCompleted.value = true
-    emit('complete', props.cell.id)
+    emit('complete', String(props.cell.id))
     
     // 显示达标徽章动画
     showBadge.value = true
@@ -275,14 +275,14 @@ const saveMasteryScore = () => {
 }
 
 // 监听完成状态
-watch(() => props.completedCellIds.has(props.cell.id), (completed) => {
+watch(() => props.completedCellIds.has(String(props.cell.id)), (completed) => {
   isCompleted.value = completed
 })
 
 // 生命周期
 onMounted(() => {
   loadMasteryScore()
-  isCompleted.value = props.completedCellIds.has(props.cell.id)
+  isCompleted.value = props.completedCellIds.has(String(props.cell.id))
 })
 
 // 暴露方法供父组件调用
