@@ -65,7 +65,11 @@
     <!-- 主体内容区 -->
     <div :class="{ 'pointer-events-none opacity-30': isLocked }">
       <!-- Cell 头部信息栏 -->
-      <div class="flex items-center justify-between mb-3 p-3 bg-gray-50 rounded-t-lg border-b-2 border-gray-200">
+      <div :class="[
+        'flex items-center justify-between mb-3 p-3 rounded-t-lg',
+        getStageBgClass(cellIndex),
+        getStageBorderClass(cellIndex)
+      ]">
         <div class="flex items-center gap-3">
           <!-- 认知层级标签 -->
           <span 
@@ -120,7 +124,7 @@
       </div>
 
       <!-- 掌握度进度条 -->
-      <div class="px-3 pb-3 bg-gray-50">
+      <div :class="['px-3 pb-3', getStageBgClass(cellIndex)]">
         <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
           <div
             class="h-2 transition-all duration-500 rounded-full"
@@ -245,6 +249,18 @@ const getMasteryBarClass = (score: number): string => {
   if (score >= 80) return 'bg-gradient-to-r from-green-500 to-green-600'
   if (score >= 60) return 'bg-gradient-to-r from-yellow-500 to-yellow-600'
   return 'bg-gradient-to-r from-gray-400 to-gray-500'
+}
+
+// 根据单元索引获取环节背景色（与教师端 PDCA 环节配色保持一致）
+const getStageBgClass = (index: number): string => {
+  const stages = ['bg-indigo-100', 'bg-sky-100', 'bg-emerald-100', 'bg-purple-100']
+  return stages[index % 4]
+}
+
+// 根据单元索引获取环节边框色（与教师端 PDCA 环节配色保持一致）
+const getStageBorderClass = (index: number): string => {
+  const stages = ['border-indigo-300', 'border-sky-300', 'border-emerald-300', 'border-purple-300']
+  return `border-b-2 ${stages[index % 4]}`
 }
 
 const markAsCompleted = () => {

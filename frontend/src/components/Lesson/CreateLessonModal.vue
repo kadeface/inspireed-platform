@@ -5,12 +5,12 @@
       class="fixed inset-0 z-50 overflow-y-auto"
       @click.self="handleClose"
     >
-      <div class="flex min-h-screen items-center justify-center p-4">
+      <div class="flex min-h-screen items-start justify-center p-4 py-8">
         <!-- 遮罩层 -->
         <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
 
         <!-- 对话框内容 -->
-        <div class="relative w-full max-w-5xl transform rounded-lg bg-white p-6 shadow-xl transition-all">
+        <div class="relative w-full max-w-5xl max-h-[90vh] transform rounded-lg bg-white p-6 shadow-xl transition-all overflow-y-auto">
           <div class="flex flex-col gap-6 lg:flex-row">
             <div class="flex-1">
               <!-- 标题 -->
