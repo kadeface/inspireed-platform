@@ -43,8 +43,11 @@
         <span class="icon">ℹ️</span>
         <span>教师暂未开放学生编辑，本流程图为只读模式。</span>
       </div>
-      <FlowchartViewer
-        :content="teacherContent"
+      <DiagramEditor
+        :mode="diagramMode"
+        :content="teacherDiagramContent"
+        :editable="false"
+        :show-sidebar="false"
         :show-minimap="cell.config?.showMinimap ?? true"
       />
     </div>
@@ -79,17 +82,23 @@
       </div>
 
       <div v-if="activeTab === 'teacher'" class="teacher-view">
-        <FlowchartViewer
-          :content="teacherContent"
+        <DiagramEditor
+          :mode="diagramMode"
+          :content="teacherDiagramContent"
+          :editable="false"
+          :show-sidebar="false"
           :show-minimap="cell.config?.showMinimap ?? true"
         />
         <p class="hint-text">可以参考教师提供的流程图范例，再切换回「我的流程图」进行创作。</p>
       </div>
 
       <div v-else class="editor-wrapper">
-        <FlowchartEditor
+        <DiagramEditor
           :key="editorKey"
-          :content="studentContent"
+          :mode="diagramMode"
+          :content="studentDiagramContent"
+          :editable="true"
+          :show-sidebar="true"
           :show-minimap="cell.config?.showMinimap ?? true"
           @update="handleStudentUpdate"
         />
@@ -102,9 +111,10 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDebounceFn } from '@vueuse/core'
-import FlowchartEditor from '@/components/Flowchart/FlowchartEditor.vue'
-import FlowchartViewer from '@/components/Flowchart/FlowchartViewer.vue'
+import DiagramEditor from '@/components/DiagramEditor/DiagramEditor.vue'
+import { autoMigrateData, migrateX6ToVueFlow } from '@/utils/diagramMigration'
 import type { FlowchartCell, FlowchartCellContent, FlowchartEdge, FlowchartNode } from '@/types/cell'
+import type { DiagramContent, DiagramMode } from '@/types/diagram'
 
 interface Props {
   cell: FlowchartCell
@@ -122,8 +132,49 @@ const teacherUpdated = ref(false)
 const savedTeacherSignature = ref<string | null>(null)
 const localLoadError = ref<string | null>(null)
 
+// 🆕 使用 X6 格式（与教师端保持一致）
+const diagramMode = ref<DiagramMode>('flowchart')
 const teacherContent = ref<FlowchartCellContent>(normalizeContent(props.cell.content))
 const studentContent = ref<FlowchartCellContent>(normalizeContent(props.cell.content))
+
+// 缓存已迁移的内容，避免重复转换
+let cachedTeacherDiagramContent: DiagramContent | null = null
+let cachedStudentDiagramContent: DiagramContent | null = null
+let lastTeacherContentStr: string | null = null
+let lastStudentContentStr: string | null = null
+
+// 将 FlowchartCellContent 转换为 DiagramContent（教师版本）
+const teacherDiagramContent = computed<DiagramContent>(() => {
+  const currentContentStr = JSON.stringify(teacherContent.value)
+  if (currentContentStr === lastTeacherContentStr && cachedTeacherDiagramContent) {
+    return cachedTeacherDiagramContent
+  }
+  
+  const migrated = autoMigrateData(teacherContent.value)
+  lastTeacherContentStr = currentContentStr
+  cachedTeacherDiagramContent = migrated
+  
+  // 检测模式
+  if (migrated.metadata?.mode) {
+    diagramMode.value = migrated.metadata.mode
+  }
+  
+  return migrated
+})
+
+// 将 FlowchartCellContent 转换为 DiagramContent（学生版本）
+const studentDiagramContent = computed<DiagramContent>(() => {
+  const currentContentStr = JSON.stringify(studentContent.value)
+  if (currentContentStr === lastStudentContentStr && cachedStudentDiagramContent) {
+    return cachedStudentDiagramContent
+  }
+  
+  const migrated = autoMigrateData(studentContent.value)
+  lastStudentContentStr = currentContentStr
+  cachedStudentDiagramContent = migrated
+  
+  return migrated
+})
 
 const editorKey = ref(0)
 
@@ -238,8 +289,15 @@ function loadFromLocalStorage() {
   }
 }
 
-function handleStudentUpdate(content: FlowchartCellContent) {
-  studentContent.value = normalizeContent(content)
+function handleStudentUpdate(content: DiagramContent) {
+  // 🆕 将 X6 格式转换回 FlowchartCellContent（用于本地存储）
+  const vueFlowContent = migrateX6ToVueFlow(content)
+  studentContent.value = normalizeContent(vueFlowContent)
+  
+  // 清除缓存，确保下次获取最新数据
+  cachedStudentDiagramContent = null
+  lastStudentContentStr = null
+  
   saveStatus.value = 'saving'
   persistStudentContent()
 }
@@ -249,6 +307,11 @@ function resetToTeacher() {
   teacherUpdated.value = false
   savedTeacherSignature.value = teacherSignature.value
   editorKey.value += 1
+  
+  // 清除缓存，确保获取最新数据
+  cachedStudentDiagramContent = null
+  lastStudentContentStr = null
+  
   saveStatus.value = 'saving'
   persistStudentContent()
 }
@@ -257,6 +320,9 @@ watch(
   () => props.cell.content,
   (newContent) => {
     teacherContent.value = normalizeContent(newContent)
+    // 清除缓存，确保获取最新数据
+    cachedTeacherDiagramContent = null
+    lastTeacherContentStr = null
   },
   { deep: true }
 )

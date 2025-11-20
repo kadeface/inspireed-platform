@@ -186,9 +186,17 @@ export const activityService = {
    */
   async getCellSubmissions(
     cellId: number,
-    status?: string
+    status?: string,
+    sessionId?: number,
+    lessonId?: number
   ): Promise<ActivitySubmission[]> {
-    const params = status ? { status } : {}
+    const params: Record<string, any> = {}
+    if (status) params.status = status
+    if (sessionId) params.session_id = sessionId
+    if (lessonId) params.lesson_id = lessonId
+    // 🆕 只在有 sessionId 时才包含未开始的学生（课堂模式）
+    // 没有 sessionId 时（课后模式），只返回实际提交记录
+    params.include_not_started = !!sessionId
     const response = await api.get<ActivitySubmission[]>(`/activities/cells/${cellId}/submissions`, { params })
     return response
   },

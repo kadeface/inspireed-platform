@@ -427,6 +427,7 @@ async def navigate_to_cell(
         # 设置 current_cell_id（用于兼容性，可选）
         if len(data.display_cell_orders) > 0:
             # 尝试根据第一个 order 查找对应的 cell_id
+            # 注意：如果存在多个相同 order 的 Cell，取最新的（按 id 降序）
             session_lesson_id = cast(int, session.lesson_id)
             result = await db.execute(
                 select(Cell).where(
@@ -434,9 +435,10 @@ async def navigate_to_cell(
                         Cell.lesson_id == session_lesson_id,
                         Cell.order == data.display_cell_orders[0],
                     )
-                )
+                ).order_by(Cell.id.desc())
             )
-            first_cell = result.scalar_one_or_none()
+            # 使用 first() 而不是 scalar_one_or_none()，避免多行数据报错
+            first_cell = result.scalars().first()
             session.current_cell_id = cast(int, first_cell.id) if first_cell else None  # type: ignore[comparison-overlap]
         else:
             session.current_cell_id = None  # type: ignore[comparison-overlap]

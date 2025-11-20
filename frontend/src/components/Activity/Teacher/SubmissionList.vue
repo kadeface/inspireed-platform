@@ -6,6 +6,7 @@
       <div class="filter-bar">
         <select v-model="statusFilter" class="filter-select" @change="loadSubmissions">
           <option value="">全部状态</option>
+          <option value="not_started">未开始</option>
           <option value="draft">草稿</option>
           <option value="submitted">已提交</option>
           <option value="graded">已评分</option>
@@ -102,6 +103,7 @@
             <td class="table-cell">
               <div class="flex gap-2">
                 <button
+                  v-if="submission.status !== 'not_started' && submission.id"
                   @click="viewSubmission(submission)"
                   class="btn-xs btn-view"
                   title="查看详情"
@@ -109,13 +111,16 @@
                   查看
                 </button>
                 <button
-                  v-if="submission.status === 'submitted'"
+                  v-if="submission.status === 'submitted' && submission.id"
                   @click="gradeSubmission(submission)"
                   class="btn-xs btn-grade"
                   title="评分"
                 >
                   评分
                 </button>
+                <span v-if="submission.status === 'not_started'" class="text-xs text-gray-400">
+                  暂无操作
+                </span>
               </div>
             </td>
           </tr>
@@ -150,6 +155,8 @@ import GradingModal from './GradingModal.vue'
 interface Props {
   cellId: number
   activity: ActivityCellContent
+  sessionId?: number
+  lessonId?: number
 }
 
 const props = defineProps<Props>()
@@ -177,6 +184,7 @@ function toggleSelectAll() {
 // 获取状态标签
 function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
+    not_started: '未开始',
     draft: '草稿',
     submitted: '已提交',
     graded: '已评分',
@@ -188,6 +196,7 @@ function getStatusLabel(status: string): string {
 // 获取状态徽章样式
 function getStatusBadgeClass(status: string): string {
   const classes: Record<string, string> = {
+    not_started: 'status-badge status-not-started',
     draft: 'status-badge status-draft',
     submitted: 'status-badge status-submitted',
     graded: 'status-badge status-graded',
@@ -217,13 +226,38 @@ function formatTime(seconds: number): string {
 async function loadSubmissions() {
   loading.value = true
   try {
+    console.log('📥 加载提交列表...', {
+      cellId: props.cellId,
+      statusFilter: statusFilter.value,
+    })
+    
     const data = await activityService.getCellSubmissions(
       props.cellId,
-      statusFilter.value || undefined
+      statusFilter.value || undefined,
+      props.sessionId,
+      props.lessonId
     )
+    
+    console.log('✅ 提交列表加载成功:', {
+      count: data.length,
+      submissions: data.map(s => ({
+        id: s.id,
+        studentName: s.studentName || s.student_name,
+        status: s.status,
+        score: s.score,
+      })),
+    })
+    
     submissions.value = data
-  } catch (error) {
-    console.error('Failed to load submissions:', error)
+  } catch (error: any) {
+    console.error('❌ 加载提交列表失败:', error)
+    console.error('错误详情:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      cellId: props.cellId,
+    })
+    submissions.value = []
   } finally {
     loading.value = false
   }
@@ -363,6 +397,10 @@ onMounted(() => {
 
 .status-returned {
   @apply bg-yellow-100 text-yellow-800;
+}
+
+.status-not-started {
+  @apply bg-gray-100 text-gray-600;
 }
 
 .late-badge {

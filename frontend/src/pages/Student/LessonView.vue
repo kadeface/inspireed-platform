@@ -351,6 +351,7 @@ const {
   hasDisplayableContent,
   findAndJoinSession,
   leaveSession,
+  updateProgress,  // 🆕 导入进度更新函数
 } = useClassroomSession(lessonId.value)
 
 // 自动保存定时器
@@ -365,6 +366,27 @@ const progress = computed(() => {
   if (!lesson.value?.content || lesson.value.content.length === 0) {
     return 0
   }
+  
+  // 🆕 在课堂模式下，进度基于教师勾选的模块数（display_cell_orders）
+  if (isInClassroomMode.value && classroomSession.value?.settings) {
+    const settings = classroomSession.value.settings as any
+    const displayOrders = settings?.display_cell_orders
+    
+    if (displayOrders && Array.isArray(displayOrders)) {
+      const checkedModules = displayOrders.length
+      const totalModules = lesson.value.content.length
+      const progressValue = Math.round((checkedModules / totalModules) * 100)
+      console.log('📊 课堂模式进度计算（基于勾选模块）:', {
+        checkedModules,
+        totalModules,
+        progressValue,
+        displayOrders,
+      })
+      return progressValue
+    }
+  }
+  
+  // 非课堂模式：基于已完成的cell数
   const completed = completedCells.value.size
   const total = lesson.value.content.length
   return Math.round((completed / total) * 100)
@@ -424,20 +446,30 @@ const filteredCells = computed(() => {
     
     // 🆕 新方式：优先使用 display_cell_orders（推荐）
     const displayOrders = settings?.display_cell_orders
-    if (displayOrders && Array.isArray(displayOrders) && displayOrders.length > 0) {
+    if (displayOrders && Array.isArray(displayOrders)) {
+      // 如果 displayOrders 是空数组，返回空数组（隐藏所有Cell）
+      if (displayOrders.length === 0) {
+        console.log('⚠️ display_cell_orders 为空数组，隐藏所有 Cell')
+        return []
+      }
+      
       console.log('✅ 学生端使用新方式 display_cell_orders:', displayOrders)
       
-      // 直接根据索引过滤，无需映射，无需 dbCells
+      // 直接根据 order 过滤，无需映射，无需 dbCells
       const filteredByOrders = lesson.value.content.filter((cell, index) => {
         const cellOrder = cell.order !== undefined ? cell.order : index
-        return displayOrders.includes(cellOrder)
+        const isIncluded = displayOrders.includes(cellOrder)
+        if (!isIncluded) {
+          console.log(`🚫 隐藏 Cell: order=${cellOrder}, title=${cell.title || cell.type}`)
+        }
+        return isIncluded
       })
       
       console.log('✅ 过滤结果（新方式）:', {
         totalCells: lesson.value.content.length,
         displayOrders: displayOrders,
         filteredCount: filteredByOrders.length,
-        firstCellOrder: lesson.value.content[0]?.order,
+        hiddenCount: lesson.value.content.length - filteredByOrders.length,
       })
       
       return filteredByOrders
@@ -795,6 +827,62 @@ const markAsCompleted = () => {
   
   saveCompletedCells()
 }
+
+// 🆕 监听 display_cell_orders 变化，自动更新学生进度
+watch(
+  () => {
+    const settings = classroomSession.value?.settings as any
+    return settings?.display_cell_orders
+  },
+  async (newOrders, oldOrders) => {
+    // 只在课堂模式下且 display_cell_orders 发生变化时更新
+    if (!isInClassroomMode.value || !classroomSession.value) return
+    
+    const newOrdersStr = JSON.stringify(newOrders || [])
+    const oldOrdersStr = JSON.stringify(oldOrders || [])
+    
+    if (newOrdersStr !== oldOrdersStr && Array.isArray(newOrders)) {
+      console.log('📊 display_cell_orders 变化，更新学生进度:', {
+        newOrders,
+        oldOrders,
+        totalModules: lesson.value?.content.length || 0,
+      })
+      
+      // 计算已勾选的模块数
+      const checkedModules = newOrders.length
+      const totalModules = lesson.value?.content.length || 1
+      const progressPercentage = Math.round((checkedModules / totalModules) * 100)
+      
+      // 将 orders 转换为 cellIds（用于 updateProgress）
+      const completedCellIds: number[] = []
+      if (lesson.value?.content) {
+        newOrders.forEach((order: number) => {
+          const cell = lesson.value!.content.find(
+            (c, idx) => (c.order !== undefined ? c.order : idx) === order
+          )
+          if (cell) {
+            const cellId = typeof cell.id === 'number' ? cell.id : parseInt(String(cell.id))
+            if (!isNaN(cellId)) {
+              completedCellIds.push(cellId)
+            }
+          }
+        })
+      }
+      
+      // 更新进度（通过 WebSocket 发送到后端）
+      if (updateProgress) {
+        await updateProgress(completedCellIds, undefined, progressPercentage)
+        console.log('✅ 学生进度已更新:', {
+          checkedModules,
+          totalModules,
+          progressPercentage,
+          completedCellIds,
+        })
+      }
+    }
+  },
+  { deep: true, immediate: false }
+)
 
 const updateLessonProgress = () => {
   const key = 'student_lesson_progress'

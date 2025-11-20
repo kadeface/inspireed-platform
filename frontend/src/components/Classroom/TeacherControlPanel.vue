@@ -205,6 +205,17 @@
           @end-activity="handleEndActivity"
         />
         
+        <!-- 调试信息（开发时可见） -->
+        <div v-if="currentCell" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
+          <div class="font-semibold mb-2">🔍 调试信息:</div>
+          <div>currentCell.type: {{ currentCell.type }}</div>
+          <div>currentCell.order: {{ currentCell.order }}</div>
+          <div>selectedCellIndex: {{ selectedCellIndex }}</div>
+          <div>currentActivityDbCell: {{ currentActivityDbCell ? `ID=${currentActivityDbCell.id}` : 'null' }}</div>
+          <div>dbCells.length: {{ dbCells.length }}</div>
+          <div>dbCells: {{ JSON.stringify(dbCells.map(c => ({ id: c.id, order: c.order, type: c.cell_type }))) }}</div>
+        </div>
+        
         <!-- 活动统计面板（当前 Cell 是 activity 类型时显示） -->
         <div v-if="currentCell && currentCell.type === 'activity' && currentActivityDbCell" class="activity-panel mt-6">
           <SubmissionStatistics
@@ -212,6 +223,24 @@
             :lesson-id="lesson?.id || lessonId"
             :session-id="session.id"
           />
+          
+          <!-- 学生提交详细列表 -->
+          <div class="mt-4">
+            <SubmissionList
+              :cell-id="currentActivityDbCell.id"
+              :activity="currentCell.content"
+              :session-id="session.id"
+              :lesson-id="lesson?.id || lessonId"
+            />
+          </div>
+        </div>
+        
+        <!-- 如果 currentCell 是 activity 但没有 currentActivityDbCell，显示提示 -->
+        <div v-else-if="currentCell && currentCell.type === 'activity' && !currentActivityDbCell" class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p class="text-red-800 font-semibold">⚠️ 无法显示统计信息</p>
+          <p class="text-red-600 text-sm mt-2">原因：找不到对应的数据库 Cell 记录</p>
+          <p class="text-red-600 text-xs mt-1">currentCell.order: {{ currentCell.order }}</p>
+          <p class="text-red-600 text-xs">dbCells: {{ dbCells.length }} 条记录</p>
         </div>
       </template>
       
@@ -254,6 +283,7 @@ import classroomSessionService from '../../services/classroomSession'
 import ClassroomSwitcher from './ClassroomSwitcher.vue'
 import ClassroomControlBoard from './ClassroomControlBoard.vue'
 import SubmissionStatistics from '../Activity/SubmissionStatistics.vue'
+import SubmissionList from '../Activity/Teacher/SubmissionList.vue'
 import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId } from '../../utils/cellId'
 
 interface Props {
@@ -307,22 +337,38 @@ const totalStudents = computed(() => {
 
 const currentCell = computed(() => {
   if (!props.lesson?.content || !session.value) {
+    console.log('🔍 currentCell: 缺少必要数据', {
+      hasLesson: !!props.lesson,
+      hasContent: !!props.lesson?.content,
+      hasSession: !!session.value,
+    })
     return null
   }
   
   // 如果 selectedCellIndex 有效，优先使用它
   if (selectedCellIndex.value >= 0 && selectedCellIndex.value < props.lesson.content.length) {
-    return props.lesson.content[selectedCellIndex.value]
+    const cell = props.lesson.content[selectedCellIndex.value]
+    console.log('✅ currentCell: 使用 selectedCellIndex', {
+      selectedCellIndex: selectedCellIndex.value,
+      cellType: cell?.type,
+      cellTitle: cell?.title,
+      cellOrder: cell?.order,
+    })
+    return cell
   }
   
   // 否则使用 current_cell_id 查找
   const currentId = session.value.current_cell_id
   if (!currentId || currentId === 0) {
+    console.log('🔍 currentCell: current_cell_id 无效', {
+      currentId,
+      selectedCellIndex: selectedCellIndex.value,
+    })
     return null
   }
   
   // 查找匹配的Cell
-  return props.lesson.content.find((cell, index) => {
+  const foundCell = props.lesson.content.find((cell, index) => {
     const cellId = getCellId(cell)
     // 尝试匹配数字ID
     if (typeof cellId === 'number' && cellId === currentId) return true
@@ -336,28 +382,57 @@ const currentCell = computed(() => {
     // 尝试通过order匹配
     if (cell.order !== undefined && cell.order === currentId) return true
     return false
-  }) || null
+  })
+  
+  console.log('🔍 currentCell: 通过 current_cell_id 查找', {
+    currentId,
+    foundCell: foundCell ? { type: foundCell.type, title: foundCell.title } : null,
+  })
+  
+  return foundCell || null
 })
 
 // 获取当前活动 Cell 的数据库 ID（用于查询提交数据）
 const currentActivityDbCell = computed(() => {
   if (!currentCell.value || currentCell.value.type !== 'activity') {
+    console.log('🔍 currentActivityDbCell: 不是活动模块', {
+      hasCurrentCell: !!currentCell.value,
+      cellType: currentCell.value?.type,
+    })
     return null
   }
   
   if (!dbCells.value || dbCells.value.length === 0) {
+    console.log('🔍 currentActivityDbCell: dbCells 为空', {
+      dbCellsLength: dbCells.value?.length || 0,
+    })
     return null
   }
   
   // 通过 order 查找对应的数据库 Cell
   const order = currentCell.value.order
   if (order === undefined) {
+    console.log('🔍 currentActivityDbCell: currentCell.order 未定义', {
+      currentCell: currentCell.value,
+    })
     return null
   }
   
-  return dbCells.value.find(dbCell => 
-    dbCell.order === order && dbCell.cell_type === 'ACTIVITY'
-  ) || null
+  // 尝试匹配 cell_type（可能是 'ACTIVITY' 或 'activity'）
+  const matchedDbCell = dbCells.value.find(dbCell => {
+    const cellTypeMatch = dbCell.cell_type === 'ACTIVITY' || 
+                          dbCell.cell_type === 'activity' ||
+                          dbCell.cell_type?.toUpperCase() === 'ACTIVITY'
+    return dbCell.order === order && cellTypeMatch
+  })
+  
+  console.log('🔍 currentActivityDbCell 查找结果:', {
+    currentCellOrder: order,
+    dbCells: dbCells.value.map(c => ({ id: c.id, order: c.order, type: c.cell_type })),
+    matchedDbCell: matchedDbCell ? { id: matchedDbCell.id, order: matchedDbCell.order } : null,
+  })
+  
+  return matchedDbCell || null
 })
 
 
@@ -925,13 +1000,52 @@ async function handleControlBoardNavigate(
     // 导航后立即刷新学生列表
     loadParticipants()
     
+    // 🆕 如果点击的是活动模块，确保数据库记录存在
+    if (cellOrder !== null && props.lesson?.content) {
+      const clickedCell = props.lesson.content.find((cell, idx) => {
+        const cellOrderValue = cell.order !== undefined ? cell.order : idx
+        return cellOrderValue === cellOrder
+      })
+      
+      if (clickedCell && clickedCell.type === 'activity') {
+        console.log('🎯 点击了活动模块，确保数据库记录存在...')
+        const createdCellId = await ensureActivityCellExists(clickedCell, cellOrder)
+        // 重新加载 dbCells 以获取最新数据
+        await loadDbCells()
+        
+        // 🆕 如果创建成功，等待一小段时间让数据库记录生效
+        if (createdCellId) {
+          console.log('✅ 活动模块数据库记录已创建，等待生效...')
+          await new Promise(resolve => setTimeout(resolve, 500))
+          // 再次加载确保获取到最新数据
+          await loadDbCells()
+        }
+      }
+    }
+    
+    // 🆕 如果 dbCells 为空，重新加载（可能活动模块刚创建）
+    if (dbCells.value.length === 0) {
+      console.log('🔄 dbCells 为空，重新加载...')
+      await loadDbCells()
+    }
+    
     // 更新selectedCellIndex
     if (cellId === 0) {
       selectedCellIndex.value = -1
     } else if (cellOrder !== null && cellOrder !== undefined && props.lesson?.content) {
-      // 使用 cellOrder 直接设置索引
-      selectedCellIndex.value = cellOrder
-      console.log('✅ 更新 selectedCellIndex 为:', cellOrder)
+      // 🆕 通过 cellOrder 查找对应的数组索引（而不是直接使用 cellOrder）
+      const index = props.lesson.content.findIndex((cell, idx) => {
+        const cellOrderValue = cell.order !== undefined ? cell.order : idx
+        return cellOrderValue === cellOrder
+      })
+      if (index >= 0) {
+        selectedCellIndex.value = index
+        console.log('✅ 通过 cellOrder 找到索引:', index, 'cellOrder:', cellOrder)
+      } else {
+        // 如果找不到，尝试使用 cellOrder 作为索引（向后兼容）
+        selectedCellIndex.value = cellOrder < props.lesson.content.length ? cellOrder : -1
+        console.log('⚠️ 未找到匹配的 cell，使用 cellOrder 作为索引:', cellOrder)
+      }
     } else if (cellId && props.lesson?.content) {
       // 通过 cellId 查找索引
       const index = props.lesson.content.findIndex((cell) => {
@@ -1103,6 +1217,70 @@ async function loadDbCells() {
     console.warn('⚠️ 加载数据库 Cell 记录失败:', error)
     dbCells.value = []
   }
+}
+
+// 🆕 确保活动模块的数据库记录存在
+async function ensureActivityCellExists(cell: Cell, order: number): Promise<number | null> {
+  // 如果 dbCells 中已经有匹配的记录，直接返回
+  const existing = dbCells.value.find(dbCell => 
+    dbCell.order === order && 
+    (dbCell.cell_type === 'ACTIVITY' || dbCell.cell_type === 'activity' || dbCell.cell_type?.toUpperCase() === 'ACTIVITY')
+  )
+  if (existing) {
+    console.log('✅ 活动模块数据库记录已存在:', existing.id)
+    return existing.id
+  }
+  
+  // 尝试创建数据库记录
+  try {
+    console.log('📤 创建活动模块数据库记录...', {
+      lessonId: props.lessonId,
+      order,
+      title: cell.title,
+      type: cell.type,
+    })
+    
+    const { api } = await import('../../services/api')
+    const cellCreateData = {
+      lesson_id: props.lessonId,
+      cell_type: 'ACTIVITY',  // 后端使用大写枚举值
+      title: cell.title || '',
+      content: cell.content || {},
+      config: cell.config || {},
+      order: order,
+      editable: cell.editable ?? false,
+    }
+    
+    console.log('📤 发送创建 Cell 请求:', cellCreateData)
+    const createResponse = await api.post('/cells', cellCreateData)
+    const newCell = createResponse
+    console.log('📥 创建 Cell 响应:', newCell)
+    
+    if (newCell && newCell.id) {
+      const cellId = typeof newCell.id === 'number' ? newCell.id : parseInt(newCell.id, 10)
+      if (!isNaN(cellId)) {
+        console.log('✅ 成功创建活动模块数据库记录:', cellId)
+        
+        // 添加到 dbCells 数组
+        dbCells.value.push({
+          id: cellId,
+          order: order,
+          cell_type: 'ACTIVITY',
+        })
+        
+        return cellId
+      }
+    }
+  } catch (error: any) {
+    console.error('❌ 创建活动模块数据库记录失败:', error)
+    console.error('错误详情:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    })
+  }
+  
+  return null
 }
 
 // 初始化

@@ -450,39 +450,116 @@ async def submit_activity(
 )
 async def get_cell_submissions(
     cell_id: int,
-    status: Optional[ActivitySubmissionStatus] = None,
+    status: Optional[str] = Query(None, description="状态筛选: draft, submitted, graded, returned, not_started"),
+    session_id: Optional[int] = Query(None, description="会话ID（课堂模式）"),
+    lesson_id: Optional[int] = Query(None, description="教案ID（用于获取所有学生）"),
+    include_not_started: bool = Query(True, description="是否包含未开始的学生"),
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """获取某个 Cell 的所有提交（教师端）"""
+    """获取某个 Cell 的所有提交（教师端），包括未开始的学生"""
 
     # 只有教师可以查看
     current_role = cast(UserRole, current_user.role)
     if current_role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="权限不足")
 
-    # 构建查询
-    query = (
-        select(ActivitySubmission, User)
-        .join(User, ActivitySubmission.student_id == User.id)
-        .where(ActivitySubmission.cell_id == cell_id)
-    )
-
-    if status:
-        query = query.where(ActivitySubmission.status == status)
-
-    result = await db.execute(query)
-    rows = result.all()
-
-    # 组装响应
+    # 初始化变量
     submissions = []
-    for submission, user in rows:
-        submission_dict = {
-            **submission.__dict__,
-            "student_email": user.email,
-            "student_name": user.full_name or user.username,
-        }
-        submissions.append(submission_dict)
+    student_ids_with_submission = set()
+    
+    # 如果状态筛选是"not_started"，只返回未开始的学生，不查询提交记录
+    if status == "not_started":
+        # 只处理未开始的学生，不查询提交记录
+        pass
+    else:
+        # 获取所有提交记录
+        query = (
+            select(ActivitySubmission, User)
+            .join(User, ActivitySubmission.student_id == User.id)
+            .where(ActivitySubmission.cell_id == cell_id)
+        )
+
+        if status and status != "not_started":
+            # 将字符串转换为枚举类型
+            try:
+                status_enum = ActivitySubmissionStatus(status)
+                query = query.where(ActivitySubmission.status == status_enum)
+            except ValueError:
+                # 如果状态值无效，忽略筛选
+                pass
+        
+        if session_id:
+            query = query.where(ActivitySubmission.session_id == session_id)
+
+        result = await db.execute(query)
+        rows = result.all()
+
+        # 组装已有提交的响应
+        for submission, user in rows:
+            submission_dict = {
+                **submission.__dict__,
+                "student_email": user.email,
+                "student_name": user.full_name or user.username,
+            }
+            submissions.append(submission_dict)
+            student_ids_with_submission.add(submission.student_id)
+
+    # 如果需要包含未开始的学生，获取所有学生并添加未开始的记录
+    # 如果状态筛选是"not_started"，必须包含未开始的学生
+    # 如果状态筛选是其他状态，只有当include_not_started=True时才包含未开始的学生
+    should_include_not_started = include_not_started or (status == "not_started")
+    
+    if should_include_not_started:
+        from app.models.classroom_session import StudentSessionParticipation, ClassSession
+        
+        if session_id:
+            # 获取session的lesson_id
+            session = await db.get(ClassSession, session_id)
+            if not session:
+                # 如果session不存在，跳过未开始学生的处理
+                pass
+            else:
+                actual_lesson_id = lesson_id or session.lesson_id
+                
+                # 课堂模式：获取参与该会话的所有学生
+                participants_query = (
+                    select(StudentSessionParticipation, User)
+                    .join(User, StudentSessionParticipation.student_id == User.id)
+                    .where(StudentSessionParticipation.session_id == session_id)
+                )
+                participants_result = await db.execute(participants_query)
+                participants = participants_result.all()
+                
+                for participation, user in participants:
+                    # 如果状态筛选是"not_started"，只添加未开始的学生
+                    # 否则，只有当学生没有提交记录时才添加
+                    if participation.student_id not in student_ids_with_submission:
+                        # 如果状态筛选是"not_started"，只添加未开始的学生
+                        # 如果状态筛选是其他状态或为空，也添加未开始的学生（如果include_not_started=True）
+                        if status == "not_started" or status is None or include_not_started:
+                            # 创建虚拟的"未开始"记录
+                            not_started_dict = {
+                                "id": None,  # 没有真实的提交ID
+                                "cell_id": cell_id,
+                                "lesson_id": actual_lesson_id,
+                                "student_id": participation.student_id,
+                                "session_id": session_id,
+                                "status": "not_started",  # 虚拟状态
+                                "student_email": user.email,
+                                "student_name": user.full_name or user.username,
+                                "score": None,
+                                "max_score": None,
+                                "submitted_at": None,
+                                "time_spent": None,
+                                "responses": {},
+                                "teacher_feedback": None,
+                            }
+                            submissions.append(not_started_dict)
+        elif lesson_id:
+            # 课后模式：TODO - 需要从lesson获取所有学生
+            # 目前暂时不处理课后模式的未开始学生
+            pass
 
     return submissions
 

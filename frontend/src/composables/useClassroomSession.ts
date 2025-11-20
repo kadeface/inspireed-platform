@@ -388,12 +388,24 @@ export function useClassroomSession(lessonId: number) {
   /**
    * 更新进度（通过 WebSocket）
    */
-  async function updateProgress(completedCellIds: number[], currentCellIdParam?: number) {
+  async function updateProgress(
+    completedCellIds: number[], 
+    currentCellIdParam?: number,
+    progressPercentageParam?: number  // 🆕 可选的进度百分比参数
+  ) {
     if (!participation.value || !session.value) return
     
-    // 计算进度百分比
-    const totalCells = 10 // TODO: 从 lesson.content.length 获取
-    const progressPercentage = (completedCellIds.length / totalCells) * 100
+    // 计算进度百分比（如果未提供参数，则基于 completedCellIds 计算）
+    let progressPercentage: number
+    if (progressPercentageParam !== undefined) {
+      // 使用提供的进度百分比
+      progressPercentage = progressPercentageParam
+    } else {
+      // 默认计算方式（向后兼容）
+      const totalCells = session.value.settings?.display_cell_orders?.length || 
+                        (completedCellIds.length > 0 ? completedCellIds.length : 10)
+      progressPercentage = (completedCellIds.length / totalCells) * 100
+    }
     
     // 如果 WebSocket 已连接，通过 WebSocket 发送进度更新
     if (isWebSocketConnected.value) {

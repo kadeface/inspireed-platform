@@ -422,8 +422,17 @@ function handleNodeClick(cell: Cell, index: number) {
   
   const isCurrentlyActive = isActive(cell, index)
   
-  // 点击节点切换选中状态（多选模式）
-  const action: 'toggle' = 'toggle'
+  // 🆕 对于活动模块，如果已经选中，使用 'add' 保持选中状态（用于显示统计信息）
+  // 如果未选中，使用 'add' 选中它
+  // 对于其他模块，使用 'toggle' 切换状态
+  let action: 'toggle' | 'add' = 'toggle'
+  if (cell.type === 'activity') {
+    // 活动模块：始终使用 'add'，确保选中状态，以便显示统计信息
+    action = 'add'
+  } else {
+    // 其他模块：使用 'toggle' 切换状态
+    action = 'toggle'
+  }
   
   console.log('🎯 导播台点击模块:', {
     index,
