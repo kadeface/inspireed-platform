@@ -33,6 +33,7 @@ from app.schemas.classroom_session import (
     ResumeSessionRequest,
     EndSessionRequest,
     SessionStatistics,
+    StudentPendingSessionResponse,
 )
 
 router = APIRouter()
@@ -720,6 +721,70 @@ async def leave_session(
     return {"message": "已离开会话"}
 
 
+# ========== 学生待开始课堂 ==========
+
+
+@router.get("/student/pending-sessions", response_model=List[StudentPendingSessionResponse])
+async def get_student_pending_sessions(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """获取学生待开始的课堂列表（pending状态的会话）"""
+
+    # 权限检查：仅学生可访问
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="仅学生可访问此接口")
+
+    # 获取学生所在班级ID
+    student_classroom_id = cast(Optional[int], current_user.classroom_id)
+    if not student_classroom_id:
+        # 如果学生没有分配班级，返回空列表
+        return []
+
+    # 查询学生所在班级的所有pending状态会话
+    query = (
+        select(ClassSession)
+        .where(ClassSession.classroom_id == student_classroom_id)
+        .where(ClassSession.status == ClassSessionStatus.PENDING)
+        .options(
+            selectinload(ClassSession.lesson),
+            selectinload(ClassSession.teacher),
+            selectinload(ClassSession.classroom),
+        )
+        .order_by(ClassSession.created_at.desc())
+    )
+
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+
+    # 构建响应数据
+    pending_sessions = []
+    for session in sessions:
+        # 获取关联信息
+        lesson = session.lesson
+        teacher = session.teacher
+        classroom = session.classroom
+
+        session_dict = {
+            "id": session.id,
+            "lesson_id": session.lesson_id,
+            "lesson_title": lesson.title if lesson else None,
+            "teacher_id": session.teacher_id,
+            "teacher_name": teacher.full_name or teacher.username if teacher else None,
+            "classroom_id": session.classroom_id,
+            "classroom_name": classroom.name if classroom else None,
+            "status": session.status,
+            "created_at": session.created_at,
+            "scheduled_start": session.scheduled_start,
+            "total_students": session.total_students,
+            "active_students": session.active_students,
+        }
+        pending_sessions.append(StudentPendingSessionResponse(**session_dict))
+
+    return pending_sessions
+
+
 # ========== 统计数据 ==========
 
 
@@ -796,6 +861,107 @@ async def get_session_statistics(
 
 # 导入 WebSocket 管理器
 from app.services.websocket_manager import manager
+
+
+# ========== 会话清理和检查 ==========
+
+
+@router.post("/sessions/{session_id}/check-teacher-status")
+async def check_teacher_status(
+    session_id: int,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    检查会话的教师连接状态（用于定期检查）
+    如果没有教师连接且会话处于活跃状态，自动结束会话
+    """
+    
+    session = await db.get(ClassSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    
+    # 权限检查：教师可以检查自己的会话，管理员可以检查所有会话
+    current_role = cast(UserRole, current_user.role)
+    session_teacher_id = cast(int, session.teacher_id)
+    current_user_id = cast(int, current_user.id)
+    
+    if current_role == UserRole.TEACHER and session_teacher_id != current_user_id:
+        raise HTTPException(status_code=403, detail="无权访问该会话")
+    
+    # 如果会话已结束，直接返回
+    if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
+        return {
+            "session_id": session_id,
+            "status": "ended",
+            "has_teacher_connection": False,
+            "message": "会话已结束"
+        }
+    
+    # 检查是否有教师连接
+    has_teacher = manager.has_teacher_connection("session", session_id)
+    
+    # 如果没有教师连接，且会话处于活跃状态，自动结束会话
+    if not has_teacher and session.status in [ClassSessionStatus.ACTIVE, ClassSessionStatus.PAUSED]:  # type: ignore[comparison-overlap]
+        print(f"⚠️ 会话 {session_id} 没有教师连接，自动结束会话（状态：{session.status}）")
+        
+        # 更新会话状态为已结束
+        session.status = ClassSessionStatus.ENDED  # type: ignore[assignment]
+        session.ended_at = datetime.utcnow()  # type: ignore[assignment]
+        
+        # 计算时长
+        if session.actual_start:  # type: ignore[comparison-overlap]
+            duration = (session.ended_at - session.actual_start).total_seconds() / 60  # type: ignore[union-attr]
+            session.duration_minutes = int(duration)  # type: ignore[assignment]
+        
+        # 更新所有学生参与记录为离线
+        result = await db.execute(
+            select(StudentSessionParticipation).where(
+                and_(
+                    StudentSessionParticipation.session_id == session_id,
+                    StudentSessionParticipation.is_active == True,
+                )
+            )
+        )
+        participations = result.scalars().all()
+        for participation in participations:
+            participation.is_active = False  # type: ignore[assignment]
+            participation.left_at = datetime.utcnow()  # type: ignore[assignment]
+        
+        await db.commit()
+        await db.refresh(session)
+        
+        # 通知所有学生会话已结束
+        await manager.broadcast_to_session(
+            message={
+                "type": "session_ended",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": {
+                    "session_id": session_id,
+                    "ended_at": session.ended_at.isoformat() if session.ended_at else None,  # type: ignore[union-attr]
+                    "reason": "teacher_disconnected",
+                    "message": "教师已断开连接，课程已自动结束"
+                }
+            },
+            session_id=session_id
+        )
+        
+        print(f"✅ 已自动结束会话 {session_id} 并通知学生")
+        
+        return {
+            "session_id": session_id,
+            "status": "ended",
+            "has_teacher_connection": False,
+            "auto_ended": True,
+            "message": "会话已自动结束（没有教师连接）"
+        }
+    
+    return {
+        "session_id": session_id,
+        "status": session.status,
+        "has_teacher_connection": has_teacher,
+        "message": "会话状态正常" if has_teacher else "会话正常但无教师连接"
+    }
 
 
 @router.websocket("/sessions/{session_id}/ws")
@@ -1112,9 +1278,70 @@ async def websocket_teacher_session_endpoint(
     
     except WebSocketDisconnect:
         print(f"🔌 教师 {teacher_id} 断开连接（会话 {session_id}）")
+        
+        # 🆕 检查是否还有其他教师连接（排除当前正在断开的教师）
+        # 注意：此时连接还未断开，所以检查时需要排除当前教师
+        has_other_teacher = manager.has_teacher_connection("session", session_id, exclude_user_id=teacher_id)
+        
+        # 如果没有其他教师连接，且会话处于活跃状态，自动结束会话
+        if not has_other_teacher:
+            try:
+                # 重新获取会话最新状态
+                session = await db.get(ClassSession, session_id)
+                if session and session.status in [ClassSessionStatus.ACTIVE, ClassSessionStatus.PAUSED]:
+                    print(f"⚠️ 教师异常退出，自动结束会话 {session_id}（状态：{session.status}）")
+                    
+                    # 更新会话状态为已结束
+                    session.status = ClassSessionStatus.ENDED  # type: ignore[assignment]
+                    session.ended_at = datetime.utcnow()  # type: ignore[assignment]
+                    
+                    # 计算时长
+                    if session.actual_start:  # type: ignore[comparison-overlap]
+                        duration = (session.ended_at - session.actual_start).total_seconds() / 60  # type: ignore[union-attr]
+                        session.duration_minutes = int(duration)  # type: ignore[assignment]
+                    
+                    # 更新所有学生参与记录为离线
+                    result = await db.execute(
+                        select(StudentSessionParticipation).where(
+                            and_(
+                                StudentSessionParticipation.session_id == session_id,
+                                StudentSessionParticipation.is_active == True,
+                            )
+                        )
+                    )
+                    participations = result.scalars().all()
+                    for participation in participations:
+                        participation.is_active = False  # type: ignore[assignment]
+                        participation.left_at = datetime.utcnow()  # type: ignore[assignment]
+                    
+                    await db.commit()
+                    await db.refresh(session)
+                    
+                    # 通知所有学生会话已结束
+                    await manager.broadcast_to_session(
+                        message={
+                            "type": "session_ended",
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "data": {
+                                "session_id": session_id,
+                                "ended_at": session.ended_at.isoformat() if session.ended_at else None,  # type: ignore[union-attr]
+                                "reason": "teacher_disconnected",
+                                "message": "教师已断开连接，课程已自动结束"
+                            }
+                        },
+                        session_id=session_id
+                    )
+                    
+                    print(f"✅ 已自动结束会话 {session_id} 并通知学生")
+            except Exception as end_error:
+                print(f"❌ 自动结束会话失败: {str(end_error)}")
+                import traceback
+                traceback.print_exc()
     
     except Exception as e:
         print(f"❌ 教师 WebSocket 异常: {str(e)}")
+        import traceback
+        traceback.print_exc()
     
     finally:
         # 8. 清理：移除连接

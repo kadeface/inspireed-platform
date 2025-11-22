@@ -52,11 +52,11 @@
             <div class="text-lg md:text-xl text-blue-100">结构化学习单元</div>
           </div>
           <div class="text-center">
-            <div class="text-5xl md:text-6xl font-bold mb-2">300+</div>
+            <div class="text-5xl md:text-6xl font-bold mb-2">200+</div>
             <div class="text-lg md:text-xl text-blue-100">交互式仿真实验</div>
           </div>
           <div class="text-center">
-            <div class="text-5xl md:text-6xl font-bold mb-2">5K+</div>
+            <div class="text-5xl md:text-6xl font-bold mb-2">500+</div>
             <div class="text-lg md:text-xl text-blue-100">教学实践案例</div>
           </div>
         </div>

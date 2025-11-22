@@ -4,7 +4,7 @@
 
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.activity import ActivitySubmissionStatus, PeerReviewStatus
 
@@ -103,9 +103,14 @@ class ActivitySubmissionResponse(ActivitySubmissionBase):
 
 class ActivitySubmissionWithStudent(ActivitySubmissionResponse):
     """活动提交响应（包含学生信息）"""
-
-    student_email: str
-    student_name: str
+    
+    # 使用序列化别名：内部代码使用 snake_case，API 返回时使用 camelCase
+    student_email: str = Field(..., serialization_alias="studentEmail")
+    student_name: str = Field(..., serialization_alias="studentName")
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
 
 
 # ========== 互评 Schemas ==========

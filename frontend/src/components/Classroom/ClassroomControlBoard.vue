@@ -155,7 +155,8 @@ interface Props {
   currentCellIndex?: number | null  // 当前选中的 Cell 索引（-1 表示隐藏）
   currentActivityId?: number | null
   completedCellIds?: number[]
-  displayCellIds?: number[]  // 多选模式下要显示的 Cell IDs（数据库 ID）
+  displayCellIds?: number[]  // 多选模式下要显示的 Cell IDs（数据库 ID，已废弃，使用 displayCellOrders）
+  displayCellOrders?: number[]  // 多选模式下要显示的 Cell Orders（推荐）
   dbCells?: Array<{ id: number; order: number; cell_type: string }>  // 数据库中的 Cell 记录（用于 ID 匹配）
   loading?: boolean
   layout?: 'horizontal' | 'vertical'
@@ -167,6 +168,7 @@ const props = withDefaults(defineProps<Props>(), {
   currentActivityId: null,
   completedCellIds: () => [],
   displayCellIds: () => [],
+  displayCellOrders: () => [],
   dbCells: () => [],
   loading: false,
   layout: 'horizontal',
@@ -207,7 +209,15 @@ function getCellId(cell: Cell): number | string | null {
 }
 
 function isActive(cell: Cell, index: number): boolean {
-  // 多选模式：检查 displayCellIds
+  // 多选模式：优先使用 displayCellOrders（推荐方式）
+  // 如果 displayCellOrders 存在（即使为空数组），只使用它来判断，不再检查其他逻辑
+  if (props.displayCellOrders !== undefined && Array.isArray(props.displayCellOrders)) {
+    const cellOrder = cell.order !== undefined ? cell.order : index
+    // 直接匹配 order
+    return props.displayCellOrders.includes(cellOrder)
+  }
+  
+  // 向后兼容：检查 displayCellIds（已废弃）
   if (props.displayCellIds && props.displayCellIds.length > 0) {
     const cellId = getCellId(cell)
     const numericId = toNumericId(cellId)
@@ -244,6 +254,8 @@ function isActive(cell: Cell, index: number): boolean {
         }
       }
     }
+    // 如果 displayCellIds 存在但当前 cell 不匹配，返回 false
+    return false
   }
   
   // 单选模式：优先使用索引匹配（最可靠，因为前端总是知道索引）

@@ -74,7 +74,7 @@ InspireEd 是一个面向STEM教育的探究式学习与教学平台，基于建
 
 ### AI 集成
 - LangChain
-- OpenAI GPT-4
+- DeepSeek
 - FAISS（向量检索）
 
 ## 项目结构

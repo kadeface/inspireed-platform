@@ -219,6 +219,27 @@ class ConnectionManager:
         
         return list(self.active_connections.keys())
     
+    def has_teacher_connection(self, scope: str, channel_id: int, exclude_user_id: Optional[int] = None) -> bool:
+        """
+        检查是否有教师连接到指定通道
+        
+        参数:
+            scope: 通道范围（'session' 或 'lesson'）
+            channel_id: 通道ID
+            exclude_user_id: 排除的用户ID（用于检查除特定用户外是否还有其他教师）
+        """
+        channel_key = self._make_channel_key(scope, channel_id)
+        if channel_key not in self.teacher_connections:
+            return False
+        
+        teacher_connections = self.teacher_connections[channel_key]
+        if exclude_user_id:
+            # 检查是否有除指定用户外的其他教师
+            return any(uid != exclude_user_id for uid in teacher_connections.keys())
+        else:
+            # 检查是否有任何教师
+            return len(teacher_connections) > 0
+    
     async def send_to_teacher(self, event: dict, scope: str, channel_id: int, teacher_ids: List[int] = []):
         """
         发送消息给教师

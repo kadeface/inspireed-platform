@@ -111,14 +111,77 @@ const formatDuration = (seconds: number): string => {
   return `${minutes}:${secs.toString().padStart(2, '0')}`
 }
 
+// 解析UTC时间字符串（处理没有时区信息的情况）
+function parseUTCTime(timeString: string): Date {
+  let utcString = timeString.trim()
+  
+  // 检查是否已有时区信息
+  const hasTimezone = utcString.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(utcString)
+  
+  if (!hasTimezone) {
+    // 如果没有时区信息，假设它是UTC时间并添加Z后缀
+    if (utcString.includes(' ')) {
+      // 空格格式转换为ISO格式：YYYY-MM-DD HH:MM:SS -> YYYY-MM-DDTHH:MM:SSZ
+      utcString = utcString.replace(' ', 'T') + 'Z'
+    } else if (utcString.includes('T')) {
+      // 已经是ISO格式，只需添加Z
+      utcString = utcString + 'Z'
+    } else {
+      // 其他格式，添加Z
+      utcString = utcString + 'Z'
+    }
+  }
+  
+  return new Date(utcString)
+}
+
+// 计算当前已进行的时长（秒）
+function calculateDuration(): number {
+  if (!props.session?.actualStart) {
+    return 0
+  }
+  
+  try {
+    const now = new Date()
+    const start = parseUTCTime(props.session.actualStart)
+    const diffMs = now.getTime() - start.getTime()
+    
+    // 如果时间差为负（未来时间），说明解析有误，返回0
+    if (diffMs < 0) {
+      console.warn('⚠️ 时间差为负，可能是时区解析问题:', {
+        actualStart: props.session.actualStart,
+        parsed: start.toISOString(),
+        now: now.toISOString(),
+        diffMs,
+      })
+      return 0
+    }
+    
+    return Math.floor(diffMs / 1000)
+  } catch (e) {
+    console.error('❌ 解析actualStart时间失败:', props.session.actualStart, e)
+    return 0
+  }
+}
+
 function startDurationTimer() {
   if (durationInterval.value || !props.session?.actualStart) return
   
+  // 计算初始时长
+  sessionDuration.value = calculateDuration()
+  
+  // 设置定时器，每秒更新时长
   durationInterval.value = setInterval(() => {
     if (props.session?.actualStart) {
-      const now = new Date()
-      const start = new Date(props.session.actualStart)
-      sessionDuration.value = Math.floor((now.getTime() - start.getTime()) / 1000)
+      const duration = calculateDuration()
+      // 如果计算出的时长有效（>= 0），更新显示
+      if (duration >= 0) {
+        sessionDuration.value = duration
+      } else {
+        // 如果计算出负值，停止计时器
+        console.error('❌ 计算出负时长，停止计时器')
+        stopDurationTimer()
+      }
     }
   }, 1000)
 }

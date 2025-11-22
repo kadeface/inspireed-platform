@@ -137,6 +137,33 @@ export function useClassroomSession(lessonId: number) {
     try {
       const updatedSession = await classroomSessionService.getSession(session.value.id)
       if (updatedSession) {
+        // 🆕 检查会话状态是否变为 ended
+        const oldStatus = session.value.status
+        const newStatus = updatedSession.status
+        
+        if (oldStatus !== 'ended' && newStatus === 'ended') {
+          console.log('⏹️ 检测到会话已结束:', {
+            sessionId: updatedSession.id,
+            oldStatus,
+            newStatus,
+          })
+          
+          // 更新会话状态
+          session.value.status = 'ended'
+          
+          // 断开 WebSocket 连接
+          disconnectWebSocket()
+          
+          // 停止轮询
+          stopPolling()
+          
+          // 显示提示
+          alert('课程已结束，感谢您的参与！')
+          
+          // 不再继续更新，直接返回
+          return
+        }
+        
         // 检查是否有实际变化（用于日志记录）
         const oldDisplayCellIds = JSON.stringify((session.value.settings as any)?.display_cell_ids || (session.value.settings as any)?.displayCellIds || [])
         const newDisplayCellIds = JSON.stringify((updatedSession.settings as any)?.display_cell_ids || (updatedSession.settings as any)?.displayCellIds || [])
@@ -320,9 +347,9 @@ export function useClassroomSession(lessonId: number) {
       }
     })
     
-    // 🆕 监听会话结束（教师主动结束课程）
+    // 🆕 监听会话结束（教师主动结束课程或异常退出）
     websocketService.on('session_ended', (message: WebSocketMessage) => {
-      console.log('⏹️ 教师已结束课程:', message.data)
+      console.log('⏹️ 课程已结束:', message.data)
       
       if (session.value) {
         session.value.status = 'ended'
@@ -330,8 +357,18 @@ export function useClassroomSession(lessonId: number) {
         // 断开 WebSocket
         disconnectWebSocket()
         
+        // 根据结束原因显示不同的提示
+        const reason = message.data?.reason
+        let messageText = '课程已结束，感谢您的参与！'
+        
+        if (reason === 'teacher_disconnected') {
+          messageText = '教师已断开连接，课程已自动结束。感谢您的参与！'
+        } else if (message.data?.message) {
+          messageText = message.data.message
+        }
+        
         // 显示提示
-        alert('教师已结束课程，感谢您的参与！')
+        alert(messageText)
         
         // 可选：重定向到学生主页
         // router.push('/student')

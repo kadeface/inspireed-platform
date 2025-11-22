@@ -96,3 +96,18 @@ export interface ClassroomEvent {
   timestamp: string
 }
 
+export interface StudentPendingSession {
+  id: number
+  lessonId: number
+  lessonTitle?: string
+  teacherId: number
+  teacherName?: string
+  classroomId: number
+  classroomName?: string
+  status: ClassSessionStatus
+  createdAt: string
+  scheduledStart?: string
+  totalStudents: number
+  activeStudents: number
+}
+

@@ -497,12 +497,13 @@ async def get_cell_submissions(
 
         # 组装已有提交的响应
         for submission, user in rows:
-            submission_dict = {
+            # 使用 Pydantic 模型序列化，确保所有字段符合模型要求
+            submission_data = ActivitySubmissionWithStudent.model_validate({
                 **submission.__dict__,
                 "student_email": user.email,
                 "student_name": user.full_name or user.username,
-            }
-            submissions.append(submission_dict)
+            }, from_attributes=True)
+            submissions.append(submission_data)
             student_ids_with_submission.add(submission.student_id)
 
     # 如果需要包含未开始的学生，获取所有学生并添加未开始的记录
@@ -520,7 +521,7 @@ async def get_cell_submissions(
                 # 如果session不存在，跳过未开始学生的处理
                 pass
             else:
-                actual_lesson_id = lesson_id or session.lesson_id
+                actual_lesson_id = lesson_id or cast(int, session.lesson_id)
                 
                 # 课堂模式：获取参与该会话的所有学生
                 participants_query = (
@@ -539,23 +540,39 @@ async def get_cell_submissions(
                         # 如果状态筛选是其他状态或为空，也添加未开始的学生（如果include_not_started=True）
                         if status == "not_started" or status is None or include_not_started:
                             # 创建虚拟的"未开始"记录
-                            not_started_dict = {
-                                "id": None,  # 没有真实的提交ID
-                                "cell_id": cell_id,
-                                "lesson_id": actual_lesson_id,
-                                "student_id": participation.student_id,
-                                "session_id": session_id,
-                                "status": "not_started",  # 虚拟状态
-                                "student_email": user.email,
-                                "student_name": user.full_name or user.username,
-                                "score": None,
-                                "max_score": None,
-                                "submitted_at": None,
-                                "time_spent": None,
-                                "responses": {},
-                                "teacher_feedback": None,
-                            }
-                            submissions.append(not_started_dict)
+                            # 注意：由于 ActivitySubmissionWithStudent 要求 id 为 int，我们使用 0 作为占位符
+                            # 前端需要识别 id=0 或 status="not_started" 作为未开始记录
+                            from datetime import datetime
+                            not_started_data = ActivitySubmissionWithStudent(
+                                id=0,  # 使用 0 作为占位符，表示未开始
+                                cell_id=cell_id,
+                                lesson_id=actual_lesson_id,
+                                student_id=participation.student_id,
+                                responses={},
+                                status=ActivitySubmissionStatus.DRAFT,  # 使用 DRAFT 状态，但前端通过 id=0 识别
+                                student_email=user.email or "",
+                                student_name=user.full_name or user.username or "",
+                                process_trace=None,
+                                context=None,
+                                score=None,
+                                max_score=None,
+                                auto_graded=False,
+                                teacher_feedback=None,
+                                graded_by=None,
+                                started_at=None,
+                                submitted_at=None,
+                                graded_at=None,
+                                submission_count=0,
+                                attempt_no=0,
+                                time_spent=None,
+                                is_late=False,
+                                activity_phase=None,
+                                version=1,
+                                synced=False,
+                                created_at=datetime.utcnow(),
+                                updated_at=datetime.utcnow(),
+                            )
+                            submissions.append(not_started_data)
         elif lesson_id:
             # 课后模式：TODO - 需要从lesson获取所有学生
             # 目前暂时不处理课后模式的未开始学生

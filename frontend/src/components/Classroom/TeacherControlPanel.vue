@@ -1,290 +1,359 @@
 <template>
   <div class="teacher-control-panel">
-    <!-- 会话状态栏 -->
-    <div class="session-status-bar" :class="statusClass">
-      <div class="status-content">
-        <div class="status-indicator">
-          <span v-if="session?.status === 'active'" class="pulse-dot"></span>
-          <span v-else-if="session?.status === 'paused'" class="pause-icon">⏸️</span>
-          <span v-else class="pending-icon">⏸️</span>
-        </div>
-        <div class="status-text">
-          <h3 class="status-title">{{ statusTitle }}</h3>
-          <p v-if="session?.status === 'active' && sessionDuration !== null && sessionDuration !== undefined" class="duration">
-            <span class="duration-label">剩余时间:</span>
-            <span class="duration-value" :class="{ 'duration-warning': remainingTime <= 300, 'duration-danger': remainingTime <= 60 }">
-              {{ formatRemainingTime(remainingTime) }}
-            </span>
-          </p>
-          <p v-else-if="session?.status === 'paused' && sessionDuration !== null && sessionDuration !== undefined" class="duration">
-            <span class="duration-label">剩余时间:</span>
-            <span class="duration-value">{{ formatRemainingTime(remainingTime) }}</span>
-          </p>
-          <p v-else-if="session?.status === 'pending'" class="pending-text">
-            等待学生加入（{{ activeStudents.length }} 人已加入）
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <!-- 控制按钮组 -->
-    <div class="control-actions">
-      <!-- 没有会话时，显示"创建课堂"按钮 -->
-      <button 
-        v-if="!session"
-        @click="handleCreateSession"
-        :disabled="loading"
-        class="btn btn-primary btn-lg"
-      >
-        📚 创建课堂
-      </button>
-      
-      <!-- PENDING 状态：等待学生登录 -->
-      <template v-if="session && session.status === 'pending'">
+    <!-- 顶部标题栏 -->
+    <div class="panel-header">
+      <h2 class="panel-title">InspireEd 教师导播台</h2>
+      <div class="header-controls">
+        <!-- 没有会话时，显示"创建课堂"按钮 -->
         <button 
-          @click="handleBeginClass"
-          :disabled="loading || activeStudents.length === 0"
-          class="btn btn-primary btn-lg"
-          :title="activeStudents.length === 0 ? '请等待学生加入课堂' : '开始上课'"
-        >
-          ▶️ 开始上课
-        </button>
-        <button 
-          @click="handleCancelSession"
-          :disabled="loading"
-          class="btn btn-secondary"
-        >
-          ❌ 取消课堂
-        </button>
-      </template>
-      
-      <!-- ACTIVE 状态：上课中 -->
-      <template v-if="session && session.status === 'active'">
-        <button 
-          @click="handlePause"
-          :disabled="loading"
-          class="btn btn-secondary"
-        >
-          ⏸️ 暂停
-        </button>
-        <button 
-          @click="handleEnd"
-          :disabled="loading"
-          class="btn btn-danger"
-        >
-          ⏹️ 结束课程
-        </button>
-      </template>
-      
-      <!-- PAUSED 状态：已暂停 -->
-      <template v-if="session && session.status === 'paused'">
-        <button 
-          @click="handleResume"
+          v-if="!session"
+          @click="handleCreateSession"
           :disabled="loading"
           class="btn btn-primary"
         >
-          ▶️ 继续
+          📚 创建课堂
         </button>
-        <button 
-          @click="handleEnd"
-          :disabled="loading"
-          class="btn btn-danger"
-        >
-          ⏹️ 结束课程
-        </button>
-      </template>
-    </div>
-    
-    <!-- 等待学生登录界面（PENDING 状态） -->
-    <div v-if="session && session.status === 'pending'" class="waiting-students-panel">
-      <div class="waiting-header">
-        <div class="waiting-icon">⏳</div>
-        <div class="waiting-content">
-          <h3 class="waiting-title">等待学生加入课堂</h3>
-          <p class="waiting-subtitle">学生加入后，点击"开始上课"按钮开始授课</p>
-        </div>
-      </div>
-      
-      <div class="waiting-stats">
-        <div class="stat-item">
-          <span class="stat-label">已加入学生</span>
-          <span class="stat-value highlight">{{ activeStudents.length }}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">总学生数</span>
-          <span class="stat-value">{{ totalStudents }}</span>
-        </div>
+        
+        <!-- PENDING 状态：等待学生登录 -->
+        <template v-if="session && session.status === 'pending'">
+          <button 
+            @click="handleBeginClass"
+            :disabled="loading || activeStudents.length === 0"
+            class="btn btn-primary"
+            :title="activeStudents.length === 0 ? '请等待学生加入课堂' : '开始上课'"
+          >
+            ▶️ 开始上课
+          </button>
+          <button 
+            @click="handleCancelSession"
+            :disabled="loading"
+            class="btn btn-secondary"
+          >
+            ❌ 取消
+          </button>
+        </template>
+        
+        <!-- ACTIVE 状态：上课中 -->
+        <template v-if="session && session.status === 'active'">
+          <button 
+            @click="handlePause"
+            :disabled="loading"
+            class="btn btn-secondary"
+          >
+            ⏸️ 暂停
+          </button>
+          <button 
+            @click="handleEnd"
+            :disabled="loading"
+            class="btn btn-danger"
+          >
+            ⏹️ 结束
+          </button>
+        </template>
+        
+        <!-- PAUSED 状态：已暂停 -->
+        <template v-if="session && session.status === 'paused'">
+          <button 
+            @click="handleResume"
+            :disabled="loading"
+            class="btn btn-primary"
+          >
+            ▶️ 继续
+          </button>
+          <button 
+            @click="handleEnd"
+            :disabled="loading"
+            class="btn btn-danger"
+          >
+            ⏹️ 结束
+          </button>
+        </template>
       </div>
     </div>
 
-    <!-- 在线学生列表 -->
-    <div v-if="session && (session.status === 'pending' || session.status === 'active' || session.status === 'paused')" class="students-panel">
-      <div class="panel-header">
-        <h4>在线学生</h4>
-        <div class="panel-stats">
-          <span class="stat-badge">
-            <span class="stat-label">在线:</span>
-            <span class="stat-value">{{ activeStudents.length }} / {{ totalStudents }}</span>
-          </span>
-          <span v-if="sessionStatistics" class="stat-badge">
-            <span class="stat-label">已完成:</span>
-            <span class="stat-value">{{ sessionStatistics.completed_students }}</span>
-          </span>
-          <span v-if="sessionStatistics" class="stat-badge">
-            <span class="stat-label">平均进度:</span>
-            <span class="stat-value">{{ Math.round(sessionStatistics.average_progress) }}%</span>
-          </span>
-        </div>
-      </div>
-      
-      <div v-if="loadingStudents" class="loading-state">
-        <div class="spinner"></div>
-        <p>加载学生列表...</p>
-      </div>
-      
-      <div v-else-if="activeStudents.length > 0" class="students-grid">
-        <div 
-          v-for="student in activeStudents" 
-          :key="student.id"
-          class="student-card"
-          :class="{ 
-            'at-current-cell': (student.currentCellId || student.current_cell_id) === (session.currentCellId || session.current_cell_id)
-          }"
-        >
-          <div class="student-avatar">
-            {{ (student.studentName || student.student_name)?.[0] || 'S' }}
+    <!-- 三栏主布局 -->
+    <div class="main-layout">
+      <!-- 左侧：教学模块 -->
+      <div class="panel teaching-modules">
+        <div class="module-panel-header">
+          <h3 class="panel-title">教学模块</h3>
+          <div class="module-count" v-if="lesson && lesson.content">
+            共 {{ lesson.content.length }} 个模块
           </div>
-          <div class="student-info">
-            <div class="student-name">{{ student.studentName || student.student_name }}</div>
-            <div class="student-progress">
-              <div class="progress-bar-mini">
-                <div 
-                  class="progress-fill" 
-                  :style="{ width: `${student.progressPercentage || student.progress_percentage || 0}%` }"
-                ></div>
-              </div>
-              <span class="progress-text">{{ Math.round(student.progressPercentage || student.progress_percentage || 0) }}%</span>
+        </div>
+        <div class="module-list" v-if="lesson && lesson.content && lesson.content.length > 0">
+          <!-- 隐藏所有内容选项 -->
+          <div 
+            class="module-item module-item-hidden"
+            :class="{ 'module-item-active': !session?.current_cell_id || session.current_cell_id === 0 }"
+            @click="handleHideAll"
+            :title="'隐藏所有内容'"
+          >
+            <div class="module-item-icon">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
             </div>
+            <div class="module-item-label">隐藏</div>
           </div>
-          <div v-if="(student.currentCellId || student.current_cell_id) === (session.currentCellId || session.current_cell_id)" class="sync-indicator">
-            ✓
-          </div>
-        </div>
-      </div>
-      
-      <div v-else class="empty-students">
-        <p>暂无学生在线</p>
-      </div>
-    </div>
-
-    <!-- 导播台 -->
-    <div v-if="lesson && lesson.content && lesson.content.length > 0" class="content-control">
-      <!-- 调试信息（开发时可见） -->
-      <div v-if="!session" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <div class="flex items-center gap-2 text-yellow-800">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span class="text-sm font-medium">请先开始上课以使用导播台</span>
-        </div>
-        <p class="text-xs text-yellow-600 mt-1">点击"开始上课"按钮创建课堂会话</p>
-      </div>
-      
-      <!-- 有 session：显示实际控制板 -->
-      <template v-if="session">
-        <ClassroomControlBoard
-          :cells="lesson.content"
-          :current-cell-id="session.current_cell_id"
-          :current-cell-index="selectedCellIndex"
-          :current-activity-id="session.current_activity_id"
-          :db-cells="dbCells"
-          :loading="loading"
-          @navigate-to-cell="handleControlBoardNavigate"
-          @navigateToCell="handleControlBoardNavigate"
-          @start-activity="handleStartActivity"
-          @end-activity="handleEndActivity"
-        />
-        
-        <!-- 调试信息（开发时可见） -->
-        <div v-if="currentCell" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
-          <div class="font-semibold mb-2">🔍 调试信息:</div>
-          <div>currentCell.type: {{ currentCell.type }}</div>
-          <div>currentCell.order: {{ currentCell.order }}</div>
-          <div>selectedCellIndex: {{ selectedCellIndex }}</div>
-          <div>currentActivityDbCell: {{ currentActivityDbCell ? `ID=${currentActivityDbCell.id}` : 'null' }}</div>
-          <div>dbCells.length: {{ dbCells.length }}</div>
-          <div>dbCells: {{ JSON.stringify(dbCells.map(c => ({ id: c.id, order: c.order, type: c.cell_type }))) }}</div>
-        </div>
-        
-        <!-- 活动统计面板（当前 Cell 是 activity 类型时显示） -->
-        <div v-if="currentCell && currentCell.type === 'activity' && currentActivityDbCell" class="activity-panel mt-6">
-          <SubmissionStatistics
-            :cell-id="currentActivityDbCell.id"
-            :lesson-id="lesson?.id || lessonId"
-            :session-id="session.id"
-          />
           
-          <!-- 学生提交详细列表 -->
-          <div class="mt-4">
-            <SubmissionList
-              :cell-id="currentActivityDbCell.id"
-              :activity="currentCell.content"
-              :session-id="session.id"
-              :lesson-id="lesson?.id || lessonId"
-            />
-          </div>
-        </div>
-        
-        <!-- 如果 currentCell 是 activity 但没有 currentActivityDbCell，显示提示 -->
-        <div v-else-if="currentCell && currentCell.type === 'activity' && !currentActivityDbCell" class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p class="text-red-800 font-semibold">⚠️ 无法显示统计信息</p>
-          <p class="text-red-600 text-sm mt-2">原因：找不到对应的数据库 Cell 记录</p>
-          <p class="text-red-600 text-xs mt-1">currentCell.order: {{ currentCell.order }}</p>
-          <p class="text-red-600 text-xs">dbCells: {{ dbCells.length }} 条记录</p>
-        </div>
-      </template>
-      
-      <!-- 没有 session：显示预览模式（只读） -->
-      <div v-else class="control-board-preview">
-        <div class="board-header">
-          <h4 class="board-title">📺 导播台（预览）</h4>
-          <div class="board-stats">
-            <span class="stat-item">共 {{ lesson.content.length }} 个模块</span>
-          </div>
-        </div>
-        <div class="control-chain">
-          <template v-for="(cell, index) in lesson.content" :key="cell.id || index">
-            <div class="chain-node chain-node-preview">
-              <div class="node-number">{{ index + 1 }}</div>
-              <div class="node-icon">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </div>
-              <div class="node-label">{{ cell.title || cell.type || `模块 ${index + 1}` }}</div>
+          <!-- 课程模块列表 -->
+          <div 
+            v-for="(cell, index) in lesson.content" 
+            :key="cell.id || index"
+            class="module-item"
+            :class="{
+              'module-item-active': isModuleActive(cell, index),
+              [`module-item-type-${cell.type}`]: true,
+              'module-item-disabled': loading,
+            }"
+            :title="loading ? '切换中，请稍候...' : getModuleTooltip(cell, index)"
+          >
+            <!-- 复选框 -->
+            <div class="module-item-checkbox" @click.stop="!loading && handleModuleCheckboxClick(cell, index, $event)">
+              <input 
+                type="checkbox" 
+                :checked="isModuleActive(cell, index)"
+                :disabled="loading"
+                @change.stop="!loading && handleModuleCheckboxChange(cell, index, $event)"
+                @click.stop
+                class="checkbox-input"
+              />
             </div>
-            <div v-if="index < lesson.content.length - 1" class="chain-connector"></div>
-          </template>
+            
+            <!-- 模块序号 -->
+            <div class="module-item-number">{{ index + 1 }}</div>
+            
+            <!-- 模块图标 -->
+            <div class="module-item-icon" :class="`icon-${cell.type}`" @click="!loading && handleModuleItemClick(cell, index)">
+              <CellTypeIcon :type="cell.type" />
+            </div>
+            
+            <!-- 模块信息 -->
+            <div class="module-item-content" @click="!loading && handleModuleItemClick(cell, index)">
+              <div class="module-item-title">{{ cell.title || getCellTypeLabel(cell.type) || `模块 ${index + 1}` }}</div>
+              <div class="module-item-subtitle">{{ getCellTypeLabel(cell.type) }}</div>
+            </div>
+            
+            <!-- 活动状态标记 -->
+            <div v-if="cell.type === 'activity' && isModuleActivityActive(cell, index)" class="module-item-activity-badge">
+              🎯
+            </div>
+          </div>
         </div>
-        <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-          💡 开始上课后，点击节点即可切换模块显示给学生
+        <div v-else class="module-empty">
+          <p>暂无课程模块</p>
         </div>
+      </div>
+
+      <!-- 中间：课堂监控 -->
+      <div class="panel classroom-monitoring">
+        <h3 class="panel-title">课堂监控</h3>
+        <div class="monitoring-content">
+          <!-- 学生状态指示器网格 -->
+          <div class="student-indicators">
+            <div 
+              v-for="(student, index) in displayStudents" 
+              :key="student.id || index"
+              class="indicator-item"
+            >
+              <div 
+                class="indicator-circle"
+                :class="getStudentStatusClass(student)"
+                :title="getStudentTooltip(student)"
+              ></div>
+              <div class="indicator-student-info">
+                <div class="indicator-student-name">{{ student.studentName || student.student_name || `学生 ${index + 1}` }}</div>
+                <div class="indicator-student-account">{{ getStudentAccount(student) }}</div>
+              </div>
+            </div>
+            <div 
+              v-for="n in Math.max(0, 8 - displayStudents.length)"
+              :key="`empty-${n}`"
+              class="indicator-item"
+            >
+              <div class="indicator-circle indicator-empty"></div>
+              <div class="indicator-student-info">
+                <div class="indicator-student-name indicator-empty-text">--</div>
+                <div class="indicator-student-account indicator-empty-text">--</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 如果学生超过8个，显示更多学生列表 -->
+          <div v-if="activeStudents.length > 8" class="student-list-extra">
+            <div class="student-list-header">
+              <span class="student-list-title">更多学生 ({{ activeStudents.length - 8 }})</span>
+            </div>
+            <div class="student-list-content">
+              <div 
+                v-for="(student, index) in activeStudents.slice(8)" 
+                :key="student.id || `extra-${index}`"
+                class="student-list-item"
+                :class="getStudentStatusClass(student)"
+              >
+                <div class="student-list-indicator"></div>
+                <div class="student-list-info">
+                  <div class="student-list-name">{{ student.studentName || student.student_name || `学生 ${index + 9}` }}</div>
+                  <div class="student-list-account">
+                    {{ getStudentAccount(student) }}
+                  </div>
+                </div>
+                <div class="student-list-progress">
+                  {{ Math.round(student.progressPercentage || student.progress_percentage || 0) }}%
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="activeStudents.length === 0" class="student-list-empty">
+            <p>暂无学生在线</p>
+          </div>
+          
+          <!-- 统计数据 -->
+          <div class="monitoring-stats">
+            <div class="stat-row">
+              <span class="stat-label">在线学生:</span>
+              <span class="stat-value">{{ activeStudents.length }}/{{ totalStudents }}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">参与度:</span>
+              <span class="stat-value">{{ participationRate }}%</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">平均得分:</span>
+              <span class="stat-value">{{ averageScore }}分</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：实时数据 -->
+      <div class="panel realtime-data">
+        <h3 class="panel-title">实时数据</h3>
+        <div class="data-content">
+          <div class="data-item">
+            <div class="data-icon">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div class="data-info">
+              <span class="data-label">课程时长</span>
+              <span class="data-value">{{ formatDuration(displayDuration) }}</span>
+            </div>
+          </div>
+          
+          <div class="data-item">
+            <div class="data-icon">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div class="data-info">
+              <span class="data-label">互动次数</span>
+              <span class="data-value">{{ interactionCount }}次</span>
+            </div>
+          </div>
+          
+          <div class="data-item">
+            <div class="data-icon data-icon-red">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div class="data-info">
+              <span class="data-label">提问数量</span>
+              <span class="data-value">{{ questionCount }}个</span>
+            </div>
+          </div>
+          
+          <div class="data-item">
+            <div class="data-icon data-icon-green">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div class="data-info">
+              <span class="data-label">正确率</span>
+              <span class="data-value">{{ accuracyRate }}%</span>
+            </div>
+          </div>
+          
+          <!-- 进度条 -->
+          <div class="progress-bars">
+            <div class="progress-item">
+              <div class="progress-bar progress-purple" :style="{ width: `${progress1}%` }"></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-bar progress-lavender" :style="{ width: `${progress2}%` }"></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-bar progress-green" :style="{ width: `${progress3}%` }"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 活动统计面板（当前 Cell 是 activity 类型时显示，放在三栏布局下方） -->
+    <div v-if="session && currentCell && currentCell.type === 'activity' && currentActivityDbCell" class="activity-panel">
+      <SubmissionStatistics
+        :cell-id="currentActivityDbCell.id"
+        :lesson-id="lesson?.id || lessonId"
+        :session-id="session.id"
+      />
+      
+      <!-- 学生提交详细列表 -->
+      <div class="mt-4">
+        <SubmissionList
+          :cell-id="currentActivityDbCell.id"
+          :activity="currentCell.content"
+          :session-id="session.id"
+          :lesson-id="lesson?.id || lessonId"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, h } from 'vue'
 import { useRoute } from 'vue-router'
 import type { Lesson } from '../../types/lesson'
-import type { Cell } from '../../types/cell'
+import type { Cell, ActivityCell } from '../../types/cell'
 import classroomSessionService from '../../services/classroomSession'
 import ClassroomSwitcher from './ClassroomSwitcher.vue'
 import ClassroomControlBoard from './ClassroomControlBoard.vue'
 import SubmissionStatistics from '../Activity/SubmissionStatistics.vue'
 import SubmissionList from '../Activity/Teacher/SubmissionList.vue'
-import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId } from '../../utils/cellId'
+import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
+
+// Cell类型图标组件
+const CellTypeIcon = (props: { type: string }) => {
+  const icons: Record<string, any> = {
+    text: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M4 6h16M4 12h16M4 18h16' })
+    ]),
+    code: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' })
+    ]),
+    activity: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' })
+    ]),
+    video: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' })
+    ]),
+    flowchart: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7' })
+    ]),
+    qa: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+    ]),
+  }
+  
+  const IconComponent = icons[props.type] || icons.text
+  return IconComponent()
+}
 
 interface Props {
   lessonId: number
@@ -306,6 +375,15 @@ const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])
 
 // 一节课的标准时长（40分钟 = 2400秒）
 const LESSON_DURATION = 40 * 60
+
+// 显示的课程时长（只有在 active 状态才显示实际时长）
+const displayDuration = computed(() => {
+  // 如果会话不存在或不是 active 状态，显示 0
+  if (!session.value || session.value.status !== 'active') {
+    return 0
+  }
+  return sessionDuration.value || 0
+})
 
 // 计算剩余时间
 const remainingTime = computed(() => {
@@ -334,6 +412,99 @@ const statusClass = computed(() => {
 const totalStudents = computed(() => {
   return session.value?.total_students || 0
 })
+
+// 显示的学生列表（最多8个用于指示器）
+const displayStudents = computed(() => {
+  return activeStudents.value.slice(0, 8)
+})
+
+// 学生状态类
+function getStudentStatusClass(student: any): string {
+  const progress = student.progressPercentage || student.progress_percentage || 0
+  if (progress >= 80) return 'indicator-green'
+  if (progress >= 50) return 'indicator-yellow'
+  return 'indicator-red'
+}
+
+// 获取学生提示信息
+function getStudentTooltip(student: any): string {
+  const name = student.studentName || student.student_name || '学生'
+  const account = getStudentAccount(student)
+  const progress = Math.round(student.progressPercentage || student.progress_percentage || 0)
+  return `${name} (${account}) - 进度: ${progress}%`
+}
+
+// 获取学生登录账号
+function getStudentAccount(student: any): string {
+  // 尝试多种可能的字段名，但不包括姓名字段
+  return student.username || 
+         student.account || 
+         student.loginAccount || 
+         student.login_account ||
+         student.userAccount ||
+         student.user_account ||
+         student.email ||
+         student.user_id?.toString() ||
+         student.id?.toString() ||
+         '未知账号'
+}
+
+// 参与度（基于在线学生和总学生的比例，以及平均进度）
+const participationRate = computed(() => {
+  if (totalStudents.value === 0) return 0
+  const onlineRatio = (activeStudents.value.length / totalStudents.value) * 100
+  const avgProgress = sessionStatistics.value?.average_progress || 0
+  // 综合在线率和平均进度
+  return Math.round((onlineRatio * 0.6 + avgProgress * 0.4))
+})
+
+// 平均得分
+const averageScore = computed(() => {
+  if (sessionStatistics.value?.average_score !== undefined) {
+    return Math.round(sessionStatistics.value.average_score)
+  }
+  // 如果没有得分数据，基于进度估算
+  const avgProgress = sessionStatistics.value?.average_progress || 0
+  return Math.round(avgProgress * 0.8) // 假设进度和得分有一定相关性
+})
+
+// 互动次数（基于活动模块的提交数）
+const interactionCount = computed(() => {
+  // 可以从sessionStatistics或其他数据源获取
+  return sessionStatistics.value?.interaction_count || 12
+})
+
+// 提问数量
+const questionCount = computed(() => {
+  return sessionStatistics.value?.question_count || 8
+})
+
+// 正确率
+const accuracyRate = computed(() => {
+  if (sessionStatistics.value?.accuracy_rate !== undefined) {
+    return Math.round(sessionStatistics.value.accuracy_rate)
+  }
+  // 如果没有数据，基于平均进度估算
+  const avgProgress = sessionStatistics.value?.average_progress || 0
+  return Math.round(avgProgress * 0.95) // 假设正确率略高于进度
+})
+
+// 进度条数据（示例数据，可以根据实际需求调整）
+const progress1 = computed(() => {
+  const avgProgress = sessionStatistics.value?.average_progress || 0
+  return Math.min(100, Math.round(avgProgress * 0.9))
+})
+
+const progress2 = computed(() => {
+  const participation = participationRate.value
+  return Math.min(100, Math.round(participation * 0.85))
+})
+
+const progress3 = computed(() => {
+  const accuracy = accuracyRate.value
+  return Math.min(100, Math.round(accuracy * 0.95))
+})
+
 
 const currentCell = computed(() => {
   if (!props.lesson?.content || !session.value) {
@@ -393,6 +564,16 @@ const currentCell = computed(() => {
 })
 
 // 获取当前活动 Cell 的数据库 ID（用于查询提交数据）
+// 计算 displayCellOrders（从 session.settings 中获取）
+const displayCellOrders = computed(() => {
+  if (!session.value?.settings) return []
+  const settings = session.value.settings as any
+  if (settings?.display_cell_orders && Array.isArray(settings.display_cell_orders)) {
+    return settings.display_cell_orders
+  }
+  return []
+})
+
 const currentActivityDbCell = computed(() => {
   if (!currentCell.value || currentCell.value.type !== 'activity') {
     console.log('🔍 currentActivityDbCell: 不是活动模块', {
@@ -449,19 +630,162 @@ function getCellTypeLabel(type: string): string {
     activity: '活动',
     video: '视频',
     flowchart: '流程图',
+    qa: '问答',
   }
   return labels[type] || type
 }
 
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-  
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+function getCellTypeEmoji(type: string): string {
+  const emojis: Record<string, string> = {
+    text: '📄',
+    code: '💻',
+    activity: '📝',
+    video: '📹',
+    flowchart: '📊',
+    qa: '❓',
   }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`
+  return emojis[type] || '📦'
+}
+
+// 判断模块是否激活
+function isModuleActive(cell: Cell, index: number): boolean {
+  if (!session.value) return false
+  
+  // 多选模式：优先使用 displayCellOrders
+  if (displayCellOrders.value !== undefined && Array.isArray(displayCellOrders.value)) {
+    const cellOrder = cell.order !== undefined ? cell.order : index
+    return displayCellOrders.value.includes(cellOrder)
+  }
+  
+  // 单选模式：使用 current_cell_id 或 selectedCellIndex
+  if (selectedCellIndex.value >= 0 && selectedCellIndex.value === index) {
+    return true
+  }
+  
+  const currentId = session.value.current_cell_id
+  if (!currentId || currentId === 0) return false
+  
+  const cellId = getCellId(cell)
+  if (typeof cellId === 'number' && cellId === currentId) return true
+  if (typeof cellId === 'string') {
+    const numId = parseInt(cellId)
+    if (!isNaN(numId) && numId === currentId) return true
+  }
+  
+  return false
+}
+
+// 判断活动模块是否激活
+function isModuleActivityActive(cell: Cell, index: number): boolean {
+  if (cell.type !== 'activity') return false
+  if (!session.value?.current_activity_id) return false
+  
+  const cellId = getCellId(cell)
+  if (typeof cellId === 'number' && cellId === session.value.current_activity_id) return true
+  if (typeof cellId === 'string') {
+    const numId = parseInt(cellId)
+    if (!isNaN(numId) && numId === session.value.current_activity_id) return true
+  }
+  return false
+}
+
+// 处理模块项点击
+function handleModuleItemClick(cell: Cell, index: number) {
+  if (loading.value) return
+  
+  const cellId = getCellId(cell)
+  const cellOrder = cell.order !== undefined ? cell.order : index
+  
+  // 使用 handleControlBoardNavigate 处理导航
+  handleControlBoardNavigate(cellId, cellOrder, 'toggle', false)
+}
+
+// 处理复选框点击（防止事件冒泡）
+function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
+  event.stopPropagation()
+  console.log('🖱️ 复选框区域被点击:', { index, cellId: cell.id })
+}
+
+// 处理复选框变化
+function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
+  console.log('🔘 复选框 change 事件触发:', { index, cellId: cell.id, loading: loading.value })
+  
+  if (loading.value) {
+    console.warn('⏸️ 切换中，请稍候...')
+    return
+  }
+  
+  const target = event.target as HTMLInputElement
+  const isChecked = target.checked
+  const isCurrentlyActive = isModuleActive(cell, index)
+  
+  console.log('🔍 复选框状态检查:', {
+    isChecked,
+    isCurrentlyActive,
+    displayCellOrders: displayCellOrders.value,
+  })
+  
+  // 如果状态没有变化，不需要操作
+  if (isChecked === isCurrentlyActive) {
+    console.log('⏭️ 状态未变化，跳过操作')
+    return
+  }
+  
+  // 确定操作类型：如果勾选则添加，否则移除
+  const action: 'add' | 'remove' = isChecked ? 'add' : 'remove'
+  
+  console.log('☑️ 复选框状态变化:', {
+    index,
+    cellId: cell.id,
+    isChecked,
+    action,
+    cellType: cell.type,
+    cellOrder: cell.order,
+  })
+  
+  const cellId = getCellId(cell)
+  const cellOrder = cell.order !== undefined ? cell.order : index
+  
+  console.log('📤 准备发送导航事件:', {
+    cellId,
+    cellOrder,
+    action,
+    multiSelect: true,
+    cellIdType: typeof cellId,
+    isUUID: cellId && typeof cellId === 'string' ? isUUID(cellId) : false,
+  })
+  
+  // 发送导航事件（多选模式）
+  if (cellId && typeof cellId === 'string' && isUUID(cellId)) {
+    console.log('✅ 使用 cellOrder (UUID):', cellOrder)
+    handleControlBoardNavigate(null, cellOrder, action, true)
+  } else {
+    const numericId = toNumericId(cellId)
+    if (numericId) {
+      console.log('✅ 使用 numericId:', numericId)
+      handleControlBoardNavigate(numericId, null, action, true)
+    } else {
+      console.log('✅ 使用 cellOrder (fallback):', cellOrder)
+      handleControlBoardNavigate(null, cellOrder, action, true)
+    }
+  }
+  
+  console.log('✅ 导航事件已发送 (emit 调用完成)')
+}
+
+// 获取模块提示信息
+function getModuleTooltip(cell: Cell, index: number): string {
+  const typeLabel = getCellTypeLabel(cell.type)
+  const title = cell.title || `模块 ${index + 1}`
+  const isActiveCell = isModuleActive(cell, index)
+  const status = isActiveCell ? ' (已选中)' : ''
+  return `${index + 1}. ${title} - ${typeLabel}${status}`
+}
+
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  // 显示为"15分钟"格式
+  return `${minutes}分钟`
 }
 
 function formatRemainingTime(seconds: number): string {
@@ -598,10 +922,8 @@ async function handleCreateSession() {
           // 如果会话是pending状态，不自动开始，保持等待状态
           // 让教师手动点击"开始上课"按钮
           
-          // 开始计时和加载数据
-          if (session.value.status === 'active') {
-            startDurationTimer()
-          }
+          // 注意：不在这里自动启动计时器
+          // 只有在用户点击"开始上课"或"继续"按钮时才启动计时器
           loadParticipants()
           loadStatistics()
           
@@ -652,12 +974,10 @@ async function handleCreateSession() {
                 
                 // 如果会话是pending状态，不自动开始，保持等待状态
                 
-                // 开始计时和加载数据
-                if (session.value.status === 'active') {
-                  startDurationTimer()
-                }
-                loadParticipants()
-                loadStatistics()
+          // 注意：不在这里自动启动计时器
+          // 只有在用户点击"开始上课"或"继续"按钮时才启动计时器
+          loadParticipants()
+          loadStatistics()
                 
                 // 如果会话是 pending 状态，设置定时刷新学生列表
                 if (session.value.status === 'pending') {
@@ -754,9 +1074,14 @@ async function handleBeginClass() {
     }
     
     // 开始计时（新会话从0开始）
+    // 注意：计时器会通过 watch 监听 session.status 变化自动启动
+    // 这里确保状态正确即可，watch 会自动处理计时器启动
     if (session.value.status === 'active') {
       sessionDuration.value = 0  // 新会话从0开始
-      startDurationTimer()
+      // watch 会自动启动计时器，但为了确保立即启动，这里也调用一次
+      if (!durationInterval.value) {
+        startDurationTimer()
+      }
     }
     
     // 加载统计信息
@@ -1161,6 +1486,34 @@ function stopDurationTimer() {
   }
 }
 
+// 监听session状态变化，自动启动/停止计时器
+watch(() => session.value?.status, (status, oldStatus) => {
+  if (status === 'active') {
+    // 当状态变为 active 时，启动计时器
+    console.log('⏱️ 会话状态变为 active，启动计时器')
+    if (!durationInterval.value) {
+      // 如果计时器还没有启动
+      // 只有在从 pending 状态变为 active（新开始）时，才重置为0
+      // 如果是从 paused 恢复（继续），保持当前时长继续计时
+      if (oldStatus === 'pending' || sessionDuration.value === 0) {
+        sessionDuration.value = 0
+      }
+      startDurationTimer()
+    }
+  } else if (status === 'paused') {
+    // 当状态变为 paused 时，停止计时器（但保持当前时长）
+    console.log('⏸️ 会话状态变为 paused，停止计时器')
+    stopDurationTimer()
+  } else if (status === 'ended') {
+    // 当状态变为 ended 时，停止计时器
+    console.log('⏹️ 会话状态变为 ended，停止计时器')
+    stopDurationTimer()
+  } else {
+    // 其他状态（如 pending），停止计时器
+    stopDurationTimer()
+  }
+}, { immediate: true })
+
 // 监听session变化，更新selectedCellIndex和displayCellIds
 watch(() => session.value, (newSession) => {
   if (!props.lesson?.content || !newSession) return
@@ -1241,18 +1594,20 @@ async function ensureActivityCellExists(cell: Cell, order: number): Promise<numb
     })
     
     const { api } = await import('../../services/api')
+    // ActivityCell 有可选的 config 属性
+    const activityCell = cell as ActivityCell
     const cellCreateData = {
       lesson_id: props.lessonId,
       cell_type: 'ACTIVITY',  // 后端使用大写枚举值
       title: cell.title || '',
       content: cell.content || {},
-      config: cell.config || {},
+      config: activityCell.config || {},
       order: order,
       editable: cell.editable ?? false,
     }
     
     console.log('📤 发送创建 Cell 请求:', cellCreateData)
-    const createResponse = await api.post('/cells', cellCreateData)
+    const createResponse = await api.post<{ id: number | string }>('/cells', cellCreateData)
     const newCell = createResponse
     console.log('📥 创建 Cell 响应:', newCell)
     
@@ -1303,9 +1658,10 @@ onMounted(async () => {
       session.value = activeSessions[0]
       console.log('✅ 加载现有会话:', session.value)
       
-      if (session.value.status === 'active') {
-        startDurationTimer()
-      }
+      // 注意：只有在用户点击"开始上课"后才会启动计时器
+      // 这里不自动启动，因为可能是之前已经开始的会话，需要从服务器获取已用时长
+      // 如果会话是 active 状态，可以考虑从服务器获取已用时长，但暂时不自动启动计时器
+      // 让用户通过"开始上课"按钮明确控制
       
       // 加载学生列表和统计
       loadParticipants()
@@ -1367,7 +1723,837 @@ onUnmounted(() => {
 }
 
 .teacher-control-panel {
-  @apply bg-white rounded-lg border border-gray-200 p-6 space-y-6;
+  @apply bg-white rounded-lg border border-gray-200 p-6;
+  min-height: auto;
+}
+
+/* 顶部标题栏 */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+  @apply bg-white border border-gray-200 rounded-lg;
+}
+
+.panel-title {
+  font-size: 24px;
+  font-weight: bold;
+  @apply text-gray-900;
+  margin: 0;
+}
+
+.header-controls {
+  display: flex;
+  gap: 12px;
+}
+
+/* 主布局 - 三栏 */
+.main-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+/* 通用面板样式 */
+.panel {
+  @apply bg-white rounded-lg border border-gray-200 p-6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.panel h3.panel-title {
+  font-size: 18px;
+  font-weight: 600;
+  @apply text-gray-900;
+  margin: 0 0 20px 0;
+  padding-bottom: 12px;
+  @apply border-b border-gray-200;
+}
+
+/* 左侧：教学模块 */
+.teaching-modules {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 200px);
+  overflow: hidden;
+}
+
+.module-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  @apply border-b border-gray-200;
+}
+
+.module-count {
+  font-size: 12px;
+  @apply text-gray-600;
+}
+
+.module-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.module-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.module-list::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+  border-radius: 3px;
+}
+
+.module-list::-webkit-scrollbar-thumb {
+  @apply bg-gray-300;
+  border-radius: 3px;
+}
+
+.module-list::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}
+
+.module-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  padding-right: 60px; /* 为复选框预留空间 */
+  @apply bg-white border-2 border-gray-200 rounded-xl;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 80px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.module-item:hover:not(.module-item-disabled) {
+  @apply border-gray-300 shadow-lg;
+  transform: translateX(4px);
+}
+
+.module-item-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 不同类型模块的颜色主题 */
+.module-item-type-video {
+  @apply border-blue-200 bg-blue-50;
+}
+
+.module-item-type-video:hover:not(.module-item-disabled) {
+  @apply border-blue-300 bg-blue-100;
+}
+
+.module-item-type-text {
+  @apply border-gray-200 bg-gray-50;
+}
+
+.module-item-type-text:hover:not(.module-item-disabled) {
+  @apply border-gray-300 bg-gray-100;
+}
+
+.module-item-type-activity {
+  @apply border-purple-200 bg-purple-50;
+}
+
+.module-item-type-activity:hover:not(.module-item-disabled) {
+  @apply border-purple-300 bg-purple-100;
+}
+
+.module-item-type-code {
+  @apply border-green-200 bg-green-50;
+}
+
+.module-item-type-code:hover:not(.module-item-disabled) {
+  @apply border-green-300 bg-green-100;
+}
+
+.module-item-type-flowchart {
+  @apply border-indigo-200 bg-indigo-50;
+}
+
+.module-item-type-flowchart:hover:not(.module-item-disabled) {
+  @apply border-indigo-300 bg-indigo-100;
+}
+
+.module-item-type-qa {
+  @apply border-yellow-200 bg-yellow-50;
+}
+
+.module-item-type-qa:hover:not(.module-item-disabled) {
+  @apply border-yellow-300 bg-yellow-100;
+}
+
+/* 激活状态 */
+.module-item-active {
+  @apply shadow-xl ring-4 ring-offset-2;
+  transform: translateX(4px) scale(1.02);
+  z-index: 10;
+}
+
+.module-item-type-video.module-item-active {
+  @apply bg-blue-500 border-blue-600 ring-blue-300;
+}
+
+.module-item-type-text.module-item-active {
+  @apply bg-gray-600 border-gray-700 ring-gray-300;
+}
+
+.module-item-type-activity.module-item-active {
+  @apply bg-purple-500 border-purple-600 ring-purple-300;
+}
+
+.module-item-type-code.module-item-active {
+  @apply bg-green-500 border-green-600 ring-green-300;
+}
+
+.module-item-type-flowchart.module-item-active {
+  @apply bg-indigo-500 border-indigo-600 ring-indigo-300;
+}
+
+.module-item-type-qa.module-item-active {
+  @apply bg-yellow-500 border-yellow-600 ring-yellow-300;
+}
+
+/* 激活状态下的 hover 效果 - 保持深色背景以确保白色文字可见 */
+.module-item-type-video.module-item-active:hover:not(.module-item-disabled) {
+  @apply bg-blue-600 border-blue-700 ring-blue-400;
+}
+
+.module-item-type-text.module-item-active:hover:not(.module-item-disabled) {
+  @apply bg-gray-700 border-gray-800 ring-gray-400;
+}
+
+.module-item-type-activity.module-item-active:hover:not(.module-item-disabled) {
+  @apply bg-purple-600 border-purple-700 ring-purple-400;
+}
+
+.module-item-type-code.module-item-active:hover:not(.module-item-disabled) {
+  @apply bg-green-600 border-green-700 ring-green-400;
+}
+
+.module-item-type-flowchart.module-item-active:hover:not(.module-item-disabled) {
+  @apply bg-indigo-600 border-indigo-700 ring-indigo-400;
+}
+
+.module-item-type-qa.module-item-active:hover:not(.module-item-disabled) {
+  @apply bg-yellow-600 border-yellow-700 ring-yellow-400;
+}
+
+.module-item-hidden {
+  @apply bg-orange-50 border-orange-200;
+}
+
+.module-item-hidden:hover:not(.module-item-disabled) {
+  @apply bg-orange-100 border-orange-300;
+}
+
+.module-item-hidden.module-item-active {
+  @apply bg-orange-500 border-orange-600 ring-orange-300;
+}
+
+.module-item-hidden.module-item-active:hover:not(.module-item-disabled) {
+  @apply bg-orange-600 border-orange-700 ring-orange-400;
+}
+
+.module-item-number {
+  @apply absolute -top-3 -left-3 w-7 h-7 rounded-full;
+  @apply flex items-center justify-center text-xs font-bold;
+  @apply bg-white border-2 border-gray-300 text-gray-700;
+  @apply shadow-md;
+  z-index: 2;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.module-item-type-video .module-item-number {
+  @apply border-blue-400 text-blue-600;
+}
+
+.module-item-type-activity .module-item-number {
+  @apply border-purple-400 text-purple-600;
+}
+
+.module-item-type-code .module-item-number {
+  @apply border-green-400 text-green-600;
+}
+
+.module-item-type-flowchart .module-item-number {
+  @apply border-indigo-400 text-indigo-600;
+}
+
+.module-item-type-qa .module-item-number {
+  @apply border-yellow-400 text-yellow-600;
+}
+
+.module-item-active .module-item-number {
+  @apply bg-white scale-110 shadow-lg;
+}
+
+.module-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  @apply bg-white border border-gray-200 rounded-lg;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.module-item-active .module-item-icon {
+  @apply bg-white scale-110;
+  border-color: transparent;
+}
+
+.icon-text {
+  @apply text-gray-600;
+}
+
+.icon-video {
+  @apply text-blue-600;
+}
+
+.icon-activity {
+  @apply text-purple-600;
+}
+
+.icon-code {
+  @apply text-green-600;
+}
+
+.icon-flowchart {
+  @apply text-indigo-600;
+}
+
+.icon-qa {
+  @apply text-yellow-600;
+}
+
+.module-item-active .module-item-icon {
+  @apply text-white;
+}
+
+.module-item-content {
+  flex: 1;
+  min-width: 0;
+  padding-right: 8px; /* 额外预留一点空间 */
+  overflow: hidden; /* 确保文字不会溢出 */
+}
+
+.module-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  @apply text-gray-800;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+  max-width: 100%; /* 确保不超过容器 */
+}
+
+.module-item-subtitle {
+  font-size: 12px;
+  @apply text-gray-500;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%; /* 确保不超过容器 */
+}
+
+.module-item-active .module-item-title,
+.module-item-active .module-item-subtitle {
+  @apply text-white font-semibold;
+}
+
+
+.module-item-activity-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  @apply bg-purple-500 text-white rounded-full;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: pulse-badge 2s infinite;
+}
+
+/* 复选框样式 */
+.module-item-checkbox {
+  @apply absolute bottom-3 right-3 z-10;
+  @apply bg-white rounded-lg shadow-md p-1.5;
+  transition: all 0.3s ease;
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 确保复选框不会遮挡内容 */
+  pointer-events: auto;
+}
+
+.module-item-checkbox:hover {
+  @apply shadow-lg scale-110;
+  @apply bg-gray-50;
+}
+
+.checkbox-input {
+  @apply w-6 h-6 cursor-pointer;
+  @apply border-2 border-gray-400 rounded;
+  @apply focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.module-item-type-video .checkbox-input:checked {
+  accent-color: #3b82f6;
+}
+
+.module-item-type-activity .checkbox-input:checked {
+  accent-color: #a855f7;
+}
+
+.module-item-type-code .checkbox-input:checked {
+  accent-color: #22c55e;
+}
+
+.module-item-type-flowchart .checkbox-input:checked {
+  accent-color: #6366f1;
+}
+
+.module-item-type-qa .checkbox-input:checked {
+  accent-color: #eab308;
+}
+
+.checkbox-input:disabled {
+  @apply cursor-not-allowed opacity-50;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.module-empty {
+  text-align: center;
+  padding: 40px 20px;
+  @apply text-gray-500;
+}
+
+/* 中间：课堂监控 */
+.classroom-monitoring {
+  display: flex;
+  flex-direction: column;
+}
+
+.monitoring-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.student-indicators {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.indicator-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  @apply bg-gray-50 border border-gray-200 rounded-lg;
+  transition: all 0.2s ease;
+}
+
+.indicator-item:hover {
+  @apply bg-gray-100 border-gray-300;
+}
+
+.indicator-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  @apply border-2 border-gray-300;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.indicator-student-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.indicator-student-name {
+  @apply text-sm font-medium text-gray-900;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.indicator-student-account {
+  @apply text-xs text-gray-500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.indicator-empty-text {
+  @apply text-gray-400;
+}
+
+.indicator-green {
+  @apply bg-green-500 border-green-600;
+}
+
+.indicator-yellow {
+  @apply bg-yellow-500 border-yellow-600;
+}
+
+.indicator-red {
+  @apply bg-red-500 border-red-600;
+}
+
+.indicator-empty {
+  @apply bg-gray-200 border-gray-300;
+  opacity: 0.5;
+}
+
+/* 学生列表样式 */
+.student-list-extra {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  @apply border-t border-gray-200 pt-4;
+}
+
+.student-list-header {
+  margin-bottom: 12px;
+}
+
+.student-list-title {
+  @apply text-sm font-semibold text-gray-700;
+}
+
+.student-list-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.student-list-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.student-list-content::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+  border-radius: 2px;
+}
+
+.student-list-content::-webkit-scrollbar-thumb {
+  @apply bg-gray-300;
+  border-radius: 2px;
+}
+
+.student-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  @apply bg-gray-50 border border-gray-200 rounded-lg;
+  transition: all 0.2s ease;
+}
+
+.student-list-item:hover {
+  @apply bg-gray-100 border-gray-300;
+}
+
+.student-list-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.student-list-item.indicator-green .student-list-indicator {
+  @apply bg-green-500;
+}
+
+.student-list-item.indicator-yellow .student-list-indicator {
+  @apply bg-yellow-500;
+}
+
+.student-list-item.indicator-red .student-list-indicator {
+  @apply bg-red-500;
+}
+
+.student-list-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-list-name {
+  @apply text-sm font-medium text-gray-900;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-list-account {
+  @apply text-xs text-gray-500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-list-progress {
+  @apply text-xs font-semibold text-gray-600;
+  flex-shrink: 0;
+  min-width: 40px;
+  text-align: right;
+}
+
+.student-list-empty {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+  padding: 20px;
+  @apply text-gray-500 text-sm;
+  @apply border-t border-gray-200 pt-4;
+}
+
+.monitoring-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  @apply border-t border-gray-200 pt-4;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  @apply border-b border-gray-200;
+}
+
+.stat-row:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
+  @apply text-gray-600;
+  font-size: 14px;
+}
+
+.stat-value {
+  @apply text-gray-900;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* 右侧：实时数据 */
+.realtime-data {
+  display: flex;
+  flex-direction: column;
+}
+
+.data-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.data-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  @apply bg-gray-50 border border-gray-200 rounded-lg;
+}
+
+.data-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  @apply bg-white border border-gray-200 rounded-lg;
+  @apply text-gray-600;
+  flex-shrink: 0;
+}
+
+.data-icon-red {
+  @apply text-red-600;
+}
+
+.data-icon-green {
+  @apply text-green-600;
+}
+
+.data-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.data-label {
+  @apply text-gray-600;
+  font-size: 12px;
+}
+
+.data-value {
+  @apply text-gray-900;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.progress-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.progress-item {
+  height: 8px;
+  @apply bg-gray-200;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-purple {
+  background: linear-gradient(90deg, #a855f7 0%, #9333ea 100%);
+}
+
+.progress-lavender {
+  background: linear-gradient(90deg, #c084fc 0%, #a855f7 100%);
+}
+
+.progress-green {
+  background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+}
+
+/* 按钮样式 */
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-secondary {
+  @apply bg-gray-100 text-gray-700;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  @apply bg-gray-200;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+/* 活动统计面板样式 */
+.activity-panel {
+  margin-top: 24px;
+  @apply bg-white rounded-lg border border-gray-200 p-6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 响应式布局 */
+@media (max-width: 1200px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .panel {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .panel-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .header-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  
+  .module-buttons {
+    gap: 12px;
+  }
+  
+  .module-btn {
+    padding: 16px;
+  }
+  
+  .student-indicators {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  
+  .indicator-circle {
+    width: 40px;
+    height: 40px;
+  }
 }
 
 .session-status-bar {

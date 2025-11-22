@@ -22,9 +22,9 @@
     </div>
 
     <!-- 主要内容 -->
-    <div v-else-if="lesson" class="flex h-screen">
+    <div v-else-if="lesson" class="flex h-screen relative">
       <!-- 左侧：课程内容 -->
-      <div class="flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-y-auto" :class="{ 'transition-all duration-300': true }">
         <!-- 🔧 临时调试面板 -->
         <div v-if="isInClassroomMode" class="bg-yellow-50 border-b border-yellow-200 px-6 py-3 text-xs font-mono">
           <div class="flex items-center justify-between">
@@ -68,6 +68,31 @@
                 </div>
               </div>
               <div class="flex items-center gap-4">
+                <!-- 侧边栏切换按钮 -->
+                <button
+                  @click="toggleSidebar"
+                  class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  :title="sidebarVisible ? '隐藏学习空间' : '显示学习空间'"
+                >
+                  <svg 
+                    v-if="sidebarVisible" 
+                    class="w-5 h-5" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <svg 
+                    v-else 
+                    class="w-5 h-5" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
                 <!-- WebSocket 连接状态指示器 -->
                 <div v-if="isInClassroomMode" class="flex items-center gap-2 px-3 py-1.5 rounded-lg" :class="isWebSocketConnected ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'">
                   <div class="w-2 h-2 rounded-full" :class="isWebSocketConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'"></div>
@@ -199,7 +224,11 @@
       </div>
 
       <!-- 右侧：学习空间 -->
-      <div class="w-96 bg-white shadow-lg border-l border-gray-200 flex flex-col">
+      <Transition name="slide-sidebar">
+        <div 
+          v-if="sidebarVisible" 
+          class="w-96 bg-white shadow-lg border-l border-gray-200 flex flex-col relative z-20 flex-shrink-0"
+        >
         <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -208,7 +237,19 @@
               </svg>
               学习空间
             </h2>
-            <span class="text-xs text-gray-500">当前进度 {{ progress }}%</span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500">当前进度 {{ progress }}%</span>
+              <!-- 关闭按钮 -->
+              <button
+                @click="toggleSidebar"
+                class="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+                title="隐藏学习空间"
+              >
+                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div class="mt-3 flex gap-2">
             <button
@@ -271,7 +312,22 @@
             @append-note="appendNoteFromAssistant"
           />
         </div>
-      </div>
+        </div>
+      </Transition>
+      
+      <!-- 浮动按钮（侧边栏隐藏时显示） -->
+      <Transition name="fade">
+        <button
+          v-if="!sidebarVisible"
+          @click="toggleSidebar"
+          class="fixed right-4 bottom-4 z-30 p-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all hover:scale-110"
+          title="显示学习空间"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+        </button>
+      </Transition>
     </div>
 
     <!-- 提问表单弹窗 -->
@@ -332,6 +388,7 @@ const notes = ref('')
 const notesSaving = ref(false)
 const notesSaved = ref(false)
 const activeSidebarTab = ref<'notes' | 'assistant'>('notes')
+const sidebarVisible = ref(true) // 侧边栏显示状态，默认显示
 
 // 问答相关状态
 const showQuestionForm = ref(false)
@@ -828,6 +885,13 @@ const markAsCompleted = () => {
   saveCompletedCells()
 }
 
+// 切换侧边栏显示/隐藏
+const toggleSidebar = () => {
+  sidebarVisible.value = !sidebarVisible.value
+  // 可选：将状态保存到 localStorage，下次访问时恢复
+  localStorage.setItem('student_sidebar_visible', String(sidebarVisible.value))
+}
+
 // 🆕 监听 display_cell_orders 变化，自动更新学生进度
 watch(
   () => {
@@ -1048,7 +1112,13 @@ const handleQuestionSuccess = (_questionId: number) => {
 }
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
+  // 恢复侧边栏显示状态（从localStorage）
+  const savedSidebarVisible = localStorage.getItem('student_sidebar_visible')
+  if (savedSidebarVisible !== null) {
+    sidebarVisible.value = savedSidebarVisible === 'true'
+  }
+  
   loadLesson()
   loadQuestions()
   // 初始化 display_cell_ids 监听器
@@ -1075,5 +1145,49 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 侧边栏滑动动画 */
+.slide-sidebar-enter-active,
+.slide-sidebar-leave-active {
+  transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+.slide-sidebar-enter-from {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.slide-sidebar-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.slide-sidebar-enter-to,
+.slide-sidebar-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* 浮动按钮淡入淡出动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.fade-enter-from {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.fade-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+  transform: scale(1);
+}
+
 /* 🎓 学习科学优化：样式已移至 CellWrapper.vue 组件中 */
 </style>

@@ -60,6 +60,65 @@
         </div>
       </div>
 
+      <!-- 准备上课区域 -->
+      <div v-if="pendingSessions.length > 0" class="mb-8 rounded-2xl bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 shadow-2xl overflow-hidden">
+        <div class="p-6 md:p-8 text-white">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+              <span class="text-3xl animate-pulse">⏳</span>
+              <div>
+                <h2 class="text-2xl font-bold">准备上课</h2>
+                <p class="text-sm text-blue-100 mt-1">以下课程即将开始，请做好准备</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-sm text-blue-100">待开始课堂</div>
+              <div class="text-3xl font-bold">{{ pendingSessions.length }}</div>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div
+              v-for="session in pendingSessions"
+              :key="session.id"
+              class="bg-white/10 backdrop-blur-sm rounded-xl p-4 hover:bg-white/20 transition-all cursor-pointer border border-white/20"
+              @click="enterClassroom(session.lessonId)"
+            >
+              <div class="flex items-start justify-between mb-3">
+                <h3 class="font-semibold text-white text-lg line-clamp-2 flex-1">{{ session.lessonTitle || '未命名课程' }}</h3>
+              </div>
+              <div class="space-y-2 text-sm text-blue-100">
+                <div class="flex items-center gap-2">
+                  <span>👨‍🏫</span>
+                  <span>{{ session.teacherName || '未知教师' }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span>🏫</span>
+                  <span>{{ session.classroomName || '未知班级' }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span>👥</span>
+                  <span>{{ session.activeStudents || 0 }}/{{ session.totalStudents || 0 }} 人已加入</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span>⏰</span>
+                  <span>{{ formatTimeAgo(session.createdAt) }}</span>
+                </div>
+              </div>
+              <button
+                class="w-full mt-4 px-4 py-2 bg-white text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                @click.stop.prevent="enterClassroom(session.lessonId)"
+              >
+                <span>进入课堂</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 快捷入口 -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <button
@@ -447,14 +506,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { lessonService } from '@/services/lesson'
 import { curriculumService } from '@/services/curriculum'
 import { favoriteService } from '@/services/favorite'
+import classroomSessionService from '@/services/classroomSession'
 import type { Lesson } from '@/types/lesson'
 import type { Subject } from '@/types/curriculum'
+import type { StudentPendingSession } from '@/types/classroomSession'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import CurriculumTreeViewStudent from '@/components/Student/CurriculumTreeViewStudent.vue'
 
@@ -482,6 +543,12 @@ const selectedChapterName = ref<string>('') // 选中的章节名称
 
 // 学习进度数据（从localStorage获取）
 const progressData = ref<Record<number, number>>({})
+
+// 准备上课相关状态
+const pendingSessions = ref<StudentPendingSession[]>([])
+const loadingPendingSessions = ref(false)
+let pendingSessionsPollingInterval: ReturnType<typeof setInterval> | null = null
+const PENDING_SESSIONS_POLLING_INTERVAL = 5000 // 5秒轮询一次
 
 // 计算属性
 const currentUser = computed(() => userStore.user)
@@ -598,6 +665,9 @@ const fetchData = async () => {
     
     // 加载推荐课程
     await loadRecommendedLessons()
+    
+    // 加载待开始课堂
+    await loadPendingSessions()
   } catch (e: any) {
     error.value = e.message || '加载数据失败'
     console.error('Failed to fetch data:', e)
@@ -675,6 +745,138 @@ const viewLesson = (lessonId: number) => {
   router.push(`/student/lesson/${lessonId}`)
 }
 
+// 加载待开始课堂列表
+const loadPendingSessions = async () => {
+  // 只允许学生访问
+  if (currentUser.value?.role !== 'student') {
+    return
+  }
+  
+  loadingPendingSessions.value = true
+  try {
+    const sessions = await classroomSessionService.getStudentPendingSessions()
+    pendingSessions.value = sessions
+    console.log('📋 Loaded pending sessions:', sessions.length)
+  } catch (e: any) {
+    console.error('Failed to load pending sessions:', e)
+    // 如果是权限错误或其他错误,不显示错误提示
+    if (e.response?.status !== 403) {
+      console.warn('⚠️ Could not load pending sessions:', e.message)
+    }
+  } finally {
+    loadingPendingSessions.value = false
+  }
+}
+
+// 格式化时间（显示多久前）
+const formatTimeAgo = (dateString: string): string => {
+  if (!dateString) {
+    return '未知时间'
+  }
+  
+  // 处理后端返回的UTC时间字符串（可能没有时区信息）
+  let utcString = dateString.trim()
+  
+  // 检查是否已有时区信息（Z或+/-时区偏移）
+  const hasTimezone = utcString.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(utcString)
+  
+  if (!hasTimezone) {
+    // 如果没有时区信息，假设它是UTC时间并添加Z后缀
+    // 处理格式：YYYY-MM-DD HH:MM:SS 或 YYYY-MM-DDTHH:MM:SS
+    if (utcString.includes(' ')) {
+      // 空格格式转换为ISO格式
+      utcString = utcString.replace(' ', 'T') + 'Z'
+    } else if (utcString.includes('T')) {
+      // 已经是ISO格式，只需添加Z
+      utcString = utcString + 'Z'
+    } else {
+      // 其他格式，尝试解析后再处理
+      utcString = utcString + 'Z'
+    }
+  }
+  
+  // 解析为UTC时间
+  let date: Date
+  try {
+    date = new Date(utcString)
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date string:', dateString, '->', utcString)
+      return '未知时间'
+    }
+  } catch (e) {
+    console.error('Error parsing date:', dateString, e)
+    return '未知时间'
+  }
+  
+  const now = new Date()
+  
+  // 计算时间差（毫秒）
+  const diffMs = now.getTime() - date.getTime()
+  
+  // 如果时间差为负（未来时间），可能解析有误，返回"刚刚"
+  if (diffMs < 0) {
+    // 检查是否是因为时区问题导致的时间差异（小于24小时，可能是时区问题）
+    if (Math.abs(diffMs) < 24 * 60 * 60 * 1000) {
+      return '刚刚'
+    }
+    // 否则返回"未知时间"
+    return '未知时间'
+  }
+  
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  
+  if (diffMins < 1) {
+    return '刚刚'
+  } else if (diffMins < 60) {
+    return `${diffMins}分钟前`
+  } else if (diffHours < 24) {
+    return `${diffHours}小时前`
+  } else if (diffDays < 7) {
+    return `${diffDays}天前`
+  } else {
+    // 显示具体日期（转换为本地时间显示）
+    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+  }
+}
+
+// 进入课堂
+const enterClassroom = (lessonId: number) => {
+  // 跳转到课程页面，会自动加入会话
+  router.push(`/student/lesson/${lessonId}`)
+}
+
+// 开始轮询待开始课堂列表
+const startPendingSessionsPolling = () => {
+  // 只允许学生轮询
+  if (currentUser.value?.role !== 'student') {
+    return
+  }
+  
+  // 如果已经有轮询,先清除
+  if (pendingSessionsPollingInterval) {
+    clearInterval(pendingSessionsPollingInterval)
+  }
+  
+  // 立即加载一次
+  loadPendingSessions()
+  
+  // 设置定时轮询
+  pendingSessionsPollingInterval = setInterval(() => {
+    loadPendingSessions()
+  }, PENDING_SESSIONS_POLLING_INTERVAL)
+}
+
+// 停止轮询
+const stopPendingSessionsPolling = () => {
+  if (pendingSessionsPollingInterval) {
+    clearInterval(pendingSessionsPollingInterval)
+    pendingSessionsPollingInterval = null
+  }
+}
+
 // 查看章节的课程列表
 async function handleViewChapterLessons(chapterId: number) {
   // 切换到列表视图并筛选指定章节的课程
@@ -709,6 +911,13 @@ const handleLogout = () => {
 // 生命周期
 onMounted(() => {
   fetchData()
+  // 开始轮询待开始课堂列表
+  startPendingSessionsPolling()
+})
+
+onUnmounted(() => {
+  // 停止轮询
+  stopPendingSessionsPolling()
 })
 </script>
 

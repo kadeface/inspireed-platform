@@ -11,6 +11,7 @@ import type {
   NavigateToCellRequest,
   StartActivityRequest,
   SessionStatistics,
+  StudentPendingSession,
 } from '../types/classroomSession'
 
 export const classroomSessionService = {
@@ -171,6 +172,46 @@ export const classroomSessionService = {
       return session
     } catch (error: any) {
       console.error('❌ Get session error:', error)
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data,
+      })
+      throw error
+    }
+  },
+
+  /**
+   * 获取学生待开始的课堂列表（pending状态的会话）
+   */
+  async getStudentPendingSessions(): Promise<StudentPendingSession[]> {
+    try {
+      console.log('📋 Fetching student pending sessions...')
+      const response = await api.get('/classroom-sessions/student/pending-sessions')
+      console.log('📋 Student pending sessions response:', response)
+      
+      // 确保返回数组
+      const sessions = Array.isArray(response) ? response : []
+      console.log(`📋 Found ${sessions.length} pending sessions`)
+      
+      // 转换字段名：后端snake_case -> 前端camelCase
+      return sessions.map((s: any) => ({
+        id: s.id,
+        lessonId: s.lesson_id || s.lessonId,
+        lessonTitle: s.lesson_title || s.lessonTitle,
+        teacherId: s.teacher_id || s.teacherId,
+        teacherName: s.teacher_name || s.teacherName,
+        classroomId: s.classroom_id || s.classroomId,
+        classroomName: s.classroom_name || s.classroomName,
+        status: s.status,
+        createdAt: s.created_at || s.createdAt,
+        scheduledStart: s.scheduled_start || s.scheduledStart,
+        totalStudents: s.total_students || s.totalStudents || 0,
+        activeStudents: s.active_students || s.activeStudents || 0,
+      } as StudentPendingSession))
+    } catch (error: any) {
+      console.error('❌ Get student pending sessions error:', error)
       console.error('❌ Error details:', {
         message: error.message,
         response: error.response,

@@ -1,7 +1,52 @@
 <template>
   <div class="sim-cell cell-container">
+    <!-- Edit Mode - Simulation Type Selector (when no simulation selected) -->
+    <div v-if="editable && !hasSelectedSimulation && !showCustomUrlMode" class="sim-type-selector p-4">
+      <div class="selector-header mb-4 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold">{{ cell.title || '仿真演示' }}</h3>
+          <p class="text-sm text-gray-600 mt-1">选择仿真类型</p>
+        </div>
+      </div>
+
+      <!-- Simulation Type Tabs -->
+      <div class="sim-type-tabs mb-4 flex gap-2 border-b border-gray-200">
+        <button
+          @click="simMode = 'phet'"
+          :class="[
+            'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            simMode === 'phet'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          ]"
+        >
+          PhET 科学仿真
+        </button>
+        <button
+          @click="simMode = 'hardware'"
+          :class="[
+            'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            simMode === 'hardware'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          ]"
+        >
+          开源硬件仿真
+        </button>
+        <button
+          @click="showCustomUrlMode = true"
+          :class="[
+            'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            'border-transparent text-gray-600 hover:text-gray-900'
+          ]"
+        >
+          自定义URL
+        </button>
+      </div>
+    </div>
+
     <!-- Edit Mode - PhET Sim Selector -->
-    <div v-if="editable && !cell.content.phetSim && !cell.content.url && !showCustomUrlMode" class="phet-selector p-4">
+    <div v-if="editable && simMode === 'phet' && !cell.content.phetSim && !cell.content.url && !showCustomUrlMode" class="phet-selector p-4">
       <div class="selector-header mb-4 flex items-center justify-between">
         <div>
           <h3 class="text-lg font-semibold">{{ cell.title || '仿真演示' }}</h3>
@@ -15,10 +60,10 @@
             浏览更多仿真 →
           </button>
           <button
-            @click="showCustomUrlMode = true"
+            @click="simMode = null"
             class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
           >
-            自定义URL
+            ← 返回
           </button>
         </div>
       </div>
@@ -67,6 +112,137 @@
             </div>
           </div>
           <div class="card-overlay group-hover:opacity-100">
+            <span class="text-white font-medium">点击选择</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Mode - Hardware Sim Selector -->
+    <div v-if="editable && simMode === 'hardware' && !cell.content.hardwareSim && !cell.content.url && !showCustomUrlMode" class="hardware-selector p-4">
+      <div class="selector-header mb-4 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold">{{ cell.title || '仿真演示' }}</h3>
+          <p class="text-sm text-gray-600 mt-1">选择开源硬件仿真工具</p>
+        </div>
+        <div class="flex gap-2">
+          <button
+            @click="simMode = null"
+            class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            ← 返回
+          </button>
+        </div>
+      </div>
+
+      <!-- Hardware Category Filter -->
+      <div class="category-filter mb-4">
+        <div class="flex flex-wrap gap-2 mb-2">
+          <button
+            v-for="category in hardwareCategories"
+            :key="category.id"
+            @click="selectedHardwareCategory = category.id"
+            :class="[
+              'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+              selectedHardwareCategory === category.id
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            ]"
+          >
+            {{ category.name }}
+          </button>
+        </div>
+        <!-- Programming Type Filter -->
+        <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+          <span class="text-sm text-gray-600 self-center">编程方式：</span>
+          <button
+            @click="selectedProgrammingType = 'all'"
+            :class="[
+              'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+              selectedProgrammingType === 'all'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            ]"
+          >
+            全部
+          </button>
+          <button
+            @click="selectedProgrammingType = 'graphical'"
+            :class="[
+              'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+              selectedProgrammingType === 'graphical'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            ]"
+          >
+            🧩 图形化编程
+          </button>
+          <button
+            @click="selectedProgrammingType = 'code'"
+            :class="[
+              'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+              selectedProgrammingType === 'code'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            ]"
+          >
+            💻 代码编程
+          </button>
+        </div>
+      </div>
+
+      <!-- Hardware Simulation Grid -->
+      <div class="simulation-grid">
+        <div
+          v-for="sim in filteredHardwareSimulations"
+          :key="sim.id"
+          @click="selectHardwareSimulation(sim)"
+          class="sim-card group cursor-pointer border-green-200 hover:border-green-500"
+        >
+          <div class="card-content">
+            <div class="flex items-center gap-2 mb-1">
+              <h4 class="font-semibold text-base">{{ sim.nameCn }}</h4>
+              <span class="text-xs text-gray-500">({{ sim.name }})</span>
+              <span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                {{ sim.platform }}
+              </span>
+              <span 
+                v-if="sim.programmingType === 'graphical'"
+                class="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded"
+                title="图形化编程"
+              >
+                🧩 图形化
+              </span>
+              <span 
+                v-else-if="sim.programmingType === 'code'"
+                class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded"
+                title="代码编程"
+              >
+                💻 代码
+              </span>
+              <span 
+                v-else-if="sim.programmingType === 'both'"
+                class="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded"
+                title="支持图形化和代码编程"
+              >
+                🎨 图形化+代码
+              </span>
+            </div>
+            <p class="text-sm text-gray-600 line-clamp-2">{{ sim.descriptionCn }}</p>
+            <div class="tags mt-2">
+              <span
+                v-for="topic in sim.topics.slice(0, 3)"
+                :key="topic"
+                class="tag bg-green-50 text-green-700"
+              >
+                {{ topic }}
+              </span>
+            </div>
+            <div v-if="sim.features && sim.features.length > 0" class="features mt-2">
+              <p class="text-xs text-gray-500">特性：{{ sim.features.slice(0, 2).join('、') }}</p>
+            </div>
+          </div>
+          <div class="card-overlay group-hover:opacity-100 bg-green-600">
             <span class="text-white font-medium">点击选择</span>
           </div>
         </div>
@@ -156,13 +332,15 @@
       </div>
     </div>
 
-    <!-- Editor Mode - Selected PhET Sim -->
-    <div v-else-if="editable && (cell.content.phetSim || cell.content.url)" class="p-4">
+    <!-- Editor Mode - Selected Simulation -->
+    <div v-else-if="editable && (cell.content.phetSim || cell.content.hardwareSim || cell.content.url)" class="p-4">
       <div class="editor-header mb-4 flex items-center justify-between">
         <div>
-          <h3 class="text-lg font-semibold">{{ cell.title || selectedSimInfo?.nameCn || '仿真演示' }}</h3>
+          <h3 class="text-lg font-semibold">{{ cell.title || selectedSimInfo?.nameCn || selectedHardwareSimInfo?.nameCn || '仿真演示' }}</h3>
           <p class="text-sm text-gray-600">
-            {{ cell.content.phetSim ? selectedSimInfo?.descriptionCn : '自定义仿真URL' }}
+            {{ cell.content.phetSim ? selectedSimInfo?.descriptionCn : 
+               cell.content.hardwareSim ? selectedHardwareSimInfo?.descriptionCn : 
+               '自定义仿真URL' }}
           </p>
         </div>
         <button
@@ -244,6 +422,18 @@
         ></iframe>
       </div>
 
+      <!-- Hardware Simulation -->
+      <div v-else-if="cell.content.type === 'hardware' && hardwareSimulationUrl" class="sim-display">
+        <iframe
+          :src="hardwareSimulationUrl"
+          :width="cell.content.config.width || 1000"
+          :height="cell.content.config.height || 700"
+          frameborder="0"
+          allowfullscreen
+          class="rounded-lg shadow-lg w-full"
+        ></iframe>
+      </div>
+
       <!-- Generic Iframe -->
       <div v-else-if="cell.content.url" class="sim-display">
         <iframe
@@ -276,6 +466,13 @@ import {
   getPHETSimulationsByCategory,
   type PhETSimulation
 } from '../../data/phet-simulations'
+import {
+  HARDWARE_SIMULATIONS,
+  HARDWARE_CATEGORIES,
+  getHardwareSimulation,
+  getHardwareSimulationsByCategory,
+  type HardwareSimulation
+} from '../../data/hardware-simulations'
 
 interface Props {
   cell: SimCellType
@@ -290,10 +487,18 @@ const emit = defineEmits<{
   update: [cell: SimCellType]
 }>()
 
-// Category filter
+// Simulation mode: 'phet' | 'hardware' | null
+const simMode = ref<'phet' | 'hardware' | null>(null)
 const selectedCategory = ref<string>('all')
+const selectedHardwareCategory = ref<string>('all')
+const selectedProgrammingType = ref<'all' | 'graphical' | 'code'>('all')
 const showCustomUrlMode = ref(false)
 const customUrl = ref('')
+
+// Check if any simulation is selected
+const hasSelectedSimulation = computed(() => {
+  return !!(props.cell.content.phetSim || props.cell.content.hardwareSim || props.cell.content.url)
+})
 
 const categories = computed(() => {
   return [
@@ -315,12 +520,67 @@ const selectedSimInfo = computed(() => {
   return null
 })
 
+const selectedHardwareSimInfo = computed(() => {
+  if (props.cell.content.hardwareSim) {
+    return getHardwareSimulation(props.cell.content.hardwareSim)
+  }
+  return null
+})
+
+const hardwareCategories = computed(() => {
+  return [
+    { id: 'all', name: '全部' },
+    ...HARDWARE_CATEGORIES
+  ]
+})
+
+const filteredHardwareSimulations = computed(() => {
+  let result = getHardwareSimulationsByCategory(
+    selectedHardwareCategory.value === 'all' ? undefined : selectedHardwareCategory.value
+  )
+  
+  // Filter by programming type
+  if (selectedProgrammingType.value !== 'all') {
+    result = result.filter(sim => {
+      if (selectedProgrammingType.value === 'graphical') {
+        return sim.programmingType === 'graphical' || sim.programmingType === 'both'
+      } else if (selectedProgrammingType.value === 'code') {
+        return sim.programmingType === 'code' || sim.programmingType === 'both'
+      }
+      return true
+    })
+  }
+  
+  return result
+})
+
+// Hardware simulation URL
+const hardwareSimulationUrl = computed(() => {
+  if (props.cell.content.hardwareSim) {
+    const sim = getHardwareSimulation(props.cell.content.hardwareSim)
+    if (sim) {
+      // Use embedUrl if available, otherwise use url
+      return sim.embedUrl || sim.url
+    }
+  }
+  return props.cell.content.url
+})
+
 const localConfig = ref({ ...props.cell.content.config })
 
 // Watch for config changes
 watch(localConfig, () => {
   updateCell()
 }, { deep: true })
+
+// Auto-set simMode based on selected simulation
+watch(() => props.cell.content, (newContent) => {
+  if (newContent.phetSim) {
+    simMode.value = 'phet'
+  } else if (newContent.hardwareSim) {
+    simMode.value = 'hardware'
+  }
+}, { immediate: true })
 
 // Construct PhET simulation URL for view mode
 const simulationUrl = computed(() => {
@@ -350,8 +610,13 @@ const simulationUrl = computed(() => {
   return props.cell.content.url
 })
 
-// Editor mode simulation URL (handles both PhET and custom URLs)
+// Editor mode simulation URL (handles PhET, hardware, and custom URLs)
 const editorSimulationUrl = computed(() => {
+  // Hardware simulation
+  if (props.cell.content.hardwareSim) {
+    return hardwareSimulationUrl.value
+  }
+  
   // If it's a custom URL (iframe type or has url but no phetSim)
   if (props.cell.content.url && !props.cell.content.phetSim) {
     return props.cell.content.url
@@ -380,6 +645,25 @@ function selectSimulation(sim: PhETSimulation) {
   emit('update', updatedCell)
 }
 
+function selectHardwareSimulation(sim: HardwareSimulation) {
+  const updatedCell: SimCellType = {
+    ...props.cell,
+    content: {
+      type: 'hardware',
+      hardwareSim: sim.id,
+      hardwarePlatform: sim.platform,
+      hardwareCategory: sim.category,
+      config: {
+        width: 1000,
+        height: 700,
+        autoplay: false
+      }
+    }
+  }
+  
+  emit('update', updatedCell)
+}
+
 function changeSimulation() {
   // Reset to selection mode by clearing the simulation data
   const updatedCell: SimCellType = {
@@ -397,6 +681,7 @@ function changeSimulation() {
   // Reset custom URL state
   customUrl.value = ''
   showCustomUrlMode.value = false
+  simMode.value = null
   emit('update', updatedCell)
 }
 

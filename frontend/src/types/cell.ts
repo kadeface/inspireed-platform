@@ -72,10 +72,14 @@ export interface ParamCell extends CellBase {
 }
 
 export interface SimCellContent {
-  type: 'phet' | 'threejs' | 'matterjs' | 'iframe' | 'custom'
+  type: 'phet' | 'threejs' | 'matterjs' | 'iframe' | 'custom' | 'hardware'
   // PhET simulation
   phetSim?: string // PhET simulation name/ID
   phetCategory?: 'physics' | 'chemistry' | 'biology' | 'earth' | 'math'
+  // Hardware simulation
+  hardwareSim?: string // Hardware simulation ID (from hardware-simulations.ts)
+  hardwarePlatform?: 'wokwi' | 'tinkercad' | 'circuitjs' | 'custom'
+  hardwareCategory?: 'arduino' | 'esp32' | 'circuit' | 'microcontroller'
   // Generic iframe/URL
   url?: string
   // Simulation configuration

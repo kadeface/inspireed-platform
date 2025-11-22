@@ -8,6 +8,26 @@ from pydantic import BaseModel, Field
 
 from app.models.classroom_session import ClassSessionStatus
 
+__all__ = [
+    "ClassSessionBase",
+    "ClassSessionCreate",
+    "ClassSessionUpdate",
+    "ClassSessionResponse",
+    "ClassSessionWithDetails",
+    "StudentParticipationBase",
+    "StudentParticipationResponse",
+    "ClassroomEvent",
+    "NavigateToCellRequest",
+    "StartActivityRequest",
+    "StudentProgressUpdate",
+    "StartSessionRequest",
+    "PauseSessionRequest",
+    "ResumeSessionRequest",
+    "EndSessionRequest",
+    "SessionStatistics",
+    "StudentPendingSessionResponse",
+]
+
 
 # ========== 课堂会话 Schemas ==========
 
@@ -168,5 +188,28 @@ class SessionStatistics(BaseModel):
     completed_students: int
     average_progress: float
     students_by_progress: Dict[str, int]  # {"0-25%": 5, "25-50%": 10, ...}
+
+
+# ========== 学生待开始课堂 Schemas ==========
+
+
+class StudentPendingSessionResponse(BaseModel):
+    """学生待开始课堂响应（包含课程、教师、班级信息）"""
+
+    id: int
+    lesson_id: int
+    lesson_title: Optional[str] = None
+    teacher_id: int
+    teacher_name: Optional[str] = None
+    classroom_id: int
+    classroom_name: Optional[str] = None
+    status: ClassSessionStatus
+    created_at: datetime
+    scheduled_start: Optional[datetime] = None
+    total_students: int
+    active_students: int
+
+    class Config:
+        from_attributes = True
 
 
