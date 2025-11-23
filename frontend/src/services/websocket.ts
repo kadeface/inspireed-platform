@@ -2,6 +2,8 @@
  * WebSocket 服务
  */
 
+import { getServerBaseUrl } from '../utils/url'
+
 export interface WebSocketMessage {
   type: string
   timestamp: string
@@ -26,22 +28,54 @@ export class WebSocketService {
   /**
    * 连接 WebSocket
    */
-  connect(sessionId: number, token: string): Promise<void> {
+  connect(sessionId: number, token: string, timeout: number = 5000): Promise<void> {
     return new Promise((resolve, reject) => {
       // 构建 WebSocket URL
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
       
-      // 获取 API 基础 URL 并移除 /api/v1 后缀（如果存在）
-      let apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-      if (apiBase.endsWith('/api/v1')) {
-        apiBase = apiBase.replace('/api/v1', '')
-      }
-      
-      const wsBase = apiBase.replace('http://', '').replace('https://', '')
+      // 使用统一的服务器基础URL获取函数
+      const serverBaseUrl = getServerBaseUrl()
+      const wsBase = serverBaseUrl.replace('http://', '').replace('https://', '')
       
       this.url = `${wsProtocol}//${wsBase}/api/v1/classroom-sessions/sessions/${sessionId}/ws?token=${token}`
       
-      console.log('🔌 连接 WebSocket:', this.url.replace(token, '***'))
+      // 连接 WebSocket
+      
+      // 设置连接超时
+      let timeoutId: ReturnType<typeof setTimeout> | null = null
+      let isResolved = false
+      
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+          timeoutId = null
+        }
+      }
+      
+      const resolveOnce = () => {
+        if (!isResolved) {
+          isResolved = true
+          cleanup()
+          resolve()
+        }
+      }
+      
+      const rejectOnce = (error: any) => {
+        if (!isResolved) {
+          isResolved = true
+          cleanup()
+          reject(error)
+        }
+      }
+      
+      // 设置超时
+      timeoutId = setTimeout(() => {
+        if (this.ws) {
+          this.ws.close()
+          this.ws = null
+        }
+        rejectOnce(new Error(`WebSocket连接超时（${timeout}ms）`))
+      }, timeout)
       
       try {
         this.ws = new WebSocket(this.url)
@@ -49,10 +83,9 @@ export class WebSocketService {
         
         // 连接成功
         this.ws.onopen = () => {
-          console.log('✅ WebSocket 连接成功')
           this.reconnectAttempts = 0
           this.startHeartbeat()
-          resolve()
+          resolveOnce()
         }
         
         // 接收消息
@@ -67,7 +100,6 @@ export class WebSocketService {
         
         // 连接关闭
         this.ws.onclose = (event) => {
-          console.log('🔌 WebSocket 连接关闭:', event.code, event.reason)
           this.stopHeartbeat()
           
           // 如果不是手动关闭，尝试重连
@@ -79,12 +111,12 @@ export class WebSocketService {
         // 连接错误
         this.ws.onerror = (error) => {
           console.error('❌ WebSocket 错误:', error)
-          reject(error)
+          rejectOnce(error)
         }
         
       } catch (error) {
         console.error('❌ WebSocket 连接失败:', error)
-        reject(error)
+        rejectOnce(error)
       }
     })
   }
@@ -101,7 +133,7 @@ export class WebSocketService {
       this.ws = null
     }
     
-    console.log('🔌 WebSocket 已断开')
+    // WebSocket 已断开
   }
   
   /**
@@ -111,7 +143,7 @@ export class WebSocketService {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message))
     } else {
-      console.warn('⚠️ WebSocket 未连接，无法发送消息')
+      console.warn('WebSocket not connected, cannot send message')
     }
   }
   
@@ -138,7 +170,7 @@ export class WebSocketService {
    * 处理接收到的消息
    */
   private handleMessage(message: WebSocketMessage) {
-    console.log('📨 收到消息:', message.type, message.data)
+    // 收到消息
     
     // 触发对应类型的监听器
     if (this.eventListeners.has(message.type)) {
@@ -170,7 +202,7 @@ export class WebSocketService {
    */
   private reconnect(sessionId: number, token: string) {
     this.reconnectAttempts++
-    console.log(`🔄 尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
+    // 尝试重连
     
     setTimeout(() => {
       this.connect(sessionId, token).catch(error => {

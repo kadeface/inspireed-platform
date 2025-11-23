@@ -2,7 +2,7 @@
 课堂会话 API
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, cast
 import json
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -729,7 +729,10 @@ async def get_student_pending_sessions(
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """获取学生待开始的课堂列表（pending状态的会话）"""
+    """获取学生待开始的课堂列表（pending状态的会话）
+    
+    只返回最近48小时内创建的pending会话，避免显示过期的课程
+    """
 
     # 权限检查：仅学生可访问
     current_role = cast(UserRole, current_user.role)
@@ -742,11 +745,15 @@ async def get_student_pending_sessions(
         # 如果学生没有分配班级，返回空列表
         return []
 
-    # 查询学生所在班级的所有pending状态会话
+    # 计算48小时前的时间点
+    cutoff_time = datetime.utcnow() - timedelta(hours=48)
+
+    # 查询学生所在班级的最近48小时内的pending状态会话
     query = (
         select(ClassSession)
         .where(ClassSession.classroom_id == student_classroom_id)
         .where(ClassSession.status == ClassSessionStatus.PENDING)
+        .where(ClassSession.created_at >= cutoff_time)  # 只返回最近48小时内的会话
         .options(
             selectinload(ClassSession.lesson),
             selectinload(ClassSession.teacher),
@@ -977,54 +984,68 @@ async def websocket_endpoint(
     连接URL: ws://api/v1/classroom-sessions/sessions/{session_id}/ws?token={jwt}
     """
     
-    # 1. 验证Token并获取用户信息
-    try:
-        current_user = await deps.get_current_user_from_token(token, db)
-        if not current_user:
-            await websocket.close(code=1008, reason="Invalid token")
-            return
-    except Exception as e:
-        await websocket.close(code=1008, reason=f"Auth failed: {str(e)}")
-        return
+    print(f"🔌 WebSocket连接请求: session_id={session_id}, token_length={len(token) if token else 0}")
     
-    # 2. 验证用户角色（只允许学生连接，教师端使用HTTP API）
-    current_role = cast(UserRole, current_user.role)
-    if current_role != UserRole.STUDENT:
-        await websocket.close(code=1008, reason="Only students can connect via WebSocket")
-        return
-    
-    # 3. 验证会话存在性和权限
-    session = await db.get(ClassSession, session_id)
-    if not session:
-        await websocket.close(code=1008, reason="Session not found")
-        return
-    
-    # 🆕 检查会话状态
-    if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
-        await websocket.close(code=1008, reason="Session has ended")
-        return
-    
-    # 验证学生属于该班级
-    classroom_id = cast(int, session.classroom_id)
-    student_classroom_id = cast(Optional[int], current_user.classroom_id)
-    if student_classroom_id != classroom_id:
-        await websocket.close(code=1008, reason="Access denied")
-        return
-    
-    # 4. 接受连接
+    # 先接受连接，这样客户端才能收到关闭原因
     await websocket.accept()
-    student_id = cast(int, current_user.id)
-    
-    # 5. 注册连接
-    await manager.connect(websocket, session_id, student_id)
-    
-    # 6. 发送初始状态（当前会话状态）
-    await send_initial_state(websocket, session, db)
-    
-    # 7. 更新学生在线状态（数据库）
-    await update_student_online_status(db, session_id, student_id, is_online=True)
     
     try:
+        # 1. 验证Token并获取用户信息
+        try:
+            current_user = await deps.get_current_user_from_token(token, db)
+            if not current_user:
+                print(f"❌ Token验证失败: 用户不存在")
+                await websocket.close(code=1008, reason="Invalid token")
+                return
+            print(f"✅ Token验证成功: user_id={current_user.id}, role={current_user.role}")
+        except Exception as e:
+            print(f"❌ Token验证异常: {str(e)}")
+            await websocket.close(code=1008, reason=f"Auth failed: {str(e)}")
+            return
+        
+        # 2. 验证用户角色（只允许学生连接，教师端使用HTTP API）
+        current_role = cast(UserRole, current_user.role)
+        if current_role != UserRole.STUDENT:
+            print(f"❌ 角色验证失败: 只允许学生连接，当前角色={current_role}")
+            await websocket.close(code=1008, reason="Only students can connect via WebSocket")
+            return
+        
+        # 3. 验证会话存在性和权限
+        session = await db.get(ClassSession, session_id)
+        if not session:
+            print(f"❌ 会话不存在: session_id={session_id}")
+            await websocket.close(code=1008, reason="Session not found")
+            return
+        
+        # 🆕 检查会话状态
+        if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
+            print(f"❌ 会话已结束: session_id={session_id}, status={session.status}")
+            await websocket.close(code=1008, reason="Session has ended")
+            return
+        
+        # 验证学生属于该班级
+        classroom_id = cast(int, session.classroom_id)
+        student_classroom_id = cast(Optional[int], current_user.classroom_id)
+        if student_classroom_id != classroom_id:
+            print(f"❌ 权限验证失败: student_classroom_id={student_classroom_id}, session_classroom_id={classroom_id}")
+            await websocket.close(code=1008, reason="Access denied")
+            return
+        
+        print(f"✅ 所有验证通过，开始建立连接: session_id={session_id}, student_id={current_user.id}")
+        student_id = cast(int, current_user.id)
+        
+        # 5. 注册连接
+        await manager.connect(websocket, session_id, student_id)
+        print(f"✅ 连接已注册到管理器: session_id={session_id}, student_id={student_id}")
+        
+        # 6. 发送初始状态（当前会话状态）
+        await send_initial_state(websocket, session, db)
+        print(f"✅ 初始状态已发送: session_id={session_id}")
+        
+        # 7. 更新学生在线状态（数据库）
+        await update_student_online_status(db, session_id, student_id, is_online=True)
+        print(f"✅ 学生在线状态已更新: session_id={session_id}, student_id={student_id}")
+        
         # 8. 监听客户端消息
         while True:
             # 接收文本消息
@@ -1042,17 +1063,23 @@ async def websocket_endpoint(
     
     except WebSocketDisconnect:
         # 客户端主动断开
-        print(f"🔌 学生 {student_id} 断开连接（会话 {session_id}）")
+        print(f"🔌 学生断开连接（会话 {session_id}）")
     
     except Exception as e:
         # 异常断开
+        import traceback
         print(f"❌ WebSocket异常: {str(e)}")
+        print(traceback.format_exc())
     
     finally:
         # 9. 清理：移除连接、更新状态
-        await manager.disconnect(session_id, student_id)
-        await update_student_online_status(db, session_id, student_id, is_online=False)
-        print(f"✅ 学生 {student_id} 连接已清理（会话 {session_id}）")
+        try:
+            if 'student_id' in locals():
+                await manager.disconnect(session_id, student_id)
+                await update_student_online_status(db, session_id, student_id, is_online=False)
+                print(f"✅ 学生 {student_id} 连接已清理（会话 {session_id}）")
+        except Exception as e:
+            print(f"⚠️ 清理连接时出错: {str(e)}")
 
 
 async def send_initial_state(websocket: WebSocket, session: ClassSession, db: AsyncSession):

@@ -152,6 +152,7 @@
 import { ref, watch, onBeforeUnmount, computed } from 'vue'
 import type { VideoCell } from '../../types/cell'
 import api from '../../services/api'
+import { getServerBaseUrl } from '@/utils/url'
 
 interface Props {
   cell: VideoCell
@@ -303,7 +304,7 @@ async function handleFileUpload(event: Event) {
     let videoUrl = response.file_url
     if (videoUrl.startsWith('/uploads/')) {
       // 构建完整 URL
-      const baseURL = import.meta.env.VITE_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:8000'
+      const baseURL = getServerBaseUrl()
       videoUrl = `${baseURL}${videoUrl}`
     }
 

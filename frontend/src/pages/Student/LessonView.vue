@@ -37,7 +37,6 @@
               <span>🔢 第一个Cell的order: <strong>{{ lesson.content?.[0]?.order }}</strong></span>
             </div>
             <button 
-              @click="() => { console.log('完整状态:', { lesson: lesson.content, session: classroomSession, filtered: filteredCells }) }"
               class="px-2 py-1 bg-yellow-200 hover:bg-yellow-300 rounded text-xs"
             >
               打印完整状态
@@ -433,12 +432,6 @@ const progress = computed(() => {
       const checkedModules = displayOrders.length
       const totalModules = lesson.value.content.length
       const progressValue = Math.round((checkedModules / totalModules) * 100)
-      console.log('📊 课堂模式进度计算（基于勾选模块）:', {
-        checkedModules,
-        totalModules,
-        progressValue,
-        displayOrders,
-      })
       return progressValue
     }
   }
@@ -474,13 +467,6 @@ const filteredCells = computed(() => {
   
   if (currentState !== lastFilterState) {
     lastFilterState = currentState
-    console.log('🔍 过滤 Cells (状态变化):', {
-      totalCells: lesson.value.content.length,
-      isInClassroomMode: isInClassroomMode.value,
-      shouldSyncDisplay: shouldSyncDisplay.value,
-      displayCellId: displayCellId.value,
-      sessionStatus: classroomSession.value?.status,
-    })
   }
   
   // 如果不在课堂模式，显示所有Cell
@@ -492,48 +478,24 @@ const filteredCells = computed(() => {
   if (shouldSyncDisplay.value) {
     const settings = classroomSession.value?.settings
     
-    // 🔧 添加详细调试信息
-    console.log('🔍 shouldSyncDisplay = true, 检查 settings:', {
-      hasSettings: !!settings,
-      settings: settings,
-      display_cell_orders: settings?.display_cell_orders,
-      isArray: Array.isArray(settings?.display_cell_orders),
-      length: settings?.display_cell_orders?.length,
-    })
-    
     // 🆕 新方式：优先使用 display_cell_orders（推荐）
     const displayOrders = settings?.display_cell_orders
     if (displayOrders && Array.isArray(displayOrders)) {
       // 如果 displayOrders 是空数组，返回空数组（隐藏所有Cell）
       if (displayOrders.length === 0) {
-        console.log('⚠️ display_cell_orders 为空数组，隐藏所有 Cell')
         return []
       }
-      
-      console.log('✅ 学生端使用新方式 display_cell_orders:', displayOrders)
       
       // 直接根据 order 过滤，无需映射，无需 dbCells
       const filteredByOrders = lesson.value.content.filter((cell, index) => {
         const cellOrder = cell.order !== undefined ? cell.order : index
-        const isIncluded = displayOrders.includes(cellOrder)
-        if (!isIncluded) {
-          console.log(`🚫 隐藏 Cell: order=${cellOrder}, title=${cell.title || cell.type}`)
-        }
-        return isIncluded
-      })
-      
-      console.log('✅ 过滤结果（新方式）:', {
-        totalCells: lesson.value.content.length,
-        displayOrders: displayOrders,
-        filteredCount: filteredByOrders.length,
-        hiddenCount: lesson.value.content.length - filteredByOrders.length,
+        return displayOrders.includes(cellOrder)
       })
       
       return filteredByOrders
     }
     
     // 如果没有 display_cell_orders，返回空数组（隐藏所有Cell）
-    console.log('⚠️ 没有 display_cell_orders，返回空数组')
     return []
   }
   
@@ -752,22 +714,28 @@ const loadLesson = async () => {
     // 从服务器获取最新教案数据（不使用缓存）
     lesson.value = await lessonService.fetchLessonById(lessonId.value)
     
-    // 加载数据库中的 Cell 记录（用于 ID 匹配）
-    await loadDbCells()
-    
     // 检查教案版本是否更新
     checkLessonVersionUpdate()
     
-    // 加载该课程的完成状态
+    // 加载该课程的完成状态（这些是本地操作，不阻塞）
     loadCompletedCells()
     loadNotes()
     
-    // 尝试查找并加入课堂会话（session 会自动更新到 classroomSession）
-    await findAndJoinSession()
+    // 先显示页面内容，再异步加载其他数据
+    loading.value = false
+    
+    // 异步加载数据库中的 Cell 记录（用于 ID 匹配）
+    loadDbCells().catch(err => {
+      console.warn('加载Cell记录失败，但不影响页面显示:', err)
+    })
+    
+    // 异步查找并加入课堂会话（不阻塞页面显示）
+    findAndJoinSession().catch(err => {
+      console.warn('加入会话失败，但不影响页面显示:', err)
+    })
   } catch (e: any) {
     error.value = e.message || '加载课程失败'
     console.error('Failed to load lesson:', e)
-  } finally {
     loading.value = false
   }
 }
@@ -785,9 +753,7 @@ const initDisplayCellIdsWatcher = () => {
     () => classroomSession.value?.settings?.display_cell_ids, 
     async (newIds, oldIds) => {
       if (newIds && newIds.length > 0 && JSON.stringify(newIds) !== JSON.stringify(oldIds)) {
-        console.log('🔄 display_cell_ids 更新，重新加载 dbCells', { newIds, oldIds })
         await loadDbCells()
-        console.log('✅ dbCells 重新加载完成，当前记录数:', dbCells.value.length)
       }
     }, 
     { deep: true, immediate: false }
@@ -797,28 +763,10 @@ const initDisplayCellIdsWatcher = () => {
 // 加载数据库中的 Cell 记录
 const loadDbCells = async () => {
   try {
-    console.log('🔄 开始加载数据库 Cell 记录，lessonId:', lessonId.value)
     const response = await api.get(`/cells/lesson/${lessonId.value}`)
     dbCells.value = Array.isArray(response) ? response : ((response as any)?.data || [])
-    console.log('📦 加载数据库 Cell 记录成功:', {
-      count: dbCells.value.length,
-      cells: dbCells.value.map(c => ({ id: c.id, order: c.order, cell_type: c.cell_type }))
-    })
-    
-    // 如果加载成功但为空数组，发出警告
-    if (dbCells.value.length === 0) {
-      console.warn('⚠️ 数据库返回了空的 Cell 列表，可能原因：')
-      console.warn('  - 教案中的 Cell 还未保存到数据库')
-      console.warn('  - API 权限问题')
-      console.warn('  - 教案 ID 不正确')
-    }
   } catch (error: any) {
-    console.error('❌ 加载数据库 Cell 记录失败:', {
-      lessonId: lessonId.value,
-      error: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-    })
+    console.error('Failed to load cell records:', error)
     dbCells.value = []
   }
 }
@@ -838,8 +786,7 @@ const checkLessonVersionUpdate = () => {
       localStorage.removeItem(completedCellsKey)
       completedCells.value = new Set()
       
-      // 显示更新提示（可选）
-      console.log('教案内容已更新，版本号:', lesson.value.version)
+      // 教案已更新，清除旧的完成状态
     }
   }
   
@@ -906,12 +853,7 @@ watch(
     const oldOrdersStr = JSON.stringify(oldOrders || [])
     
     if (newOrdersStr !== oldOrdersStr && Array.isArray(newOrders)) {
-      console.log('📊 display_cell_orders 变化，更新学生进度:', {
-        newOrders,
-        oldOrders,
-        totalModules: lesson.value?.content.length || 0,
-      })
-      
+      // 更新学生进度
       // 计算已勾选的模块数
       const checkedModules = newOrders.length
       const totalModules = lesson.value?.content.length || 1

@@ -755,8 +755,37 @@ const loadPendingSessions = async () => {
   loadingPendingSessions.value = true
   try {
     const sessions = await classroomSessionService.getStudentPendingSessions()
-    pendingSessions.value = sessions
-    console.log('📋 Loaded pending sessions:', sessions.length)
+    
+    // 前端过滤：只保留最近48小时内的会话（双重保障）
+    const now = new Date()
+    const cutoffTime = new Date(now.getTime() - 48 * 60 * 60 * 1000) // 48小时前
+    
+    const filteredSessions = sessions.filter(session => {
+      if (!session.createdAt) {
+        return false // 没有创建时间的会话不显示
+      }
+      
+      // 解析创建时间
+      let createdAt: Date
+      try {
+        const dateString = session.createdAt.toString()
+        // 处理UTC时间字符串
+        if (dateString.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(dateString)) {
+          createdAt = new Date(dateString)
+        } else {
+          // 如果没有时区信息，假设是UTC
+          createdAt = new Date(dateString + 'Z')
+        }
+      } catch (e) {
+        console.warn('Failed to parse session created_at:', session.createdAt, e)
+        return false
+      }
+      
+      // 只返回48小时内的会话
+      return createdAt >= cutoffTime
+    })
+    
+    pendingSessions.value = filteredSessions
   } catch (e: any) {
     console.error('Failed to load pending sessions:', e)
     // 如果是权限错误或其他错误,不显示错误提示

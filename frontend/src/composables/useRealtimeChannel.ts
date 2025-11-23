@@ -4,6 +4,7 @@
  */
 import { ref, computed, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import { useUserStore } from '../store/user'
+import { getServerBaseUrl } from '../utils/url'
 
 export interface ChannelDescriptor {
   scope: 'session' | 'lesson'
@@ -61,13 +62,9 @@ export class RealtimeChannelManager {
       // 构建 WebSocket URL
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
       
-      // 获取 API 基础 URL 并移除 /api/v1 后缀（如果存在）
-      let apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-      if (apiBase.endsWith('/api/v1')) {
-        apiBase = apiBase.replace('/api/v1', '')
-      }
-      
-      const wsBase = apiBase.replace('http://', '').replace('https://', '')
+      // 使用统一的服务器基础URL获取函数
+      const serverBaseUrl = getServerBaseUrl()
+      const wsBase = serverBaseUrl.replace('http://', '').replace('https://', '')
       
       // 根据角色和通道类型选择端点
       let endpoint = ''
@@ -92,8 +89,7 @@ export class RealtimeChannelManager {
       
       this.url = `${wsProtocol}//${wsBase}${endpoint}?token=${token}`
       
-      console.log(`🔌 连接实时通道 [${isTeacher ? '教师' : '学生'}]:`, channel.scope, channel.id)
-      console.log(`🔗 WebSocket URL: ${this.url.replace(/token=.+$/, 'token=***')}`)
+      // 连接实时通道
       
       try {
         this.ws = new WebSocket(this.url)
@@ -101,9 +97,6 @@ export class RealtimeChannelManager {
         
         // 连接成功
         this.ws.onopen = () => {
-          console.log('✅ 实时通道连接成功')
-          console.log('  - readyState:', this.ws?.readyState)
-          console.log('  - isConnected:', this.isConnected)
           this.reconnectAttempts = 0
           this.startHeartbeat()
           resolve()
@@ -121,7 +114,6 @@ export class RealtimeChannelManager {
         
         // 连接关闭
         this.ws.onclose = (event) => {
-          console.log('🔌 实时通道连接关闭:', event.code, event.reason)
           this.stopHeartbeat()
           
           // 如果不是手动关闭，尝试重连
@@ -132,14 +124,12 @@ export class RealtimeChannelManager {
         
         // 连接错误
         this.ws.onerror = (error) => {
-          console.error('❌ 实时通道错误:', error)
-          console.error('❌ 连接 URL:', this.url.replace(/token=.+$/, 'token=***'))
-          console.error('❌ isTeacher:', isTeacher)
+          console.error('Realtime channel error:', error)
           reject(error)
         }
         
       } catch (error) {
-        console.error('❌ 实时通道连接失败:', error)
+        console.error('Failed to connect realtime channel:', error)
         reject(error)
       }
     })
@@ -161,7 +151,7 @@ export class RealtimeChannelManager {
     this.eventListeners.clear()
     this.processedMessages.clear()
     
-    console.log('🔌 实时通道已断开')
+    // 实时通道已断开
   }
 
   /**
@@ -193,18 +183,12 @@ export class RealtimeChannelManager {
    * 发送消息
    */
   send(message: any) {
-    console.log('📤 准备发送消息:', message.type)
-    console.log('  - ws 状态:', this.ws ? `readyState=${this.ws.readyState}` : 'null')
-    console.log('  - WebSocket.OPEN =', WebSocket.OPEN)
+    // 准备发送消息
     
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('✅ 发送消息')
       this.ws.send(JSON.stringify(message))
     } else {
-      console.warn('⚠️ 实时通道未连接，无法发送消息')
-      console.warn('  - this.ws:', this.ws)
-      console.warn('  - readyState:', this.ws?.readyState)
-      console.warn('  - URL:', this.url)
+      console.warn('Realtime channel not connected, cannot send message')
     }
   }
 
@@ -228,7 +212,7 @@ export class RealtimeChannelManager {
   private handleMessage(message: WebSocketMessage) {
     // 消息去重
     if (message.event_id && this.processedMessages.has(message.event_id)) {
-      console.log('⚠️ 重复消息已忽略:', message.event_id)
+      // 重复消息已忽略
       return
     }
     
@@ -243,7 +227,7 @@ export class RealtimeChannelManager {
       }
     }
     
-    console.log('📨 收到实时消息:', message.type, message.data)
+    // 收到实时消息
     
     // 触发对应类型的监听器
     if (this.eventListeners.has(message.type)) {
@@ -268,7 +252,7 @@ export class RealtimeChannelManager {
     }
     
     this.reconnectAttempts++
-    console.log(`🔄 尝试重连实时通道 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
+    // 尝试重连实时通道
     
     setTimeout(() => {
       this.connect(this.channelDescriptor!, this.token, this.isTeacher).catch(error => {

@@ -48,14 +48,8 @@ export function useClassroomSession(lessonId: number) {
         
         // 🆕 检查会话状态
         if (activeSession.status === 'ended') {
-          console.log('⏹️ 会话已结束，无法加入')
           alert('该课程已结束，无法加入')
           return
-        }
-        
-        // 🆕 如果是 pending 状态，提示学生等待
-        if (activeSession.status === 'pending') {
-          console.log('⏳ 会话处于等待状态，等待教师开始上课')
         }
         
         // 确保 settings 被正确设置
@@ -73,52 +67,36 @@ export function useClassroomSession(lessonId: number) {
         const displayCellIdsFromSession = (activeSession.settings as any)?.display_cell_ids || 
                                          (activeSession.settings as any)?.displayCellIds || []
         
-        console.log('🎓 找到活跃会话:', {
-          sessionId: activeSession.id,
-          status: activeSession.status,
-          currentCellId: cellId,
-          settings: activeSession.settings,
-          displayCellIds: displayCellIdsFromSession,
-          displayCellIdsLength: Array.isArray(displayCellIdsFromSession) ? displayCellIdsFromSession.length : 0,
-        })
-        
         // 尝试加入会话
         try {
           participation.value = await classroomSessionService.joinSession(activeSession.id)
-          console.log('✅ 成功加入会话:', participation.value)
         } catch (error: any) {
           // 🆕 检查是否因为会话已结束而失败
           if (error.response?.status === 400 && error.response?.data?.detail?.includes('已结束')) {
-            console.log('⏹️ 会话已结束')
             alert('该课程已结束，无法加入')
             session.value = null
             return
           }
           
           // 如果已经加入过（403或其他错误），继续使用会话
-          if (error.response?.status === 403) {
-            console.log('ℹ️ 已经加入过会话，继续使用')
-          } else {
-            console.error('❌ 加入会话失败:', error)
+          if (error.response?.status !== 403) {
+            console.error('Failed to join session:', error)
           }
         }
         
-        // 尝试建立 WebSocket 连接
+        // 尝试建立 WebSocket 连接（不阻塞，后台异步连接）
         if (useWebSocket.value) {
-          try {
-            await connectWebSocket(activeSession.id)
-          } catch (error) {
-            console.warn('⚠️ WebSocket 连接失败，降级到轮询模式')
+          // 异步连接WebSocket，不阻塞页面加载
+          connectWebSocket(activeSession.id).catch((error) => {
+            console.warn('⚠️ WebSocket 连接失败，降级到轮询模式:', error)
             startPolling()
-          }
+          })
         } else {
           // 不使用 WebSocket，直接使用轮询
           startPolling()
         }
         
         return activeSession
-      } else {
-        console.log('ℹ️ 未找到活跃会话')
       }
       
       return null
@@ -142,12 +120,7 @@ export function useClassroomSession(lessonId: number) {
         const newStatus = updatedSession.status
         
         if (oldStatus !== 'ended' && newStatus === 'ended') {
-          console.log('⏹️ 检测到会话已结束:', {
-            sessionId: updatedSession.id,
-            oldStatus,
-            newStatus,
-          })
-          
+          // 会话已结束
           // 更新会话状态
           session.value.status = 'ended'
           
@@ -192,23 +165,7 @@ export function useClassroomSession(lessonId: number) {
         const cellId = (updatedSession as any)?.current_cell_id ?? updatedSession.currentCellId ?? null
         currentCellId.value = cellId
         
-        // 只在有实际变化时记录日志，但如果有 displayCellIds 则总是记录
-        if (hasDisplayCellIdsChanged || hasCurrentCellIdChanged || session.value.status !== updatedSession.status || displayCellIdsArray.length > 0) {
-          console.log('🔄 会话状态已更新:', {
-            sessionId: updatedSession.id,
-            status: updatedSession.status,
-            currentCellId: cellId,
-            settings: rawSettings,
-            settingsKeys: Object.keys(rawSettings),
-            displayCellIds: displayCellIdsArray,
-            displayCellIdsLength: displayCellIdsArray.length,
-            displayCellIdsType: typeof displayCellIdsArray,
-            isArray: Array.isArray(displayCellIdsArray),
-            rawDisplayCellIds: displayCellIdsFromSettings,
-            hasDisplayCellIdsChanged,
-            hasCurrentCellIdChanged,
-          })
-        }
+        // 会话状态已更新
       }
     } catch (error) {
       console.error('❌ 刷新会话状态失败:', error)
@@ -227,7 +184,7 @@ export function useClassroomSession(lessonId: number) {
   function startPolling() {
     if (pollingInterval) return // 已经在轮询
     
-    console.log('🔄 开始轮询会话状态（每1秒）')
+    // 开始轮询会话状态
     pollingInterval = setInterval(() => {
       refreshSession()
     }, POLLING_INTERVAL)
@@ -238,7 +195,7 @@ export function useClassroomSession(lessonId: number) {
    */
   function stopPolling() {
     if (pollingInterval) {
-      console.log('⏹️ 停止轮询会话状态')
+      // 停止轮询会话状态
       clearInterval(pollingInterval)
       pollingInterval = null
     }
@@ -263,7 +220,7 @@ export function useClassroomSession(lessonId: number) {
       // 监听消息
       setupWebSocketListeners()
       
-      console.log('✅ WebSocket 连接已建立')
+      // WebSocket 连接已建立
     } catch (error) {
       console.error('❌ WebSocket 连接失败:', error)
       isWebSocketConnected.value = false
@@ -277,7 +234,7 @@ export function useClassroomSession(lessonId: number) {
   function setupWebSocketListeners() {
     // 1. 监听连接成功消息
     websocketService.on('connected', (message: WebSocketMessage) => {
-      console.log('🎉 WebSocket 已连接，接收初始状态:', message.data)
+      // WebSocket 已连接，接收初始状态
       
       // 更新会话状态
       if (message.data.current_state && session.value) {
@@ -293,17 +250,13 @@ export function useClassroomSession(lessonId: number) {
         session.value = newSession
         currentCellId.value = message.data.current_state.current_cell_id
         
-        console.log('🔧 初始状态已更新:', {
-          status: newSession.status,
-          displayCellOrders: newSession.settings?.display_cell_orders,
-          currentCellId: message.data.current_state.current_cell_id,
-        })
+        // 初始状态已更新
       }
     })
     
     // 2. 监听内容切换消息（核心）
     websocketService.on('cell_changed', (message: WebSocketMessage) => {
-      console.log('🔄 收到内容切换消息:', message.data)
+      // 收到内容切换消息
       
       if (session.value) {
         // 🔧 修复：创建新对象以触发 Vue 响应式更新
@@ -324,24 +277,16 @@ export function useClassroomSession(lessonId: number) {
         
         // 🔧 重新赋值整个 session 对象，确保响应式触发
         session.value = newSession
-        
-        console.log('✅ 内容已同步:', {
-          displayCellOrders: session.value.settings?.display_cell_orders,
-          currentCellId: currentCellId.value,
-        })
       }
     })
     
     // 3. 监听会话状态变化
     websocketService.on('session_status_changed', (message: WebSocketMessage) => {
-      console.log('📊 会话状态变化:', message.data)
-      
       if (session.value) {
         session.value.status = message.data.status
         
         // 如果会话结束，断开连接
         if (message.data.status === 'ended') {
-          console.log('⏹️ 会话已结束')
           disconnectWebSocket()
         }
       }
@@ -349,7 +294,6 @@ export function useClassroomSession(lessonId: number) {
     
     // 🆕 监听会话结束（教师主动结束课程或异常退出）
     websocketService.on('session_ended', (message: WebSocketMessage) => {
-      console.log('⏹️ 课程已结束:', message.data)
       
       if (session.value) {
         session.value.status = 'ended'
@@ -377,19 +321,17 @@ export function useClassroomSession(lessonId: number) {
     
     // 4. 监听活动开始
     websocketService.on('activity_started', (message: WebSocketMessage) => {
-      console.log('🎯 活动开始:', message.data)
       // TODO: 触发活动界面显示
     })
     
     // 5. 监听活动结束
     websocketService.on('activity_ended', (message: WebSocketMessage) => {
-      console.log('✅ 活动结束:', message.data)
       // TODO: 显示活动结果
     })
     
     // 6. 监听错误消息
     websocketService.on('error', (message: WebSocketMessage) => {
-      console.error('❌ 服务器错误:', message.data)
+      console.error('Server error:', message.data)
       // TODO: 显示错误提示
     })
   }

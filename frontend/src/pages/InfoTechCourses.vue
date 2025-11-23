@@ -18,7 +18,18 @@
     <main class="mx-auto max-w-6xl px-6 py-12 md:px-12 md:py-16">
       <section class="mb-10">
         <div class="flex items-center justify-between gap-4">
-          <h2 class="text-lg font-semibold text-slate-700">学科导航</h2>
+          <div class="flex items-center gap-4">
+            <h2 class="text-lg font-semibold text-slate-700">学科导航</h2>
+            <RouterLink
+              :to="{ name: 'Home' }"
+              class="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-4 py-1.5 text-sm font-medium text-slate-600 transition-all duration-200 hover:border-slate-400 hover:bg-slate-50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span>返回首页</span>
+            </RouterLink>
+          </div>
           <span v-if="subjects.length > 0" class="text-xs uppercase tracking-wide text-slate-400">
             点击任意学科即可查看对应课程
           </span>

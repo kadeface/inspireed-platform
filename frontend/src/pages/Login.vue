@@ -83,62 +83,74 @@
             </div>
           </RouterLink>
           <!-- 数学 -->
-          <div class="group cursor-pointer">
-            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-500 to-green-600 p-8 text-white shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+          <RouterLink
+            :to="{ name: 'SubjectCourses', params: { subjectCode: 'math' } }"
+            class="group block rounded-2xl focus:outline-none focus-visible:ring-4 focus-visible:ring-green-200"
+          >
+            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-500 to-green-600 p-8 text-white shadow-lg transition-all duration-300 transform group-hover:shadow-2xl group-hover:scale-105">
               <div class="text-center">
                 <div class="w-16 h-16 mx-auto mb-4 flex items-center justify-center text-5xl leading-none">📐</div>
                 <h4 class="text-xl font-bold mb-2">数学</h4>
                 <p class="text-sm text-green-100">Math</p>
               </div>
             </div>
-          </div>
+          </RouterLink>
 
-          
           <!-- 物理 -->
-          <div class="group cursor-pointer">
-            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-8 text-white shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+          <RouterLink
+            :to="{ name: 'SubjectCourses', params: { subjectCode: 'physics' } }"
+            class="group block rounded-2xl focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+          >
+            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-8 text-white shadow-lg transition-all duration-300 transform group-hover:shadow-2xl group-hover:scale-105">
               <div class="text-center">
                 <div class="w-16 h-16 mx-auto mb-4 flex items-center justify-center text-5xl leading-none">⚛️</div>
                 <h4 class="text-xl font-bold mb-2">物理</h4>
                 <p class="text-sm text-blue-100">Physics</p>
               </div>
             </div>
-          </div>
-
-
+          </RouterLink>
 
           <!-- 化学 -->
-          <div class="group cursor-pointer">
-            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 p-8 text-white shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+          <RouterLink
+            :to="{ name: 'SubjectCourses', params: { subjectCode: 'chemistry' } }"
+            class="group block rounded-2xl focus:outline-none focus-visible:ring-4 focus-visible:ring-purple-200"
+          >
+            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 p-8 text-white shadow-lg transition-all duration-300 transform group-hover:shadow-2xl group-hover:scale-105">
               <div class="text-center">
                 <div class="w-16 h-16 mx-auto mb-4 flex items-center justify-center text-5xl leading-none">🧪</div>
                 <h4 class="text-xl font-bold mb-2">化学</h4>
                 <p class="text-sm text-purple-100">Chemistry</p>
               </div>
             </div>
-          </div>
+          </RouterLink>
 
           <!-- 生物 -->
-          <div class="group cursor-pointer">
-            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-500 to-pink-600 p-8 text-white shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+          <RouterLink
+            :to="{ name: 'SubjectCourses', params: { subjectCode: 'biology' } }"
+            class="group block rounded-2xl focus:outline-none focus-visible:ring-4 focus-visible:ring-pink-200"
+          >
+            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-500 to-pink-600 p-8 text-white shadow-lg transition-all duration-300 transform group-hover:shadow-2xl group-hover:scale-105">
               <div class="text-center">
                 <div class="w-16 h-16 mx-auto mb-4 flex items-center justify-center text-5xl leading-none">🧬</div>
                 <h4 class="text-xl font-bold mb-2">生物</h4>
                 <p class="text-sm text-pink-100">Biology</p>
               </div>
             </div>
-          </div>
+          </RouterLink>
 
           <!-- 地球科学 -->
-          <div class="group cursor-pointer">
-            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-500 to-yellow-600 p-8 text-white shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+          <RouterLink
+            :to="{ name: 'SubjectCourses', params: { subjectCode: 'geography' } }"
+            class="group block rounded-2xl focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-200"
+          >
+            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-500 to-yellow-600 p-8 text-white shadow-lg transition-all duration-300 transform group-hover:shadow-2xl group-hover:scale-105">
               <div class="text-center">
                 <div class="w-16 h-16 mx-auto mb-4 flex items-center justify-center text-5xl leading-none">🌍</div>
                 <h4 class="text-xl font-bold mb-2">地球科学</h4>
                 <p class="text-sm text-yellow-100">Earth Science</p>
               </div>
             </div>
-          </div>
+          </RouterLink>
         </div>
       </div>
     </section>

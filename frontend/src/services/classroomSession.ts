@@ -20,23 +20,11 @@ export const classroomSessionService = {
    */
   async createSession(lessonId: number, data: { classroom_id: number; scheduled_start?: string }): Promise<ClassSession> {
     try {
-      console.log('📤 Creating session:', { lessonId, classroom_id: data.classroom_id })
-      console.log('📤 Request URL:', `/classroom-sessions/lessons/${lessonId}/sessions`)
-      console.log('📤 Request body:', {
-        lesson_id: lessonId,
-        classroom_id: data.classroom_id,
-        scheduled_start: data.scheduled_start,
-      })
-      
       const response = await api.post(`/classroom-sessions/lessons/${lessonId}/sessions`, {
         lesson_id: lessonId,
         classroom_id: data.classroom_id,
         scheduled_start: data.scheduled_start,
       })
-      
-      console.log('📥 Create session response received:', response)
-      console.log('📥 Response type:', typeof response)
-      console.log('📥 Response keys:', response ? Object.keys(response) : 'null/undefined')
       
       // api.post 已经返回 response.data，所以 response 就是数据本身
       // 检查响应数据
@@ -61,7 +49,7 @@ export const classroomSessionService = {
       // 如果响应使用 snake_case，可能需要转换，但目前直接返回
       // 确保返回的数据符合 ClassSession 接口
       const session = {
-        ...response,
+        ...(response as object),
         id: sessionId,
         // 处理可能的字段名差异
         lessonId: (response as any).lesson_id || (response as any).lessonId,
@@ -80,37 +68,10 @@ export const classroomSessionService = {
         updatedAt: (response as any).updated_at || (response as any).updatedAt,
       } as ClassSession
       
-      console.log('✅ Session created successfully:', session)
       return session
     } catch (error: any) {
-      console.error('❌ Create session error:', error)
-      console.error('❌ Error type:', typeof error)
-      console.error('❌ Error details:', {
-        message: error.message,
-        response: error.response,
-        status: error.response?.status,
-        data: error.response?.data,
-        stack: error.stack,
-      })
-      
-      // 如果是 HTTP 错误，保持原有错误信息
-      if (error.response) {
-        console.error('❌ HTTP Error Response:', {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data,
-          headers: error.response.headers,
-        })
-        throw error
-      }
-      // 如果是我们抛出的错误，直接抛出
-      if (error.message) {
-        console.error('❌ Error message:', error.message)
-        throw error
-      }
-      // 其他错误，包装一下
-      console.error('❌ Unknown error format:', error)
-      throw new Error(`创建会话失败：${error.message || '未知错误'}`)
+      console.error('Failed to create session:', error)
+      throw error
     }
   },
 
@@ -119,10 +80,10 @@ export const classroomSessionService = {
    */
   async getSession(sessionId: number): Promise<ClassSession> {
     try {
-      console.log('📥 Getting session:', sessionId)
+      // 获取会话
       // api.get 已经返回 response.data，所以 response 就是数据本身
       const response = await api.get(`/classroom-sessions/sessions/${sessionId}`)
-      console.log('📥 Get session response:', response)
+      // 获取会话响应
       
       if (!response) {
         throw new Error('获取会话失败：服务器未返回数据')
@@ -131,16 +92,9 @@ export const classroomSessionService = {
       // 确保 settings 对象存在
       const rawSettings = (response as any).settings || {}
       
-      console.log('📥 Get session - settings 详情:', {
-        hasSettings: !!rawSettings,
-        settingsKeys: Object.keys(rawSettings),
-        displayCellOrders: rawSettings.display_cell_orders,
-        rawSettings: rawSettings,
-      })
-      
       // 处理字段映射（snake_case 到 camelCase）
       const session = {
-        ...response,
+        ...(response as object),
         id: (response as any).id,
         lessonId: (response as any).lesson_id || (response as any).lessonId,
         classroomId: (response as any).classroom_id || (response as any).classroomId,
@@ -162,13 +116,6 @@ export const classroomSessionService = {
         teacherName: (response as any).teacher_name || (response as any).teacherName,
       } as ClassSession
       
-      console.log('✅ Session loaded:', {
-        id: session.id,
-        status: session.status,
-        currentCellId: session.currentCellId,
-        settings: session.settings,
-        displayCellIds: (session.settings as any)?.display_cell_ids || (session.settings as any)?.displayCellIds,
-      })
       return session
     } catch (error: any) {
       console.error('❌ Get session error:', error)
@@ -187,13 +134,10 @@ export const classroomSessionService = {
    */
   async getStudentPendingSessions(): Promise<StudentPendingSession[]> {
     try {
-      console.log('📋 Fetching student pending sessions...')
       const response = await api.get('/classroom-sessions/student/pending-sessions')
-      console.log('📋 Student pending sessions response:', response)
       
       // 确保返回数组
       const sessions = Array.isArray(response) ? response : []
-      console.log(`📋 Found ${sessions.length} pending sessions`)
       
       // 转换字段名：后端snake_case -> 前端camelCase
       return sessions.map((s: any) => ({
@@ -308,7 +252,7 @@ export const classroomSessionService = {
    */
   async navigateToCell(sessionId: number, data: NavigateToCellRequest): Promise<ClassSession> {
     try {
-      console.log('🎯 导航到 Cell:', { sessionId, data })
+      // 导航到 Cell
       const requestData: any = {}
       if (data.cellId !== undefined) {
         requestData.cell_id = data.cellId
@@ -327,7 +271,7 @@ export const classroomSessionService = {
         requestData.display_cell_orders = data.displayCellOrders
       }
       const response = await api.post(`/classroom-sessions/sessions/${sessionId}/navigate`, requestData)
-      console.log('✅ 导航响应:', response)
+      // 导航响应
       
       // 检查响应是否为空或格式不正确
       if (!response || typeof response !== 'object') {
@@ -339,14 +283,17 @@ export const classroomSessionService = {
       const settings = (response as any).settings || {}
       
       // 调试日志：检查 settings
-      console.log('📥 Navigate response data:', {
+      // Navigate response data
+      if (false) { // 调试代码已禁用
+        console.log('📥 Navigate response data:', {
         hasSettings: !!settings,
         settingsKeys: Object.keys(settings),
         displayCellOrders: settings.display_cell_orders,
       })
+      }
       
       const session = {
-        ...response,
+        ...(response as object),
         id: (response as any).id,
         lessonId: (response as any).lesson_id || (response as any).lessonId,
         classroomId: (response as any).classroom_id || (response as any).classroomId,
@@ -444,12 +391,15 @@ export const classroomSessionService = {
           studentEmail: p.student_email || p.studentEmail,
         }
         
-        console.log('✅ 处理后的参与者:', {
+        // 处理后的参与者
+        if (false) { // 调试代码已禁用
+          console.log('✅ 处理后的参与者:', {
           id: participant.id,
           studentName: participant.studentName,
           isActive: participant.isActive,
           studentId: participant.studentId,
         })
+        }
         
         return participant
       })
@@ -470,10 +420,10 @@ export const classroomSessionService = {
    */
   async joinSession(sessionId: number): Promise<StudentParticipation> {
     try {
-      console.log('👤 加入会话:', sessionId)
+      // 加入会话
       // api.post 已经返回 response.data，所以 response 就是数据本身
       const response = await api.post(`/classroom-sessions/sessions/${sessionId}/join`)
-      console.log('✅ 加入会话响应:', response)
+      // 加入会话响应
       
       if (!response) {
         throw new Error('加入会话失败：服务器未返回数据')
@@ -481,7 +431,7 @@ export const classroomSessionService = {
       
       // 处理字段映射（如果需要）
       const participation = {
-        ...response,
+        ...(response as object),
         id: (response as any).id,
         sessionId: (response as any).session_id || (response as any).sessionId,
         studentId: (response as any).student_id || (response as any).studentId,
