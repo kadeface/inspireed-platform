@@ -58,6 +58,7 @@
         &lt;/&gt;
       </button>
       <button @click="triggerImageUpload" class="menu-btn">🖼️ Image</button>
+      <button @click="triggerFileUpload" class="menu-btn">📎 File</button>
       <input
         ref="imageInput"
         type="file"
@@ -65,9 +66,15 @@
         @change="handleImageUpload"
         style="display: none"
       />
+      <input
+        ref="fileInput"
+        type="file"
+        @change="handleFileUpload"
+        style="display: none"
+      />
     </div>
     <editor-content :editor="editor" class="editor-content" />
-    <div v-if="isUploadingImage" class="upload-status">
+    <div v-if="isUploadingImage || isUploadingFile" class="upload-status">
       <p class="text-sm text-gray-600">上传中... {{ uploadProgress }}%</p>
     </div>
   </div>
@@ -135,6 +142,85 @@ const editor = useEditor({
       return match
     })
     
+    // 替换PDF和文件组件中的完整URL为相对路径
+    html = html.replace(/<div\s+class="(pdf|file)-attachment[^"]*"[^>]*>/gi, (match) => {
+      // 提取data-pdf-url或data-file-url属性
+      const urlMatch = match.match(/data-(pdf|file)-url\s*=\s*(["'])([^"']+)\2/i)
+      if (urlMatch) {
+        const quote = urlMatch[2]
+        let url = urlMatch[3]
+        
+        // 如果URL包含完整地址，提取相对路径
+        if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('http')) {
+          try {
+            const urlObj = new URL(url)
+            const relativePath = urlObj.pathname
+            const newUrlAttr = `data-${urlMatch[1]}-url=${quote}${relativePath}${quote}`
+            return match.replace(urlMatch[0], newUrlAttr)
+          } catch {
+            // URL解析失败，尝试直接提取路径
+            const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
+            if (pathMatch) {
+              const newUrlAttr = `data-${urlMatch[1]}-url=${quote}${pathMatch[0]}${quote}`
+              return match.replace(urlMatch[0], newUrlAttr)
+            }
+          }
+        }
+      }
+      return match
+    })
+    
+    // 替换PDF查看按钮中的data-pdf-view-url属性为相对路径
+    html = html.replace(/data-pdf-view-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
+      if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('http')) {
+        try {
+          const urlObj = new URL(url)
+          const relativePath = urlObj.pathname
+          return `data-pdf-view-url=${quote}${relativePath}${quote}`
+        } catch {
+          const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
+          if (pathMatch) {
+            return `data-pdf-view-url=${quote}${pathMatch[0]}${quote}`
+          }
+        }
+      }
+      return match
+    })
+    
+    // 替换文件下载链接中的href为相对路径
+    html = html.replace(/href\s*=\s*(["'])([^"']+)\1[^>]*download/gi, (match, quote, url) => {
+      if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('http')) {
+        try {
+          const urlObj = new URL(url)
+          const relativePath = urlObj.pathname
+          return `href=${quote}${relativePath}${quote} download`
+        } catch {
+          const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
+          if (pathMatch) {
+            return `href=${quote}${pathMatch[0]}${quote} download`
+          }
+        }
+      }
+      return match
+    })
+    
+    // 替换data-file-download-url属性为相对路径
+    html = html.replace(/data-file-download-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
+      if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('http')) {
+        try {
+          const urlObj = new URL(url)
+          const relativePath = urlObj.pathname
+          return `data-file-download-url=${quote}${relativePath}${quote}`
+        } catch {
+          const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
+          if (pathMatch) {
+            return `data-file-download-url=${quote}${pathMatch[0]}${quote}`
+          }
+        }
+      }
+      return match
+    })
+    
     emit('update', html)
   },
   editorProps: {
@@ -154,12 +240,18 @@ watch(
 )
 
 const imageInput = ref<HTMLInputElement | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 const isUploadingImage = ref(false)
+const isUploadingFile = ref(false)
 const uploadProgress = ref(0)
 
 function triggerImageUpload() {
   // 直接触发文件选择，优先使用本地图片上传
   imageInput.value?.click()
+}
+
+function triggerFileUpload() {
+  fileInput.value?.click()
 }
 
 // 添加通过URL插入图片的功能（可以通过右键菜单或其他方式调用）
@@ -300,6 +392,122 @@ async function handleImageUpload(event: Event) {
   }
 }
 
+// 文件上传处理（支持所有文件类型，包括PDF）
+async function handleFileUpload(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file || !editor.value) {
+    return
+  }
+
+  // 验证文件大小（限制为500MB）
+  const maxSize = 500 * 1024 * 1024 // 500MB
+  if (file.size > maxSize) {
+    alert('文件大小不能超过500MB')
+    return
+  }
+
+  isUploadingFile.value = true
+  uploadProgress.value = 0
+
+  try {
+    // 准备上传到服务器
+    const formData = new FormData()
+    formData.append('file', file)
+
+    // 上传文件
+    const response = await api.post<{
+      file_url: string
+      file_size: number
+      filename: string
+    }>('/upload/', formData, {
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          uploadProgress.value = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        }
+      },
+      timeout: 300000, // 5分钟超时
+    })
+
+    // 获取相对路径（与图片上传保持一致，api服务已经返回数据对象）
+    const fileUrl = response.file_url
+    const filename = response.filename || file.name
+    
+    // 构建下载URL
+    const downloadUrl = fileUrl.startsWith('/uploads/') 
+      ? `${getServerBaseUrl()}${fileUrl}`
+      : fileUrl
+
+    // 获取文件图标和类型
+    const fileIcon = getFileIcon(filename)
+    const isPDF = filename.toLowerCase().endsWith('.pdf')
+    
+    // 在编辑器中插入文件下载/查看组件
+    // 使用相对路径保存，在查看时动态构建完整URL
+    const fileHtml = `
+      <div class="file-attachment" data-file-url="${fileUrl}" data-file-filename="${filename}">
+        <div class="file-preview-card">
+          <div class="file-icon">${fileIcon}</div>
+          <div class="file-info">
+            <div class="file-filename">${filename}</div>
+            <div class="file-size">${formatFileSize(response.file_size)}</div>
+          </div>
+          <div class="file-actions">
+            ${isPDF ? `<button class="file-view-btn" onclick="window.open('${downloadUrl}', '_blank')">查看</button>` : ''}
+            <a href="${downloadUrl}" download="${filename}" class="file-download-btn">下载</a>
+          </div>
+        </div>
+      </div>
+    `
+
+    // 插入HTML
+    editor.value.chain().focus().insertContent(fileHtml).run()
+
+    uploadProgress.value = 100
+  } catch (error: any) {
+    console.error('文件上传失败:', error)
+    alert(error.response?.data?.detail || error.message || '文件上传失败，请稍后重试')
+  } finally {
+    isUploadingFile.value = false
+    uploadProgress.value = 0
+    // 清空文件输入
+    if (target) {
+      target.value = ''
+    }
+  }
+}
+
+// 格式化文件大小
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+}
+
+// 根据文件扩展名获取图标
+function getFileIcon(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || ''
+  const iconMap: Record<string, string> = {
+    'pdf': '📄',
+    'doc': '📝',
+    'docx': '📝',
+    'xls': '📊',
+    'xlsx': '📊',
+    'ppt': '📊',
+    'pptx': '📊',
+    'zip': '📦',
+    'rar': '📦',
+    'txt': '📄',
+    'md': '📄',
+    'mp4': '🎬',
+    'avi': '🎬',
+    'mov': '🎬',
+  }
+  return iconMap[ext] || '📎'
+}
+
 onBeforeUnmount(() => {
   editor.value?.destroy()
 })
@@ -356,6 +564,50 @@ onBeforeUnmount(() => {
 
 :deep(.ProseMirror img) {
   @apply max-w-full h-auto rounded;
+}
+
+:deep(.ProseMirror .file-attachment) {
+  @apply my-6 border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm;
+}
+
+:deep(.ProseMirror .file-preview-card) {
+  @apply flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-200;
+}
+
+:deep(.ProseMirror .file-actions) {
+  @apply flex items-center gap-2;
+}
+
+:deep(.ProseMirror .pdf-icon),
+:deep(.ProseMirror .file-icon) {
+  @apply text-3xl flex-shrink-0;
+}
+
+:deep(.ProseMirror .pdf-info),
+:deep(.ProseMirror .file-info) {
+  @apply flex-1 min-w-0;
+}
+
+:deep(.ProseMirror .pdf-filename),
+:deep(.ProseMirror .file-filename) {
+  @apply font-medium text-gray-900 truncate;
+}
+
+:deep(.ProseMirror .pdf-size),
+:deep(.ProseMirror .file-size) {
+  @apply text-sm text-gray-500 mt-1;
+}
+
+:deep(.ProseMirror .file-view-btn),
+:deep(.ProseMirror .file-download-btn) {
+  @apply px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm font-medium flex-shrink-0 shadow-sm hover:shadow;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+}
+
+:deep(.ProseMirror .file-view-btn) {
+  @apply bg-green-500 hover:bg-green-600;
 }
 
 .upload-status {

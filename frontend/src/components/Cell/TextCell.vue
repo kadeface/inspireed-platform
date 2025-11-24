@@ -224,11 +224,78 @@ const sanitizedHtml = computed(() => {
     })
   }
   
-  // 配置DOMPurify允许图片标签
+  // 处理PDF和文件附件中的URL
+  html = html.replace(/<div\s+class="(pdf|file)-attachment[^"]*"[^>]*>/gi, (match) => {
+    // 提取data-pdf-url或data-file-url属性
+    const urlMatch = match.match(/data-(pdf|file)-url\s*=\s*(["'])([^"']+)\2/i)
+    if (urlMatch) {
+      const quote = urlMatch[2]
+      let url = urlMatch[3]
+      let newUrl = url
+      
+      // 如果是相对路径，转换为绝对URL
+      if (url.startsWith('/') && !url.startsWith('//')) {
+        newUrl = `${baseURL}${url}`
+      } else if (!url.startsWith('http') && !url.startsWith('//')) {
+        newUrl = `${baseURL}/${url.startsWith('/') ? url.slice(1) : url}`
+      }
+      
+      if (newUrl !== url) {
+        const newUrlAttr = `data-${urlMatch[1]}-url=${quote}${url}${quote}`
+        const newMatch = match.replace(urlMatch[0], newUrlAttr)
+        return newMatch
+      }
+    }
+    return match
+  })
+  
+  // 处理文件查看按钮的onclick
+  html = html.replace(/<button[^>]*class="file-view-btn"[^>]*onclick="window\.open\('([^']+)'[^)]*\)"[^>]*>/gi, (match, url) => {
+    let newUrl = url
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      newUrl = `${baseURL}${url}`
+    } else if (!url.startsWith('http') && !url.startsWith('//')) {
+      newUrl = `${baseURL}/${url.startsWith('/') ? url.slice(1) : url}`
+    }
+    if (newUrl !== url) {
+      return match.replace(/window\.open\('([^']+)'/gi, `window.open('${newUrl}'`)
+    }
+    return match
+  })
+  
+  // 处理文件下载链接：将相对路径转换为完整URL
+  html = html.replace(/<a[^>]*class="file-download-btn"[^>]*href\s*=\s*(["'])([^"']+)\1[^>]*>/gi, (match, quote, url) => {
+    let newUrl = url
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      newUrl = `${baseURL}${url}`
+    } else if (!url.startsWith('http') && !url.startsWith('//')) {
+      newUrl = `${baseURL}/${url.startsWith('/') ? url.slice(1) : url}`
+    }
+    if (newUrl !== url) {
+      return match.replace(/href\s*=\s*["'][^"']+["']/gi, `href=${quote}${newUrl}${quote}`)
+    }
+    return match
+  })
+  
+  // 处理data-file-download-url属性
+  html = html.replace(/data-file-download-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
+    let newUrl = url
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      newUrl = `${baseURL}${url}`
+    } else if (!url.startsWith('http') && !url.startsWith('//')) {
+      newUrl = `${baseURL}/${url.startsWith('/') ? url.slice(1) : url}`
+    }
+    if (newUrl !== url) {
+      return `data-file-download-url=${quote}${newUrl}${quote}`
+    }
+    return match
+  })
+  
+  // 配置DOMPurify允许图片和文件标签
   const config = {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img', 'div', 'span'],
-    ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'title', 'width', 'height', 'class', 'style', 'id'],
-    ALLOW_DATA_ATTR: false,
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img', 'div', 'span', 'button'],
+    ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'title', 'width', 'height', 'class', 'style', 'id', 'data-file-url', 'data-file-filename', 'onclick', 'download'],
+    ALLOW_DATA_ATTR: true,
     KEEP_CONTENT: true,
   }
   
@@ -355,6 +422,65 @@ onUnmounted(() => {
   height: auto;
   display: block;
   margin: 1rem 0;
+}
+
+/* 文件附件样式 */
+.text-cell-view :deep(.file-attachment),
+.text-cell-editor :deep(.file-attachment) {
+  @apply my-6 border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm;
+}
+
+.text-cell-view :deep(.file-preview-card),
+.text-cell-editor :deep(.file-preview-card) {
+  @apply flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all duration-200;
+}
+
+.text-cell-view :deep(.file-actions),
+.text-cell-editor :deep(.file-actions) {
+  @apply flex items-center gap-2;
+}
+
+.text-cell-view :deep(.pdf-icon),
+.text-cell-view :deep(.file-icon),
+.text-cell-editor :deep(.pdf-icon),
+.text-cell-editor :deep(.file-icon) {
+  @apply text-3xl flex-shrink-0;
+}
+
+.text-cell-view :deep(.pdf-info),
+.text-cell-view :deep(.file-info),
+.text-cell-editor :deep(.pdf-info),
+.text-cell-editor :deep(.file-info) {
+  @apply flex-1 min-w-0;
+}
+
+.text-cell-view :deep(.pdf-filename),
+.text-cell-view :deep(.file-filename),
+.text-cell-editor :deep(.pdf-filename),
+.text-cell-editor :deep(.file-filename) {
+  @apply font-medium text-gray-900 truncate;
+}
+
+.text-cell-view :deep(.pdf-size),
+.text-cell-view :deep(.file-size),
+.text-cell-editor :deep(.pdf-size),
+.text-cell-editor :deep(.file-size) {
+  @apply text-sm text-gray-500 mt-1;
+}
+
+.text-cell-view :deep(.file-view-btn),
+.text-cell-view :deep(.file-download-btn),
+.text-cell-editor :deep(.file-view-btn),
+.text-cell-editor :deep(.file-download-btn) {
+  @apply px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm font-medium flex-shrink-0 shadow-sm hover:shadow;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+}
+
+.text-cell-view :deep(.file-view-btn),
+.text-cell-editor :deep(.file-view-btn) {
+  @apply bg-green-500 hover:bg-green-600;
 }
 </style>
 

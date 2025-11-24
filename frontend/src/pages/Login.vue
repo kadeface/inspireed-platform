@@ -401,6 +401,10 @@
         
         <div class="pt-8 border-t border-gray-800 text-center text-sm text-gray-400">
           <p>© 2025 InspireEd. 探究式STEM教学系统 · Evidence-based Learning & Teaching Platform</p>
+          <p class="mt-2">
+            作者：广东省开平市教师发展中心 廖作东 | 
+            <a href="mailto:382241106@qq.com" class="text-gray-400 hover:text-white transition-colors">382241106@qq.com</a>
+          </p>
         </div>
       </div>
     </footer>

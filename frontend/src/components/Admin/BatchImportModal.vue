@@ -199,6 +199,7 @@ import { ref } from 'vue'
 import { useToast } from '@/composables/useToast'
 import adminService, { type UserCreate, type BatchImportResult } from '@/services/admin'
 import * as XLSX from 'xlsx'
+import GBK from 'gbk.js'
 
 const props = defineProps<{
   show: boolean
@@ -222,6 +223,7 @@ const HEADER_MAP: Record<string, string | null> = {
   username: 'username',
   用户名: 'username',
   '学号/用户名': 'username',
+  '学号/用户': 'username',
   学号: 'username',
   full_name: 'full_name',
   姓名: 'full_name',
@@ -265,10 +267,22 @@ const ROLE_MAP: Record<string, string> = {
 }
 
 function normalizeHeader(header: string): string | null {
-  if (Object.prototype.hasOwnProperty.call(HEADER_MAP, header)) {
-    return HEADER_MAP[header]
+  // 清理列名：去除引号、首尾空格
+  const cleaned = header.replace(/^["']|["']$/g, '').trim()
+  
+  // 直接匹配
+  if (Object.prototype.hasOwnProperty.call(HEADER_MAP, cleaned)) {
+    return HEADER_MAP[cleaned]
   }
-  return header
+  
+  // 尝试去除括号内容后匹配（如 "区域ID(可选)" -> "区域ID"）
+  const withoutBrackets = cleaned.replace(/\([^)]*\)/g, '').trim()
+  if (withoutBrackets !== cleaned && Object.prototype.hasOwnProperty.call(HEADER_MAP, withoutBrackets)) {
+    return HEADER_MAP[withoutBrackets]
+  }
+  
+  // 如果都不匹配，返回原始清理后的值（可能是未知列）
+  return cleaned || null
 }
 
 // 方法
@@ -399,15 +413,118 @@ async function startImport() {
 function readFileAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = (e) => resolve(e.target?.result as string)
-    reader.onerror = (e) => reject(e)
-    reader.readAsText(file, 'utf-8')
+    
+    // 先尝试读取为 ArrayBuffer，以便检测编码
+    reader.onload = async (e) => {
+      try {
+        const arrayBuffer = e.target?.result as ArrayBuffer
+        if (!arrayBuffer) {
+          reject(new Error('文件读取失败'))
+          return
+        }
+        
+        // 先尝试 UTF-8
+        try {
+          const utf8Text = new TextDecoder('utf-8', { fatal: true }).decode(arrayBuffer)
+          // 检查是否包含替换字符（\uFFFD）或明显的乱码模式
+          // 如果前100个字符中包含替换字符，说明 UTF-8 解码有问题
+          const hasReplacementChar = utf8Text.slice(0, 200).includes('\uFFFD')
+          
+          // 检查是否包含中文字符（如果应该包含中文但没有，可能是编码问题）
+          const hasChinese = /[\u4e00-\u9fa5]/.test(utf8Text.slice(0, 200))
+          const hasGarbledPattern = /[^\u0000-\u007F\u4e00-\u9fa5\s，。！？：；""''（）【】《》、]/.test(utf8Text.slice(0, 200))
+          
+          // 如果 UTF-8 解码成功且没有替换字符，使用 UTF-8
+          if (!hasReplacementChar && (!hasGarbledPattern || hasChinese)) {
+            resolve(utf8Text)
+            return
+          }
+        } catch (e) {
+          // UTF-8 解码失败，继续尝试 GBK
+        }
+        
+        // 尝试 GBK/GB2312 编码
+        try {
+          const uint8Array = new Uint8Array(arrayBuffer)
+          const gbkText = GBK.toString(uint8Array)
+          // 验证 GBK 解码结果是否合理（包含中文字符）
+          if (/[\u4e00-\u9fa5]/.test(gbkText.slice(0, 200))) {
+            resolve(gbkText)
+            return
+          }
+        } catch (gbkError) {
+          // GBK 解码失败，继续
+        }
+        
+        // 如果都失败，尝试使用 UTF-8（即使可能有乱码）
+        const utf8Text = new TextDecoder('utf-8', { fatal: false }).decode(arrayBuffer)
+        resolve(utf8Text)
+      } catch (error: any) {
+        reject(new Error(`文件读取失败: ${error.message}`))
+      }
+    }
+    
+    reader.onerror = () => reject(new Error('文件读取失败'))
+    reader.readAsArrayBuffer(file)
   })
 }
 
+// 解析 CSV 行，正确处理带引号的字段
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        // 转义的双引号
+        current += '"'
+        i++
+      } else {
+        // 切换引号状态
+        inQuotes = !inQuotes
+      }
+    } else if (char === ',' && !inQuotes) {
+      // 字段分隔符
+      result.push(current.trim())
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  
+  // 添加最后一个字段
+  result.push(current.trim())
+  
+  return result
+}
+
 function parseCSV(csvText: string): UserCreate[] {
-  const lines = csvText.trim().split('\n')
-  const originalHeaders = lines[0].split(',').map(h => h.trim())
+  // 去除可能的 UTF-8 BOM
+  let text = csvText
+  if (text.charCodeAt(0) === 0xFEFF) {
+    text = text.slice(1)
+  }
+  
+  const lines = text.trim().split(/\r?\n/)
+  if (lines.length === 0) {
+    throw new Error('CSV文件为空')
+  }
+  
+  // 检测分隔符（逗号或制表符）
+  const firstLine = lines[0]
+  const hasTabs = firstLine.includes('\t')
+  const delimiter = hasTabs ? '\t' : ','
+  
+  // 如果使用制表符，使用简单的 split，否则使用 parseCSVLine
+  const parseLine = delimiter === '\t' 
+    ? (line: string) => line.split('\t').map(h => h.trim())
+    : parseCSVLine
+  
+  const originalHeaders = parseLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim())
   const normalizedHeaders = originalHeaders.map(normalizeHeader)
   const activeHeaders = normalizedHeaders.filter((header): header is string => Boolean(header))
   
@@ -416,7 +533,14 @@ function parseCSV(csvText: string): UserCreate[] {
   const missingColumns = requiredColumns.filter(col => !activeHeaders.includes(col))
   
   if (missingColumns.length > 0) {
-    throw new Error(`缺少必需的列: ${missingColumns.join(', ')}`)
+    // 提供更详细的错误信息
+    const detectedHeaders = activeHeaders.join(', ')
+    const originalHeadersStr = originalHeaders.join(', ')
+    throw new Error(
+      `缺少必需的列: ${missingColumns.join(', ')}\n` +
+      `检测到的列名: ${detectedHeaders || '(无)'}\n` +
+      `原始列名: ${originalHeadersStr}`
+    )
   }
   
   const parseBoolean = (value: string, rowNumber: number) => {
@@ -443,9 +567,9 @@ function parseCSV(csvText: string): UserCreate[] {
     if (!line) continue
     const rowNumber = i + 1
     
-    const values = line.split(',').map(v => v.trim())
+    const values = parseLine(line).map(v => v.replace(/^"|"$/g, '').trim())
     if (values.length !== normalizedHeaders.length) {
-      throw new Error(`第${rowNumber}行数据列数不匹配`)
+      throw new Error(`第${rowNumber}行数据列数不匹配，期望 ${normalizedHeaders.length} 列，实际 ${values.length} 列`)
     }
     
     const user: any = {}
@@ -511,7 +635,14 @@ async function parseExcel(file: File): Promise<UserCreate[]> {
         const missingColumns = requiredColumns.filter(col => !activeHeaders.includes(col))
         
         if (missingColumns.length > 0) {
-          throw new Error(`缺少必需的列: ${missingColumns.join(', ')}`)
+          // 提供更详细的错误信息
+          const detectedHeaders = activeHeaders.join(', ')
+          const originalHeadersStr = originalHeaders.join(', ')
+          throw new Error(
+            `缺少必需的列: ${missingColumns.join(', ')}\n` +
+            `检测到的列名: ${detectedHeaders || '(无)'}\n` +
+            `原始列名: ${originalHeadersStr}`
+          )
         }
         
         const parseBoolean = (value: string, rowNumber: number) => {
