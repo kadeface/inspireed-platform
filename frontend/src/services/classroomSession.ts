@@ -467,6 +467,45 @@ export const classroomSessionService = {
     const response = await api.get<SessionStatistics>(`/classroom-sessions/sessions/${sessionId}/statistics`)
     return response
   },
+
+  /**
+   * 更新显示模式（全屏/窗口）
+   */
+  async updateDisplayMode(sessionId: number, displayMode: 'fullscreen' | 'window'): Promise<ClassSession> {
+    try {
+      const response = await api.post(`/classroom-sessions/sessions/${sessionId}/display-mode`, {
+        display_mode: displayMode,
+      })
+      
+      // 处理字段映射（snake_case 到 camelCase）
+      const settings = (response as any).settings || {}
+      
+      const session = {
+        ...(response as object),
+        id: (response as any).id,
+        lessonId: (response as any).lesson_id || (response as any).lessonId,
+        classroomId: (response as any).classroom_id || (response as any).classroomId,
+        teacherId: (response as any).teacher_id || (response as any).teacherId,
+        status: (response as any).status,
+        scheduledStart: (response as any).scheduled_start || (response as any).scheduledStart,
+        actualStart: (response as any).actual_start || (response as any).actualStart,
+        endedAt: (response as any).ended_at || (response as any).endedAt,
+        durationMinutes: (response as any).duration_minutes || (response as any).durationMinutes,
+        currentCellId: (response as any).current_cell_id ?? (response as any).currentCellId ?? null,
+        currentActivityId: (response as any).current_activity_id ?? (response as any).currentActivityId ?? null,
+        settings: settings,
+        totalStudents: (response as any).total_students || (response as any).totalStudents || 0,
+        activeStudents: (response as any).active_students || (response as any).activeStudents || 0,
+        createdAt: (response as any).created_at || (response as any).createdAt,
+        updatedAt: (response as any).updated_at || (response as any).updatedAt,
+      } as ClassSession
+      
+      return session
+    } catch (error: any) {
+      console.error('❌ 更新显示模式失败:', error)
+      throw error
+    }
+  },
 }
 
 export default classroomSessionService

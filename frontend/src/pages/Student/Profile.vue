@@ -1,41 +1,47 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50 relative overflow-hidden">
+    <!-- 装饰性背景元素 -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-emerald-200/40 to-teal-200/40 rounded-full blur-3xl"></div>
+      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-cyan-200/40 to-blue-200/40 rounded-full blur-3xl"></div>
+    </div>
+
     <!-- 顶部导航栏 -->
-    <header class="bg-white shadow-sm">
+    <header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-gray-100 relative">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-4">
             <button
               @click="router.push('/student')"
-              class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              class="p-2 hover:bg-gray-100 rounded-xl transition-all transform hover:scale-105"
               title="返回工作台"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
-            <h1 class="text-2xl font-bold text-gray-900">个人中心</h1>
+            <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">个人中心</h1>
           </div>
         </div>
       </div>
     </header>
 
     <!-- 主要内容 -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- 左侧：个人信息 -->
         <div class="lg:col-span-1">
-          <div class="bg-white rounded-lg shadow p-6">
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-white/50">
             <!-- 头像 -->
             <div class="flex flex-col items-center">
-              <div class="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+              <div class="w-24 h-24 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30">
                 <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
-              <h2 class="mt-4 text-xl font-semibold text-gray-900">{{ currentUser?.username || '学生' }}</h2>
-              <p class="text-sm text-gray-500">{{ currentUser?.email }}</p>
-              <div class="mt-2 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+              <h2 class="mt-4 text-xl font-bold text-gray-900">{{ currentUser?.username || '学生' }}</h2>
+              <p class="text-sm text-gray-600 font-medium">{{ currentUser?.email }}</p>
+              <div class="mt-2 px-3 py-1 bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">
                 学生
               </div>
             </div>
@@ -47,12 +53,12 @@
                 <span class="text-lg font-semibold text-gray-900">{{ stats.totalLessons }}</span>
               </div>
               <div class="flex justify-between items-center py-3 border-b border-gray-200">
-                <span class="text-sm text-gray-600">已完成</span>
-                <span class="text-lg font-semibold text-green-600">{{ stats.completedLessons }}</span>
+                <span class="text-sm text-gray-600 font-medium">已完成</span>
+                <span class="text-lg font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">{{ stats.completedLessons }}</span>
               </div>
               <div class="flex justify-between items-center py-3 border-b border-gray-200">
-                <span class="text-sm text-gray-600">进行中</span>
-                <span class="text-lg font-semibold text-yellow-600">{{ stats.inProgressLessons }}</span>
+                <span class="text-sm text-gray-600 font-medium">进行中</span>
+                <span class="text-lg font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">{{ stats.inProgressLessons }}</span>
               </div>
               <div class="flex justify-between items-center py-3">
                 <span class="text-sm text-gray-600">学习时长</span>
@@ -80,17 +86,17 @@
         <!-- 右侧：学习记录和统计 -->
         <div class="lg:col-span-2 space-y-6">
           <!-- 学习进度概览 -->
-          <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">学习进度概览</h3>
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-white/50">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">学习进度概览</h3>
             <div class="space-y-4">
               <div>
-                <div class="flex justify-between text-sm text-gray-600 mb-2">
+                <div class="flex justify-between text-sm text-gray-600 mb-2 font-medium">
                   <span>总体完成度</span>
-                  <span>{{ overallProgress }}%</span>
+                  <span class="font-bold text-emerald-600">{{ overallProgress }}%</span>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-3">
+                <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                   <div
-                    class="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all"
+                    class="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 h-3 rounded-full transition-all shadow-sm"
                     :style="{ width: `${overallProgress}%` }"
                   ></div>
                 </div>
@@ -99,25 +105,25 @@
           </div>
 
           <!-- 最近学习 -->
-          <div class="bg-white rounded-lg shadow p-6">
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-white/50">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">最近学习</h3>
             <div v-if="recentLessons.length > 0" class="space-y-4">
               <div
                 v-for="lesson in recentLessons"
                 :key="lesson.lessonId"
-                class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                class="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-emerald-50/50 cursor-pointer transition-all transform hover:scale-[1.02]"
                 @click="router.push(`/student/lesson/${lesson.lessonId}`)"
               >
                 <div class="flex-1">
-                  <h4 class="font-medium text-gray-900">{{ lesson.title }}</h4>
-                  <p class="text-sm text-gray-500 mt-1">上次学习: {{ formatDate(lesson.lastStudied) }}</p>
+                  <h4 class="font-semibold text-gray-900">{{ lesson.title }}</h4>
+                  <p class="text-sm text-gray-600 mt-1 font-medium">上次学习: {{ formatDate(lesson.lastStudied) }}</p>
                 </div>
                 <div class="flex items-center gap-4">
                   <div class="text-right">
-                    <div class="text-sm text-gray-600">进度</div>
-                    <div class="text-lg font-semibold text-blue-600">{{ lesson.progress }}%</div>
+                    <div class="text-sm text-gray-600 font-medium">进度</div>
+                    <div class="text-lg font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">{{ lesson.progress }}%</div>
                   </div>
-                  <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
@@ -132,13 +138,13 @@
           </div>
 
           <!-- 学习笔记 -->
-          <div class="bg-white rounded-lg shadow p-6">
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-white/50">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">我的笔记</h3>
             <div v-if="savedNotes.length > 0" class="space-y-3">
               <div
                 v-for="note in savedNotes"
                 :key="note.lessonId"
-                class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                class="p-4 border border-gray-200 rounded-xl hover:bg-emerald-50/50 cursor-pointer transition-all transform hover:scale-[1.01]"
                 @click="router.push(`/student/lesson/${note.lessonId}`)"
               >
                 <h4 class="font-medium text-gray-900 mb-2">{{ note.lessonTitle }}</h4>

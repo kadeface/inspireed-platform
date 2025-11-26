@@ -1,6 +1,24 @@
 <!-- eslint-disable vue/no-mutating-props -->
 <template>
-  <div class="text-cell cell-container" :data-cell-id="cell.id">
+  <div class="text-cell cell-container" :data-cell-id="cell.id" :class="{ 'fullscreen': isFullscreen }" ref="containerRef">
+    <!-- 全屏按钮 -->
+    <div class="cell-toolbar">
+      <button
+        class="cell-fullscreen-btn"
+        :class="{ 'active': isFullscreen }"
+        @click="toggleFullscreen"
+        :title="isFullscreen ? '退出全屏 (Esc)' : '全屏查看'"
+      >
+        <svg v-if="!isFullscreen" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+        </svg>
+        <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        <span class="text-sm font-medium ml-1">{{ isFullscreen ? '退出全屏' : '全屏' }}</span>
+      </button>
+    </div>
+    
     <div v-if="!isEditing && !editable" class="text-cell-view" v-html="sanitizedHtml"></div>
     
     <div v-else class="text-cell-editor">
@@ -55,6 +73,7 @@ import type { TextCell as TextCellType } from '../../types/cell'
 import TipTapEditor from '../Editor/TipTapEditor.vue'
 import DOMPurify from 'dompurify'
 import { getServerBaseUrl } from '@/utils/url'
+import { useFullscreen } from '@/composables/useFullscreen'
 
 interface Props {
   cell: TextCellType
@@ -69,44 +88,35 @@ const emit = defineEmits<{
   update: [cell: TextCellType]
 }>()
 
+const containerRef = ref<HTMLElement | null>(null)
+const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)
+
 const isEditing = ref(props.editable)
 const tempContent = ref(props.cell.content.html)
 
 const sanitizedHtml = computed(() => {
   let html = props.cell.content.html || ''
+  const isDev = import.meta.env.DEV
+  const baseURL = getServerBaseUrl()
   
   // 处理图片URL：将相对路径转换为绝对路径
   if (html) {
-    const baseURL = getServerBaseUrl()
-    
-    // 先检查是否有图片标签
-    const hasImgTags = /<img\s+[^>]*>/gi.test(html)
-    if (hasImgTags) {
-      console.log('🖼️ TextCell检测到图片标签，开始处理:', {
-        cellId: props.cell.id,
-        baseURL,
-        htmlLength: html.length,
-        htmlPreview: html.substring(0, 500)
-      })
-    }
     
     // 匹配所有img标签，处理src属性
-    // 使用更宽松的正则表达式，确保能匹配到所有img标签
     html = html.replace(/<img([^>]*?)>/gi, (match, attrs) => {
-      console.log('🖼️ 处理img标签:', { match, attrs, 完整标签: match })
       // 提取src属性值（支持单引号、双引号，以及无引号的情况）
       const srcMatch = attrs.match(/\ssrc\s*=\s*(["'])([^"']+)\1/i) || 
                        attrs.match(/\ssrc\s*=\s*([^\s>]+)/i) ||
                        attrs.match(/src\s*=\s*(["'])([^"']+)\1/i) ||
                        attrs.match(/src\s*=\s*([^\s>]+)/i)
       if (srcMatch) {
-        console.log('🖼️ 找到src属性:', srcMatch)
         const quote = srcMatch[1] || '"'
         let src = srcMatch[2] || srcMatch[1]
         let newSrc = src
         
         // 如果是blob URL，移除该图片（blob URL已经失效）
         if (src.startsWith('blob:')) {
+          if (isDev) console.warn('⚠️ 移除无效的blob URL图片:', src)
           return '' // 移除无效的blob URL图片
         }
         
@@ -121,7 +131,15 @@ const sanitizedHtml = computed(() => {
           try {
             const url = new URL(src)
             const path = url.pathname + (url.search || '') + (url.hash || '')
-            newSrc = `${baseURL}${path}`
+            // 如果路径只是/，则不添加（避免baseURL后面出现多余的/）
+            // 否则确保路径以/开头
+            let normalizedPath = path
+            if (path === '/') {
+              normalizedPath = ''
+            } else if (!path.startsWith('/')) {
+              normalizedPath = '/' + path
+            }
+            newSrc = `${baseURL}${normalizedPath}`
             // 验证文件名是否一致
             const originalFilename = url.pathname.split('/').pop()
             const newFilename = newSrc.split('/').pop()?.split('?')[0]
@@ -132,16 +150,12 @@ const sanitizedHtml = computed(() => {
                 原始文件名: originalFilename,
                 新文件名: newFilename
               })
-            } else {
-              console.log('✅ localhost URL转换成功:', {
-                原始URL: src,
-                转换后URL: newSrc,
-                文件名: newFilename || originalFilename
-              })
+            } else if (isDev) {
+              console.log('✅ localhost URL已转换:', newSrc)
             }
           } catch (e) {
             // 如果URL解析失败，尝试直接替换localhost部分
-            console.warn('⚠️ URL解析失败，使用字符串替换:', e)
+            if (isDev) console.warn('⚠️ URL解析失败，使用字符串替换:', e)
             const originalFilename = src.split('/').pop()?.split('?')[0]
             newSrc = src.replace(/https?:\/\/localhost(:\d+)?/, baseURL)
               .replace(/https?:\/\/127\.0\.0\.1(:\d+)?/, baseURL)
@@ -153,33 +167,26 @@ const sanitizedHtml = computed(() => {
                 原始文件名: originalFilename,
                 新文件名: newFilename
               })
-            } else {
-              console.log('✅ localhost URL替换成功:', {
-                原始URL: src,
-                转换后URL: newSrc,
-                文件名: newFilename || originalFilename
-              })
+            } else if (isDev) {
+              console.log('✅ localhost URL已替换:', newSrc)
             }
           }
         }
         // 如果已经是完整URL（http/https），且不包含localhost，不需要处理
         else if (src.startsWith('http://') || src.startsWith('https://')) {
-          console.log('🖼️ 完整URL（非localhost），不处理:', src)
+          // 完整URL无需处理，不输出日志
           return match
         }
         // 如果是相对路径（以/开头但不是//），转换为绝对URL
         else if (src.startsWith('/') && !src.startsWith('//')) {
           newSrc = `${baseURL}${src}`
-          console.log('🖼️ 相对路径转换:', { 原始: src, 转换后: newSrc })
+          if (isDev) console.log('🖼️ 相对路径已转换:', newSrc)
         }
         // 如果是其他相对路径，也转换为绝对URL
         else if (!src.startsWith('//')) {
           newSrc = `${baseURL}/${src.startsWith('/') ? src.slice(1) : src}`
-          console.log('🖼️ 其他相对路径转换:', { 原始: src, 转换后: newSrc })
+          if (isDev) console.log('🖼️ 相对路径已转换:', newSrc)
         }
-        
-        // 重要：如果已经处理了localhost，确保后续逻辑不会覆盖newSrc
-        // 但这里newSrc已经在上面设置好了，所以不需要额外处理
         
         // 如果URL被修改，替换原src值
         if (newSrc !== src) {
@@ -196,28 +203,29 @@ const sanitizedHtml = computed(() => {
               新文件名: newFilename,
               baseURL
             })
-          } else {
-            // 调试日志
-            console.log('🖼️ 图片URL转换:', { 
-              原始: src, 
-              转换后: newSrc, 
-              baseURL,
-              文件名: newFilename || originalFilename,
-              文件名一致: originalFilename === newFilename
-            })
           }
           
-          const originalSrcAttr = srcMatch[0]
-          const newSrcAttr = ` src=${quote}${newSrc}${quote}`
-          return match.replace(originalSrcAttr, newSrcAttr)
-        } else {
-          // 即使没有修改，也输出日志以便排查
-          const filename = src.split('/').pop()?.split('?')[0]
-          console.log('🖼️ 图片URL未修改:', { 
-            src,
-            文件名: filename,
-            baseURL
+          // 使用更可靠的替换方法：直接替换src属性值
+          // 匹配src属性（支持各种引号格式）
+          const srcAttrPattern = /src\s*=\s*(["']?)([^"'\s>]+)\1/i
+          const newMatch = match.replace(srcAttrPattern, (fullMatch, quoteChar, urlValue) => {
+            // 如果匹配到的URL值就是我们要替换的src，则替换它
+            if (urlValue === src || urlValue === src.replace(/^["']|["']$/g, '')) {
+              const finalQuote = quoteChar || quote
+              return `src=${finalQuote}${newSrc}${finalQuote}`
+            }
+            return fullMatch
           })
+          
+          // 如果替换成功，返回新匹配；否则尝试更通用的方法
+          if (newMatch !== match) {
+            return newMatch
+          } else {
+            // 备用方法：直接替换整个src属性
+            const escapedSrc = src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            const srcPattern = new RegExp(`(src\\s*=\\s*["']?)${escapedSrc}(["']?)`, 'gi')
+            return match.replace(srcPattern, `$1${newSrc}$2`)
+          }
         }
       }
       return match
@@ -299,23 +307,65 @@ const sanitizedHtml = computed(() => {
     KEEP_CONTENT: true,
   }
   
-  const sanitized = DOMPurify.sanitize(html, config)
+  let sanitized = DOMPurify.sanitize(html, config)
   
-  // 调试：检查处理后的HTML
+  // 最终清理：替换sanitized HTML中任何剩余的localhost URL
+  // 这是一个安全网，确保所有localhost URL都被替换
+  // 只有当baseURL不包含localhost时才进行替换
+  const baseURLHasLocalhost = baseURL.includes('localhost') || baseURL.includes('127.0.0.1')
+  
+  if (!baseURLHasLocalhost) {
+    // 只有当baseURL不是localhost时，才需要替换localhost URL
+    // 匹配完整的localhost URL（包含路径）
+    sanitized = sanitized.replace(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/[^\s"'>]*)?/gi, (match) => {
+      try {
+        const url = new URL(match)
+        const path = url.pathname + (url.search || '') + (url.hash || '')
+        // 如果路径只是/，则不添加（避免baseURL后面出现多余的/）
+        // 否则确保路径以/开头
+        let normalizedPath = path
+        if (path === '/') {
+          normalizedPath = ''
+        } else if (!path.startsWith('/')) {
+          normalizedPath = '/' + path
+        }
+        const newUrl = baseURL + normalizedPath
+        if (isDev) {
+          console.log('🔧 最终清理：替换剩余的localhost URL', { 原始: match, 新URL: newUrl })
+        }
+        return newUrl
+      } catch (e) {
+        // 如果URL解析失败，直接替换localhost部分
+        const newUrl = match.replace(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, baseURL)
+        if (isDev && newUrl !== match) {
+          console.log('🔧 最终清理：替换剩余的localhost URL（简单替换）', { 原始: match, 新URL: newUrl })
+        }
+        return newUrl
+      }
+    })
+  }
+  
+  // 修复双斜杠问题（如果baseURL以/结尾，路径也以/开头）
+  // 转义baseURL中的特殊字符用于正则表达式
+  const escapedBaseURL = baseURL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  sanitized = sanitized.replace(new RegExp(escapedBaseURL + '//+', 'g'), baseURL + '/')
+  
+  // 检查处理后的HTML（仅在开发环境或发现问题时输出日志）
   const originalHasImg = html.includes('<img')
   const sanitizedHasImg = sanitized.includes('<img')
   if (originalHasImg) {
-    // 检查是否有localhost URL
-    const hasLocalhost = /localhost|127\.0\.0\.1/.test(sanitized)
-    if (hasLocalhost) {
-      console.error('❌ 处理后的HTML仍然包含localhost URL！', {
-        cellId: props.cell.id,
-        htmlPreview: html.substring(0, 300),
-        sanitizedPreview: sanitized.substring(0, 300),
-        baseURL: getServerBaseUrl()
-      })
-    } else {
-      console.log('✅ HTML处理成功，已移除localhost URL')
+    // 只有当baseURL不包含localhost时，才检查是否有localhost URL
+    // 如果baseURL本身就是localhost，那么包含localhost是正常的
+    if (!baseURLHasLocalhost) {
+      const hasLocalhost = /localhost|127\.0\.0\.1/.test(sanitized)
+      if (hasLocalhost) {
+        console.error('❌ 处理后的HTML仍然包含localhost URL！', {
+          cellId: props.cell.id,
+          htmlPreview: html.substring(0, 300),
+          sanitizedPreview: sanitized.substring(0, 300),
+          baseURL: getServerBaseUrl()
+        })
+      }
     }
     
     if (!sanitizedHasImg) {
@@ -369,18 +419,23 @@ onMounted(async () => {
   // 等待DOM渲染完成后再添加事件监听
   await nextTick()
   
+  const isDev = import.meta.env.DEV
+  
   // 在组件挂载后，为所有图片添加错误监听
   const cellElement = document.querySelector(`[data-cell-id="${props.cell.id}"]`)
   if (cellElement) {
     const images = cellElement.querySelectorAll('img')
-    console.log('🖼️ TextCell挂载，找到图片数量:', images.length, 'cellId:', props.cell.id)
+    if (isDev && images.length > 0) {
+      console.log(`🖼️ TextCell[${props.cell.id}] 找到 ${images.length} 张图片`)
+    }
     images.forEach(img => {
-      console.log('🖼️ 为图片添加错误监听:', img.src)
       img.addEventListener('error', handleImageError)
-      // 也监听load事件，确认图片加载成功
-      img.addEventListener('load', () => {
-        console.log('✅ 图片加载成功:', img.src)
-      })
+      // 仅在开发环境监听load事件
+      if (isDev) {
+        img.addEventListener('load', () => {
+          console.log('✅ 图片加载成功:', img.src.split('/').pop())
+        })
+      }
     })
   }
 })
@@ -466,6 +521,32 @@ onUnmounted(() => {
 .text-cell-editor :deep(.pdf-size),
 .text-cell-editor :deep(.file-size) {
   @apply text-sm text-gray-500 mt-1;
+}
+
+/* 全屏按钮样式 */
+.cell-toolbar {
+  @apply flex justify-end mb-2;
+}
+
+.cell-fullscreen-btn {
+  @apply flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors;
+}
+
+.cell-fullscreen-btn.active {
+  @apply bg-red-50 hover:bg-red-100 text-red-700;
+}
+
+.cell-fullscreen-btn .icon {
+  @apply w-4 h-4;
+}
+
+/* 全屏模式样式 */
+.text-cell.fullscreen {
+  @apply fixed inset-0 z-50 bg-white overflow-auto;
+}
+
+.text-cell.fullscreen .text-cell-view {
+  @apply p-8 max-w-5xl mx-auto;
 }
 
 .text-cell-view :deep(.file-view-btn),

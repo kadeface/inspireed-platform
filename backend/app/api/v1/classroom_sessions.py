@@ -32,6 +32,7 @@ from app.schemas.classroom_session import (
     PauseSessionRequest,
     ResumeSessionRequest,
     EndSessionRequest,
+    UpdateDisplayModeRequest,
     SessionStatistics,
     StudentPendingSessionResponse,
 )
@@ -268,6 +269,21 @@ async def start_session(
     await db.commit()
     await db.refresh(session)
 
+    # 🆕 通过 WebSocket 通知所有学生会话状态已变化
+    await manager.broadcast_to_session(
+        message={
+            "type": "session_status_changed",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "session_id": session_id,
+                "status": session.status.value if hasattr(session.status, 'value') else str(session.status),
+                "actual_start": session.actual_start.isoformat() if session.actual_start else None, # type: ignore[union-attr]
+            }
+        },
+        session_id=session_id
+    )
+    print(f"📢 已广播会话状态变化（会话 {session_id}）：pending -> active")
+
     return session
 
 
@@ -295,6 +311,20 @@ async def pause_session(
     await db.commit()
     await db.refresh(session)
 
+    # 🆕 通过 WebSocket 通知所有学生会话状态已变化
+    await manager.broadcast_to_session(
+        message={
+            "type": "session_status_changed",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "session_id": session_id,
+                "status": session.status.value if hasattr(session.status, 'value') else str(session.status),
+            }
+        },
+        session_id=session_id
+    )
+    print(f"📢 已广播会话状态变化（会话 {session_id}）：active -> paused")
+
     return session
 
 
@@ -321,6 +351,20 @@ async def resume_session(
     session.status = ClassSessionStatus.ACTIVE # type: ignore[comparison-overlap]
     await db.commit()
     await db.refresh(session)
+
+    # 🆕 通过 WebSocket 通知所有学生会话状态已变化
+    await manager.broadcast_to_session(
+        message={
+            "type": "session_status_changed",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "session_id": session_id,
+                "status": session.status.value if hasattr(session.status, 'value') else str(session.status),
+            }
+        },
+        session_id=session_id
+    )
+    print(f"📢 已广播会话状态变化（会话 {session_id}）：paused -> active")
 
     return session
 
@@ -484,6 +528,78 @@ async def navigate_to_cell(
         raise HTTPException(
             status_code=500,
             detail=f"导航失败: {str(e)}"
+        )
+
+
+@router.post("/sessions/{session_id}/display-mode", response_model=ClassSessionResponse)
+async def update_display_mode(
+    session_id: int,
+    data: UpdateDisplayModeRequest,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """更新学生端显示模式（全屏/窗口）"""
+    
+    try:
+        # 验证display_mode值
+        if data.display_mode not in ["fullscreen", "window"]:
+            raise HTTPException(status_code=400, detail="display_mode 必须是 'fullscreen' 或 'window'")
+        
+        print(f"🖥️ 更新显示模式: session_id={session_id}, display_mode={data.display_mode}")
+
+        session = await db.get(ClassSession, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="会话不存在")
+
+        session_teacher_id = cast(int, session.teacher_id)
+        current_user_id = cast(int, current_user.id)
+        if session_teacher_id != current_user_id:
+            raise HTTPException(status_code=403, detail="无权操作")
+
+        if session.status != ClassSessionStatus.ACTIVE:  # type: ignore[comparison-overlap]
+            raise HTTPException(status_code=400, detail="只能在活跃会话中更新显示模式")
+        
+        # 保存 display_mode 到 settings
+        new_settings = dict(session.settings) if session.settings else {} # type: ignore[assignment]
+        new_settings["display_mode"] = data.display_mode # type: ignore[assignment]
+        setattr(session, "settings", new_settings)
+        
+        await db.commit()
+        await db.refresh(session)
+        
+        print(f"✅ 显示模式更新成功: session_id={session_id}, display_mode={data.display_mode}")
+        
+        # 通过 WebSocket 广播变化
+        from app.services.websocket_manager import manager as ws_manager
+        
+        await ws_manager.broadcast_to_session(
+            message={
+                "type": "display_mode_changed",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": {
+                    "display_mode": data.display_mode,
+                    "changed_by": {
+                        "user_id": current_user.id,
+                        "user_name": current_user.full_name or current_user.username,
+                    }
+                }
+            },
+            session_id=session_id,
+        )
+        
+        print(f"📢 已广播显示模式变化（会话 {session_id}）")
+        
+        return session
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"❌ 更新显示模式异常: {type(e).__name__}: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"更新显示模式失败: {str(e)}"
         )
 
 
@@ -1085,6 +1201,11 @@ async def websocket_endpoint(
 async def send_initial_state(websocket: WebSocket, session: ClassSession, db: AsyncSession):
     """发送初始状态给新连接的客户端"""
     
+    # 加载关联信息（教师、课程、班级）
+    session_lesson = await db.get(Lesson, cast(int, session.lesson_id))
+    session_teacher = await db.get(User, cast(int, session.teacher_id))
+    session_classroom = await db.get(Classroom, cast(int, session.classroom_id))
+    
     message = {
         "type": "connected",
         "timestamp": datetime.utcnow().isoformat(),
@@ -1093,8 +1214,13 @@ async def send_initial_state(websocket: WebSocket, session: ClassSession, db: As
             "current_state": {
                 "status": session.status.value if hasattr(session.status, 'value') else str(session.status),
                 "display_cell_orders": (session.settings or {}).get("display_cell_orders", []),
+                "display_mode": (session.settings or {}).get("display_mode", "window"),
                 "current_cell_id": session.current_cell_id,
                 "current_activity_id": session.current_activity_id,
+                # 🆕 添加教师和课程信息
+                "teacher_name": session_teacher.full_name or session_teacher.username if session_teacher else None,
+                "lesson_title": session_lesson.title if session_lesson else None,
+                "classroom_name": session_classroom.name if session_classroom else None,
             }
         }
     }

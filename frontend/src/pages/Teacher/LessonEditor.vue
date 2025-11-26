@@ -136,7 +136,11 @@
 
       <!-- 中间：编辑区 -->
       <main class="flex-1 overflow-y-auto">
-        <div class="max-w-4xl mx-auto py-6 px-4">
+        <div 
+          :class="[
+            isPreviewMode ? 'w-full py-4 px-2' : 'max-w-4xl mx-auto py-6 px-4'
+          ]"
+        >
           <!-- 加载状态 -->
           <div v-if="isLoading" class="text-center py-12">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -159,13 +163,13 @@
           </div>
 
           <!-- Cell 列表 -->
-          <div v-else-if="currentLesson" class="space-y-4">
+          <div v-else-if="currentLesson" :class="isPreviewMode ? 'space-y-2' : 'space-y-4'">
             <!-- 课堂控制面板（预览模式下） -->
             <TeacherClassroomControlPanel
               v-if="isPreviewMode && showClassroomPanel && currentLesson"
               :lesson-id="currentLesson.id"
               :lesson="currentLesson"
-              class="mb-6"
+              :class="isPreviewMode ? 'mb-2' : 'mb-6'"
             />
 
             <!-- MVP: 参考资源面板 -->
@@ -192,7 +196,7 @@
             </div>
 
             <!-- Cell 列表容器 -->
-            <div ref="cellListRef" class="space-y-4">
+            <div ref="cellListRef" :class="isPreviewMode ? 'space-y-2' : 'space-y-4'">
               <template v-for="(cell, index) in cells" :key="cell.id">
                 <!-- 顶部添加按钮（第一个 Cell 前） -->
                 <div v-if="index === 0 && !isPreviewMode" class="add-cell-menu-container">

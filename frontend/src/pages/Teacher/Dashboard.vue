@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50">
     <!-- 统一头部 -->
     <DashboardHeader
       title="教师工作台"
@@ -20,50 +20,82 @@
             <!-- 问答总览卡片 -->
           <router-link
             to="/teacher/questions"
-            class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white hover:shadow-xl transition-shadow cursor-pointer"
+            class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
           >
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-semibold">💬 学生问答</h3>
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cyan-500 to-blue-600"></span>
+            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-cyan-50/80 via-transparent to-transparent"></div>
+
+            <div class="relative flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-cyan-600">学生问答</p>
+                <h3 class="mt-1 text-lg font-bold text-gray-900">互动反馈</h3>
+              </div>
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg bg-gradient-to-br from-cyan-500 to-blue-600">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+            </div>
+
+            <div v-if="questionStats" class="relative mt-4 flex items-baseline gap-2">
+              <span class="text-3xl font-bold text-cyan-700">{{ questionStats.pending || 0 }}</span>
+              <span class="text-sm text-gray-500">待回答</span>
+            </div>
+            <div v-else class="relative mt-4 text-sm text-gray-500">加载中...</div>
+
+            <p class="relative mt-3 text-sm text-gray-600 leading-relaxed">
+              {{ questionStats?.pending ? '有待处理互动，尽快回应学生的实时反馈。' : '课堂互动已及时闭环，随时查看评估总览。' }}
+            </p>
+            <p v-if="questionStats" class="relative mt-1 text-xs text-gray-500">
+              总问题 {{ questionStats.total || 0 }} · 已解决 {{ questionStats.resolved || 0 }}
+            </p>
+
+            <div class="relative mt-4 inline-flex items-center gap-1 text-sm font-medium text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 px-4 py-2 rounded-xl transition-all">
+              查看总览
+              <svg class="ml-1 h-4 w-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
-            </div>
-            <div v-if="questionStats" class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-blue-100">待回答</span>
-                <span class="text-2xl font-bold">{{ questionStats.pending || 0 }}</span>
-              </div>
-              <div class="text-sm text-blue-100 opacity-80">
-                总问题: {{ questionStats.total || 0 }} | 已解决: {{ questionStats.resolved || 0 }}
-              </div>
-            </div>
-            <div v-else class="text-blue-100 text-sm">
-              加载中...
             </div>
           </router-link>
 
           <!-- 学科教研组卡片 -->
           <router-link
             to="/teacher/subject-groups"
-            class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white hover:shadow-xl transition-shadow cursor-pointer"
+            class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
           >
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-semibold">👥 学科教研组</h3>
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600"></span>
+            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-emerald-50/80 via-transparent to-transparent"></div>
+
+            <div class="relative flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-emerald-600">学科教研组</p>
+                <h3 class="mt-1 text-lg font-bold text-gray-900">协作共研</h3>
+              </div>
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg bg-gradient-to-br from-emerald-500 to-teal-600">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+            </div>
+
+            <div v-if="subjectGroupStats" class="relative mt-4 flex items-baseline gap-2">
+              <span class="text-3xl font-bold text-emerald-700">{{ subjectGroupStats.my_groups || 0 }}</span>
+              <span class="text-sm text-gray-500">我的教研组</span>
+            </div>
+            <div v-else class="relative mt-4 text-sm text-gray-500">加载中...</div>
+
+            <p class="relative mt-3 text-sm text-gray-600 leading-relaxed">
+              {{ subjectGroupStats?.my_groups ? '在教研组内沉淀成果，推动持续改进。' : '将优秀实践分享到教研组，形成共研。' }}
+            </p>
+            <p v-if="subjectGroupStats" class="relative mt-1 text-xs text-gray-500">
+              全部 {{ subjectGroupStats.total_groups || 0 }} 个 · 共享教案 {{ subjectGroupStats.total_shared_lessons || 0 }} 篇
+            </p>
+
+            <div class="relative mt-4 inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-xl transition-all">
+              进入教研组
+              <svg class="ml-1 h-4 w-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
-            </div>
-            <div v-if="subjectGroupStats" class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-green-100">我的教研组</span>
-                <span class="text-2xl font-bold">{{ subjectGroupStats.my_groups || 0 }}</span>
-              </div>
-              <div class="text-sm text-green-100 opacity-80">
-                全部: {{ subjectGroupStats.total_groups || 0 }} | 共享教案: {{ subjectGroupStats.total_shared_lessons || 0 }}
-              </div>
-            </div>
-            <div v-else class="text-green-100 text-sm">
-              加载中...
             </div>
           </router-link>
 
@@ -71,31 +103,48 @@
           <button
             type="button"
             @click="openAssistantModal"
-            class="bg-gradient-to-br from-purple-500 via-indigo-500 to-purple-600 rounded-lg shadow-lg p-6 text-left text-white hover:shadow-xl transition-shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-300"
+            class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 text-left shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-300"
           >
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-semibold">🤖 AI 教学助理</h3>
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-violet-500 to-purple-600"></span>
+            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-violet-50/80 via-transparent to-transparent"></div>
+
+            <div class="relative flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-violet-600">AI 教学助理</p>
+                <h3 class="mt-1 text-lg font-bold text-gray-900">智能建议</h3>
+              </div>
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg bg-gradient-to-br from-violet-500 to-purple-600">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+            </div>
+
+            <p class="relative mt-4 text-sm text-gray-600 leading-relaxed">
+              基于课堂数据的智能建议，快速制定教学行动。
+            </p>
+
+            <ul class="relative mt-3 space-y-1.5">
+              <li class="flex items-center gap-2 text-xs text-gray-500">
+                <span class="inline-flex h-1 w-1 rounded-full bg-violet-400"></span>
+                <span>即时总结课堂表现</span>
+              </li>
+              <li class="flex items-center gap-2 text-xs text-gray-500">
+                <span class="inline-flex h-1 w-1 rounded-full bg-violet-400"></span>
+                <span>生成教学改进建议</span>
+              </li>
+              <li class="flex items-center gap-2 text-xs text-gray-500">
+                <span class="inline-flex h-1 w-1 rounded-full bg-violet-400"></span>
+                <span>一键草拟课堂答疑</span>
+              </li>
+            </ul>
+
+            <div class="relative mt-4 inline-flex items-center gap-1 text-sm font-medium text-violet-600 hover:text-violet-700 hover:bg-violet-50 px-4 py-2 rounded-xl transition-all">
+              使用助理
+              <svg class="ml-1 h-4 w-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
             </div>
-            <p class="text-sm text-purple-100 mb-3">
-              基于课堂数据的智能建议，快速制定教学行动。
-            </p>
-            <ul class="space-y-1 text-xs text-purple-100 opacity-90">
-              <li class="flex items-center gap-2">
-                <span class="inline-flex h-1.5 w-1.5 rounded-full bg-purple-200"></span>
-                即时总结课堂表现
-              </li>
-              <li class="flex items-center gap-2">
-                <span class="inline-flex h-1.5 w-1.5 rounded-full bg-purple-200"></span>
-                生成教学改进建议
-              </li>
-              <li class="flex items-center gap-2">
-                <span class="inline-flex h-1.5 w-1.5 rounded-full bg-purple-200"></span>
-                一键草拟课堂答疑
-              </li>
-            </ul>
           </button>
           </div>
         </section>
@@ -104,16 +153,16 @@
       <section class="dashboard-section">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <h2 class="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
               <span>🔄</span>
               <span>PDCA 教学质量管理循环</span>
             </h2>
-            <p class="mt-1 text-sm text-gray-500">
+            <p class="mt-2 text-sm text-gray-600">
               从教学设计到课堂实施、过程评估与循证改进，持续优化教学闭环。
             </p>
           </div>
-          <div v-if="isPdcaLoading" class="flex items-center gap-2 text-sm text-gray-500">
-            <svg class="w-4 h-4 text-blue-500 animate-spin" viewBox="0 0 24 24" fill="none">
+          <div v-if="isPdcaLoading" class="flex items-center gap-2 text-sm text-emerald-600">
+            <svg class="w-4 h-4 text-emerald-500 animate-spin" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
             </svg>
@@ -121,13 +170,13 @@
           </div>
         </div>
 
-        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           <div
             v-for="stage in pdcaStages"
             :key="stage.key"
-            class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
+            class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
           >
-            <span :class="['absolute inset-x-0 top-0 h-1', stage.accentBar]"></span>
+            <span :class="['absolute inset-x-0 top-0 h-1.5', stage.accentBar]"></span>
             <div
               :class="['absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none', stage.hoverGradient]"
             ></div>
@@ -137,11 +186,11 @@
                 <p :class="['text-xs font-semibold uppercase tracking-wide', stage.labelClass]">
                   {{ stage.label }}
                 </p>
-                <h3 class="mt-1 text-lg font-semibold text-gray-900">
+                <h3 class="mt-1 text-lg font-bold text-gray-900">
                   {{ stage.title }}
                 </h3>
               </div>
-              <div :class="['flex h-11 w-11 items-center justify-center rounded-full', stage.iconBg]">
+              <div :class="['flex h-12 w-12 items-center justify-center rounded-xl shadow-lg', stage.iconBg]">
                 <span :class="['text-xl', stage.iconText]">{{ stage.icon }}</span>
               </div>
             </div>
@@ -150,13 +199,13 @@
               <span :class="['text-3xl font-bold', stage.metricText]">
                 {{ stage.value }}
               </span>
-              <span class="text-sm text-gray-400">{{ stage.unit }}</span>
+              <span class="text-sm text-gray-500">{{ stage.unit }}</span>
             </div>
 
             <p class="relative mt-3 text-sm text-gray-600 leading-relaxed">
               {{ stage.description }}
             </p>
-            <p v-if="stage.secondary" class="relative mt-1 text-xs text-gray-400">
+            <p v-if="stage.secondary" class="relative mt-1 text-xs text-gray-500">
               {{ stage.secondary }}
             </p>
 
@@ -164,10 +213,10 @@
               v-if="stage.cta && stage.action"
               type="button"
               @click="stage.action()"
-              :class="['relative mt-4 inline-flex items-center gap-1 text-sm font-medium', stage.buttonClass]"
+              :class="['relative mt-4 inline-flex items-center gap-1 text-sm font-medium px-4 py-2 rounded-xl transition-all', stage.buttonClass]"
             >
               {{ stage.cta }}
-              <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="ml-1 h-4 w-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -179,17 +228,17 @@
         <div class="mb-6">
           <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h2 class="text-2xl font-bold text-gray-900">我的教案</h2>
-              <p class="mt-1 text-sm text-gray-500">
+              <h2 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-gray-900 via-emerald-700 to-teal-700 bg-clip-text text-transparent">我的教案</h2>
+              <p class="mt-2 text-sm text-gray-600">
                 共 {{ lessonStore.totalLessons }} 个教案
-                <span v-if="selectedGrade" class="ml-2 text-blue-600">
+                <span v-if="selectedGrade" class="ml-2 text-emerald-600 font-medium">
                   - 已筛选: {{ selectedGradeName }}
                 </span>
-                <span v-if="selectedChapterId && selectedChapterName" class="ml-2 text-green-600">
+                <span v-if="selectedChapterId && selectedChapterName" class="ml-2 text-teal-600 font-medium">
                   - 章节: {{ selectedChapterName }}
                   <button 
                     @click="clearChapterFilter"
-                    class="ml-1 text-xs hover:underline"
+                    class="ml-1 text-xs hover:underline hover:text-teal-700 transition-colors"
                   >
                     ✕ 清除
                   </button>
@@ -205,15 +254,15 @@
 
               <div class="flex items-center gap-3">
               <!-- 视图切换按钮 -->
-              <div class="inline-flex rounded-md shadow-sm" role="group">
+              <div class="inline-flex rounded-xl shadow-sm bg-white/80 backdrop-blur-sm border border-gray-200" role="group">
                 <button
                   @click="viewMode = 'list'"
                   :class="[
-                    'px-4 py-2 text-sm font-medium border transition-colors',
-                    'rounded-l-md',
+                    'px-4 py-2 text-sm font-medium transition-all',
+                    'rounded-l-xl',
                     viewMode === 'list'
-                      ? 'bg-blue-600 text-white border-blue-600 z-10'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 z-10'
+                      : 'bg-transparent text-gray-700 hover:bg-gray-50'
                   ]"
                   title="列表视图"
                 >
@@ -224,11 +273,11 @@
                 <button
                   @click="viewMode = 'tree'"
                   :class="[
-                    'px-4 py-2 text-sm font-medium border transition-colors',
-                    'rounded-r-md',
+                    'px-4 py-2 text-sm font-medium transition-all',
+                    'rounded-r-xl',
                     viewMode === 'tree'
-                      ? 'bg-blue-600 text-white border-blue-600 z-10'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 z-10'
+                      : 'bg-transparent text-gray-700 hover:bg-gray-50'
                   ]"
                   title="课程体系视图"
                 >
@@ -241,7 +290,7 @@
               <!-- 创建教案按钮 -->
               <button
                 @click="showCreateModal = true"
-                class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium rounded-xl hover:from-emerald-600 hover:to-teal-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transform hover:scale-105"
               >
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -267,7 +316,7 @@
                 v-model="searchQuery"
                 type="text"
                 placeholder="搜索教案标题..."
-                class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                class="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-xl leading-5 bg-white/80 backdrop-blur-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm transition-all"
               />
             </div>
           </div>
@@ -279,10 +328,10 @@
               :key="filter.value || 'all'"
               @click="currentStatus = filter.value"
               :class="[
-                'px-4 py-2 text-sm font-medium rounded-md transition-colors',
+                'px-4 py-2.5 text-sm font-medium rounded-xl transition-all',
                 currentStatus === filter.value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
+                  : 'bg-white/80 backdrop-blur-sm text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400',
               ]"
             >
               {{ filter.label }}
@@ -294,7 +343,7 @@
             <select
               v-model="selectedChapterId"
               @change="handleChapterSelected"
-              class="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              class="px-3 py-2.5 text-sm border border-gray-300 rounded-xl bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
             >
               <option value="">所有章节</option>
               <option v-for="chapter in availableChapters" :key="chapter.id" :value="chapter.id">
@@ -309,7 +358,7 @@
           <!-- 错误提示 -->
           <div
             v-if="lessonStore.error"
-            class="mb-6 bg-red-50 border border-red-200 rounded-md p-4"
+            class="mb-6 bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-2xl p-4 shadow-lg"
           >
             <div class="flex">
               <div class="flex-shrink-0">
@@ -328,13 +377,13 @@
           <div
             v-for="i in 6"
             :key="i"
-            class="bg-white rounded-lg border border-gray-200 overflow-hidden animate-pulse"
+            class="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-pulse"
           >
-            <div class="h-40 bg-gray-200"></div>
+            <div class="h-40 bg-gradient-to-br from-gray-200 to-gray-300"></div>
             <div class="p-4">
-              <div class="h-6 bg-gray-200 rounded mb-2"></div>
-              <div class="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
-              <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+              <div class="h-6 bg-gray-200 rounded-xl mb-2"></div>
+              <div class="h-4 bg-gray-200 rounded-lg w-3/4 mb-4"></div>
+              <div class="h-4 bg-gray-200 rounded-lg w-1/2"></div>
             </div>
             </div>
           </div>
@@ -342,7 +391,7 @@
           <!-- 空状态 -->
           <div
             v-else-if="!lessonStore.isLoading && lessonStore.lessons.length === 0"
-            class="bg-white rounded-lg border border-gray-200 p-12 text-center"
+            class="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-12 text-center"
           >
           <svg
             class="mx-auto h-12 w-12 text-gray-400"
@@ -365,7 +414,7 @@
             <button
               v-if="!searchQuery && !currentStatus"
               @click="showCreateModal = true"
-              class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+              class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium rounded-xl hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transform hover:scale-105 transition-all"
             >
               <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -397,20 +446,20 @@
           <!-- 分页控件 -->
           <div
             v-if="!lessonStore.isLoading && lessonStore.lessons.length > 0 && lessonStore.totalLessons > lessonStore.pageSize"
-            class="mt-6 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg"
+            class="mt-6 flex items-center justify-between border-t border-gray-200 bg-white/80 backdrop-blur-sm px-4 py-3 sm:px-6 rounded-2xl shadow-lg"
           >
           <div class="flex flex-1 justify-between sm:hidden">
             <button
               @click="handlePrevPage"
               :disabled="lessonStore.currentPage === 1"
-              class="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               上一页
             </button>
             <button
               @click="handleNextPage"
               :disabled="lessonStore.currentPage >= totalPages"
-              class="relative ml-3 inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="relative ml-3 inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               下一页
             </button>
@@ -432,20 +481,20 @@
                 <button
                   @click="handlePrevPage"
                   :disabled="lessonStore.currentPage === 1"
-                  class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="relative inline-flex items-center rounded-l-xl px-3 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   <span class="sr-only">上一页</span>
                   <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
                   </svg>
                 </button>
-                <span class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300">
+                <span class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 bg-white/50">
                   {{ lessonStore.currentPage }} / {{ totalPages }}
                 </span>
                 <button
                   @click="handleNextPage"
                   :disabled="lessonStore.currentPage >= totalPages"
-                  class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="relative inline-flex items-center rounded-r-xl px-3 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   <span class="sr-only">下一页</span>
                   <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -516,8 +565,8 @@
       >
         <div
           :class="[
-            'rounded-lg shadow-lg p-4',
-            toast.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200',
+            'rounded-2xl shadow-xl p-4 backdrop-blur-sm',
+            toast.type === 'success' ? 'bg-green-50/90 border border-green-200' : 'bg-red-50/90 border border-red-200',
           ]"
         >
           <div class="flex items-start">
@@ -698,40 +747,40 @@ const pdcaStages = computed(() => {
     }
   > = {
     plan: {
-      accentBar: 'bg-indigo-400',
-      hoverGradient: 'bg-gradient-to-br from-indigo-50/80 via-transparent to-transparent',
-      iconBg: 'bg-indigo-100',
-      iconText: 'text-indigo-600',
-      metricText: 'text-indigo-700',
-      labelClass: 'text-indigo-500',
-      buttonClass: 'text-indigo-600 hover:text-indigo-700',
+      accentBar: 'bg-gradient-to-r from-violet-500 to-purple-600',
+      hoverGradient: 'bg-gradient-to-br from-violet-50/80 via-transparent to-transparent',
+      iconBg: 'bg-gradient-to-br from-violet-500 to-purple-600',
+      iconText: 'text-white',
+      metricText: 'text-violet-700',
+      labelClass: 'text-violet-600',
+      buttonClass: 'text-violet-600 hover:text-violet-700 hover:bg-violet-50',
     },
     do: {
-      accentBar: 'bg-sky-400',
-      hoverGradient: 'bg-gradient-to-br from-sky-50/80 via-transparent to-transparent',
-      iconBg: 'bg-sky-100',
-      iconText: 'text-sky-600',
-      metricText: 'text-sky-700',
-      labelClass: 'text-sky-500',
-      buttonClass: 'text-sky-600 hover:text-sky-700',
+      accentBar: 'bg-gradient-to-r from-cyan-500 to-teal-600',
+      hoverGradient: 'bg-gradient-to-br from-cyan-50/80 via-transparent to-transparent',
+      iconBg: 'bg-gradient-to-br from-cyan-500 to-teal-600',
+      iconText: 'text-white',
+      metricText: 'text-cyan-700',
+      labelClass: 'text-cyan-600',
+      buttonClass: 'text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50',
     },
     check: {
-      accentBar: 'bg-emerald-400',
+      accentBar: 'bg-gradient-to-r from-emerald-500 to-green-600',
       hoverGradient: 'bg-gradient-to-br from-emerald-50/80 via-transparent to-transparent',
-      iconBg: 'bg-emerald-100',
-      iconText: 'text-emerald-600',
+      iconBg: 'bg-gradient-to-br from-emerald-500 to-green-600',
+      iconText: 'text-white',
       metricText: 'text-emerald-700',
-      labelClass: 'text-emerald-500',
-      buttonClass: 'text-emerald-600 hover:text-emerald-700',
+      labelClass: 'text-emerald-600',
+      buttonClass: 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50',
     },
     act: {
-      accentBar: 'bg-purple-400',
-      hoverGradient: 'bg-gradient-to-br from-purple-50/80 via-transparent to-transparent',
-      iconBg: 'bg-purple-100',
-      iconText: 'text-purple-600',
-      metricText: 'text-purple-700',
-      labelClass: 'text-purple-500',
-      buttonClass: 'text-purple-600 hover:text-purple-700',
+      accentBar: 'bg-gradient-to-r from-amber-500 to-orange-600',
+      hoverGradient: 'bg-gradient-to-br from-amber-50/80 via-transparent to-transparent',
+      iconBg: 'bg-gradient-to-br from-amber-500 to-orange-600',
+      iconText: 'text-white',
+      metricText: 'text-amber-700',
+      labelClass: 'text-amber-600',
+      buttonClass: 'text-amber-600 hover:text-amber-700 hover:bg-amber-50',
     },
   }
 
@@ -1221,11 +1270,12 @@ onMounted(() => {
 
 <style scoped>
 .dashboard-section {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
   border: 1px solid rgba(226, 232, 240, 0.8);
-  border-radius: 1.25rem;
-  box-shadow: 0 12px 35px -25px rgba(15, 23, 42, 0.35);
-  padding: 1.75rem;
+  border-radius: 1.5rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 2rem;
 }
 
 .overview-grid {

@@ -1,8 +1,8 @@
 <template>
-  <header class="relative overflow-hidden border-b border-gray-200 bg-white/90 backdrop-blur">
-    <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-blue-200/40 to-transparent"></div>
-    <div class="absolute inset-y-0 left-0 w-48 bg-gradient-to-br from-blue-50/60 via-transparent to-transparent pointer-events-none"></div>
-    <div class="absolute -bottom-8 -right-8 h-32 w-32 rounded-full bg-blue-100/40 blur-3xl pointer-events-none"></div>
+  <header class="relative overflow-hidden border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
+    <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-200/40 to-transparent"></div>
+    <div class="absolute inset-y-0 left-0 w-48 bg-gradient-to-br from-emerald-50/60 via-transparent to-transparent pointer-events-none"></div>
+    <div class="absolute -bottom-8 -right-8 h-32 w-32 rounded-full bg-emerald-100/40 blur-3xl pointer-events-none"></div>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div class="flex flex-col gap-5">
@@ -10,14 +10,14 @@
         <!-- 左侧：标题和欢迎信息 -->
         <div class="relative z-10">
           <div class="flex items-center gap-3">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 shadow-inner">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m8-6H4" />
+            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 shadow-lg shadow-emerald-500/20">
+              <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
               </svg>
             </div>
             <div>
-              <h1 class="text-2xl font-semibold text-gray-900 tracking-tight">{{ title }}</h1>
-              <p v-if="subtitle" class="text-sm text-gray-500 mt-1">
+              <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent tracking-tight">{{ title }}</h1>
+              <p v-if="subtitle" class="text-sm text-gray-600 mt-1 font-medium">
                 {{ subtitle }}
               </p>
             </div>
@@ -41,7 +41,7 @@
               <span
                 v-for="(info, index) in organizationInfo"
                 :key="index"
-                class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-blue-600"
+                class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700 border border-emerald-100"
               >
                 <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 10-6 0 3 3 0 006 0z" />
@@ -57,7 +57,7 @@
           <button
             v-if="showProfileButton"
             @click="$emit('profile')"
-            class="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all shadow-sm"
+            class="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm hover:bg-white border border-gray-200 rounded-xl transition-all shadow-sm hover:shadow-md"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -68,7 +68,7 @@
           <!-- 退出登录按钮 -->
           <button
             @click="$emit('logout')"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-rose-500 to-rose-600 rounded-xl shadow-md hover:shadow-lg hover:from-rose-600 hover:to-rose-700 transition-all"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-rose-500 to-rose-600 rounded-xl shadow-lg shadow-rose-500/30 hover:shadow-xl hover:shadow-rose-500/40 hover:from-rose-600 hover:to-rose-700 transition-all transform hover:scale-105"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H3m12 0l-4 4m4-4l-4-4m13 8v-8" />
@@ -137,8 +137,8 @@ defineEmits<{
   flex-wrap: wrap;
   gap: 0.85rem;
   padding: 1rem 1.25rem;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(79, 70, 229, 0.05));
-  border: 1px solid rgba(99, 102, 241, 0.18);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(20, 184, 166, 0.05));
+  border: 1px solid rgba(16, 185, 129, 0.18);
   border-radius: 1rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }

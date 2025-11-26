@@ -1,8 +1,26 @@
 <!-- eslint-disable vue/no-mutating-props -->
 <template>
-  <div class="code-cell cell-container">
-    <!-- 控制栏 - 编辑模式显示全部控件，预览模式下Python/JS显示运行按钮 -->
-    <div v-if="editable || cell.content.language !== 'html'" class="flex justify-between items-center mb-2">
+  <div class="code-cell cell-container" :class="{ 'fullscreen': isFullscreen }" ref="containerRef">
+    <!-- 工具栏 -->
+    <div class="cell-toolbar flex justify-between items-center mb-2">
+      <!-- 全屏按钮 -->
+      <button
+        class="cell-fullscreen-btn"
+        :class="{ 'active': isFullscreen }"
+        @click="toggleFullscreen"
+        :title="isFullscreen ? '退出全屏 (Esc)' : '全屏查看'"
+      >
+        <svg v-if="!isFullscreen" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+        </svg>
+        <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        <span class="text-sm font-medium ml-1">{{ isFullscreen ? '退出全屏' : '全屏' }}</span>
+      </button>
+      
+      <!-- 控制栏 - 编辑模式显示全部控件，预览模式下Python/JS显示运行按钮 -->
+      <div v-if="editable || cell.content.language !== 'html'" class="flex items-center gap-2">
       <div class="flex items-center gap-2">
         <!-- 语言选择器 - 仅编辑模式显示 -->
         <select
@@ -57,6 +75,7 @@
         </span>
       </div>
     </div>
+    </div>
 
     <!-- 代码编辑器 - HTML类型在预览模式下隐藏，Python/JS显示 -->
     <div :class="['code-editor-wrapper', { 'hidden': !editable && cell.content.language === 'html' }]">
@@ -91,13 +110,14 @@
 
 <script setup lang="ts">
 /* eslint-disable vue/no-mutating-props */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { python } from '@codemirror/lang-python'
 import { javascript } from '@codemirror/lang-javascript'
 import { html } from '@codemirror/lang-html'
 import { oneDark } from '@codemirror/theme-one-dark'
 import type { CodeCell as CodeCellType } from '../../types/cell'
+import { useFullscreen } from '@/composables/useFullscreen'
 import { pyodideService } from '../../services/pyodide'
 
 interface Props {
@@ -113,6 +133,9 @@ const emit = defineEmits<{
   update: [cell: CodeCellType]
 }>()
 
+const containerRef = ref<HTMLElement | null>(null)
+const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)
+
 const editorRef = ref<HTMLElement>()
 const htmlPreviewRef = ref<HTMLIFrameElement>()
 const output = ref('')
@@ -121,6 +144,7 @@ const isRunning = ref(false)
 const pyodideStatus = ref<'unloaded' | 'loading' | 'ready' | 'error'>('unloaded')
 const executionTime = ref(0)
 const iframeHeight = ref('800px')
+const editorHeight = ref<number | null>(null)
 
 let editorView: EditorView | null = null
 
@@ -137,6 +161,29 @@ const languageDisplayName = computed(() => {
       return props.cell.content.language
   }
 })
+
+// 更新编辑器高度的函数
+function updateEditorHeight() {
+  if (editorView && editorRef.value) {
+    nextTick(() => {
+      const contentHeight = editorView!.contentHeight
+      const minHeight = 100 // 最小高度
+      const maxHeight = 2000 // 最大高度（防止过长）
+      const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 20))
+      
+      editorHeight.value = newHeight
+      
+      // 直接设置编辑器高度
+      if (editorRef.value) {
+        const editorElement = editorRef.value.querySelector('.cm-editor') as HTMLElement
+        if (editorElement) {
+          editorElement.style.height = `${newHeight}px`
+          editorElement.style.minHeight = `${minHeight}px`
+        }
+      }
+    })
+  }
+}
 
 onMounted(() => {
   // 初始化编辑器（始终初始化，但通过CSS控制显示）
@@ -157,10 +204,23 @@ onMounted(() => {
             props.cell.content.code = update.state.doc.toString()
             emit('update', props.cell)
           }
+          // 内容变化时更新高度
+          updateEditorHeight()
+        }),
+        EditorView.theme({
+          '&': {
+            height: 'auto',
+          },
+          '.cm-scroller': {
+            overflow: 'visible',
+          },
         }),
       ],
       parent: editorRef.value,
     })
+    
+    // 初始设置高度
+    updateEditorHeight()
   }
   
   // 在预览模式下，如果是 HTML 类型，自动渲染；如果是 Python/JavaScript，自动运行
@@ -181,6 +241,8 @@ watch(
       editorView.dispatch({
         changes: { from: 0, to: editorView.state.doc.length, insert: newCode },
       })
+      // 代码变化后更新高度
+      updateEditorHeight()
     }
     
     // 如果是HTML代码变化，重新计算iframe高度
@@ -241,10 +303,25 @@ function handleLanguageChange() {
             props.cell.content.code = update.state.doc.toString()
             emit('update', props.cell)
           }
+          // 内容变化时更新高度
+          updateEditorHeight()
+        }),
+        EditorView.theme({
+          '&': {
+            height: 'auto',
+          },
+          '.cm-scroller': {
+            overflow: 'visible',
+          },
         }),
       ],
       parent: editorRef.value,
     })
+    
+    // 初始设置高度
+    setTimeout(() => {
+      updateEditorHeight()
+    }, 100)
   }
   
   // 触发更新
@@ -440,20 +517,70 @@ async function runCode() {
 </script>
 
 <style scoped>
+/* 全屏按钮样式 */
+.cell-toolbar {
+  @apply flex justify-between items-center;
+}
+
+.cell-fullscreen-btn {
+  @apply flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors;
+}
+
+.cell-fullscreen-btn.active {
+  @apply bg-red-50 hover:bg-red-100 text-red-700;
+}
+
+.cell-fullscreen-btn .icon {
+  @apply w-4 h-4;
+}
+
+/* 全屏模式样式 */
+.code-cell.fullscreen {
+  @apply fixed inset-0 z-50 bg-white overflow-auto;
+}
+
+.code-cell.fullscreen .code-editor-wrapper {
+  @apply p-4;
+}
+
+.code-cell.fullscreen .output-area,
+.code-cell.fullscreen .error-area,
+.code-cell.fullscreen .preview-area {
+  @apply p-4;
+}
+
 .code-cell {
   @apply p-4;
 }
 
 .code-editor-wrapper {
-  @apply border rounded overflow-hidden;
+  @apply border rounded;
+  overflow-x: auto;
+  overflow-y: visible;
+  position: relative;
 }
 
 :deep(.cm-editor) {
   @apply text-sm;
+  height: auto !important;
+  width: 100%;
 }
 
 :deep(.cm-scroller) {
-  @apply max-h-96 overflow-auto;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  min-height: 100px;
+}
+
+:deep(.cm-content) {
+  min-height: 100px;
+  overflow-wrap: normal;
+  white-space: pre;
+}
+
+:deep(.cm-line) {
+  white-space: pre;
+  word-break: normal;
 }
 </style>
 

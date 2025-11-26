@@ -224,16 +224,16 @@ onUnmounted(() => {
 }
 
 .classroom-banner {
-  @apply bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-4 shadow-lg;
+  @apply bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white rounded-2xl p-5 md:p-6 shadow-xl shadow-emerald-500/30;
 }
 
 .banner-content {
-  @apply flex items-center gap-3;
+  @apply flex items-center gap-4;
 }
 
 .exit-button {
-  @apply px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors flex items-center gap-2 font-medium text-sm;
-  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl transition-all flex items-center gap-2 font-medium text-sm shadow-lg hover:shadow-xl;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105;
 }
 
 .exit-button:hover:not(:disabled) {
@@ -245,7 +245,7 @@ onUnmounted(() => {
 }
 
 .live-indicator {
-  @apply w-3 h-3 bg-red-500 rounded-full animate-pulse;
+  @apply w-3 h-3 bg-white rounded-full animate-pulse shadow-lg;
 }
 
 .banner-text {
@@ -253,27 +253,27 @@ onUnmounted(() => {
 }
 
 .banner-title {
-  @apply text-lg font-bold mb-1;
+  @apply text-xl md:text-2xl font-bold mb-2;
 }
 
 .banner-subtitle {
-  @apply text-sm text-blue-100;
+  @apply text-sm md:text-base text-emerald-50 font-medium;
 }
 
 .teacher-name {
-  @apply font-medium;
+  @apply font-semibold;
 }
 
 .sync-status {
-  @apply mt-3 pt-3 border-t border-blue-400 flex items-center gap-2 text-sm text-blue-100;
+  @apply mt-4 pt-4 border-t border-emerald-300/50 flex items-center gap-2 text-sm text-emerald-50 font-medium;
 }
 
 .sync-icon {
-  @apply animate-spin;
+  @apply animate-spin text-lg;
 }
 
 .classroom-info {
-  @apply flex items-center gap-6 text-sm text-gray-600 bg-gray-50 rounded-lg p-3;
+  @apply flex items-center gap-6 text-sm bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/50;
 }
 
 .info-item {
@@ -281,23 +281,23 @@ onUnmounted(() => {
 }
 
 .info-label {
-  @apply text-gray-600;
+  @apply text-gray-600 font-medium;
 }
 
 .info-value {
-  @apply font-semibold text-gray-900;
+  @apply font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent;
 }
 
 .waiting-banner {
-  @apply bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-lg p-4 shadow-lg;
+  @apply bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white rounded-2xl p-5 md:p-6 shadow-xl shadow-emerald-500/30;
 }
 
 .waiting-indicator {
-  @apply text-2xl;
+  @apply text-3xl animate-pulse;
 }
 
 .waiting-message {
-  @apply mt-3 pt-3 border-t border-yellow-300 text-sm text-yellow-50;
+  @apply mt-4 pt-4 border-t border-emerald-300/50 text-sm text-emerald-50 font-medium;
 }
 </style>
 

@@ -66,7 +66,7 @@
     <div :class="{ 'pointer-events-none opacity-30': isLocked }">
       <!-- Cell 头部信息栏 -->
       <div :class="[
-        'flex items-center justify-between mb-3 p-3 rounded-t-lg',
+        'flex items-center justify-between mb-3 p-4 md:p-6 rounded-t-lg',
         getStageBgClass(cellIndex),
         getStageBorderClass(cellIndex)
       ]">
@@ -145,7 +145,7 @@
       </div>
 
       <!-- Cell 实际内容 -->
-      <div class="p-6 bg-white rounded-b-lg border border-gray-200">
+      <div class="bg-white rounded-b-lg border border-gray-200">
         <slot></slot>
       </div>
     </div>

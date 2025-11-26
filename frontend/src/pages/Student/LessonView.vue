@@ -1,20 +1,26 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50 relative overflow-hidden">
+    <!-- 装饰性背景元素 -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-emerald-200/40 to-teal-200/40 rounded-full blur-3xl"></div>
+      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-cyan-200/40 to-blue-200/40 rounded-full blur-3xl"></div>
+    </div>
+
     <!-- 加载状态 -->
-    <div v-if="loading" class="flex items-center justify-center min-h-screen">
-      <div class="text-center">
-        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-        <p class="mt-4 text-gray-600">加载中...</p>
+    <div v-if="loading" class="flex items-center justify-center min-h-screen relative z-10">
+      <div class="text-center bg-white/80 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white/50">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+        <p class="mt-4 text-gray-700 font-medium">加载中...</p>
       </div>
     </div>
 
     <!-- 错误状态 -->
-    <div v-else-if="error" class="flex items-center justify-center min-h-screen">
-      <div class="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-        <p class="text-red-600 mb-4">{{ error }}</p>
+    <div v-else-if="error" class="flex items-center justify-center min-h-screen relative z-10">
+      <div class="bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-2xl p-6 max-w-md shadow-xl">
+        <p class="text-red-600 mb-4 font-medium">{{ error }}</p>
         <button
           @click="router.back()"
-          class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+          class="px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl hover:from-red-600 hover:to-rose-600 font-medium shadow-lg shadow-red-500/30 hover:shadow-xl transition-all transform hover:scale-105"
         >
           返回
         </button>
@@ -44,14 +50,51 @@
           </div>
         </div>
         
+        <!-- 全屏提示弹窗 -->
+        <Transition name="fade">
+          <div
+            v-if="showFullscreenPrompt"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            @click.self="showFullscreenPrompt = false"
+          >
+            <div class="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
+              <div class="flex items-center gap-4 mb-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900">教师要求进入全屏模式</h3>
+                  <p class="text-sm text-gray-600">点击下方按钮进入全屏，以便更好地集中注意力学习</p>
+                </div>
+              </div>
+              <div class="flex gap-3">
+                <button
+                  @click="toggleFullscreen('fullscreen')"
+                  class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  进入全屏
+                </button>
+                <button
+                  @click="showFullscreenPrompt = false"
+                  class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  稍后
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+
         <!-- 顶部导航栏 -->
-        <header class="bg-white shadow-sm sticky top-0 z-10">
+        <header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-10 border-b border-gray-100">
           <div class="px-6 py-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-4">
                 <button
                   @click="router.push('/student')"
-                  class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  class="p-2 hover:bg-gray-100 rounded-xl transition-all transform hover:scale-105"
                   title="返回"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -59,8 +102,8 @@
                   </svg>
                 </button>
                 <div>
-                  <h1 class="text-xl font-bold text-gray-900">{{ lesson.title }}</h1>
-                  <p class="text-sm text-gray-500 mt-1">
+                  <h1 class="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">{{ lesson.title }}</h1>
+                  <p class="text-sm text-gray-600 mt-1 font-medium">
                     <span v-if="lesson.course">{{ lesson.course.name }}</span>
                     <span v-if="lesson.chapter"> / {{ lesson.chapter.name }}</span>
                   </p>
@@ -70,7 +113,7 @@
                 <!-- 侧边栏切换按钮 -->
                 <button
                   @click="toggleSidebar"
-                  class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  class="p-2 hover:bg-gray-100 rounded-xl transition-all transform hover:scale-105"
                   :title="sidebarVisible ? '隐藏学习空间' : '显示学习空间'"
                 >
                   <svg 
@@ -93,24 +136,24 @@
                   </svg>
                 </button>
                 <!-- WebSocket 连接状态指示器 -->
-                <div v-if="isInClassroomMode" class="flex items-center gap-2 px-3 py-1.5 rounded-lg" :class="isWebSocketConnected ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'">
-                  <div class="w-2 h-2 rounded-full" :class="isWebSocketConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'"></div>
+                <div v-if="isInClassroomMode" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border" :class="isWebSocketConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-200'">
+                  <div class="w-2 h-2 rounded-full" :class="isWebSocketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'"></div>
                   <span class="text-xs font-medium">{{ isWebSocketConnected ? '实时同步' : '轮询模式' }}</span>
                 </div>
                 <!-- 学习进度 -->
-                <div class="flex items-center gap-2">
-                  <span class="text-sm text-gray-600">学习进度:</span>
-                  <span class="text-sm font-semibold text-blue-600">{{ progress }}%</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-100">
+                  <span class="text-sm text-gray-600 font-medium">学习进度:</span>
+                  <span class="text-sm font-bold text-emerald-600">{{ progress }}%</span>
                 </div>
                 <!-- 完成按钮 -->
                 <button
                   v-if="progress < 100"
                   @click="markAsCompleted"
-                  class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm"
+                  class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 text-sm font-medium shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all transform hover:scale-105"
                 >
                   标记为完成
                 </button>
-                <div v-else class="flex items-center gap-2 text-green-600">
+                <div v-else class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-600">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -122,8 +165,8 @@
         </header>
 
         <!-- 课程描述 -->
-        <div v-if="lesson.description" class="bg-blue-50 border-l-4 border-blue-500 px-6 py-4">
-          <p class="text-gray-700">{{ lesson.description }}</p>
+        <div v-if="lesson.description" class="bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500 px-6 py-4">
+          <p class="text-gray-700 font-medium">{{ lesson.description }}</p>
         </div>
 
         <!-- 课堂模式提示 -->
@@ -134,29 +177,31 @@
           :on-leave-session="leaveSession"
         />
 
-        <!-- Cell 内容 -->
-        <div class="px-6 py-8 max-w-5xl">
-          <!-- 课堂模式：等待教师切换内容 -->
-          <div 
-            v-if="isInClassroomMode && !hasDisplayableContent && lesson.content && lesson.content.length > 0" 
-            class="text-center py-16 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300"
-          >
-            <div class="max-w-md mx-auto">
-              <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <!-- 课堂模式：等待教师切换内容（全屏显示） -->
+        <div 
+          v-if="isInClassroomMode && !hasDisplayableContent && lesson.content && lesson.content.length > 0" 
+          class="mx-6 my-8 text-center py-24 bg-gradient-to-br from-emerald-50/80 via-teal-50/80 to-cyan-50/80 rounded-2xl border-2 border-dashed border-emerald-300/50 backdrop-blur-sm shadow-lg"
+        >
+          <div class="max-w-md mx-auto">
+            <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <svg class="h-10 w-10 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <h3 class="text-lg font-medium text-gray-900 mb-2">等待教师切换内容</h3>
-              <p class="text-sm text-gray-600">
-                教师正在准备课程内容，请稍候...
-              </p>
-              <p class="text-xs text-gray-500 mt-2">
-                教师切换内容后，这里将显示相应的学习模块
-              </p>
             </div>
+            <h3 class="text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-3">等待教师切换内容</h3>
+            <p class="text-sm text-gray-700 font-medium mb-2">
+              教师正在准备课程内容，请稍候...
+            </p>
+            <p class="text-xs text-gray-600">
+              教师切换内容后，这里将显示相应的学习模块
+            </p>
           </div>
-          
+        </div>
+
+        <!-- Cell 内容 -->
+        <div v-if="filteredCells.length > 0" class="w-full">
           <!-- 正常内容显示 -->
-          <div v-else-if="filteredCells.length > 0" class="space-y-6">
+          <div class="space-y-6 px-6">
             <!-- 🎓 学习科学优化：使用 CellWrapper 组件实现认知脚手架 -->
             <CellWrapper
               v-for="(cell, index) in filteredCells"
@@ -178,7 +223,7 @@
           </div>
 
           <!-- 空状态 -->
-          <div v-else-if="!isInClassroomMode || (isInClassroomMode && hasDisplayableContent && filteredCells.length === 0)" class="text-center py-12">
+          <div v-if="!isInClassroomMode || (isInClassroomMode && hasDisplayableContent && filteredCells.length === 0)" class="text-center py-12">
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
@@ -398,6 +443,81 @@ const questionsPage = ref(1)
 
 // 课堂会话相关状态
 const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录
+
+// 全屏提示状态
+const showFullscreenPrompt = ref(false)
+const pendingFullscreenMode = ref<'fullscreen' | 'window' | null>(null)
+
+// 全屏切换函数（用户交互触发）
+async function toggleFullscreen(mode: 'fullscreen' | 'window') {
+  try {
+    if (mode === 'fullscreen') {
+      // 进入全屏
+      const element = document.documentElement
+      if (element.requestFullscreen) {
+        await element.requestFullscreen()
+      } else if ((element as any).webkitRequestFullscreen) {
+        await (element as any).webkitRequestFullscreen()
+      } else if ((element as any).mozRequestFullScreen) {
+        await (element as any).mozRequestFullScreen()
+      } else if ((element as any).msRequestFullscreen) {
+        await (element as any).msRequestFullscreen()
+      }
+      console.log('✅ 已进入全屏模式')
+      showFullscreenPrompt.value = false
+      pendingFullscreenMode.value = null
+    } else {
+      // 退出全屏
+      if (document.exitFullscreen) {
+        await document.exitFullscreen()
+      } else if ((document as any).webkitExitFullscreen) {
+        await (document as any).webkitExitFullscreen()
+      } else if ((document as any).mozCancelFullScreen) {
+        await (document as any).mozCancelFullScreen()
+      } else if ((document as any).msExitFullscreen) {
+        await (document as any).msExitFullscreen()
+      }
+      console.log('✅ 已退出全屏模式')
+      showFullscreenPrompt.value = false
+      pendingFullscreenMode.value = null
+    }
+  } catch (error: any) {
+    console.error('❌ 全屏切换失败:', error)
+    // 如果用户拒绝全屏请求，不显示错误提示（这是正常的浏览器行为）
+    if (error.name !== 'NotAllowedError') {
+      console.warn('⚠️ 全屏切换被拒绝或浏览器不支持')
+    }
+    showFullscreenPrompt.value = false
+    pendingFullscreenMode.value = null
+  }
+}
+
+// 处理WebSocket触发的全屏请求（显示提示）
+function handleFullscreenRequest(mode: 'fullscreen' | 'window') {
+  if (mode === 'fullscreen') {
+    // 显示提示，让用户点击按钮进入全屏
+    showFullscreenPrompt.value = true
+    pendingFullscreenMode.value = 'fullscreen'
+  } else {
+    // 退出全屏可以直接执行（不需要用户交互）
+    toggleFullscreen('window')
+  }
+}
+
+// 监听浏览器全屏状态变化（用户按Esc退出时）
+function handleFullscreenChange() {
+  const isCurrentlyFullscreen = !!(
+    document.fullscreenElement ||
+    (document as any).webkitFullscreenElement ||
+    (document as any).mozFullScreenElement ||
+    (document as any).msFullscreenElement
+  )
+  
+  // 如果用户手动退出全屏，但教师端仍设置为全屏模式，可以重新进入全屏
+  // 但为了避免循环，这里只记录状态，不自动重新进入
+  console.log('📺 浏览器全屏状态变化:', isCurrentlyFullscreen ? '全屏' : '窗口')
+}
+
 const {
   session: classroomSession,  // 直接使用 composable 返回的 session（会通过 WebSocket 实时更新）
   isInClassroomMode,
@@ -408,7 +528,7 @@ const {
   findAndJoinSession,
   leaveSession,
   updateProgress,  // 🆕 导入进度更新函数
-} = useClassroomSession(lessonId.value)
+} = useClassroomSession(lessonId.value, handleFullscreenRequest)
 
 // 自动保存定时器
 let notesAutoSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -1065,6 +1185,12 @@ onMounted(async () => {
   loadQuestions()
   // 初始化 display_cell_ids 监听器
   initDisplayCellIdsWatcher()
+  
+  // 监听浏览器全屏状态变化
+  document.addEventListener('fullscreenchange', handleFullscreenChange)
+  document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+  document.addEventListener('mozfullscreenchange', handleFullscreenChange)
+  document.addEventListener('MSFullscreenChange', handleFullscreenChange)
 })
 
 onUnmounted(() => {
@@ -1083,6 +1209,12 @@ onUnmounted(() => {
     stopWatchDisplayCellIds()
     stopWatchDisplayCellIds = null
   }
+  
+  // 移除全屏状态监听器
+  document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+  document.removeEventListener('mozfullscreenchange', handleFullscreenChange)
+  document.removeEventListener('MSFullscreenChange', handleFullscreenChange)
 })
 </script>
 

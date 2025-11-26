@@ -1,23 +1,32 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50 relative overflow-hidden">
+    <!-- 装饰性背景元素 -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-emerald-200/40 to-teal-200/40 rounded-full blur-3xl"></div>
+      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-cyan-200/40 to-blue-200/40 rounded-full blur-3xl"></div>
+      <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-teal-100/30 to-emerald-100/30 rounded-full blur-3xl"></div>
+    </div>
+
     <!-- 统一头部 -->
-    <DashboardHeader
-      title="学生工作台"
-      subtitle="开始您的学习之旅"
-      :user-name="userName"
-      :region-name="regionName"
-      :school-name="schoolName"
-      :grade-name="gradeName"
-      :classroom-name="classroomName"
-      :show-profile-button="true"
-      @profile="router.push('/student/profile')"
-      @logout="handleLogout"
-    />
+    <div class="relative z-10">
+      <DashboardHeader
+        title="学生工作台"
+        subtitle="开始您的学习之旅"
+        :user-name="userName"
+        :region-name="regionName"
+        :school-name="schoolName"
+        :grade-name="gradeName"
+        :classroom-name="classroomName"
+        :show-profile-button="true"
+        @profile="router.push('/student/profile')"
+        @logout="handleLogout"
+      />
+    </div>
 
     <!-- 主要内容区域 -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- 5E 学习活动循环横幅 -->
-      <div class="mb-8 rounded-2xl bg-gradient-to-r from-[#4C6EF5] via-[#7B5CF7] to-[#E056FD] shadow-2xl overflow-hidden">
+      <div class="mb-8 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 shadow-2xl shadow-emerald-500/30 overflow-hidden">
         <div class="p-8 md:p-10 text-white">
           <div class="flex flex-col gap-6">
             <div class="flex items-center gap-3">
@@ -61,18 +70,18 @@
       </div>
 
       <!-- 准备上课区域 -->
-      <div v-if="pendingSessions.length > 0" class="mb-8 rounded-2xl bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 shadow-2xl overflow-hidden">
+      <div v-if="pendingSessions.length > 0" class="mb-8 rounded-2xl bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 shadow-2xl shadow-cyan-500/30 overflow-hidden">
         <div class="p-6 md:p-8 text-white">
           <div class="flex items-center justify-between mb-6">
             <div class="flex items-center gap-3">
               <span class="text-3xl animate-pulse">⏳</span>
               <div>
                 <h2 class="text-2xl font-bold">准备上课</h2>
-                <p class="text-sm text-blue-100 mt-1">以下课程即将开始，请做好准备</p>
+                <p class="text-sm text-emerald-50 mt-1 font-medium">以下课程即将开始，请做好准备</p>
               </div>
             </div>
             <div class="text-right">
-              <div class="text-sm text-blue-100">待开始课堂</div>
+              <div class="text-sm text-emerald-50 font-medium">待开始课堂</div>
               <div class="text-3xl font-bold">{{ pendingSessions.length }}</div>
             </div>
           </div>
@@ -87,7 +96,7 @@
               <div class="flex items-start justify-between mb-3">
                 <h3 class="font-semibold text-white text-lg line-clamp-2 flex-1">{{ session.lessonTitle || '未命名课程' }}</h3>
               </div>
-              <div class="space-y-2 text-sm text-blue-100">
+              <div class="space-y-2 text-sm text-emerald-50">
                 <div class="flex items-center gap-2">
                   <span>👨‍🏫</span>
                   <span>{{ session.teacherName || '未知教师' }}</span>
@@ -106,7 +115,7 @@
                 </div>
               </div>
               <button
-                class="w-full mt-4 px-4 py-2 bg-white text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                class="w-full mt-4 px-4 py-2 bg-white/90 backdrop-blur-sm text-emerald-600 rounded-xl font-medium hover:bg-white transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 transform hover:scale-[1.02]"
                 @click.stop.prevent="enterClassroom(session.lessonId)"
               >
                 <span>进入课堂</span>
@@ -123,81 +132,81 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <button
           @click="router.push('/student/favorites')"
-          class="bg-white rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center"
+          class="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50 p-6 text-center"
         >
-          <div class="text-3xl mb-2">❤️</div>
-          <div class="text-sm font-medium text-gray-900">我的收藏</div>
+          <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">❤️</div>
+          <div class="text-sm font-semibold text-gray-900">我的收藏</div>
         </button>
         <button
           @click="router.push('/student/learning-paths')"
-          class="bg-white rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center"
+          class="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50 p-6 text-center"
         >
-          <div class="text-3xl mb-2">🗺️</div>
-          <div class="text-sm font-medium text-gray-900">学习路径</div>
+          <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">🗺️</div>
+          <div class="text-sm font-semibold text-gray-900">学习路径</div>
         </button>
         <button
           @click="router.push('/student/profile')"
-          class="bg-white rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center"
+          class="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50 p-6 text-center"
         >
-          <div class="text-3xl mb-2">📊</div>
-          <div class="text-sm font-medium text-gray-900">学习统计</div>
+          <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">📊</div>
+          <div class="text-sm font-semibold text-gray-900">学习统计</div>
         </button>
         <button
           @click="showRecommended = !showRecommended"
-          class="bg-white rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center"
+          class="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50 p-6 text-center"
         >
-          <div class="text-3xl mb-2">⭐</div>
-          <div class="text-sm font-medium text-gray-900">推荐课程</div>
+          <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">⭐</div>
+          <div class="text-sm font-semibold text-gray-900">推荐课程</div>
         </button>
       </div>
 
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 border border-white/50 p-6">
           <div class="flex items-center">
-            <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
+            <div class="flex-shrink-0 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl p-3 shadow-lg shadow-emerald-500/20">
               <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">可用课程</p>
-              <p class="text-2xl font-semibold text-gray-900">{{ availableLessons.length }}</p>
+              <p class="text-sm font-medium text-gray-600">可用课程</p>
+              <p class="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">{{ availableLessons.length }}</p>
             </div>
           </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 border border-white/50 p-6">
           <div class="flex items-center">
-            <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
+            <div class="flex-shrink-0 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl p-3 shadow-lg shadow-teal-500/20">
               <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">已完成</p>
-              <p class="text-2xl font-semibold text-gray-900">{{ completedCount }}</p>
+              <p class="text-sm font-medium text-gray-600">已完成</p>
+              <p class="text-2xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">{{ completedCount }}</p>
             </div>
           </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 border border-white/50 p-6">
           <div class="flex items-center">
-            <div class="flex-shrink-0 bg-yellow-500 rounded-md p-3">
+            <div class="flex-shrink-0 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl p-3 shadow-lg shadow-cyan-500/20">
               <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium text-gray-500">进行中</p>
-              <p class="text-2xl font-semibold text-gray-900">{{ inProgressCount }}</p>
+              <p class="text-sm font-medium text-gray-600">进行中</p>
+              <p class="text-2xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">{{ inProgressCount }}</p>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 推荐课程区域 -->
-      <div v-if="showRecommended" class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-lg p-6 mb-8">
+      <div v-if="showRecommended" class="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-2xl shadow-xl shadow-emerald-500/30 p-6 md:p-8 mb-8">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-2xl font-bold text-white flex items-center">
             <span class="mr-2">⭐</span>
@@ -218,22 +227,25 @@
           <div
             v-for="lesson in recommendedLessons"
             :key="lesson.id"
-            class="bg-white rounded-lg p-4 hover:shadow-xl transition-shadow cursor-pointer"
+            class="bg-white/90 backdrop-blur-sm rounded-xl p-5 hover:shadow-xl transition-all transform hover:scale-105 cursor-pointer border border-white/50"
             @click="viewLesson(lesson.id)"
           >
             <h3 class="font-semibold text-gray-900 mb-2 line-clamp-1">{{ lesson.title }}</h3>
-            <div class="flex items-center text-sm text-gray-600 mb-2">
+            <div class="flex items-center text-sm text-gray-600 mb-3">
               <span class="mr-2">⭐</span>
               <span>{{ lesson.average_rating?.toFixed(1) || '暂无评分' }}</span>
               <span class="mx-2">|</span>
               <span>{{ lesson.view_count || 0 }} 次学习</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded">
+              <span class="text-xs px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-medium">
                 {{ getDifficultyText(lesson.difficulty_level) }}
               </span>
-              <button class="text-blue-600 text-sm font-medium hover:text-blue-800">
-                开始学习 →
+              <button class="text-emerald-600 text-sm font-semibold hover:text-emerald-700 flex items-center gap-1">
+                开始学习
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
               </button>
             </div>
           </div>
@@ -255,14 +267,14 @@
               </button>
             </span>
           </h2>
-          <div class="inline-flex rounded-md shadow-sm" role="group">
+          <div class="inline-flex rounded-xl shadow-lg overflow-hidden" role="group">
             <button
               @click="viewMode = 'list'"
               :class="[
-                'px-4 py-2 text-sm font-medium border transition-colors rounded-l-md',
+                'px-4 py-2 text-sm font-medium border transition-all rounded-l-xl',
                 viewMode === 'list'
-                  ? 'bg-green-600 text-white border-green-600 z-10'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 z-10 shadow-lg'
+                  : 'bg-white/80 backdrop-blur-sm text-gray-700 border-gray-300 hover:bg-white'
               ]"
               title="列表视图"
             >
@@ -273,10 +285,10 @@
             <button
               @click="viewMode = 'tree'"
               :class="[
-                'px-4 py-2 text-sm font-medium border transition-colors rounded-r-md',
+                'px-4 py-2 text-sm font-medium border transition-all rounded-r-xl',
                 viewMode === 'tree'
-                  ? 'bg-green-600 text-white border-green-600 z-10'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 z-10 shadow-lg'
+                  : 'bg-white/80 backdrop-blur-sm text-gray-700 border-gray-300 hover:bg-white'
               ]"
               title="课程体系视图"
             >
@@ -289,7 +301,7 @@
       </div>
 
       <!-- 高级筛选和搜索（仅列表视图显示） -->
-      <div v-if="viewMode === 'list'" class="bg-white rounded-lg shadow p-6 mb-6">
+      <div v-if="viewMode === 'list'" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-white/50">
         <div class="flex flex-col gap-4">
           <!-- 第一行：搜索和基础筛选 -->
           <div class="flex flex-col md:flex-row gap-4">
@@ -298,12 +310,12 @@
                 v-model="searchQuery"
                 type="text"
                 placeholder="搜索课程名称..."
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                class="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200"
               />
             </div>
             <select
               v-model="filterStatus"
-              class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200"
             >
               <option value="">全部状态</option>
               <option value="not_started">未开始</option>
@@ -312,7 +324,7 @@
             </select>
             <select
               v-model="filterSubject"
-              class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200"
             >
               <option value="">全部学科</option>
               <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
@@ -325,7 +337,7 @@
           <div class="flex flex-col md:flex-row gap-4">
             <select
               v-model="filterDifficulty"
-              class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200"
             >
               <option value="">全部难度</option>
               <option value="beginner">基础</option>
@@ -334,7 +346,7 @@
             </select>
             <select
               v-model="filterRating"
-              class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200"
             >
               <option value="">全部评分</option>
               <option value="4">4星以上</option>
@@ -343,7 +355,7 @@
             </select>
             <select
               v-model="sortBy"
-              class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200"
             >
               <option value="default">默认排序</option>
               <option value="rating">评分最高</option>
@@ -352,7 +364,7 @@
             </select>
             <button
               @click="resetFilters"
-              class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+              class="px-4 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 text-gray-700 font-medium transition-all duration-200"
             >
               重置筛选
             </button>
@@ -364,21 +376,21 @@
       <div v-if="viewMode === 'list'">
         <!-- 课程列表 -->
         <div v-if="loading" class="text-center py-12">
-        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-        <p class="mt-4 text-gray-600">加载中...</p>
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+        <p class="mt-4 text-gray-600 font-medium">加载中...</p>
       </div>
 
-        <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-        <p class="text-red-600">{{ error }}</p>
+        <div v-else-if="error" class="bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-2xl p-6 text-center shadow-lg">
+        <p class="text-red-600 font-medium">{{ error }}</p>
         <button
           @click="fetchData"
-          class="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+          class="mt-4 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl hover:from-red-600 hover:to-rose-600 font-medium shadow-lg shadow-red-500/30 hover:shadow-xl transition-all transform hover:scale-105"
         >
           重试
           </button>
         </div>
 
-        <div v-else-if="filteredLessons.length === 0" class="bg-white rounded-lg shadow p-12 text-center">
+        <div v-else-if="filteredLessons.length === 0" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-12 text-center border border-white/50">
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
@@ -390,7 +402,7 @@
         <div
           v-for="lesson in filteredLessons"
           :key="lesson.id"
-          class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow relative group"
+          class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 relative group border border-white/50"
         >
           <!-- 收藏按钮 -->
           <button
@@ -405,7 +417,7 @@
 
           <!-- 课程封面 -->
           <div 
-            class="h-40 bg-gradient-to-br from-blue-500 to-purple-600 rounded-t-lg flex items-center justify-center cursor-pointer"
+            class="h-40 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 rounded-t-2xl flex items-center justify-center cursor-pointer shadow-lg shadow-emerald-500/20"
             @click="viewLesson(lesson.id)"
           >
             <svg class="w-16 h-16 text-white opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -471,13 +483,13 @@
 
             <!-- 学习进度 -->
             <div class="mb-4">
-              <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
-                <span>学习进度</span>
-                <span>{{ getLessonProgress(lesson.id) }}%</span>
+              <div class="flex items-center justify-between text-xs text-gray-600 mb-2">
+                <span class="font-medium">学习进度</span>
+                <span class="font-semibold text-emerald-600">{{ getLessonProgress(lesson.id) }}%</span>
               </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                 <div
-                  class="bg-blue-500 h-2 rounded-full transition-all"
+                  class="bg-gradient-to-r from-emerald-500 to-teal-500 h-2.5 rounded-full transition-all shadow-sm"
                   :style="{ width: `${getLessonProgress(lesson.id)}%` }"
                 ></div>
               </div>
@@ -485,11 +497,11 @@
 
             <!-- 操作按钮 -->
             <button
-              class="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              class="w-full px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 font-medium shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all transform hover:scale-[1.02]"
               @click="viewLesson(lesson.id)"
             >
               {{ getLessonProgress(lesson.id) === 0 ? '开始学习' : '继续学习' }}
-              </button>
+            </button>
             </div>
           </div>
         </div>

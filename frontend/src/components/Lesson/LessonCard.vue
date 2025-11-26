@@ -1,10 +1,10 @@
 <template>
   <div
-    class="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+    class="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white/80 backdrop-blur-sm shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-2xl hover:shadow-emerald-500/20"
     @click="handleView"
   >
     <!-- 封面图 -->
-    <div class="relative h-44 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600">
+    <div class="relative h-44 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500">
       <img
         v-if="lesson.cover_image_url"
         :src="lesson.cover_image_url"
@@ -13,9 +13,9 @@
       />
       <div
         v-else
-        class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/80"
+        class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/90"
       >
-        <div class="rounded-2xl bg-white/10 p-4 ring-1 ring-inset ring-white/15 backdrop-blur">
+        <div class="rounded-2xl bg-white/20 backdrop-blur-md p-4 ring-2 ring-inset ring-white/30 shadow-xl">
           <svg class="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path
               stroke-linecap="round"
@@ -25,7 +25,7 @@
             />
           </svg>
         </div>
-        <span class="text-sm font-medium tracking-wide text-white/80">教案封面</span>
+        <span class="text-sm font-semibold tracking-wide text-white/90 drop-shadow-sm">教案封面</span>
       </div>
 
       <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-slate-900/20 to-slate-900/0"></div>
@@ -35,7 +35,7 @@
         <span
           v-for="tag in displayTags"
           :key="tag"
-          class="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium text-white shadow-sm backdrop-blur"
+          class="inline-flex items-center gap-1 rounded-full bg-white/30 backdrop-blur-md px-2.5 py-1 text-xs font-medium text-white shadow-lg border border-white/20"
         >
           <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor">
             <path
@@ -49,7 +49,7 @@
         </span>
         <span
           v-if="extraTagCount > 0"
-          class="inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium text-white shadow-sm backdrop-blur"
+          class="inline-flex items-center rounded-full bg-white/30 backdrop-blur-md px-2.5 py-1 text-xs font-medium text-white shadow-lg border border-white/20"
         >
           +{{ extraTagCount }}
         </span>
@@ -68,19 +68,19 @@
       <div class="flex items-start justify-between gap-3">
         <div class="space-y-2">
           <!-- 标题 -->
-          <h3 class="text-lg font-semibold text-slate-900 transition-colors duration-200 group-hover:text-blue-600 line-clamp-2">
+          <h3 class="text-lg font-semibold text-gray-900 transition-colors duration-200 group-hover:text-emerald-600 line-clamp-2">
             {{ lesson.title }}
           </h3>
 
           <!-- 描述 -->
-          <p class="text-sm leading-relaxed text-slate-600 line-clamp-2 min-h-[2.75rem]">
+          <p class="text-sm leading-relaxed text-gray-600 line-clamp-2 min-h-[2.75rem]">
             {{ displayDescription }}
           </p>
         </div>
 
         <button
           v-if="showActions"
-          class="hidden shrink-0 rounded-full border border-white/80 bg-white px-3 py-1 text-xs font-medium text-slate-500 transition-all duration-200 hover:border-blue-200 hover:text-blue-600 group-hover:flex"
+          class="hidden shrink-0 rounded-xl border border-gray-200 bg-white/80 backdrop-blur-sm px-3 py-1.5 text-xs font-medium text-gray-600 transition-all duration-200 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 group-hover:flex shadow-sm"
           @click.stop="handleEdit"
           :title="lesson.status === 'published' ? '编辑已发布教案' : '编辑教案'"
         >
@@ -92,7 +92,7 @@
       <div v-if="lesson.course || lesson.chapter" class="flex flex-wrap items-center gap-2 text-xs font-medium">
         <span
           v-if="lesson.course"
-          class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-blue-600"
+          class="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2.5 py-1 text-cyan-700 border border-cyan-100"
         >
           <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor">
             <path
@@ -107,7 +107,7 @@
         </span>
         <span
           v-if="lesson.chapter"
-          class="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-1 text-purple-600"
+          class="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-teal-700 border border-teal-100"
         >
           <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor">
             <path
@@ -128,9 +128,9 @@
       </div>
 
       <!-- 元信息 -->
-      <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+      <div class="flex flex-wrap items-center gap-3 text-xs text-gray-500">
         <span class="inline-flex items-center gap-2">
-          <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -141,7 +141,7 @@
           更新 {{ formattedDate }}
         </span>
         <span v-for="item in metaItems" :key="item.id" class="inline-flex items-center gap-2" :title="item.tooltip">
-          <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               v-for="(path, index) in metaIconPaths[item.icon]"
               :key="`${item.id}-${index}`"
@@ -158,16 +158,16 @@
       <!-- 操作按钮 -->
       <div
         v-if="showActions"
-        class="mt-auto flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/80 p-2 transition group-hover:border-blue-100 group-hover:bg-blue-50/60"
+        class="mt-auto flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/80 backdrop-blur-sm p-2 transition-all duration-200 group-hover:border-emerald-200 group-hover:bg-emerald-50/60"
         @click.stop
       >
         <button
           @click="handleEdit"
           :class="[
-            'flex-1 min-w-[90px] rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+            'flex-1 min-w-[90px] rounded-xl px-3 py-2 text-sm font-medium transition-all shadow-sm',
             lesson.status === 'published'
-              ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              ? 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 hover:from-amber-200 hover:to-orange-200'
+              : 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 hover:from-emerald-200 hover:to-teal-200'
           ]"
           :title="lesson.status === 'published' ? '编辑已发布教案' : '编辑教案'"
         >
@@ -175,7 +175,7 @@
         </button>
         <button
           @click="handleDuplicate"
-          class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:text-blue-600 hover:ring-blue-200"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-gray-500 ring-1 ring-inset ring-gray-200 transition-all hover:text-emerald-600 hover:ring-emerald-300 hover:bg-emerald-50 shadow-sm"
           title="复制"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -190,7 +190,7 @@
         <button
           v-if="lesson.status === 'draft'"
           @click="handlePublish"
-          class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-green-600 ring-1 ring-inset ring-green-200 transition hover:bg-green-50"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-emerald-600 ring-1 ring-inset ring-emerald-200 transition-all hover:bg-emerald-50 hover:ring-emerald-300 shadow-sm"
           title="发布"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -204,7 +204,7 @@
         </button>
         <button
           @click="handleDelete"
-          class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-red-600 ring-1 ring-inset ring-red-200 transition hover:bg-red-50"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-red-600 ring-1 ring-inset ring-red-200 transition-all hover:bg-red-50 hover:ring-red-300 shadow-sm"
           title="删除"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -258,11 +258,11 @@ const statusLabel = computed(() => {
 const statusBadgeClass = computed(() => {
   const classMap = {
     [LessonStatus.DRAFT]:
-      'inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur',
+      'inline-flex items-center gap-1 rounded-full bg-white/90 backdrop-blur-md px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-lg border border-white/30',
     [LessonStatus.PUBLISHED]:
-      'inline-flex items-center gap-1 rounded-full bg-green-100/90 px-2.5 py-1 text-xs font-semibold text-green-700 shadow-sm',
+      'inline-flex items-center gap-1 rounded-full bg-emerald-100/90 backdrop-blur-md px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-lg border border-emerald-200/50',
     [LessonStatus.ARCHIVED]:
-      'inline-flex items-center gap-1 rounded-full bg-amber-100/90 px-2.5 py-1 text-xs font-semibold text-amber-700 shadow-sm',
+      'inline-flex items-center gap-1 rounded-full bg-amber-100/90 backdrop-blur-md px-2.5 py-1 text-xs font-semibold text-amber-700 shadow-lg border border-amber-200/50',
   }
   return classMap[props.lesson.status]
 })

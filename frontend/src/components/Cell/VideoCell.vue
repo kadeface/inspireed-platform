@@ -1,5 +1,23 @@
 <template>
-  <div class="video-cell">
+  <div class="video-cell cell-container" :class="{ 'fullscreen': isFullscreen }" ref="containerRef">
+    <!-- 全屏按钮 -->
+    <div v-if="!editable" class="cell-toolbar">
+      <button
+        class="cell-fullscreen-btn"
+        :class="{ 'active': isFullscreen }"
+        @click="toggleFullscreen"
+        :title="isFullscreen ? '退出全屏 (Esc)' : '全屏查看'"
+      >
+        <svg v-if="!isFullscreen" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+        </svg>
+        <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        <span class="text-sm font-medium ml-1">{{ isFullscreen ? '退出全屏' : '全屏' }}</span>
+      </button>
+    </div>
+    
     <div v-if="editable" class="video-editor">
       <!-- 视频上传/选择区域 -->
       <div v-if="!cell.content.videoUrl" class="video-upload">
@@ -153,6 +171,7 @@ import { ref, watch, onBeforeUnmount, computed } from 'vue'
 import type { VideoCell } from '../../types/cell'
 import api from '../../services/api'
 import { getServerBaseUrl } from '@/utils/url'
+import { useFullscreen } from '@/composables/useFullscreen'
 
 interface Props {
   cell: VideoCell
@@ -166,6 +185,9 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   update: [cell: VideoCell]
 }>()
+
+const containerRef = ref<HTMLElement | null>(null)
+const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)
 
 const fileInput = ref<HTMLInputElement>()
 const videoPlayer = ref<HTMLVideoElement>()
@@ -447,6 +469,36 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* 全屏按钮样式 */
+.cell-toolbar {
+  @apply flex justify-end mb-2;
+}
+
+.cell-fullscreen-btn {
+  @apply flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors;
+}
+
+.cell-fullscreen-btn.active {
+  @apply bg-red-50 hover:bg-red-100 text-red-700;
+}
+
+.cell-fullscreen-btn .icon {
+  @apply w-4 h-4;
+}
+
+/* 全屏模式样式 */
+.video-cell.fullscreen {
+  @apply fixed inset-0 z-50 bg-black overflow-auto;
+}
+
+.video-cell.fullscreen .video-player {
+  @apply flex flex-col items-center justify-center min-h-screen p-8;
+}
+
+.video-cell.fullscreen .video-player video {
+  @apply max-w-full max-h-[80vh];
+}
+
 .video-cell {
   @apply w-full;
 }

@@ -9,7 +9,7 @@ import { websocketService, type WebSocketMessage } from '../services/websocket'
 import { getAuthToken } from '../utils/auth'
 import type { ClassSession, StudentParticipation } from '../types/classroomSession'
 
-export function useClassroomSession(lessonId: number) {
+export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mode: 'fullscreen' | 'window') => void) {
   const route = useRoute()
   const session = ref<ClassSession | null>(null)
   const participation = ref<StudentParticipation | null>(null)
@@ -52,16 +52,41 @@ export function useClassroomSession(lessonId: number) {
           return
         }
         
-        // 确保 settings 被正确设置
-        if (!activeSession.settings) {
-          activeSession.settings = {}
+        // 🆕 获取完整的会话信息（包括 teacherName 和 lessonTitle）
+        try {
+          const fullSession = await classroomSessionService.getSession(activeSession.id)
+          if (fullSession) {
+            // 使用完整会话信息，确保包含 teacherName 和 lessonTitle
+            session.value = {
+              ...fullSession,
+              settings: fullSession.settings || {},
+            }
+          } else {
+            // 如果获取失败，使用列表中的会话信息
+            session.value = {
+              ...activeSession,
+              settings: activeSession.settings || {},
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ 获取完整会话信息失败，使用列表信息:', error)
+          // 如果获取失败，使用列表中的会话信息
+          session.value = {
+            ...activeSession,
+            settings: activeSession.settings || {},
+          }
         }
         
-        session.value = activeSession
-        
         // 处理字段映射：后端可能返回 current_cell_id（snake_case）或 currentCellId（camelCase）
-        const cellId = (activeSession as any).current_cell_id ?? activeSession.currentCellId ?? null
+        const cellId = (session.value as any)?.current_cell_id ?? session.value?.currentCellId ?? null
         currentCellId.value = cellId
+        
+        console.log('✅ 会话信息已加载:', {
+          sessionId: session.value?.id,
+          status: session.value?.status,
+          teacherName: session.value?.teacherName,
+          lessonTitle: session.value?.lessonTitle,
+        })
         
         // 读取 display_cell_ids（多选模式）
         const displayCellIdsFromSession = (activeSession.settings as any)?.display_cell_ids || 
@@ -69,7 +94,7 @@ export function useClassroomSession(lessonId: number) {
         
         // 尝试加入会话
         try {
-          participation.value = await classroomSessionService.joinSession(activeSession.id)
+          participation.value = await classroomSessionService.joinSession(session.value.id)
         } catch (error: any) {
           // 🆕 检查是否因为会话已结束而失败
           if (error.response?.status === 400 && error.response?.data?.detail?.includes('已结束')) {
@@ -87,7 +112,7 @@ export function useClassroomSession(lessonId: number) {
         // 尝试建立 WebSocket 连接（不阻塞，后台异步连接）
         if (useWebSocket.value) {
           // 异步连接WebSocket，不阻塞页面加载
-          connectWebSocket(activeSession.id).catch((error) => {
+          connectWebSocket(session.value.id).catch((error) => {
             console.warn('⚠️ WebSocket 连接失败，降级到轮询模式:', error)
             startPolling()
           })
@@ -96,7 +121,7 @@ export function useClassroomSession(lessonId: number) {
           startPolling()
         }
         
-        return activeSession
+        return session.value
       }
       
       return null
@@ -235,6 +260,7 @@ export function useClassroomSession(lessonId: number) {
     // 1. 监听连接成功消息
     websocketService.on('connected', (message: WebSocketMessage) => {
       // WebSocket 已连接，接收初始状态
+      console.log('📥 收到 WebSocket 连接成功消息:', message.data)
       
       // 更新会话状态
       if (message.data.current_state && session.value) {
@@ -244,11 +270,34 @@ export function useClassroomSession(lessonId: number) {
         newSession.settings = {
           ...session.value.settings,
           display_cell_orders: message.data.current_state.display_cell_orders,
+          display_mode: message.data.current_state.display_mode || 'window',
+        }
+        
+        // 🆕 保留或更新教师和课程信息（如果 WebSocket 消息中包含）
+        if (message.data.current_state.teacher_name !== undefined) {
+          newSession.teacherName = message.data.current_state.teacher_name
+        }
+        if (message.data.current_state.lesson_title !== undefined) {
+          newSession.lessonTitle = message.data.current_state.lesson_title
+        }
+        if (message.data.current_state.classroom_name !== undefined) {
+          newSession.classroomName = message.data.current_state.classroom_name
         }
         
         // 🔧 重新赋值整个 session 对象
         session.value = newSession
         currentCellId.value = message.data.current_state.current_cell_id
+        
+        console.log('✅ 会话状态已更新（WebSocket 连接）:', {
+          status: newSession.status,
+          teacherName: newSession.teacherName,
+          lessonTitle: newSession.lessonTitle,
+        })
+        
+        // 如果初始状态包含display_mode，触发回调
+        if (message.data.current_state.display_mode && onDisplayModeChanged) {
+          onDisplayModeChanged(message.data.current_state.display_mode as 'fullscreen' | 'window')
+        }
         
         // 初始状态已更新
       }
@@ -280,10 +329,41 @@ export function useClassroomSession(lessonId: number) {
       }
     })
     
+    // 🆕 监听显示模式变化
+    websocketService.on('display_mode_changed', (message: WebSocketMessage) => {
+      console.log('📺 收到显示模式变化:', message.data)
+      
+      if (session.value && message.data.display_mode) {
+        const newSession = { ...session.value }
+        newSession.settings = {
+          ...session.value.settings,
+          display_mode: message.data.display_mode,
+        }
+        session.value = newSession
+        
+        // 触发显示模式变化事件（供组件监听）
+        if (onDisplayModeChanged) {
+          onDisplayModeChanged(message.data.display_mode)
+        }
+      }
+    })
+    
     // 3. 监听会话状态变化
     websocketService.on('session_status_changed', (message: WebSocketMessage) => {
-      if (session.value) {
-        session.value.status = message.data.status
+      console.log('📢 收到会话状态变化:', message.data)
+      
+      if (session.value && message.data.status) {
+        // 🔧 修复：创建新对象以触发 Vue 响应式更新
+        const newSession = { ...session.value }
+        newSession.status = message.data.status
+        
+        // 🔧 重新赋值整个 session 对象，确保响应式触发
+        session.value = newSession
+        
+        console.log('✅ 会话状态已更新:', {
+          oldStatus: session.value?.status,
+          newStatus: message.data.status,
+        })
         
         // 如果会话结束，断开连接
         if (message.data.status === 'ended') {
