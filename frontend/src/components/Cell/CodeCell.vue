@@ -78,8 +78,58 @@
     </div>
 
     <!-- 代码编辑器 - HTML类型在预览模式下隐藏，Python/JS显示 -->
-    <div :class="['code-editor-wrapper', { 'hidden': !editable && cell.content.language === 'html' }]">
+    <div 
+      :class="[
+        'code-editor-wrapper', 
+        { 
+          'hidden': !editable && cell.content.language === 'html',
+          'compact-editor': compactMode && !isExpanded,
+          'expanded-editor': compactMode && isExpanded
+        }
+      ]"
+    >
       <div ref="editorRef" class="code-editor"></div>
+    </div>
+    
+    <!-- 紧凑模式下的展开/折叠按钮 -->
+    <div 
+      v-if="compactMode" 
+      class="flex flex-col items-center gap-2 mt-2 pt-2 border-t border-gray-200"
+    >
+      <button
+        @click="isExpanded = !isExpanded"
+        class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
+      >
+        <svg 
+          v-if="!isExpanded" 
+          class="w-4 h-4" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+        <svg 
+          v-else 
+          class="w-4 h-4" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+        </svg>
+        <span>{{ isExpanded ? '收起' : '展开查看全部' }}</span>
+      </button>
+      <button
+        @click="scrollToTop"
+        class="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+        :title="editable ? '点击滚动到顶部工具栏' : '点击滚动到顶部'"
+      >
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>紧凑模式已启用，<span class="underline">{{ editable ? '点击前往顶部关闭' : '点击前往顶部切换' }}</span></span>
+      </button>
     </div>
 
     <!-- 输出区域 - Python/JS在预览模式下也显示 -->
@@ -123,10 +173,12 @@ import { pyodideService } from '../../services/pyodide'
 interface Props {
   cell: CodeCellType
   editable?: boolean
+  compactMode?: boolean // 紧凑模式：限制长内容的高度
 }
 
 const props = withDefaults(defineProps<Props>(), {
   editable: false,
+  compactMode: false,
 })
 
 const emit = defineEmits<{
@@ -145,6 +197,12 @@ const pyodideStatus = ref<'unloaded' | 'loading' | 'ready' | 'error'>('unloaded'
 const executionTime = ref(0)
 const iframeHeight = ref('800px')
 const editorHeight = ref<number | null>(null)
+const isExpanded = ref(false) // 是否展开（在紧凑模式下）
+
+// 滚动到顶部
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 let editorView: EditorView | null = null
 
@@ -558,6 +616,29 @@ async function runCode() {
   overflow-x: auto;
   overflow-y: visible;
   position: relative;
+}
+
+/* 紧凑模式样式 */
+.compact-editor {
+  max-height: 400px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.compact-editor::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to bottom, rgba(26, 32, 44, 0), rgba(26, 32, 44, 0.95));
+  pointer-events: none;
+  z-index: 10;
+}
+
+.expanded-editor {
+  max-height: none;
 }
 
 :deep(.cm-editor) {

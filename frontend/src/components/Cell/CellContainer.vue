@@ -54,30 +54,33 @@
             </span>
 
             <!-- 可编辑标题 -->
-            <div class="flex-1 cell-drag-area min-w-0" :class="{ 'cursor-move': draggable }" v-if="editable">
-              <input
-                v-if="isEditingTitle"
-                v-model="localTitle"
-                @blur="saveTitle"
-                @keyup.enter="saveTitle"
-                @keyup.esc="cancelEditTitle"
-                @mousedown.stop
-                class="w-full rounded border border-blue-300 px-3 py-1 text-base font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="输入模块标题..."
-                ref="titleInputRef"
-              />
-              <div
-                v-else
-                @click="startEditTitle"
-                @mousedown.stop
-                class="flex cursor-pointer items-center rounded px-3 py-1 text-base font-medium transition-colors hover:bg-gray-100 min-w-0"
-                :title="cell.title || '点击添加标题'"
-              >
-                <span v-if="cell.title" class="text-gray-700 truncate">{{ cell.title }}</span>
-                <span v-else class="italic text-gray-400">点击添加标题</span>
-                <svg class="ml-1 h-4 w-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
+            <div class="flex-1 min-w-0" v-if="editable">
+              <div class="cell-title-editor">
+                <input
+                  v-if="isEditingTitle"
+                  v-model="localTitle"
+                  @blur="saveTitle"
+                  @keyup.enter="saveTitle"
+                  @keyup.esc="cancelEditTitle"
+                  @mousedown.stop
+                  @click.stop
+                  class="w-full rounded border border-blue-300 px-3 py-1 text-base font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="输入模块标题..."
+                  ref="titleInputRef"
+                />
+                <div
+                  v-else
+                  @click.stop="startEditTitle"
+                  @mousedown.stop
+                  class="flex cursor-pointer items-center rounded px-3 py-1 text-base font-medium transition-colors hover:bg-gray-100 min-w-0"
+                  :title="cell.title || '点击添加标题'"
+                >
+                  <span v-if="cell.title" class="text-gray-700 truncate">{{ cell.title }}</span>
+                  <span v-else class="italic text-gray-400">点击添加标题</span>
+                  <svg class="ml-1 h-4 w-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </div>
               </div>
             </div>
             <div v-else-if="cell.title" class="flex-1 font-medium text-gray-700 cell-drag-area min-w-0 truncate" :class="{ 'cursor-move': draggable }">
@@ -122,6 +125,7 @@
           :is="cellComponent"
           :cell="cell as any"
           :editable="editable"
+          :compact-mode="compactMode"
           @update="handleUpdate"
         />
       </div>
@@ -143,6 +147,7 @@ import VideoCell from './VideoCell.vue'
 import ActivityCell from './ActivityCell.vue'
 import FlowchartCell from './FlowchartCell.vue'
 import FlowchartCellX6 from './FlowchartCellX6.vue'
+import BrowserCell from './BrowserCell.vue'
 import ReferenceMaterialCell from '@/components/Cell/ReferenceMaterialCell.vue'
 import { useFeatureFlag } from '@/composables/useFeatureFlag'
 
@@ -153,6 +158,7 @@ interface Props {
   draggable?: boolean
   showMoveButtons?: boolean
   index?: number
+  compactMode?: boolean // 紧凑模式：限制长内容的高度
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -161,6 +167,7 @@ const props = withDefaults(defineProps<Props>(), {
   draggable: false,
   showMoveButtons: false,
   index: 0,
+  compactMode: false,
 })
 
 const emit = defineEmits<{
@@ -218,6 +225,7 @@ const cellComponent = computed(() => {
     [CellType.ACTIVITY]: ActivityCell,
     // 使用特性开关选择流程图编辑器
     [CellType.FLOWCHART]: useX6Editor ? FlowchartCellX6 : FlowchartCell,
+    [CellType.BROWSER]: BrowserCell,
     [CellType.REFERENCE_MATERIAL]: ReferenceMaterialCell,
   }
   return componentMap[props.cell.type]
@@ -234,6 +242,7 @@ const cellTypeLabel = computed(() => {
     [CellType.VIDEO]: '视频',
     [CellType.ACTIVITY]: '活动',
     [CellType.FLOWCHART]: '流程图',
+    [CellType.BROWSER]: '浏览器',
     [CellType.REFERENCE_MATERIAL]: '参考素材',
   }
   return labelMap[props.cell.type]
@@ -269,6 +278,7 @@ const stageStyles = computed(() => {
     [CellType.VIDEO]: { bg: 'bg-pink-500', label: 'text-pink-100' },
     [CellType.ACTIVITY]: { bg: 'bg-orange-500', label: 'text-orange-100' },
     [CellType.FLOWCHART]: { bg: 'bg-indigo-500', label: 'text-indigo-100' },
+    [CellType.BROWSER]: { bg: 'bg-cyan-500', label: 'text-cyan-100' },
     [CellType.REFERENCE_MATERIAL]: { bg: 'bg-slate-500', label: 'text-slate-100' },
   }
   return map[props.cell.type] || { bg: 'bg-blue-500', label: 'text-blue-100' }

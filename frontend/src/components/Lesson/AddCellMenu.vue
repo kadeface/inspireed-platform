@@ -146,6 +146,12 @@ const cellTypes = [
     icon: '🏆',
     description: '积分竞赛、排行榜',
   },
+  {
+    type: CellType.BROWSER,
+    name: '浏览器单元',
+    icon: '🌐',
+    description: '嵌入网页内容',
+  },
 ]
 
 function toggleMenu() {

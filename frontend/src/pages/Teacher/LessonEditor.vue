@@ -94,6 +94,24 @@
             <!-- 课堂模式按钮 -->
             <!-- 课堂控制按钮已隐藏，进入授课模式时自动显示课堂控制面板 -->
 
+            <!-- 紧凑模式切换 -->
+            <button
+              v-if="!isPreviewMode"
+              @click="compactMode = !compactMode"
+              :class="[
+                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                compactMode
+                  ? 'bg-purple-600 text-white hover:bg-purple-700'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
+              ]"
+              title="紧凑模式：限制长内容的高度，便于浏览教案结构"
+            >
+              <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              {{ compactMode ? '展开模式' : '紧凑模式' }}
+            </button>
+
             <!-- 预览模式切换 -->
             <button
               @click="isPreviewMode = !isPreviewMode"
@@ -135,10 +153,10 @@
       />
 
       <!-- 中间：编辑区 -->
-      <main class="flex-1 overflow-y-auto">
+      <main class="flex-1 overflow-y-auto bg-gray-50">
         <div 
           :class="[
-            isPreviewMode ? 'w-full py-4 px-2' : 'max-w-4xl mx-auto py-6 px-4'
+            isPreviewMode ? 'w-full py-4 px-2' : 'w-full py-6 px-4 sm:px-6 lg:px-8'
           ]"
         >
           <!-- 加载状态 -->
@@ -213,6 +231,7 @@
                   :editable="!isPreviewMode"
                   :draggable="!isPreviewMode"
                   :show-move-buttons="!isPreviewMode"
+                  :compact-mode="compactMode && !isPreviewMode"
                   @update="handleCellUpdate"
                   @delete="handleDeleteCell"
                   @move-up="handleMoveUp"
@@ -339,6 +358,23 @@
                   </div>
                 </div>
                 <div class="flex items-center gap-4">
+                  <!-- 紧凑模式切换 -->
+                  <button
+                    @click="compactMode = !compactMode"
+                    :class="[
+                      'px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2',
+                      compactMode
+                        ? 'bg-purple-600 text-white hover:bg-purple-700'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
+                    ]"
+                    title="紧凑模式：限制长内容的高度，便于浏览教案结构"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    {{ compactMode ? '展开模式' : '紧凑模式' }}
+                  </button>
+                  
                   <!-- 退出全屏按钮 -->
                   <button
                     @click="toggleFullscreenPreview"
@@ -355,10 +391,10 @@
           </header>
 
           <!-- 全屏预览内容 -->
-          <div class="h-[calc(100vh-73px)] overflow-y-auto">
-            <div class="max-w-5xl mx-auto px-6 py-8">
+          <div class="h-[calc(100vh-73px)] overflow-y-auto bg-gray-50">
+            <div class="w-full px-4 sm:px-6 lg:px-8 py-6">
               <!-- Cell 列表 -->
-              <div v-if="cells.length > 0" class="space-y-6">
+              <div v-if="cells.length > 0" class="space-y-4 max-w-none">
                 <CellContainer
                   v-for="(cell, index) in cells"
                   :key="cell.id"
@@ -367,6 +403,7 @@
                   :editable="false"
                   :draggable="false"
                   :show-move-buttons="false"
+                  :compact-mode="compactMode"
                 />
               </div>
 
@@ -434,6 +471,7 @@ const isLoading = ref(true)
 const loadError = ref<string | null>(null)
 const toolbarCollapsed = ref(false)
 const isPreviewMode = ref(false)
+const compactMode = ref(true) // 紧凑模式：默认启用，限制长内容的高度
 const isFullscreenPreview = ref(false)
 const cellListRef = ref<HTMLElement>()
 const lessonTitle = ref('')
@@ -667,6 +705,23 @@ function getDefaultCell(cellType: CellType, order: number): Cell {
         config: {
           editable: true,
           showMinimap: false,
+        },
+      } as Cell
+
+    case CellType.BROWSER:
+      return {
+        ...baseCell,
+        type: CellType.BROWSER,
+        content: {
+          url: '',
+          title: '',
+          description: '',
+        },
+        config: {
+          allowFullscreen: true,
+          allowNavigation: true,
+          showToolbar: false,
+          height: '600px',
         },
       } as Cell
 
@@ -917,7 +972,7 @@ function initSortable() {
     sortableInstance = Sortable.create(cellListRef.value, {
       animation: 200,
       handle: '.drag-handle, .cell-drag-area',
-      filter: '.add-cell-menu-container',
+      filter: '.add-cell-menu-container, .cell-title-editor',
       preventOnFilter: false,
       ghostClass: 'sortable-ghost',
       chosenClass: 'sortable-chosen',

@@ -12,6 +12,7 @@ export const CellType = {
   PARAM: 'param',
   ACTIVITY: 'activity',  // 教学活动（测验、问卷、作业、评价）
   FLOWCHART: 'flowchart',  // 流程图
+  BROWSER: 'browser',  // 浏览器单元
   REFERENCE_MATERIAL: 'reference_material',
 } as const
 
@@ -38,6 +39,8 @@ export interface CellBase {
 export interface TextCellContent {
   html: string
   json?: any // TipTap JSON格式
+  markdown?: string // Markdown格式（可选）
+  editorMode?: 'html' | 'markdown' // 编辑器模式
 }
 
 export interface TextCell extends CellBase {
@@ -214,6 +217,26 @@ export interface ReferenceMaterialCell extends CellBase {
   content: ReferenceMaterialCellContent
 }
 
+export interface BrowserCellContent {
+  url: string                    // 目标网址
+  title?: string                 // 单元标题
+  description?: string           // 单元描述
+  thumbnail?: string             // 缩略图URL（可选）
+}
+
+export interface BrowserCell extends CellBase {
+  type: typeof CellType.BROWSER
+  content: BrowserCellContent
+  config?: {
+    allowFullscreen?: boolean      // 是否允许全屏（默认true）
+    allowNavigation?: boolean       // 是否允许导航（默认true）
+    sandbox?: string[]             // iframe sandbox 属性（安全控制）
+    width?: string                 // iframe 宽度（默认100%）
+    height?: string                // iframe 高度（默认600px）
+    showToolbar?: boolean          // 是否显示工具栏（默认false）
+  }
+}
+
 export type Cell =
   | TextCell
   | CodeCell
@@ -224,4 +247,5 @@ export type Cell =
   | VideoCell
   | ActivityCell
   | FlowchartCell
+  | BrowserCell
   | ReferenceMaterialCell

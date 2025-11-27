@@ -98,6 +98,8 @@ inspireed-platform/
 - Docker 和 Docker Compose
 - pnpm 8+
 
+> **Windows 用户**：请查看 [Windows 部署指南](docs/deployment/WINDOWS_DEPLOYMENT_GUIDE.md) 获取详细的 Windows 系统部署说明。
+
 ### 1. 启动基础服务
 
 ```bash
@@ -210,6 +212,7 @@ pnpm dev --host
 
 项目提供了便捷的启动脚本：
 
+**Linux/macOS:**
 ```bash
 # 启动所有服务
 ./start.sh
@@ -219,6 +222,18 @@ pnpm dev --host
 
 # 重启所有服务
 ./restart.sh
+```
+
+**Windows:**
+```cmd
+# 启动所有服务
+start.bat
+
+# 停止所有服务
+stop.bat
+
+# 重启所有服务
+restart.bat
 ```
 
 这些脚本会自动：

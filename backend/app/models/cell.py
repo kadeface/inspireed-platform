@@ -33,6 +33,7 @@ class CellType(str, Enum):
     PARAM = "PARAM"  # 参数设置单元
     ACTIVITY = "ACTIVITY"  # 教学活动单元（测验、问卷、作业、评价）
     FLOWCHART = "FLOWCHART"  # 流程图单元
+    BROWSER = "BROWSER"  # 浏览器单元
 
 
 class CognitiveLevel(str, Enum):

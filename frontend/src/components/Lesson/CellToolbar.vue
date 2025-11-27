@@ -149,6 +149,12 @@ const cellTypes = [
     icon: '⚙️',
     description: '参数配置表单',
   },
+  {
+    type: CellType.BROWSER,
+    name: '浏览器单元',
+    icon: '🌐',
+    description: '嵌入网页内容',
+  },
 ]
 
 async function handleAddCell(cellType: CellType) {
