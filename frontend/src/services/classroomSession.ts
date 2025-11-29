@@ -167,6 +167,43 @@ export const classroomSessionService = {
   },
 
   /**
+   * 获取学生正在上课的课堂列表（active状态的会话）
+   */
+  async getStudentActiveSessions(): Promise<StudentPendingSession[]> {
+    try {
+      const response = await api.get('/classroom-sessions/student/active-sessions')
+      
+      // 确保返回数组
+      const sessions = Array.isArray(response) ? response : []
+      
+      // 转换字段名：后端snake_case -> 前端camelCase
+      return sessions.map((s: any) => ({
+        id: s.id,
+        lessonId: s.lesson_id || s.lessonId,
+        lessonTitle: s.lesson_title || s.lessonTitle,
+        teacherId: s.teacher_id || s.teacherId,
+        teacherName: s.teacher_name || s.teacherName,
+        classroomId: s.classroom_id || s.classroomId,
+        classroomName: s.classroom_name || s.classroomName,
+        status: s.status,
+        createdAt: s.created_at || s.createdAt,
+        scheduledStart: s.scheduled_start || s.scheduledStart,
+        totalStudents: s.total_students || s.totalStudents || 0,
+        activeStudents: s.active_students || s.activeStudents || 0,
+      } as StudentPendingSession))
+    } catch (error: any) {
+      console.error('❌ Get student active sessions error:', error)
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data,
+      })
+      throw error
+    }
+  },
+
+  /**
    * 获取教案的所有会话
    */
   async listSessions(lessonId: number, status?: string): Promise<ClassSession[]> {

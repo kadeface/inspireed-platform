@@ -852,8 +852,13 @@ const loadLesson = async () => {
     })
     
     // 异步查找并加入课堂会话（不阻塞页面显示）
-    findAndJoinSession().catch(err => {
-      console.warn('加入会话失败，但不影响页面显示:', err)
+    findAndJoinSession().then(session => {
+      if (!session) {
+        console.log('ℹ️ 当前没有可加入的课堂会话，学生可以自主学习')
+      }
+    }).catch(err => {
+      console.warn('⚠️ 加入会话失败，但不影响页面显示:', err)
+      // 不显示错误提示，因为可能是正常的（没有正在进行的会话）
     })
   } catch (e: any) {
     error.value = e.message || '加载课程失败'

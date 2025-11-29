@@ -69,6 +69,66 @@
         </div>
       </div>
 
+      <!-- 正在上课区域 -->
+      <div v-if="activeSessions.length > 0" class="mb-8 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 shadow-2xl shadow-emerald-500/30 overflow-hidden">
+        <div class="p-6 md:p-8 text-white">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+              <span class="text-3xl animate-pulse">🎓</span>
+              <div>
+                <h2 class="text-2xl font-bold">正在上课</h2>
+                <p class="text-sm text-emerald-50 mt-1 font-medium">以下课程正在进行中，点击加入</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-sm text-emerald-50 font-medium">进行中课堂</div>
+              <div class="text-3xl font-bold">{{ activeSessions.length }}</div>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div
+              v-for="session in activeSessions"
+              :key="session.id"
+              class="bg-white/10 backdrop-blur-sm rounded-xl p-4 hover:bg-white/20 transition-all cursor-pointer border border-white/20"
+              @click="enterClassroom(session.lessonId)"
+            >
+              <div class="flex items-start justify-between mb-3">
+                <h3 class="font-semibold text-white text-lg line-clamp-2 flex-1">{{ session.lessonTitle || '未命名课程' }}</h3>
+                <span class="ml-2 px-2 py-1 bg-red-500/80 text-white text-xs font-bold rounded-full animate-pulse">进行中</span>
+              </div>
+              <div class="space-y-2 text-sm text-emerald-50">
+                <div class="flex items-center gap-2">
+                  <span>👨‍🏫</span>
+                  <span>{{ session.teacherName || '未知教师' }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span>🏫</span>
+                  <span>{{ session.classroomName || '未知班级' }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span>👥</span>
+                  <span>{{ session.activeStudents || 0 }}/{{ session.totalStudents || 0 }} 人已加入</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span>⏰</span>
+                  <span>{{ formatTimeAgo(session.createdAt) }}</span>
+                </div>
+              </div>
+              <button
+                class="w-full mt-4 px-4 py-2 bg-white/90 backdrop-blur-sm text-emerald-600 rounded-xl font-medium hover:bg-white transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 transform hover:scale-[1.02]"
+                @click.stop.prevent="enterClassroom(session.lessonId)"
+              >
+                <span>立即加入</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 准备上课区域 -->
       <div v-if="pendingSessions.length > 0" class="mb-8 rounded-2xl bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 shadow-2xl shadow-cyan-500/30 overflow-hidden">
         <div class="p-6 md:p-8 text-white">
@@ -562,6 +622,12 @@ const loadingPendingSessions = ref(false)
 let pendingSessionsPollingInterval: ReturnType<typeof setInterval> | null = null
 const PENDING_SESSIONS_POLLING_INTERVAL = 5000 // 5秒轮询一次
 
+// 正在上课相关状态
+const activeSessions = ref<StudentPendingSession[]>([])
+const loadingActiveSessions = ref(false)
+let activeSessionsPollingInterval: ReturnType<typeof setInterval> | null = null
+const ACTIVE_SESSIONS_POLLING_INTERVAL = 5000 // 5秒轮询一次
+
 // 计算属性
 const currentUser = computed(() => userStore.user)
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '学生')
@@ -809,6 +875,28 @@ const loadPendingSessions = async () => {
   }
 }
 
+// 加载正在上课的课堂列表
+const loadActiveSessions = async () => {
+  // 只允许学生访问
+  if (currentUser.value?.role !== 'student') {
+    return
+  }
+  
+  loadingActiveSessions.value = true
+  try {
+    const sessions = await classroomSessionService.getStudentActiveSessions()
+    activeSessions.value = sessions
+  } catch (e: any) {
+    console.error('Failed to load active sessions:', e)
+    // 如果是权限错误或其他错误,不显示错误提示
+    if (e.response?.status !== 403) {
+      console.warn('⚠️ Could not load active sessions:', e.message)
+    }
+  } finally {
+    loadingActiveSessions.value = false
+  }
+}
+
 // 格式化时间（显示多久前）
 const formatTimeAgo = (dateString: string): string => {
   if (!dateString) {
@@ -910,11 +998,40 @@ const startPendingSessionsPolling = () => {
   }, PENDING_SESSIONS_POLLING_INTERVAL)
 }
 
-// 停止轮询
+// 停止轮询待开始课堂列表
 const stopPendingSessionsPolling = () => {
   if (pendingSessionsPollingInterval) {
     clearInterval(pendingSessionsPollingInterval)
     pendingSessionsPollingInterval = null
+  }
+}
+
+// 开始轮询正在上课的课堂列表
+const startActiveSessionsPolling = () => {
+  // 只允许学生轮询
+  if (currentUser.value?.role !== 'student') {
+    return
+  }
+  
+  // 如果已经有轮询,先清除
+  if (activeSessionsPollingInterval) {
+    clearInterval(activeSessionsPollingInterval)
+  }
+  
+  // 立即加载一次
+  loadActiveSessions()
+  
+  // 设置定时轮询
+  activeSessionsPollingInterval = setInterval(() => {
+    loadActiveSessions()
+  }, ACTIVE_SESSIONS_POLLING_INTERVAL)
+}
+
+// 停止轮询正在上课的课堂列表
+const stopActiveSessionsPolling = () => {
+  if (activeSessionsPollingInterval) {
+    clearInterval(activeSessionsPollingInterval)
+    activeSessionsPollingInterval = null
   }
 }
 
@@ -952,11 +1069,17 @@ const handleLogout = () => {
 // 生命周期
 onMounted(() => {
   fetchData()
+  // 开始轮询待开始和正在上课的课堂列表
+  startPendingSessionsPolling()
+  startActiveSessionsPolling()
   // 开始轮询待开始课堂列表
   startPendingSessionsPolling()
 })
 
 onUnmounted(() => {
+  // 停止轮询
+  stopPendingSessionsPolling()
+  stopActiveSessionsPolling()
   // 停止轮询
   stopPendingSessionsPolling()
 })

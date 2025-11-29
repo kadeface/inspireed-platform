@@ -761,11 +761,17 @@ async def join_session(
     existing = result.scalar_one_or_none()
 
     if existing:
-        # 如果已加入，更新状态
+        # 如果已加入，更新状态（支持重新加入，例如异常退出后重新进入）
+        was_inactive = not existing.is_active  # type: ignore[comparison-overlap]
         existing.is_active = True # type: ignore[comparison-overlap]
         existing.last_active_at = datetime.utcnow() # type: ignore[comparison-overlap]
         if session.current_cell_id: # type: ignore[comparison-overlap]
-            existing.current_cell_id = session.current_cell_id # type: ignore[comparison-overlap]   
+            existing.current_cell_id = session.current_cell_id # type: ignore[comparison-overlap]
+        
+        # 如果之前是离线状态，现在重新加入，需要更新活跃学生数
+        if was_inactive:
+            session.active_students = (session.active_students or 0) + 1 # type: ignore[comparison-overlap]
+        
         await db.commit()
         await db.refresh(existing)
 
@@ -906,6 +912,91 @@ async def get_student_pending_sessions(
         pending_sessions.append(StudentPendingSessionResponse(**session_dict))
 
     return pending_sessions
+
+
+@router.get("/student/active-sessions", response_model=List[StudentPendingSessionResponse])
+async def get_student_active_sessions(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """获取学生正在上课的课堂列表（active状态的会话）
+    
+    只返回最近40分钟内开始的active会话，确保只显示真正正在进行的课程
+    """
+
+    # 权限检查：仅学生可访问
+    current_role = cast(UserRole, current_user.role)
+    if current_role != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="仅学生可访问此接口")
+
+    # 获取学生所在班级ID
+    student_classroom_id = cast(Optional[int], current_user.classroom_id)
+    if not student_classroom_id:
+        # 如果学生没有分配班级，返回空列表
+        return []
+
+    # 计算40分钟前的时间点（一节课的标准时长）
+    cutoff_time = datetime.utcnow() - timedelta(minutes=40)
+
+    # 查询学生所在班级的active状态会话
+    # 只返回最近40分钟内开始的会话
+    # 使用COALESCE：优先使用actual_start，如果没有则使用created_at
+    query = (
+        select(ClassSession)
+        .where(ClassSession.classroom_id == student_classroom_id)
+        .where(ClassSession.status == ClassSessionStatus.ACTIVE)
+        .where(
+            # 使用actual_start或created_at，只要有一个在40分钟内即可
+            or_(
+                # 如果有actual_start，检查它是否在40分钟内
+                and_(
+                    ClassSession.actual_start.isnot(None),
+                    ClassSession.actual_start >= cutoff_time
+                ),
+                # 如果没有actual_start，检查created_at是否在40分钟内
+                and_(
+                    ClassSession.actual_start.is_(None),
+                    ClassSession.created_at >= cutoff_time
+                )
+            )
+        )
+        .options(
+            selectinload(ClassSession.lesson),
+            selectinload(ClassSession.teacher),
+            selectinload(ClassSession.classroom),
+        )
+        .order_by(ClassSession.actual_start.desc().nulls_last(), ClassSession.created_at.desc())
+    )
+
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+
+    # 构建响应数据
+    active_sessions = []
+    for session in sessions:
+        
+        # 获取关联信息
+        lesson = session.lesson
+        teacher = session.teacher
+        classroom = session.classroom
+
+        session_dict = {
+            "id": session.id,
+            "lesson_id": session.lesson_id,
+            "lesson_title": lesson.title if lesson else None,
+            "teacher_id": session.teacher_id,
+            "teacher_name": teacher.full_name or teacher.username if teacher else None,
+            "classroom_id": session.classroom_id,
+            "classroom_name": classroom.name if classroom else None,
+            "status": session.status,
+            "created_at": session.created_at,
+            "scheduled_start": session.scheduled_start,
+            "total_students": session.total_students,
+            "active_students": session.active_students,
+        }
+        active_sessions.append(StudentPendingSessionResponse(**session_dict))
+
+    return active_sessions
 
 
 # ========== 统计数据 ==========

@@ -28,9 +28,12 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
   const useWebSocket = ref<boolean>(true) // 默认启用 WebSocket
   
   /**
-   * 查找并加入会话
+   * 查找并加入会话（带重试机制）
    */
-  async function findAndJoinSession() {
+  async function findAndJoinSession(retryCount: number = 0): Promise<ClassSession | null> {
+    const MAX_RETRIES = 3
+    const RETRY_DELAY = 2000 // 2秒
+    
     try {
       // 🆕 获取该教案的所有会话（包括 pending 和 active 状态）
       // 先尝试查找 active 状态的会话
@@ -48,33 +51,22 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         
         // 🆕 检查会话状态
         if (activeSession.status === 'ended') {
-          alert('该课程已结束，无法加入')
-          return
+          console.warn('⚠️ 会话已结束，无法加入')
+          return null
         }
         
         // 🆕 获取完整的会话信息（包括 teacherName 和 lessonTitle）
+        let fullSession: ClassSession | null = null
         try {
-          const fullSession = await classroomSessionService.getSession(activeSession.id)
-          if (fullSession) {
-            // 使用完整会话信息，确保包含 teacherName 和 lessonTitle
-            session.value = {
-              ...fullSession,
-              settings: fullSession.settings || {},
-            }
-          } else {
-            // 如果获取失败，使用列表中的会话信息
-            session.value = {
-              ...activeSession,
-              settings: activeSession.settings || {},
-            }
-          }
+          fullSession = await classroomSessionService.getSession(activeSession.id)
         } catch (error) {
           console.warn('⚠️ 获取完整会话信息失败，使用列表信息:', error)
-          // 如果获取失败，使用列表中的会话信息
-          session.value = {
-            ...activeSession,
-            settings: activeSession.settings || {},
-          }
+        }
+        
+        // 使用完整会话信息或列表信息
+        session.value = {
+          ...(fullSession || activeSession),
+          settings: (fullSession || activeSession).settings || {},
         }
         
         // 处理字段映射：后端可能返回 current_cell_id（snake_case）或 currentCellId（camelCase）
@@ -88,29 +80,38 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
           lessonTitle: session.value?.lessonTitle,
         })
         
-        // 读取 display_cell_ids（多选模式）
-        const displayCellIdsFromSession = (activeSession.settings as any)?.display_cell_ids || 
-                                         (activeSession.settings as any)?.displayCellIds || []
-        
-        // 尝试加入会话
+        // 尝试加入会话（带重试）
         try {
           participation.value = await classroomSessionService.joinSession(session.value.id)
+          console.log('✅ 成功加入会话:', participation.value)
         } catch (error: any) {
           // 🆕 检查是否因为会话已结束而失败
           if (error.response?.status === 400 && error.response?.data?.detail?.includes('已结束')) {
-            alert('该课程已结束，无法加入')
+            console.warn('⚠️ 会话已结束，无法加入')
             session.value = null
-            return
+            return null
           }
           
-          // 如果已经加入过（403或其他错误），继续使用会话
-          if (error.response?.status !== 403) {
-            console.error('Failed to join session:', error)
+          // 🆕 如果是权限错误（403），可能是班级不匹配，不重试
+          if (error.response?.status === 403) {
+            console.warn('⚠️ 无权加入该会话:', error.response?.data?.detail)
+            session.value = null
+            return null
           }
+          
+          // 🆕 其他错误，如果还有重试次数，则重试
+          if (retryCount < MAX_RETRIES) {
+            console.warn(`⚠️ 加入会话失败，${RETRY_DELAY}ms后重试 (${retryCount + 1}/${MAX_RETRIES}):`, error)
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+            return findAndJoinSession(retryCount + 1)
+          }
+          
+          // 重试次数用完，记录错误但不阻塞
+          console.error('❌ 加入会话失败（已重试${MAX_RETRIES}次）:', error)
         }
         
         // 尝试建立 WebSocket 连接（不阻塞，后台异步连接）
-        if (useWebSocket.value) {
+        if (useWebSocket.value && session.value) {
           // 异步连接WebSocket，不阻塞页面加载
           connectWebSocket(session.value.id).catch((error) => {
             console.warn('⚠️ WebSocket 连接失败，降级到轮询模式:', error)
@@ -124,9 +125,25 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         return session.value
       }
       
+      // 如果没有找到会话，且还有重试次数，则重试
+      if (retryCount < MAX_RETRIES) {
+        console.log(`⚠️ 未找到会话，${RETRY_DELAY}ms后重试 (${retryCount + 1}/${MAX_RETRIES})`)
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+        return findAndJoinSession(retryCount + 1)
+      }
+      
+      console.log('⚠️ 未找到可加入的会话')
       return null
     } catch (error) {
-      console.error('Failed to find session:', error)
+      console.error('❌ 查找会话失败:', error)
+      
+      // 如果还有重试次数，则重试
+      if (retryCount < MAX_RETRIES) {
+        console.log(`⚠️ 查找会话异常，${RETRY_DELAY}ms后重试 (${retryCount + 1}/${MAX_RETRIES})`)
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+        return findAndJoinSession(retryCount + 1)
+      }
+      
       return null
     }
   }
@@ -413,6 +430,30 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
     websocketService.on('error', (message: WebSocketMessage) => {
       console.error('Server error:', message.data)
       // TODO: 显示错误提示
+    })
+    
+    // 7. 监听重连失败事件
+    websocketService.on('reconnect_failed', (message: WebSocketMessage) => {
+      console.warn('⚠️ WebSocket 重连失败，降级到轮询模式')
+      isWebSocketConnected.value = false
+      startPolling()
+    })
+    
+    // 8. 监听连接关闭事件（服务器主动关闭）
+    websocketService.on('connection_closed', (message: WebSocketMessage) => {
+      console.warn('⚠️ WebSocket 连接被服务器关闭:', message.data)
+      isWebSocketConnected.value = false
+      
+      // 如果是因为会话已结束，停止轮询
+      if (message.data?.reason?.includes('ended') || message.data?.reason?.includes('结束')) {
+        if (session.value) {
+          session.value.status = 'ended'
+        }
+        stopPolling()
+      } else {
+        // 其他原因，降级到轮询模式
+        startPolling()
+      }
     })
   }
   

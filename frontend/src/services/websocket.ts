@@ -102,9 +102,30 @@ export class WebSocketService {
         this.ws.onclose = (event) => {
           this.stopHeartbeat()
           
+          console.log(`🔌 WebSocket 连接关闭: code=${event.code}, reason=${event.reason || '无原因'}`)
+          
           // 如果不是手动关闭，尝试重连
           if (!this.isManualClose && this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnect(sessionId, token)
+            // 检查关闭代码，某些代码不应该重连（如会话已结束）
+            if (event.code === 1008) {
+              // 1008: Policy Violation，通常是服务器主动关闭（如会话已结束）
+              console.warn('⚠️ 服务器主动关闭连接，可能原因:', event.reason || '会话已结束或权限不足')
+              this.handleMessage({
+                type: 'connection_closed',
+                timestamp: new Date().toISOString(),
+                data: { code: event.code, reason: event.reason }
+              })
+            } else {
+              // 其他情况，尝试重连
+              this.reconnect(sessionId, token)
+            }
+          } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.error('❌ WebSocket 重连次数已达上限')
+            this.handleMessage({
+              type: 'reconnect_failed',
+              timestamp: new Date().toISOString(),
+              data: { sessionId, attempts: this.reconnectAttempts }
+            })
           }
         }
         
@@ -202,13 +223,29 @@ export class WebSocketService {
    */
   private reconnect(sessionId: number, token: string) {
     this.reconnectAttempts++
-    // 尝试重连
+    console.log(`🔄 尝试重连 WebSocket (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
+    
+    // 使用指数退避策略，但最大延迟不超过30秒
+    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000)
     
     setTimeout(() => {
       this.connect(sessionId, token).catch(error => {
-        console.error('❌ 重连失败:', error)
+        console.error(`❌ 重连失败 (${this.reconnectAttempts}/${this.maxReconnectAttempts}):`, error)
+        
+        // 如果重连次数未达到上限，继续重连
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.reconnect(sessionId, token)
+        } else {
+          console.error('❌ WebSocket 重连次数已达上限，停止重连')
+          // 触发重连失败事件，让调用方知道需要降级到轮询
+          this.handleMessage({
+            type: 'reconnect_failed',
+            timestamp: new Date().toISOString(),
+            data: { sessionId, attempts: this.reconnectAttempts }
+          })
+        }
       })
-    }, this.reconnectDelay)
+    }, delay)
   }
   
   /**
