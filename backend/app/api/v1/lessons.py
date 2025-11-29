@@ -5,7 +5,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union, cast
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -187,9 +187,33 @@ async def list_lessons(
             .distinct(Lesson.id)
         )
     else:
-        base_query = base_query.where(Lesson.creator_id == current_user.id)
+        # 教师/管理员/教研员：可以看到自己创建的教案 + 所有已发布的教案（共享教案）
         if status_enum:
-            base_query = base_query.where(Lesson.status == status_enum)
+            # 如果指定了状态筛选
+            if status_enum == LessonStatus.PUBLISHED:
+                # 查看已发布教案时，显示自己的 + 所有已发布的
+                base_query = base_query.where(
+                    or_(
+                        Lesson.creator_id == current_user.id,
+                        Lesson.status == LessonStatus.PUBLISHED
+                    )
+                )
+            else:
+                # 查看其他状态时，只显示自己创建的
+                base_query = base_query.where(
+                    and_(
+                        Lesson.creator_id == current_user.id,
+                        Lesson.status == status_enum
+                    )
+                )
+        else:
+            # 没有状态筛选时，显示自己创建的 + 所有已发布的
+            base_query = base_query.where(
+                or_(
+                    Lesson.creator_id == current_user.id,
+                    Lesson.status == LessonStatus.PUBLISHED
+                )
+            )
 
     if search:
         base_query = base_query.where(Lesson.title.ilike(f"%{search}%"))
@@ -890,7 +914,13 @@ async def get_chapter_lessons(
             ),
             selectinload(Lesson.reference_resource),
         )
-        .where(Lesson.creator_id == current_user.id, Lesson.chapter_id == chapter_id)
+        .where(
+            or_(
+                Lesson.creator_id == current_user.id,
+                Lesson.status == LessonStatus.PUBLISHED
+            ),
+            Lesson.chapter_id == chapter_id
+        )
     )
 
     if status_enum:

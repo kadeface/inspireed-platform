@@ -79,32 +79,6 @@
             />
             允许全屏
           </label>
-          <label>
-            <input
-              v-model="localConfig.allowNavigation"
-              type="checkbox"
-              @change="updateCell"
-            />
-            允许导航
-          </label>
-          <label>
-            <input
-              v-model="localConfig.showToolbar"
-              type="checkbox"
-              @change="updateCell"
-            />
-            显示工具栏
-          </label>
-        </div>
-        
-        <div class="form-group">
-          <label>高度:</label>
-          <input
-            v-model="localConfig.height"
-            type="text"
-            placeholder="600px 或 100vh"
-            @blur="updateCell"
-          />
         </div>
       </div>
     </div>
@@ -117,17 +91,37 @@
         <p v-if="displayContent.description" class="browser-description">{{ displayContent.description }}</p>
       </div>
 
-      <!-- 链接模式：当检测到 X-Frame-Options 限制时，直接显示链接卡片 -->
-      <div v-if="useLinkMode" class="link-mode-card">
+      <!-- 链接卡片 -->
+      <div class="link-mode-card" :class="{ 'fullscreen-preview': isFullscreenPreview }">
         <div class="link-card-content">
-          <svg class="link-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-          </svg>
-          <div class="link-info">
-            <h3 class="link-title">网站链接</h3>
-            <p class="link-url">{{ displayUrl }}</p>
-            <p class="link-hint">该网站不允许在框架中显示，请在新窗口打开</p>
+          <!-- 链接信息 -->
+          <div class="link-header">
+            <svg class="link-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            <div class="link-info">
+              <h3 class="link-title">网站链接</h3>
+              <p class="link-url">{{ displayUrl }}</p>
+            </div>
           </div>
+
+          <!-- 二维码区域 -->
+          <div class="qr-code-section">
+            <img 
+              v-if="qrCodeDataUrl"
+              :src="qrCodeDataUrl" 
+              @click="showLargeQR = true"
+              class="qr-code"
+              alt="二维码"
+            />
+            <div v-else class="qr-code-loading">
+              <div class="loading-spinner-small"></div>
+              <p>生成二维码中...</p>
+            </div>
+            <p class="qr-hint">点击二维码放大</p>
+          </div>
+
+          <!-- 打开按钮 -->
           <button @click="openInNewWindow" class="link-open-btn">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -136,73 +130,45 @@
           </button>
         </div>
       </div>
+    </div>
 
-      <!-- iframe 模式：尝试嵌入显示 -->
-      <div v-else class="iframe-container" :style="iframeStyle">
-        <iframe
-          v-if="displayUrl"
-          ref="iframeRef"
-          :src="displayUrl"
-          :sandbox="sandboxAttributes"
-          frameborder="0"
-          allowfullscreen
-          @load="handleIframeLoad"
-          @error="handleIframeError"
-          class="browser-iframe"
-        />
-        
-        <!-- 加载状态 -->
-        <div v-if="isLoading" class="loading-overlay">
-          <div class="loading-spinner"></div>
-          <p>加载中...</p>
-        </div>
-        
-        <!-- 错误状态（仅在 iframe 模式下显示，如果检测到错误会自动切换到链接模式） -->
-        <div v-if="loadError && !useLinkMode" class="error-overlay">
-          <div class="error-content">
-            <svg class="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h3 class="error-title">无法在框架中显示</h3>
-            <p class="error-message">{{ loadError }}</p>
-            <div class="error-actions">
-              <button @click="switchToLinkMode" class="retry-btn retry-btn-primary">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                切换到链接模式
-              </button>
-              <button @click="retryLoad" class="retry-btn">重试</button>
+    <!-- 放大二维码模态框 -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div
+          v-if="showLargeQR"
+          class="qr-modal-overlay"
+          @click.self="showLargeQR = false"
+          @keydown.esc="showLargeQR = false"
+          tabindex="0"
+        >
+          <div class="qr-modal-content">
+            <button @click="showLargeQR = false" class="qr-modal-close">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div class="qr-modal-body">
+              <img 
+                v-if="qrCodeLargeDataUrl"
+                :src="qrCodeLargeDataUrl" 
+                class="qr-code-large"
+                alt="二维码（放大）"
+              />
+              <div v-else class="qr-code-loading-large">
+                <div class="loading-spinner"></div>
+                <p>生成二维码中...</p>
+              </div>
+              <p class="qr-modal-hint">用手机扫描二维码打开网站</p>
+              <p class="qr-modal-url">{{ displayUrl }}</p>
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- 工具栏 -->
-      <div class="browser-toolbar">
-        <button v-if="displayConfig?.showToolbar && !useLinkMode" @click="refreshIframe" class="toolbar-btn" title="刷新">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          刷新
-        </button>
-        <button v-if="!useLinkMode" @click="switchToLinkMode" class="toolbar-btn" title="切换到链接模式">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-          </svg>
-          链接模式
-        </button>
-        <button @click="openInNewWindow" class="toolbar-btn toolbar-btn-primary" title="在新窗口打开">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-          在新窗口打开
-        </button>
-      </div>
-    </div>
+      </Transition>
+    </Teleport>
 
     <!-- 空状态提示 -->
-    <div v-else-if="!editable && !displayUrl" class="empty-state">
+    <div v-if="!editable && !displayUrl" class="empty-state">
       <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
       </svg>
@@ -219,9 +185,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onBeforeUnmount, onMounted } from 'vue'
+import { ref, watch, computed, onBeforeUnmount, onMounted, nextTick } from 'vue'
 import type { BrowserCell } from '../../types/cell'
 import { useFullscreen } from '@/composables/useFullscreen'
+import QRCode from 'qrcode'
 
 interface Props {
   cell: BrowserCell
@@ -239,20 +206,19 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLElement | null>(null)
 const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)
 
-const iframeRef = ref<HTMLIFrameElement>()
 const localContent = ref({ ...props.cell.content })
 const localConfig = ref<BrowserCell['config']>({ 
   allowFullscreen: true,
-  allowNavigation: true,
-  showToolbar: false,
-  height: '600px',
   ...(props.cell.config || {})
 })
 
 const urlError = ref<string | null>(null)
-const isLoading = ref(false)
-const loadError = ref<string | null>(null)
-const useLinkMode = ref(false) // 是否使用链接模式（当 iframe 被阻止时）
+
+// 二维码相关
+const qrCodeDataUrl = ref<string | null>(null)
+const qrCodeLargeDataUrl = ref<string | null>(null)
+const showLargeQR = ref(false)
+const isGeneratingQR = ref(false)
 
 // 在编辑模式下使用 localContent，非编辑模式下使用 props
 const displayUrl = computed(() => {
@@ -266,38 +232,6 @@ const displayContent = computed(() => {
 
 const displayConfig = computed(() => {
   return props.editable ? localConfig.value : (props.cell.config || {} as BrowserCell['config'])
-})
-
-// iframe 样式
-const iframeStyle = computed(() => {
-  const height = displayConfig.value?.height || '600px'
-  return {
-    height: height,
-    minHeight: '400px',
-  }
-})
-
-// iframe sandbox 属性
-const sandboxAttributes = computed(() => {
-  const sandbox = displayConfig.value?.sandbox || []
-  const allowNavigation = displayConfig.value?.allowNavigation !== false
-  
-  // 基础安全限制
-  const baseSandbox = [
-    'allow-same-origin',
-    'allow-scripts',
-    'allow-forms',
-    'allow-popups',
-    'allow-popups-to-escape-sandbox',
-  ]
-  
-  // 如果允许导航，添加 allow-top-navigation-by-user-activation
-  if (allowNavigation) {
-    baseSandbox.push('allow-top-navigation-by-user-activation')
-  }
-  
-  // 合并用户自定义的 sandbox 属性
-  return [...new Set([...baseSandbox, ...sandbox])].join(' ')
 })
 
 // URL 验证
@@ -346,77 +280,6 @@ function previewUrl() {
   }
 }
 
-// 切换到链接模式
-function switchToLinkMode() {
-  useLinkMode.value = true
-  loadError.value = null
-  isLoading.value = false
-}
-
-// iframe 加载处理
-function handleIframeLoad() {
-  isLoading.value = false
-  
-  // 立即检查是否被 X-Frame-Options 阻止
-  // 如果被阻止，访问 contentDocument 会抛出 SecurityError
-  try {
-    if (iframeRef.value?.contentWindow) {
-      // 尝试访问内容，如果被阻止会抛出 SecurityError
-      const iframeDoc = iframeRef.value.contentDocument || iframeRef.value.contentWindow?.document
-      if (iframeDoc && iframeDoc.body) {
-        // 成功访问，内容正常加载
-        loadError.value = null
-        useLinkMode.value = false
-      } else {
-        // 内容为空，可能被阻止，自动切换到链接模式
-        switchToLinkMode()
-      }
-    }
-  } catch (e: any) {
-    // 跨域访问被阻止，说明网站设置了 X-Frame-Options，自动切换到链接模式
-    if (e.name === 'SecurityError' || e.message.includes('Blocked a frame') || e.message.includes('cross-origin')) {
-      switchToLinkMode()
-    } else if (e.message.includes('frame') || e.message.includes('X-Frame')) {
-      switchToLinkMode()
-    } else {
-      // 其他错误，可能是网络问题
-      loadError.value = '网页加载失败，请检查网址是否正确或网络连接。'
-    }
-  }
-}
-
-// iframe 错误处理
-function handleIframeError(event: Event) {
-  isLoading.value = false
-  
-  // 检查是否是网络错误（522 等）
-  const target = event.target as HTMLIFrameElement
-  if (target) {
-    // 522 错误通常是服务器超时
-    loadError.value = '网页加载超时（服务器响应 522）。请检查网络连接，或点击"新窗口"按钮在新标签页中打开。'
-  } else {
-    loadError.value = '网页加载失败，请检查网址是否正确或网络连接。某些网站可能不允许在框架中显示。'
-  }
-}
-
-
-// 重试加载
-function retryLoad() {
-  if (iframeRef.value && displayUrl.value) {
-    loadError.value = null
-    isLoading.value = true
-    iframeRef.value.src = displayUrl.value
-  }
-}
-
-// 刷新 iframe
-function refreshIframe() {
-  if (iframeRef.value) {
-    isLoading.value = true
-    loadError.value = null
-    iframeRef.value.src = iframeRef.value.src
-  }
-}
 
 // 在新窗口打开
 function openInNewWindow() {
@@ -425,71 +288,132 @@ function openInNewWindow() {
   }
 }
 
+// 生成二维码
+async function generateQRCode(url: string, size: number = 200): Promise<string | null> {
+  if (!url) return null
+  
+  try {
+    const dataUrl = await QRCode.toDataURL(url, {
+      width: size,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    })
+    return dataUrl
+  } catch (error) {
+    console.error('生成二维码失败:', error)
+    return null
+  }
+}
+
+// 生成二维码（基础尺寸）
+async function generateNormalQR() {
+  if (!displayUrl.value || isGeneratingQR.value) return
+  
+  isGeneratingQR.value = true
+  try {
+    const size = isFullscreenPreview.value ? 300 : 200
+    const dataUrl = await generateQRCode(displayUrl.value, size)
+    qrCodeDataUrl.value = dataUrl
+  } finally {
+    isGeneratingQR.value = false
+  }
+}
+
+// 生成大尺寸二维码（用于放大模态框）
+async function generateLargeQR() {
+  if (!displayUrl.value || qrCodeLargeDataUrl.value) return
+  
+  try {
+    const size = isFullscreenPreview.value ? 600 : 500
+    const dataUrl = await generateQRCode(displayUrl.value, size)
+    qrCodeLargeDataUrl.value = dataUrl
+  } catch (error) {
+    console.error('生成大尺寸二维码失败:', error)
+  }
+}
+
+// 检测是否在全屏预览模式（通过检查父元素）
+const isFullscreenPreview = computed(() => {
+  if (!containerRef.value) return false
+  // 检查是否在全屏预览的上下文中
+  const parent = containerRef.value.closest('.fixed.inset-0')
+  return !!parent || isFullscreen.value
+})
+
 // 监听 props.cell 的变化，同步到本地状态
 watch(() => props.cell, (newCell) => {
   if (newCell && !props.editable) {
-    // 非编辑模式下，如果 URL 变化，重置加载状态
+    // 非编辑模式下，如果 URL 变化，重新生成二维码
     if (newCell.content?.url !== localContent.value.url) {
       localContent.value = { ...newCell.content }
       localConfig.value = {
         allowFullscreen: true,
-        allowNavigation: true,
-        showToolbar: false,
-        height: '600px',
         ...(newCell.config || {})
       }
-      isLoading.value = true
-      loadError.value = null
+      // 重置并重新生成二维码
+      qrCodeDataUrl.value = null
+      qrCodeLargeDataUrl.value = null
+      if (displayUrl.value) {
+        nextTick(() => {
+          generateNormalQR()
+        })
+      }
     }
   }
 }, { deep: true })
 
-// 当 URL 变化时，设置加载状态
+// 当 URL 变化时，生成二维码
 watch(() => displayUrl.value, (newUrl, oldUrl) => {
   if (newUrl && newUrl !== oldUrl && !props.editable) {
-    isLoading.value = true
-    loadError.value = null
+    // 重置二维码
+    qrCodeDataUrl.value = null
+    qrCodeLargeDataUrl.value = null
+    // 生成新二维码
+    nextTick(() => {
+      generateNormalQR()
+    })
   }
 }, { immediate: true })
 
-// 组件挂载时检查 URL
-let errorHandler: ((event: ErrorEvent) => void) | null = null
+// 当显示放大模态框时，生成大尺寸二维码
+watch(() => showLargeQR.value, (show) => {
+  if (show && displayUrl.value && !qrCodeLargeDataUrl.value) {
+    generateLargeQR()
+  }
+})
+
 
 onMounted(() => {
-  if (props.cell.content?.url && !props.editable) {
-    isLoading.value = true
-    loadError.value = null
+  // 生成二维码
+  if (displayUrl.value && !props.editable) {
+    nextTick(() => {
+      generateNormalQR()
+    })
   }
-  
-  // 监听页面错误事件（捕获 X-Frame-Options 错误）
-  errorHandler = (event: ErrorEvent) => {
-    const errorMsg = event.message || ''
-    if (errorMsg.includes('X-Frame-Options') || 
-        errorMsg.includes('Refused to display') || 
-        errorMsg.includes('frame') ||
-        errorMsg.includes('frame-ancestors')) {
-      switchToLinkMode()
-      // 阻止错误继续传播
-      event.preventDefault()
+})
+
+// 监听 ESC 键关闭二维码模态框
+let escKeyHandler: ((e: KeyboardEvent) => void) | null = null
+
+onMounted(() => {
+  escKeyHandler = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && showLargeQR.value) {
+      showLargeQR.value = false
     }
   }
-  
-  window.addEventListener('error', errorHandler, true) // 使用捕获阶段
+  window.addEventListener('keydown', escKeyHandler)
 })
 
 onBeforeUnmount(() => {
-  if (errorHandler) {
-    window.removeEventListener('error', errorHandler)
-    errorHandler = null
+  if (escKeyHandler) {
+    window.removeEventListener('keydown', escKeyHandler)
+    escKeyHandler = null
   }
 })
 
-watch(() => props.cell.content?.url, (url) => {
-  if (url && !props.editable) {
-    isLoading.value = true
-    loadError.value = null
-  }
-})
 </script>
 
 <style scoped>
@@ -517,10 +441,6 @@ watch(() => props.cell.content?.url, (url) => {
 
 .browser-cell.fullscreen .browser-display {
   @apply h-full flex flex-col;
-}
-
-.browser-cell.fullscreen .iframe-container {
-  @apply flex-1;
 }
 
 .browser-cell {
@@ -602,69 +522,6 @@ watch(() => props.cell.content?.url, (url) => {
   @apply text-sm text-gray-600;
 }
 
-.iframe-container {
-  @apply relative w-full border border-gray-300 rounded-lg overflow-hidden bg-gray-100;
-}
-
-.browser-iframe {
-  @apply w-full h-full border-0;
-}
-
-.loading-overlay {
-  @apply absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-90;
-}
-
-.loading-spinner {
-  @apply w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2;
-}
-
-.error-overlay {
-  @apply absolute inset-0 flex items-center justify-center bg-white bg-opacity-95 p-6;
-}
-
-.error-content {
-  @apply text-center max-w-md;
-}
-
-.error-icon {
-  @apply w-16 h-16 text-amber-500 mx-auto mb-4;
-}
-
-.error-title {
-  @apply text-lg font-semibold text-gray-900 mb-2;
-}
-
-.error-message {
-  @apply text-sm text-gray-600 mb-6 leading-relaxed;
-}
-
-.error-actions {
-  @apply flex flex-col sm:flex-row gap-3 justify-center items-stretch sm:items-center;
-}
-
-.retry-btn {
-  @apply flex items-center justify-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium;
-}
-
-.retry-btn-primary {
-  @apply bg-blue-600 text-white hover:bg-blue-700 shadow-md;
-}
-
-.browser-toolbar {
-  @apply flex gap-2 mt-2 p-2 bg-gray-50 rounded-lg;
-}
-
-.toolbar-btn {
-  @apply flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors;
-}
-
-.toolbar-btn-primary {
-  @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700;
-}
-
-.toolbar-btn-primary {
-  @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700;
-}
 
 .empty-state {
   @apply flex flex-col items-center justify-center p-12 text-center;
@@ -680,35 +537,158 @@ watch(() => props.cell.content?.url, (url) => {
 
 /* 链接模式样式 */
 .link-mode-card {
-  @apply w-full border-2 border-blue-200 rounded-lg bg-blue-50 p-6;
+  @apply w-full border-2 border-blue-200 rounded-lg bg-white p-6;
+}
+
+.link-mode-card.fullscreen-preview {
+  @apply p-8;
 }
 
 .link-card-content {
-  @apply flex flex-col items-center text-center;
+  @apply flex flex-col items-center text-center gap-6;
+}
+
+.link-header {
+  @apply flex flex-col items-center gap-3;
 }
 
 .link-icon {
-  @apply w-16 h-16 text-blue-600 mb-4;
+  @apply w-12 h-12 text-blue-600;
+}
+
+.link-mode-card.fullscreen-preview .link-icon {
+  @apply w-16 h-16;
 }
 
 .link-info {
-  @apply mb-6;
+  @apply flex flex-col items-center gap-2;
 }
 
 .link-title {
-  @apply text-xl font-semibold text-gray-900 mb-2;
+  @apply text-lg font-semibold text-gray-900;
+}
+
+.link-mode-card.fullscreen-preview .link-title {
+  @apply text-xl;
 }
 
 .link-url {
-  @apply text-sm text-blue-600 mb-2 break-all;
+  @apply text-sm text-blue-600 break-all max-w-md;
 }
 
-.link-hint {
-  @apply text-sm text-gray-600;
+.link-mode-card.fullscreen-preview .link-url {
+  @apply text-base;
 }
 
+/* 二维码区域 */
+.qr-code-section {
+  @apply flex flex-col items-center gap-3;
+}
+
+.qr-code {
+  @apply border-2 border-gray-200 rounded-lg p-2 bg-white cursor-pointer transition-all hover:border-blue-400 hover:shadow-lg;
+  width: 200px;
+  height: 200px;
+}
+
+.link-mode-card.fullscreen-preview .qr-code {
+  width: 300px;
+  height: 300px;
+}
+
+.qr-hint {
+  @apply text-sm text-gray-500;
+}
+
+.link-mode-card.fullscreen-preview .qr-hint {
+  @apply text-base;
+}
+
+.qr-code-loading {
+  @apply flex flex-col items-center justify-center gap-2 border-2 border-gray-200 rounded-lg bg-gray-50;
+  width: 200px;
+  height: 200px;
+}
+
+.link-mode-card.fullscreen-preview .qr-code-loading {
+  width: 300px;
+  height: 300px;
+}
+
+.loading-spinner-small {
+  @apply w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin;
+}
+
+.loading-spinner {
+  @apply w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4;
+}
+
+/* 打开按钮 */
 .link-open-btn {
-  @apply flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md;
+  @apply flex items-center justify-center gap-2 px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md text-base min-w-[200px];
+}
+
+.link-mode-card.fullscreen-preview .link-open-btn {
+  @apply px-12 py-5 text-lg min-w-[280px];
+}
+
+/* 二维码模态框 */
+.qr-modal-overlay {
+  @apply fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-80 p-4;
+}
+
+.qr-modal-content {
+  @apply relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8;
+}
+
+.qr-modal-close {
+  @apply absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors;
+}
+
+.qr-modal-body {
+  @apply flex flex-col items-center gap-4;
+}
+
+.qr-code-large {
+  @apply border-4 border-gray-200 rounded-lg p-4 bg-white;
+  width: 500px;
+  height: 500px;
+}
+
+.qr-code-loading-large {
+  @apply flex flex-col items-center justify-center gap-4 border-4 border-gray-200 rounded-lg bg-gray-50;
+  width: 500px;
+  height: 500px;
+}
+
+.qr-modal-hint {
+  @apply text-lg font-semibold text-gray-900 mt-2;
+}
+
+.qr-modal-url {
+  @apply text-sm text-blue-600 break-all max-w-md text-center;
+}
+
+/* 模态框过渡动画 */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-fade-enter-active .qr-modal-content,
+.modal-fade-leave-active .qr-modal-content {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+.modal-fade-enter-from .qr-modal-content,
+.modal-fade-leave-to .qr-modal-content {
+  transform: scale(0.9);
+  opacity: 0;
 }
 </style>
 

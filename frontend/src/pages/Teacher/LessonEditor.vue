@@ -146,14 +146,14 @@
     <div class="flex flex-1 overflow-hidden">
       <!-- 左侧：Cell 工具箱 -->
       <CellToolbar
-        v-if="!isPreviewMode"
+        v-if="!isPreviewMode && !isFullscreenPreview"
         :collapsed="toolbarCollapsed"
         @add-cell="handleAddCellToEnd"
         @toggle-collapsed="toolbarCollapsed = !toolbarCollapsed"
       />
 
       <!-- 中间：编辑区 -->
-      <main class="flex-1 overflow-y-auto bg-gray-50">
+      <main v-if="!isFullscreenPreview" class="flex-1 overflow-y-auto bg-gray-50">
         <div 
           :class="[
             isPreviewMode ? 'w-full py-4 px-2' : 'w-full py-6 px-4 sm:px-6 lg:px-8'
@@ -345,21 +345,57 @@
       <Transition name="fullscreen-fade">
         <div
           v-if="isFullscreenPreview"
-          class="fixed inset-0 z-50 bg-gray-50 overflow-hidden"
+          class="fixed inset-0 z-50 bg-gray-50 overflow-hidden flex flex-col"
         >
           <!-- 全屏预览顶部栏 -->
-          <header class="bg-white shadow-sm sticky top-0 z-10">
+          <header v-if="!slideFullscreen" class="bg-white shadow-sm z-10 flex-shrink-0">
             <div class="px-6 py-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-4">
                   <div>
                     <h1 class="text-xl font-bold text-gray-900">{{ lessonTitle }}</h1>
-                    <p class="text-sm text-gray-500 mt-1">沉浸式预览</p>
+                    <p class="text-sm text-gray-500 mt-1">{{ slideMode ? '幻灯片模式' : '沉浸式预览' }}</p>
                   </div>
                 </div>
                 <div class="flex items-center gap-4">
-                  <!-- 紧凑模式切换 -->
+                  <!-- 幻灯片模式切换 -->
                   <button
+                    @click="slideMode = !slideMode"
+                    :class="[
+                      'px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2',
+                      slideMode
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
+                    ]"
+                    title="切换幻灯片模式：一页一页播放，适合大屏授课"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    {{ slideMode ? '滚动模式' : '幻灯片模式' }}
+                  </button>
+                  
+                  <!-- 幻灯片全屏按钮（仅在幻灯片模式显示） -->
+                  <button
+                    v-if="slideMode"
+                    @click="handleSlideFullscreenToggle"
+                    :class="[
+                      'px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2',
+                      slideFullscreen
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
+                    ]"
+                    title="全屏模式：使用浏览器原生全屏，隐藏所有UI"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    {{ slideFullscreen ? '退出全屏' : '全屏' }}
+                  </button>
+                  
+                  <!-- 紧凑模式切换（仅在滚动模式显示） -->
+                  <button
+                    v-if="!slideMode"
                     @click="compactMode = !compactMode"
                     :class="[
                       'px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2',
@@ -390,35 +426,197 @@
             </div>
           </header>
 
-          <!-- 全屏预览内容 -->
-          <div class="h-[calc(100vh-73px)] overflow-y-auto bg-gray-50">
-            <div class="w-full px-4 sm:px-6 lg:px-8 py-6">
-              <!-- Cell 列表 -->
-              <div v-if="cells.length > 0" class="space-y-4 max-w-none">
-                <CellContainer
-                  v-for="(cell, index) in cells"
-                  :key="cell.id"
-                  :cell="cell"
-                  :index="index"
-                  :editable="false"
-                  :draggable="false"
-                  :show-move-buttons="false"
-                  :compact-mode="compactMode"
-                />
-              </div>
+          <!-- 全屏预览内容区域 -->
+          <div class="flex-1 overflow-hidden relative">
+            <!-- 滚动模式 -->
+            <div v-if="!slideMode" class="h-full overflow-y-auto bg-gray-50">
+              <div class="w-full px-4 sm:px-6 lg:px-8 py-6">
+                <!-- Cell 列表 -->
+                <div v-if="cells.length > 0" class="space-y-4 max-w-none">
+                  <CellContainer
+                    v-for="(cell, index) in cells"
+                    :key="cell.id"
+                    :cell="cell"
+                    :index="index"
+                    :editable="false"
+                    :draggable="false"
+                    :show-move-buttons="false"
+                    :compact-mode="compactMode"
+                  />
+                </div>
 
-              <!-- 空状态 -->
-              <div v-else class="text-center py-12">
-                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p class="mt-4 text-lg text-gray-600">该教案暂无内容</p>
+                <!-- 空状态 -->
+                <div v-else class="text-center py-12">
+                  <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p class="mt-4 text-lg text-gray-600">该教案暂无内容</p>
+                </div>
               </div>
+            </div>
+
+            <!-- 幻灯片模式 -->
+            <div 
+              v-else 
+              ref="slideContainerRef"
+              class="h-full bg-gray-50" 
+              :class="{ 
+                'slide-fullscreen-mode': slideFullscreen,
+                'overflow-y-auto': !slideFullscreen
+              }"
+              :style="slideFullscreen ? 'overflow: hidden; position: relative;' : ''"
+              @mousemove="handleSlideMouseMove"
+              @touchstart="handleSlideMouseMove"
+              @mouseleave="handleSlideMouseLeave"
+            >
+              <div class="flex justify-center relative" :class="slideFullscreen ? 'h-full p-0 overflow-y-auto' : 'p-8 items-center'">
+                <Transition name="slide-fade" mode="out-in">
+                  <div
+                    v-if="currentCell"
+                    :key="`slide-${currentCell.id}`"
+                    :class="slideFullscreen ? 'w-full min-h-full flex items-start justify-center p-8' : 'w-full max-w-6xl'"
+                  >
+                    <div :class="slideFullscreen ? 'w-full max-w-7xl mx-auto my-auto' : 'w-full'">
+                      <CellContainer
+                        :cell="currentCell"
+                        :index="currentSlideIndex"
+                        :editable="false"
+                        :draggable="false"
+                        :show-move-buttons="false"
+                        :compact-mode="false"
+                      />
+                    </div>
+                  </div>
+                  <div
+                    v-else
+                    key="empty-slide"
+                    class="text-center py-12 w-full"
+                  >
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p class="mt-4 text-lg text-gray-600">该教案暂无内容</p>
+                  </div>
+                </Transition>
+              </div>
+              
+              <!-- 全屏模式下的浮动控制按钮（自动隐藏） -->
+              <Transition name="controls-fade">
+                <div 
+                  v-if="slideFullscreen && cells.length > 0 && showSlideControls" 
+                  class="fixed bottom-8 right-8 z-[9999] flex items-center gap-4 flex-shrink-0"
+                  style="height: auto !important; width: auto !important; pointer-events: auto;"
+                  @mouseenter="handleControlsMouseEnter"
+                  @mouseleave="handleControlsMouseLeave"
+                >
+                <!-- 上一页按钮 -->
+                <button
+                  @click="goToPreviousSlide"
+                  :disabled="currentSlideIndex === 0"
+                  :class="[
+                    'w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md touch-manipulation',
+                    currentSlideIndex === 0
+                      ? 'bg-gray-100 bg-opacity-80 text-gray-400 cursor-not-allowed'
+                      : 'bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-700 hover:shadow-lg border border-gray-300 active:scale-95',
+                  ]"
+                  title="上一页 (←)"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                <!-- 页码显示 -->
+                <div class="px-4 py-1.5 bg-white bg-opacity-90 rounded-full border border-gray-300 shadow-md min-w-[80px] text-center">
+                  <span class="text-sm font-semibold text-gray-800">
+                    {{ currentSlideIndex + 1 }} / {{ cells.length }}
+                  </span>
+                </div>
+
+                <!-- 下一页按钮 -->
+                <button
+                  @click="goToNextSlide"
+                  :disabled="currentSlideIndex >= cells.length - 1"
+                  :class="[
+                    'w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md touch-manipulation',
+                    currentSlideIndex >= cells.length - 1
+                      ? 'bg-gray-100 bg-opacity-80 text-gray-400 cursor-not-allowed'
+                      : 'bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-700 hover:shadow-lg border border-gray-300 active:scale-95',
+                  ]"
+                  title="下一页 (→)"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+
+                <!-- 退出全屏按钮 -->
+                <button
+                  @click="handleSlideFullscreenToggle"
+                  class="px-3 py-1.5 bg-white bg-opacity-90 hover:bg-opacity-100 border border-gray-300 rounded-lg shadow-md flex items-center gap-1.5 text-xs font-medium text-gray-700 transition-all ml-2"
+                  title="退出全屏 (ESC)"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span>退出</span>
+                </button>
+                </div>
+              </Transition>
             </div>
           </div>
 
-          <!-- 浮动操作按钮 -->
-          <div class="fixed bottom-8 right-8 flex flex-col gap-3">
+          <!-- 底部导航栏（仅幻灯片模式显示，全屏模式下隐藏） -->
+          <div
+            v-if="slideMode && cells.length > 0 && !slideFullscreen"
+            class="bg-white border-t border-gray-200 flex-shrink-0 py-5 px-4"
+          >
+            <div class="flex items-center justify-center gap-8 max-w-4xl mx-auto">
+              <!-- 上一页按钮 -->
+              <button
+                @click="goToPreviousSlide"
+                :disabled="currentSlideIndex === 0"
+                :class="[
+                  'w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-lg touch-manipulation',
+                  currentSlideIndex === 0
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 hover:shadow-xl border-2 border-gray-300 active:scale-90',
+                ]"
+                title="上一页 (←)"
+              >
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              <!-- 页码显示 -->
+              <div class="px-8 py-3 bg-gray-50 rounded-full border-2 border-gray-200 min-w-[120px] text-center">
+                <span class="text-xl font-bold text-gray-800">
+                  {{ currentSlideIndex + 1 }} / {{ cells.length }}
+                </span>
+              </div>
+
+              <!-- 下一页按钮 -->
+              <button
+                @click="goToNextSlide"
+                :disabled="currentSlideIndex >= cells.length - 1"
+                :class="[
+                  'w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-lg touch-manipulation',
+                  currentSlideIndex >= cells.length - 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 hover:shadow-xl border-2 border-gray-300 active:scale-90',
+                ]"
+                title="下一页 (→)"
+              >
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 滚动模式的浮动操作按钮 -->
+          <div v-if="!slideMode" class="fixed bottom-8 right-8 flex flex-col gap-3">
             <!-- 返回顶部 -->
             <button
               @click="scrollToTop"
@@ -457,6 +655,7 @@ import PDFViewerModal from '../../components/Resource/PDFViewerModal.vue'
 import ClassroomSelectorModal from '../../components/Lesson/ClassroomSelectorModal.vue'
 import LessonAiAssistantDrawer from '@/components/Teacher/LessonAiAssistantDrawer.vue'
 import TeacherClassroomControlPanel from '@/components/Classroom/TeacherControlPanel.vue'
+import { useFullscreen } from '@/composables/useFullscreen'
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
@@ -473,7 +672,14 @@ const toolbarCollapsed = ref(false)
 const isPreviewMode = ref(false)
 const compactMode = ref(true) // 紧凑模式：默认启用，限制长内容的高度
 const isFullscreenPreview = ref(false)
+const slideMode = ref(false) // 幻灯片模式：一页一页播放
+const currentSlideIndex = ref(0) // 当前幻灯片索引
+const slideFullscreen = ref(false) // 幻灯片全屏模式：隐藏顶部栏和底部栏，铺满屏幕
+const showSlideControls = ref(true) // 全屏模式下控制按钮的显示状态
+let slideControlsTimer: ReturnType<typeof setTimeout> | null = null
 const cellListRef = ref<HTMLElement>()
+const slideContainerRef = ref<HTMLElement>() // 幻灯片容器引用，用于全屏
+const { isFullscreen: isSlideNativeFullscreen, toggleFullscreen: toggleSlideFullscreen } = useFullscreen(slideContainerRef)
 const lessonTitle = ref('')
 const isFlowInteractionActive = ref(false)
 let flowInteractionResumeTimer: ReturnType<typeof setTimeout> | null = null
@@ -498,6 +704,15 @@ const toast = ref({
 // 计算属性
 const currentLesson = computed(() => lessonStore.currentLesson)
 const cells = computed(() => lessonStore.cells)
+
+// 幻灯片模式：当前显示的Cell
+const currentCell = computed(() => {
+  if (!slideMode.value || cells.value.length === 0) {
+    return null
+  }
+  const index = Math.max(0, Math.min(currentSlideIndex.value, cells.value.length - 1))
+  return cells.value[index] || null
+})
 
 // 调试：输出课堂控制按钮的显示条件
 watch([isPreviewMode, () => currentLesson.value?.status], ([preview, status]) => {
@@ -899,15 +1114,48 @@ function toggleFullscreenPreview() {
   // 进入全屏时，禁止body滚动
   if (isFullscreenPreview.value) {
     document.body.style.overflow = 'hidden'
+    // 进入全屏时，如果启用幻灯片模式，重置到第一页
+    if (slideMode.value) {
+      currentSlideIndex.value = 0
+    }
   } else {
     document.body.style.overflow = ''
   }
 }
 
+// 切换幻灯片全屏（使用浏览器原生全屏API）
+async function handleSlideFullscreenToggle() {
+  try {
+    await toggleSlideFullscreen()
+  } catch (error) {
+    console.error('切换幻灯片全屏失败:', error)
+  }
+}
+
+// 幻灯片模式：上一页
+function goToPreviousSlide() {
+  if (currentSlideIndex.value > 0) {
+    currentSlideIndex.value--
+  }
+}
+
+// 幻灯片模式：下一页
+function goToNextSlide() {
+  if (currentSlideIndex.value < cells.value.length - 1) {
+    currentSlideIndex.value++
+  }
+}
+
+// 幻灯片模式：跳转到指定页
+function goToSlide(index: number) {
+  const maxIndex = cells.value.length - 1
+  currentSlideIndex.value = Math.max(0, Math.min(index, maxIndex))
+}
+
 // 滚动到顶部
 function scrollToTop() {
-  const container = document.querySelector('.fixed.inset-0 .overflow-y-auto')
-  if (container) {
+  const container = document.querySelector('.fixed.inset-0 .overflow-y-auto') as HTMLElement | null
+  if (container && container.scrollTo) {
     container.scrollTo({
       top: 0,
       behavior: 'smooth'
@@ -928,9 +1176,9 @@ function scrollToNewCell(index: number) {
   if (!cellListRef.value) return
   
   const cellElements = cellListRef.value.querySelectorAll('[data-cell-index]')
-  const targetElement = cellElements[index]
+  const targetElement = cellElements[index] as HTMLElement | null
   
-  if (targetElement) {
+  if (targetElement && targetElement.classList) {
     targetElement.scrollIntoView({
       behavior: 'smooth',
       block: 'center',
@@ -940,7 +1188,9 @@ function scrollToNewCell(index: number) {
     // 添加高亮效果
     targetElement.classList.add('ring-2', 'ring-blue-400', 'ring-opacity-75')
     setTimeout(() => {
-      targetElement.classList.remove('ring-2', 'ring-blue-400', 'ring-opacity-75')
+      if (targetElement && targetElement.classList) {
+        targetElement.classList.remove('ring-2', 'ring-blue-400', 'ring-opacity-75')
+      }
     }, 2000)
   }
 }
@@ -1041,10 +1291,141 @@ watch(isFullscreenPreview, (newValue) => {
   }
 })
 
+// 监听幻灯片模式切换，重置索引
+watch(slideMode, (newValue) => {
+  if (newValue && isFullscreenPreview.value) {
+    // 切换到幻灯片模式时，重置到第一页
+    currentSlideIndex.value = 0
+    // 退出全屏模式
+    slideFullscreen.value = false
+  }
+})
+
+// 监听原生全屏状态变化，同步到slideFullscreen
+watch(isSlideNativeFullscreen, (newValue) => {
+  slideFullscreen.value = newValue
+  if (newValue) {
+    // 进入全屏时，显示控制按钮
+    showSlideControls.value = true
+    resetControlsTimer()
+  } else {
+    // 退出全屏时，清除定时器
+    clearControlsTimer()
+  }
+})
+
+// 监听全屏模式切换，重置控制按钮显示状态
+watch(slideFullscreen, (newValue) => {
+  if (newValue) {
+    // 进入全屏时，显示控制按钮
+    showSlideControls.value = true
+    resetControlsTimer()
+  } else {
+    // 退出全屏时，清除定时器
+    clearControlsTimer()
+  }
+})
+
+// 处理幻灯片区域的鼠标移动
+function handleSlideMouseMove() {
+  if (slideFullscreen.value) {
+    showSlideControls.value = true
+    resetControlsTimer()
+  }
+}
+
+// 处理鼠标离开幻灯片区域
+function handleSlideMouseLeave() {
+  if (slideFullscreen.value) {
+    resetControlsTimer()
+  }
+}
+
+// 处理控制按钮区域的鼠标进入
+function handleControlsMouseEnter() {
+  if (slideFullscreen.value) {
+    clearControlsTimer()
+    showSlideControls.value = true
+  }
+}
+
+// 处理控制按钮区域的鼠标离开
+function handleControlsMouseLeave() {
+  if (slideFullscreen.value) {
+    resetControlsTimer()
+  }
+}
+
+// 重置控制按钮隐藏定时器
+function resetControlsTimer() {
+  clearControlsTimer()
+  if (slideFullscreen.value) {
+    slideControlsTimer = setTimeout(() => {
+      if (slideFullscreen.value) {
+        showSlideControls.value = false
+      }
+    }, 3000) // 3秒后自动隐藏
+  }
+}
+
+// 清除控制按钮隐藏定时器
+function clearControlsTimer() {
+  if (slideControlsTimer) {
+    clearTimeout(slideControlsTimer)
+    slideControlsTimer = null
+  }
+}
+
+// 监听cells变化，确保索引有效
+watch(() => cells.value.length, (newLength) => {
+  if (slideMode.value && currentSlideIndex.value >= newLength) {
+    currentSlideIndex.value = Math.max(0, newLength - 1)
+  }
+})
+
 // 处理全屏预览的键盘事件
 function handleFullscreenKeydown(event: KeyboardEvent) {
+  // ESC: 退出全屏或退出幻灯片全屏（原生全屏API会自动处理ESC键，这里主要是为了兼容）
   if (event.key === 'Escape') {
-    toggleFullscreenPreview()
+    if (slideFullscreen.value && isSlideNativeFullscreen.value) {
+      handleSlideFullscreenToggle()
+      return
+    }
+    if (isFullscreenPreview.value) {
+      toggleFullscreenPreview()
+      return
+    }
+  }
+
+  // 仅在幻灯片模式下处理导航快捷键
+  if (!slideMode.value) {
+    return
+  }
+
+  // 阻止默认行为（如空格键滚动页面）
+  if (['ArrowLeft', 'ArrowRight', 'Space', 'Enter', 'Home', 'End'].includes(event.key)) {
+    event.preventDefault()
+  }
+
+  switch (event.key) {
+    case 'ArrowLeft':
+      // 左箭头：上一页
+      goToPreviousSlide()
+      break
+    case 'ArrowRight':
+    case 'Space':
+    case 'Enter':
+      // 右箭头/空格/回车：下一页
+      goToNextSlide()
+      break
+    case 'Home':
+      // Home: 第一页
+      goToSlide(0)
+      break
+    case 'End':
+      // End: 最后一页
+      goToSlide(cells.value.length - 1)
+      break
   }
 }
 
@@ -1282,6 +1663,8 @@ onUnmounted(() => {
     clearTimeout(flowInteractionResumeTimer)
     flowInteractionResumeTimer = null
   }
+  // 清除控制按钮定时器
+  clearControlsTimer()
 })
 </script>
 
@@ -1329,6 +1712,135 @@ onUnmounted(() => {
 .fullscreen-fade-leave-to {
   opacity: 0;
   transform: scale(0.95);
+}
+
+/* 幻灯片切换动画 */
+.slide-fade-enter-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.slide-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  position: absolute;
+  width: 100%;
+}
+
+.slide-fade-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.slide-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.slide-fade-enter-to,
+.slide-fade-leave-from {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* 触摸优化 */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 幻灯片全屏模式 */
+.slide-fullscreen-mode {
+  @apply bg-gray-900;
+}
+
+.slide-fullscreen-mode .flex {
+  height: 100%;
+}
+
+/* 全屏模式下隐藏 CellContainer 的边框和背景，添加白色背景 */
+.slide-fullscreen-mode :deep(.cell-container) {
+  @apply border-0 shadow-lg bg-white rounded-lg;
+  max-height: none;
+  max-width: 95vw;
+  margin: auto;
+  overflow: visible;
+}
+
+.slide-fullscreen-mode :deep(.cell-container > div) {
+  @apply bg-white;
+}
+
+/* 确保文本内容可以滚动 */
+.slide-fullscreen-mode :deep(.cell-container .text-cell-view),
+.slide-fullscreen-mode :deep(.cell-container .text-cell-editor),
+.slide-fullscreen-mode :deep(.cell-container .prose) {
+  max-height: none;
+  overflow: visible;
+}
+
+/* 全屏模式下优化内容显示 */
+.slide-fullscreen-mode :deep(.cell-container .prose) {
+  @apply max-w-none;
+}
+
+.slide-fullscreen-mode :deep(.cell-container img) {
+  @apply max-h-[70vh] mx-auto;
+}
+
+/* 浏览器原生全屏模式下的样式 */
+:fullscreen .slide-fullscreen-mode,
+:-webkit-full-screen .slide-fullscreen-mode,
+:-moz-full-screen .slide-fullscreen-mode,
+:-ms-fullscreen .slide-fullscreen-mode {
+  @apply bg-gray-900;
+}
+
+/* 只对幻灯片内容区域应用全屏样式，不影响按钮容器 */
+:fullscreen .slide-fullscreen-mode > .flex.justify-center,
+:-webkit-full-screen .slide-fullscreen-mode > .flex.justify-center,
+:-moz-full-screen .slide-fullscreen-mode > .flex.justify-center,
+:-ms-fullscreen .slide-fullscreen-mode > .flex.justify-center {
+  min-height: 100vh;
+  width: 100vw;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 确保按钮容器不受全屏样式影响，并确保在最上层 */
+:fullscreen .slide-fullscreen-mode .fixed.bottom-8.right-8,
+:-webkit-full-screen .slide-fullscreen-mode .fixed.bottom-8.right-8,
+:-moz-full-screen .slide-fullscreen-mode .fixed.bottom-8.right-8,
+:-ms-fullscreen .slide-fullscreen-mode .fixed.bottom-8.right-8 {
+  height: auto !important;
+  width: auto !important;
+  flex-shrink: 0;
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+}
+
+/* 确保按钮本身可以点击 */
+:fullscreen .slide-fullscreen-mode .fixed.bottom-8.right-8 button,
+:-webkit-full-screen .slide-fullscreen-mode .fixed.bottom-8.right-8 button,
+:-moz-full-screen .slide-fullscreen-mode .fixed.bottom-8.right-8 button,
+:-ms-fullscreen .slide-fullscreen-mode .fixed.bottom-8.right-8 button {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 10000;
+}
+
+/* 控制按钮淡入淡出动画 */
+.controls-fade-enter-active,
+.controls-fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.controls-fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.controls-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
 /* 滚动条样式优化 */

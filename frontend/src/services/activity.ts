@@ -40,9 +40,11 @@ export const activityService = {
     // started_at 需要是 ISO 字符串格式，Pydantic 会自动转换为 datetime
     if (data.startedAt !== undefined) {
       // 确保是有效的 ISO 字符串
-      const startedAt = data.startedAt instanceof Date 
-        ? data.startedAt.toISOString() 
-        : data.startedAt
+      const startedAt = typeof data.startedAt === 'string'
+        ? data.startedAt
+        : (data.startedAt as unknown) instanceof Date
+          ? (data.startedAt as unknown as Date).toISOString()
+          : String(data.startedAt)
       requestData.started_at = startedAt
     }
     

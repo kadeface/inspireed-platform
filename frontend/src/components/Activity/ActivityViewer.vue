@@ -74,169 +74,14 @@
 
         <!-- 根据题型渲染不同的答题组件 -->
         <div class="item-answer">
-          <!-- 单选题 -->
-          <div v-if="item.type === 'single-choice'" class="space-y-2">
-            <label
-              v-for="option in item.config.options"
-              :key="option.id"
-              class="option-label"
-              :class="{
-                'option-correct': isSubmitted && isCorrectAnswerForSingle(item.id, option.id),
-                'option-selected': answers[item.id] === option.id,
-                'option-wrong': isSubmitted && answers[item.id] === option.id && !getItemAnswer(item.id)?.correct
-              }"
-            >
-              <input
-                v-model="answers[item.id]"
-                type="radio"
-                :value="option.id"
-                :name="`item-${item.id}`"
-                :disabled="isSubmitted"
-                @change="saveAnswer(item.id)"
-              />
-              <span>{{ option.text }}</span>
-              <span v-if="isSubmitted && isCorrectAnswerForSingle(item.id, option.id)" class="correct-badge">✓ 正确答案</span>
-            </label>
-            <!-- 反馈信息 -->
-            <div v-if="isSubmitted && getItemAnswer(item.id)" class="feedback-info">
-              <div v-if="getItemAnswer(item.id)?.correct" class="feedback-correct">
-                ✓ 回答正确！正确答案：{{ getItemAnswer(item.id)?.correctAnswer }}
-              </div>
-              <div v-else class="feedback-wrong">
-                ✗ 回答错误。正确答案：{{ getItemAnswer(item.id)?.correctAnswer }}
-              </div>
-              <div v-if="getItemAnswer(item.id)?.score !== undefined" class="feedback-score">
-                得分：{{ getItemAnswer(item.id)?.score }} / {{ item.points || 0 }} 分
-              </div>
-            </div>
-          </div>
-
-          <!-- 多选题 -->
-          <div v-if="item.type === 'multiple-choice'" class="space-y-2">
-            <label
-              v-for="option in item.config.options"
-              :key="option.id"
-              class="option-label"
-              :class="{
-                'option-correct': isSubmitted && isCorrectAnswer(item.id, option.id),
-                'option-selected': Array.isArray(answers[item.id]) && answers[item.id].includes(option.id),
-                'option-wrong': isSubmitted && Array.isArray(answers[item.id]) && answers[item.id].includes(option.id) && !isCorrectAnswer(item.id, option.id)
-              }"
-            >
-              <input
-                v-model="answers[item.id]"
-                type="checkbox"
-                :value="option.id"
-                :disabled="isSubmitted"
-                @change="saveAnswer(item.id)"
-              />
-              <span>{{ option.text }}</span>
-              <span v-if="isSubmitted && isCorrectAnswer(item.id, option.id)" class="correct-badge">✓ 正确答案</span>
-            </label>
-            <!-- 反馈信息 -->
-            <div v-if="isSubmitted && getItemAnswer(item.id)" class="feedback-info">
-              <div v-if="getItemAnswer(item.id)?.correct" class="feedback-correct">
-                ✓ 回答正确！正确答案：{{ getItemAnswer(item.id)?.correctAnswer }}
-              </div>
-              <div v-else class="feedback-wrong">
-                ✗ 回答错误。正确答案：{{ getItemAnswer(item.id)?.correctAnswer }}
-              </div>
-              <div v-if="getItemAnswer(item.id)?.score !== undefined" class="feedback-score">
-                得分：{{ getItemAnswer(item.id)?.score }} / {{ item.points || 0 }} 分
-              </div>
-            </div>
-          </div>
-
-          <!-- 判断题 -->
-          <div v-if="item.type === 'true-false'" class="space-y-2">
-            <label class="option-label" :class="{
-              'option-correct': isSubmitted && getItemAnswer(item.id)?.correctAnswer === '正确' && answers[item.id] === true,
-              'option-selected': answers[item.id] === true,
-              'option-wrong': isSubmitted && answers[item.id] === true && !getItemAnswer(item.id)?.correct
-            }">
-              <input
-                v-model="answers[item.id]"
-                type="radio"
-                :value="true"
-                :name="`item-${item.id}`"
-                :disabled="isSubmitted"
-                @change="saveAnswer(item.id)"
-              />
-              <span>正确</span>
-            </label>
-            <label class="option-label" :class="{
-              'option-correct': isSubmitted && getItemAnswer(item.id)?.correctAnswer === '错误' && answers[item.id] === false,
-              'option-selected': answers[item.id] === false,
-              'option-wrong': isSubmitted && answers[item.id] === false && !getItemAnswer(item.id)?.correct
-            }">
-              <input
-                v-model="answers[item.id]"
-                type="radio"
-                :value="false"
-                :name="`item-${item.id}`"
-                :disabled="isSubmitted"
-                @change="saveAnswer(item.id)"
-              />
-              <span>错误</span>
-            </label>
-            <!-- 反馈信息 -->
-            <div v-if="isSubmitted && getItemAnswer(item.id)" class="feedback-info">
-              <div v-if="getItemAnswer(item.id)?.correct" class="feedback-correct">
-                ✓ 回答正确！正确答案：{{ getItemAnswer(item.id)?.correctAnswer }}
-              </div>
-              <div v-else class="feedback-wrong">
-                ✗ 回答错误。正确答案：{{ getItemAnswer(item.id)?.correctAnswer }}
-              </div>
-              <div v-if="getItemAnswer(item.id)?.score !== undefined" class="feedback-score">
-                得分：{{ getItemAnswer(item.id)?.score }} / {{ item.points || 0 }} 分
-              </div>
-            </div>
-          </div>
-
-          <!-- 简答题/论述题 -->
-          <div v-if="item.type === 'short-answer' || item.type === 'long-answer'">
-            <textarea
-              v-model="answers[item.id]"
-              class="answer-textarea"
-              :rows="item.type === 'long-answer' ? 8 : 4"
-              :placeholder="item.config.placeholder || '请在此输入答案'"
-              :minlength="item.config.minLength"
-              :maxlength="item.config.maxLength"
-              @input="saveAnswer(item.id)"
-            />
-            <p v-if="item.config.maxLength" class="text-xs text-gray-500 mt-1">
-              {{ (answers[item.id]?.length || 0) }} / {{ item.config.maxLength }} 字
-            </p>
-          </div>
-
-          <!-- 量表评分 -->
-          <div v-if="item.type === 'scale'" class="scale-container">
-            <div class="scale-labels">
-              <span>{{ item.config.minLabel }}</span>
-              <span>{{ item.config.maxLabel }}</span>
-            </div>
-            <div class="scale-options">
-              <label
-                v-for="value in scaleRange(item.config.min, item.config.max)"
-                :key="value"
-                class="scale-option"
-              >
-                <input
-                  v-model.number="answers[item.id]"
-                  type="radio"
-                  :value="value"
-                  :name="`item-${item.id}`"
-                  @change="saveAnswer(item.id)"
-                />
-                <span>{{ value }}</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- 其他题型占位 -->
-          <div v-if="['file-upload', 'code-submission', 'rubric-item'].includes(item.type)" class="placeholder">
-            <p class="text-gray-500">此题型的答题界面正在开发中...</p>
-          </div>
+          <ItemRenderer
+            :item="item"
+            v-model="answers[item.id]"
+            :is-submitted="isSubmitted"
+            :answer-data="getItemAnswer(item.id)"
+            @update:model-value="answers[item.id] = $event"
+            @change="saveAnswer(item.id)"
+          />
         </div>
       </div>
     </div>
@@ -271,7 +116,11 @@ import { useUserStore } from '../../store/user'
 import type { ActivityCell } from '../../types/cell'
 import type { ActivityItemType } from '../../types/activity'
 import activityService from '../../services/activity'
+import { useCellIdResolver } from '../../composables/useCellIdResolver'
+import { useActivityState } from '../../composables/useActivityState'
+import { useActivitySubmission } from '../../composables/useActivitySubmission'
 import { useOfflineActivity } from '../../composables/useOfflineActivity'
+import ItemRenderer from './ItemTypes/ItemRenderer.vue'
 
 interface Props {
   cell: ActivityCell
@@ -288,16 +137,6 @@ const emit = defineEmits<{
 
 const route = useRoute()
 const userStore = useUserStore()
-
-// 提交状态
-const isSubmitted = ref(false)
-const submissionData = ref<any>(null)  // 存储提交后的完整数据（包含正确答案）
-
-// 状态
-const answers = ref<Record<string, any>>({})
-const submitting = ref(false)
-const startTime = ref(new Date())
-const submissionId = ref<number | null>(null)
 
 // 从用户 store 获取当前学生 ID
 const currentStudentId = computed(() => {
@@ -318,6 +157,37 @@ const lessonId = computed(() => {
   console.warn('⚠️ lessonId not found, using fallback value 1')
   return 1
 })
+
+// 使用 composables 管理状态
+const cellIdResolver = useCellIdResolver({
+  cell: props.cell,
+  lessonId: lessonId.value,
+})
+
+const activityState = useActivityState({
+  cell: props.cell,
+})
+
+// 解构状态（注意：answeredCount, progress, canSubmit, getItemAnswer 已经在 composable 中定义）
+const {
+  answers,
+  isSubmitted,
+  submissionData,
+  submitting,
+  startTime,
+  submissionId,
+  answeredCount,
+  progress,
+  canSubmit,
+  getItemAnswer,
+  setAnswers,
+  setSubmitted,
+  setSubmissionId,
+  setSubmitting,
+} = activityState
+
+// 初始化提交管理（需要等待 cellId 解析完成）
+let activitySubmission: ReturnType<typeof useActivitySubmission> | null = null
 
 // 安全地解析 cellId
 // 注意：如果 cell.id 是 UUID，我们需要通过 API 查找对应的数字 ID
@@ -444,7 +314,7 @@ async function resolveCellIdFromApi(uuid: string): Promise<number | null> {
       }
       
       console.log('📤 Creating cell:', cellCreateData)
-      const createResponse = await api.post('/cells', cellCreateData)
+      const createResponse = await api.post('/cells', cellCreateData) as any
       const newCell = createResponse.data
       
       if (newCell && newCell.id) {
@@ -589,7 +459,7 @@ const syncToServer = async (responses: Record<string, any>, status: string = 'dr
   if (cellIdType === 'string') {
     try {
       const submission = await activityService.createSubmission({
-        cellId: actualCellId,
+        cellId: actualCellId as any, // 后端支持 number 或 string (UUID)
         lessonId: lessonId.value,
         responses,
         startedAt: new Date().toISOString(),
@@ -607,7 +477,7 @@ const syncToServer = async (responses: Record<string, any>, status: string = 'dr
     console.warn('⚠️ Offline activity not initialized yet, using direct API call')
     try {
       const submission = await activityService.createSubmission({
-        cellId: actualCellId,
+        cellId: actualCellId as any, // 后端支持 number 或 string (UUID)
         lessonId: lessonId.value,
         responses,
         startedAt: new Date().toISOString(),
@@ -644,72 +514,7 @@ const activityTypeLabel = computed(() => {
   return labels[props.cell.content.activityType]
 })
 
-const answeredCount = computed(() => {
-  return Object.keys(answers.value).filter(key => {
-    const answer = answers.value[key]
-    return answer !== undefined && answer !== null && answer !== ''
-  }).length
-})
-
-const progress = computed(() => {
-  const total = props.cell.content.items.length
-  return total > 0 ? Math.round((answeredCount.value / total) * 100) : 0
-})
-
-const canSubmit = computed(() => {
-  // 检查所有必答题是否已完成
-  const requiredItems = props.cell.content.items.filter(item => item.required)
-  return requiredItems.every(item => {
-    const answer = answers.value[item.id]
-    return answer !== undefined && answer !== null && answer !== ''
-  })
-})
-
-// 获取题目的答案数据（包含正确性判断）
-function getItemAnswer(itemId: string): any {
-  if (!submissionData.value || !submissionData.value.responses) {
-    return null
-  }
-  return submissionData.value.responses[itemId]
-}
-
-// 判断选项是否为正确答案（单选题）
-function isCorrectAnswerForSingle(itemId: string, optionId: string): boolean {
-  const answer = getItemAnswer(itemId)
-  if (!answer) return false
-  
-  // 优先使用 correctAnswerId（如果存在）
-  if (answer.correctAnswerId) {
-    return String(answer.correctAnswerId) === String(optionId)
-  }
-  
-  // 否则比较选项文本
-  if (answer.correctAnswer) {
-    const item = props.cell.content.items.find((it: any) => it.id === itemId)
-    if (!item) return false
-    const option = item.config.options.find((opt: any) => opt.id === optionId)
-    if (!option) return false
-    return answer.correctAnswer === option.text || answer.correctAnswer === option.id
-  }
-  
-  return false
-}
-
-// 判断选项是否为正确答案（多选题）
-function isCorrectAnswer(itemId: string, optionId: string): boolean {
-  const answer = getItemAnswer(itemId)
-  if (!answer || !answer.correctAnswer) return false
-  
-  // 多选题的正确答案可能是逗号分隔的字符串
-  const correctAnswers = answer.correctAnswer.split(',').map((s: string) => s.trim())
-  return correctAnswers.some((text: string) => {
-    // 找到对应的选项
-    const item = props.cell.content.items.find((it: any) => it.id === itemId)
-    if (!item) return false
-    const option = item.config.options.find((opt: any) => opt.id === optionId)
-    return option && (text === option.text || text === option.id)
-  })
-}
+// 注意：answeredCount, progress, canSubmit, getItemAnswer 已经在 useActivityState 中定义，不需要重复定义
 
 // 方法
 function getItemTypeLabel(type: ActivityItemType): string {
@@ -725,14 +530,6 @@ function getItemTypeLabel(type: ActivityItemType): string {
     'rubric-item': '评价',
   }
   return labels[type]
-}
-
-function scaleRange(min: number, max: number): number[] {
-  const range = []
-  for (let i = min; i <= max; i++) {
-    range.push(i)
-  }
-  return range
 }
 
 function formatDeadline(deadline: string): string {
@@ -803,7 +600,7 @@ async function handleSubmit() {
     } else {
       // 先创建提交再提交
       const submission = await activityService.createSubmission({
-        cellId: getActualCellId(),  // 可能是数字或 UUID 字符串
+        cellId: getActualCellId() as any,  // 可能是数字或 UUID 字符串，后端都支持
         lessonId: lessonId.value,
         responses: answers.value,
         startedAt: startTime.value.toISOString(),
@@ -872,9 +669,8 @@ onMounted(async () => {
           try {
             const database = await (await import('idb')).openDB('inspireed-activity', 1)
             // 对于 UUID，使用哈希值作为 key 的一部分
-            const cellIdForKey = typeof actualCellId === 'string' 
-              ? actualCellId.split('-')[0] 
-              : actualCellId
+            // actualCellId 在这里一定是 number（因为上面的 if 条件）
+            const cellIdForKey = String(actualCellId)
             const key = `${cellIdForKey}-${currentStudentId.value}`
             const existing = await database.get('submissions', key).catch(() => null)
             if (existing) {
@@ -1036,50 +832,6 @@ watch(answers, () => {
   @apply pl-6;
 }
 
-.option-label {
-  @apply flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors;
-}
-
-.option-label input {
-  @apply mt-1;
-}
-
-.option-label:has(input:disabled) {
-  @apply opacity-75 cursor-not-allowed;
-}
-
-.option-correct {
-  @apply bg-green-50 border-green-300;
-}
-
-.option-selected {
-  @apply bg-blue-50 border-blue-300;
-}
-
-.option-wrong {
-  @apply bg-red-50 border-red-300;
-}
-
-.correct-badge {
-  @apply ml-auto px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded;
-}
-
-.feedback-info {
-  @apply mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200;
-}
-
-.feedback-correct {
-  @apply text-green-700 font-semibold mb-2;
-}
-
-.feedback-wrong {
-  @apply text-red-700 font-semibold mb-2;
-}
-
-.feedback-score {
-  @apply text-gray-600 text-sm mt-2;
-}
-
 .submitted-info {
   @apply flex items-center gap-4;
 }
@@ -1092,33 +844,6 @@ watch(answers, () => {
   @apply text-lg font-semibold text-gray-900;
 }
 
-.answer-textarea {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
-}
-
-.scale-container {
-  @apply space-y-3;
-}
-
-.scale-labels {
-  @apply flex justify-between text-sm text-gray-600;
-}
-
-.scale-options {
-  @apply flex justify-between gap-2;
-}
-
-.scale-option {
-  @apply flex flex-col items-center gap-1 cursor-pointer;
-}
-
-.scale-option input {
-  @apply w-5 h-5;
-}
-
-.placeholder {
-  @apply py-8 text-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-300;
-}
 
 .submit-section {
   @apply flex justify-end gap-4 mt-8 pt-6 border-t border-gray-200;

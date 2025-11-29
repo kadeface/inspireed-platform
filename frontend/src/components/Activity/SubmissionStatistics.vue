@@ -109,6 +109,7 @@ const statistics = ref({
 })
 
 const refreshing = ref(false)
+let pollingInterval: ReturnType<typeof setInterval> | null = null
 
 const progressPercent = computed(() => {
   if (statistics.value.totalStudents === 0) return 0
@@ -220,7 +221,7 @@ onMounted(async () => {
       } else {
         console.warn('⚠️ WebSocket 未连接，将使用 API 定期刷新')
         // 如果 WebSocket 未连接，定期通过 API 刷新
-        setInterval(() => {
+        pollingInterval = setInterval(() => {
           loadStatisticsFromAPI()
         }, 5000) // 每5秒刷新一次
       }
@@ -228,7 +229,7 @@ onMounted(async () => {
   } catch (error) {
     console.error('❌ 连接实时通道失败:', error)
     // 如果 WebSocket 连接失败，使用 API 定期刷新
-    setInterval(() => {
+    pollingInterval = setInterval(() => {
       loadStatisticsFromAPI()
     }, 5000)
   }
@@ -237,6 +238,11 @@ onMounted(async () => {
 onUnmounted(() => {
   unregisterAll()
   disconnectRealtime()
+  // 清理轮询定时器
+  if (pollingInterval) {
+    clearInterval(pollingInterval)
+    pollingInterval = null
+  }
 })
 </script>
 

@@ -10,10 +10,17 @@ from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 import json
 import io
+import os
+import re
+import zipfile
+import tempfile
+from pathlib import Path
 from datetime import datetime
+from typing import Set
 
 from app.core.database import get_db
 from app.models import Subject, Grade, Course, Chapter, Lesson, Resource, User, UserRole
+from app.models.lesson import LessonStatus
 from app.api.deps import get_current_user, get_current_admin, get_current_researcher
 
 router = APIRouter()
@@ -24,6 +31,246 @@ def require_admin_or_researcher(current_user: User = Depends(get_current_user)) 
     if current_user.role not in [UserRole.ADMIN, UserRole.RESEARCHER]:
         raise HTTPException(status_code=403, detail="需要管理员或研究员权限")
     return current_user
+
+
+def extract_file_urls_from_content(content: List[Dict]) -> Set[str]:
+    """从教案内容中提取所有文件URL"""
+    file_urls = set()
+    
+    if not content:
+        return file_urls
+    
+    for cell in content:
+        if not isinstance(cell, dict):
+            continue
+            
+        cell_type = cell.get("type", "")
+        cell_content = cell.get("content", {})
+        
+        # TextCell: 从HTML中提取图片和文件URL
+        if cell_type == "text" and isinstance(cell_content, dict):
+            html = cell_content.get("html", "")
+            if html:
+                # 提取img标签的src
+                img_pattern = r'<img[^>]+src\s*=\s*["\']([^"\']+)["\']'
+                for match in re.finditer(img_pattern, html, re.IGNORECASE):
+                    url = match.group(1)
+                    if url and not url.startswith(("data:", "blob:", "http://", "https://")):
+                        file_urls.add(url)
+                
+                # 提取文件附件的URL
+                file_pattern = r'data-(?:pdf|file)-url\s*=\s*["\']([^"\']+)["\']'
+                for match in re.finditer(file_pattern, html, re.IGNORECASE):
+                    url = match.group(1)
+                    if url and not url.startswith(("http://", "https://")):
+                        file_urls.add(url)
+        
+        # VideoCell: 提取视频URL
+        elif cell_type == "video" and isinstance(cell_content, dict):
+            video_url = cell_content.get("videoUrl") or cell_content.get("video_url")
+            if video_url and not video_url.startswith(("http://", "https://", "blob:")):
+                file_urls.add(video_url)
+        
+        # ReferenceMaterialCell: 提取资源URL
+        elif cell_type == "reference_material" and isinstance(cell_content, dict):
+            preview_url = cell_content.get("preview_url")
+            download_url = cell_content.get("download_url")
+            for url in [preview_url, download_url]:
+                if url and not url.startswith(("http://", "https://")):
+                    file_urls.add(url)
+    
+    return file_urls
+
+
+def url_to_file_path(url: str) -> Optional[str]:
+    """将URL转换为实际文件路径"""
+    if not url:
+        return None
+    
+    # 处理 /uploads/resources/xxx 格式的URL
+    if url.startswith("/uploads/resources/"):
+        filename = url.replace("/uploads/resources/", "")
+        file_path = os.path.join("storage", "resources", filename)
+        if os.path.exists(file_path):
+            return file_path
+    
+    # 处理相对路径
+    elif url.startswith("/") and not url.startswith("//"):
+        # 尝试作为资源文件
+        if "/resources/" in url or "/uploads/" in url:
+            filename = url.split("/")[-1]
+            file_path = os.path.join("storage", "resources", filename)
+            if os.path.exists(file_path):
+                return file_path
+    
+    return None
+
+
+async def _process_zip_import(zip_content: bytes, current_user: User) -> tuple[Dict, Dict[str, str]]:
+    """
+    处理ZIP文件导入
+    返回: (导入数据字典, URL映射字典)
+    """
+    from app.services.upload import upload_service
+    from fastapi import UploadFile
+    
+    url_mapping = {}
+    import_data = None
+    
+    # 创建临时目录
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # 解压ZIP文件
+        zip_path = os.path.join(temp_dir, "import.zip")
+        with open(zip_path, "wb") as f:
+            f.write(zip_content)
+        
+        with zipfile.ZipFile(zip_path, 'r') as zip_file:
+            # 读取JSON数据
+            if "data.json" not in zip_file.namelist():
+                raise HTTPException(400, "ZIP文件中缺少data.json")
+            
+            json_content = zip_file.read("data.json")
+            import_data = json.loads(json_content.decode("utf-8"))
+            
+            # 处理资源文件
+            resources_dir = os.path.join(temp_dir, "resources")
+            os.makedirs(resources_dir, exist_ok=True)
+            
+            # 提取所有资源文件
+            for file_info in zip_file.filelist:
+                if file_info.filename.startswith("resources/") and not file_info.is_dir():
+                    # 提取文件
+                    zip_file.extract(file_info.filename, temp_dir)
+                    file_path = os.path.join(temp_dir, file_info.filename)
+                    
+                    # 上传文件到服务器
+                    original_filename = os.path.basename(file_info.filename)
+                    
+                    # 读取文件内容
+                    with open(file_path, "rb") as f:
+                        file_content = f.read()
+                    
+                    # 创建UploadFile对象（使用BytesIO）
+                    from io import BytesIO
+                    file_stream = BytesIO(file_content)
+                    upload_file = UploadFile(
+                        filename=original_filename,
+                        file=file_stream
+                    )
+                    
+                    # 上传文件
+                    upload_result = await upload_service.upload_file(upload_file)
+                    
+                    # 记录URL映射
+                    old_url = f"/uploads/resources/{original_filename}"
+                    new_url = upload_result["file_url"]
+                    url_mapping[old_url] = new_url
+                    
+                    # 也映射文件名（不包含路径）
+                    url_mapping[original_filename] = new_url
+                    url_mapping[f"resources/{original_filename}"] = new_url
+    
+    return import_data, url_mapping
+
+
+def _update_urls_in_data(data: Dict, url_mapping: Dict[str, str]) -> Dict:
+    """
+    更新数据中的URL引用
+    """
+    import copy
+    data = copy.deepcopy(data)
+    
+    def update_urls_in_content(content: Any) -> Any:
+        """递归更新内容中的URL"""
+        if isinstance(content, dict):
+            # 更新字典中的URL字段
+            for key, value in content.items():
+                if key in ["file_url", "thumbnail_url", "cover_image_url", "videoUrl", "video_url", 
+                          "preview_url", "download_url"] and isinstance(value, str):
+                    # 尝试匹配URL
+                    for old_url, new_url in url_mapping.items():
+                        if old_url in value or value.endswith(old_url.split("/")[-1]):
+                            content[key] = new_url
+                            break
+                elif key == "html" and isinstance(value, str):
+                    # 更新HTML中的URL
+                    html = value
+                    for old_url, new_url in url_mapping.items():
+                        # 替换各种可能的URL格式
+                        html = html.replace(old_url, new_url)
+                        filename = old_url.split("/")[-1]
+                        if filename in html:
+                            html = html.replace(f"/uploads/resources/{filename}", new_url)
+                            html = html.replace(f'"/uploads/resources/{filename}"', f'"{new_url}"')
+                            html = html.replace(f"'/uploads/resources/{filename}'", f"'{new_url}'")
+                    content[key] = html
+                else:
+                    content[key] = update_urls_in_content(value)
+            return content
+        elif isinstance(content, list):
+            return [update_urls_in_content(item) for item in content]
+        else:
+            return content
+    
+    # 更新教案内容
+    for lesson in data.get("lessons", []):
+        lesson["content"] = update_urls_in_content(lesson.get("content", []))
+        if "cover_image_url" in lesson:
+            for old_url, new_url in url_mapping.items():
+                if old_url in lesson["cover_image_url"]:
+                    lesson["cover_image_url"] = new_url
+                    break
+    
+    # 更新资源URL
+    for resource in data.get("resources", []):
+        for key in ["file_url", "thumbnail_url"]:
+            if key in resource:
+                for old_url, new_url in url_mapping.items():
+                    if old_url in resource[key]:
+                        resource[key] = new_url
+                        break
+    
+    return data
+
+
+def collect_all_files(export_data: Dict, lesson_data_list: List[Dict], resource_data_list: List[Dict]) -> Dict[str, str]:
+    """
+    收集所有需要导出的文件
+    返回: {文件在ZIP中的路径: 实际文件路径}
+    """
+    files_map = {}
+    
+    # 从教案内容中提取文件
+    for lesson_data in lesson_data_list:
+        content = lesson_data.get("content", [])
+        file_urls = extract_file_urls_from_content(content)
+        
+        # 封面图
+        cover_image_url = lesson_data.get("cover_image_url")
+        if cover_image_url:
+            file_urls.add(cover_image_url)
+        
+        # 转换URL为文件路径
+        for url in file_urls:
+            file_path = url_to_file_path(url)
+            if file_path and os.path.exists(file_path):
+                # 在ZIP中使用相对路径
+                zip_path = f"resources/{os.path.basename(file_path)}"
+                files_map[zip_path] = file_path
+    
+    # 从资源数据中提取文件
+    for resource_data in resource_data_list:
+        file_url = resource_data.get("file_url")
+        thumbnail_url = resource_data.get("thumbnail_url")
+        
+        for url in [file_url, thumbnail_url]:
+            if url:
+                file_path = url_to_file_path(url)
+                if file_path and os.path.exists(file_path):
+                    zip_path = f"resources/{os.path.basename(file_path)}"
+                    files_map[zip_path] = file_path
+    
+    return files_map
 
 
 @router.get("/export-template")
@@ -248,21 +495,43 @@ async def export_course(
             }
             export_data["data"]["lessons"].append(lesson_data)
 
-    # 转换为JSON字符串
-    json_str = json.dumps(export_data, ensure_ascii=False, indent=2, default=str)
-
-    # 创建字节流
-    output = io.BytesIO()
-    output.write(json_str.encode("utf-8"))
-    output.seek(0)
-
-    # 返回文件下载
+    # 收集所有需要导出的文件
+    lesson_data_list = export_data["data"].get("lessons", [])
+    resource_data_list = export_data["data"].get("resources", [])
+    files_map = collect_all_files(export_data, lesson_data_list, resource_data_list)
+    
+    # 创建ZIP文件
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # 添加JSON数据
+        json_str = json.dumps(export_data, ensure_ascii=False, indent=2, default=str)
+        zip_file.writestr("data.json", json_str.encode("utf-8"))
+        
+        # 添加所有资源文件
+        for zip_path, file_path in files_map.items():
+            try:
+                zip_file.write(file_path, zip_path)
+            except Exception as e:
+                # 如果文件不存在或无法读取，记录错误但继续
+                print(f"警告: 无法添加文件 {file_path}: {str(e)}")
+        
+        # 创建文件清单
+        manifest = {
+            "version": "1.0",
+            "export_time": datetime.utcnow().isoformat(),
+            "files": list(files_map.keys()),
+            "file_count": len(files_map)
+        }
+        zip_file.writestr("manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
+    
+    zip_buffer.seek(0)
+    
+    # 返回ZIP文件下载
     import urllib.parse
-
-    filename = urllib.parse.quote(f"{course.name}_导出.json")
+    filename = urllib.parse.quote(f"{course.name}_导出.zip")
     return StreamingResponse(
-        output,
-        media_type="application/json",
+        zip_buffer,
+        media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
     )
 
@@ -417,23 +686,45 @@ async def export_all_courses(
     export_data["data"]["subjects"] = list(subjects_dict.values())
     export_data["data"]["grades"] = list(grades_dict.values())
 
-    # 转换为JSON字符串
-    json_str = json.dumps(export_data, ensure_ascii=False, indent=2, default=str)
-
-    # 创建字节流
-    output = io.BytesIO()
-    output.write(json_str.encode("utf-8"))
-    output.seek(0)
-
-    # 返回文件下载
+    # 收集所有需要导出的文件
+    lesson_data_list = export_data["data"].get("lessons", [])
+    resource_data_list = export_data["data"].get("resources", [])
+    files_map = collect_all_files(export_data, lesson_data_list, resource_data_list)
+    
+    # 创建ZIP文件
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # 添加JSON数据
+        json_str = json.dumps(export_data, ensure_ascii=False, indent=2, default=str)
+        zip_file.writestr("data.json", json_str.encode("utf-8"))
+        
+        # 添加所有资源文件
+        for zip_path, file_path in files_map.items():
+            try:
+                zip_file.write(file_path, zip_path)
+            except Exception as e:
+                # 如果文件不存在或无法读取，记录错误但继续
+                print(f"警告: 无法添加文件 {file_path}: {str(e)}")
+        
+        # 创建文件清单
+        manifest = {
+            "version": "1.0",
+            "export_time": datetime.utcnow().isoformat(),
+            "files": list(files_map.keys()),
+            "file_count": len(files_map)
+        }
+        zip_file.writestr("manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
+    
+    zip_buffer.seek(0)
+    
+    # 返回ZIP文件下载
     import urllib.parse
-
     filename = urllib.parse.quote(
-        f"完整课程体系导出_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        f"完整课程体系导出_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
     )
     return StreamingResponse(
-        output,
-        media_type="application/json",
+        zip_buffer,
+        media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
     )
 
@@ -445,11 +736,17 @@ async def import_courses(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_researcher),
 ):
-    """导入课程数据"""
+    """导入课程数据（支持ZIP和JSON格式）"""
 
     # 验证文件类型
-    if not file.filename or not file.filename.endswith(".json"):
-        raise HTTPException(400, "文件必须是JSON格式")
+    if not file.filename:
+        raise HTTPException(400, "文件名不能为空")
+    
+    is_zip = file.filename.endswith(".zip")
+    is_json = file.filename.endswith(".json")
+    
+    if not (is_zip or is_json):
+        raise HTTPException(400, "文件必须是ZIP或JSON格式")
 
     try:
         # 读取文件内容
@@ -458,17 +755,28 @@ async def import_courses(
         if len(content) == 0:
             raise HTTPException(400, "上传的文件为空")
 
-        # 解析JSON数据
-        try:
-            import_data = json.loads(content.decode("utf-8"))
-        except json.JSONDecodeError as e:
-            raise HTTPException(400, f"JSON解析失败: {str(e)}")
+        # URL映射：旧URL -> 新URL（用于更新导入后的文件引用）
+        url_mapping = {}
+        
+        # 如果是ZIP文件，解压并处理文件
+        if is_zip:
+            import_data, url_mapping = await _process_zip_import(content, current_user)
+        else:
+            # JSON文件，直接解析
+            try:
+                import_data = json.loads(content.decode("utf-8"))
+            except json.JSONDecodeError as e:
+                raise HTTPException(400, f"JSON解析失败: {str(e)}")
 
         # 验证数据格式
         if not isinstance(import_data, dict) or "data" not in import_data:
             raise HTTPException(400, "无效的导入文件格式")
 
         data = import_data["data"]
+        
+        # 更新URL引用（如果有文件映射）
+        if url_mapping:
+            data = _update_urls_in_data(data, url_mapping)
 
         # 导入结果统计
         import_result = {
@@ -816,12 +1124,22 @@ async def import_courses(
                         import_result["lessons"]["skipped"] += 1
                 else:
                     # 创建新教案
+                    # 导入的教案默认设置为PUBLISHED状态，实现共享功能
+                    # 因为教师导出教案就表示愿意与他人分享
+                    imported_status = lesson_data.get("status", "draft")
+                    # 如果导出时是已发布状态，保持已发布；如果是草稿，也设为已发布（共享）
+                    final_status = (
+                        LessonStatus.PUBLISHED 
+                        if imported_status in ["published", "draft"] 
+                        else LessonStatus(imported_status)
+                    )
+                    
                     lesson = Lesson(
                         course_id=course_id,
                         chapter_id=chapter_id,
                         title=lesson_data["title"],
                         description=lesson_data.get("description"),
-                        status=lesson_data.get("status", "draft"),
+                        status=final_status,
                         content=lesson_data.get("content", []),
                         tags=lesson_data.get("tags", []),
                         cover_image_url=lesson_data.get("cover_image_url"),
@@ -830,6 +1148,9 @@ async def import_courses(
                         reference_notes=lesson_data.get("reference_notes"),
                         creator_id=current_user.id,
                     )
+                    # 如果是已发布状态，设置发布时间
+                    if final_status == LessonStatus.PUBLISHED:
+                        setattr(lesson, "published_at", datetime.utcnow())
                     db.add(lesson)
                     await db.commit()
                     await db.refresh(lesson)

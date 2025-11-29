@@ -1634,7 +1634,6 @@ async function handleHideAll() {
     // 🆕 使用 displayCellOrders: [] 来隐藏所有内容
     session.value = await classroomSessionService.navigateToCell(session.value.id, {
       displayCellOrders: [],
-      action: 'set',
     })
     selectedCellIndex.value = -1
   } catch (error: any) {
@@ -1926,7 +1925,7 @@ function startDurationTimer() {
   }
   
   // 每秒递增，直到达到课程时长
-  durationInterval.value = setInterval(() => {
+  durationInterval.value = window.setInterval(() => {
     sessionDuration.value = Math.min(sessionDuration.value + 1, LESSON_DURATION)
   }, 1000)
 }

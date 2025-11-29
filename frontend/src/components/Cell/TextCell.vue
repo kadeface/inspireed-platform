@@ -19,57 +19,61 @@
       </button>
     </div>
     
-    <div 
-      v-if="!isEditing && !editable" 
-      class="text-cell-view"
-      :class="{
-        'compact-content': compactMode && !isExpanded,
-        'expanded-content': compactMode && isExpanded
-      }"
-      v-html="sanitizedHtml"
-    ></div>
-    
-    <!-- 预览模式下的展开/折叠按钮 -->
-    <div 
-      v-if="compactMode && !editable" 
-      class="flex flex-col items-center gap-2 mt-2 pt-2 border-t border-gray-200"
-    >
-      <button
-        @click="isExpanded = !isExpanded"
-        class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
+    <!-- 非编辑模式且不可编辑：纯预览模式 -->
+    <template v-if="!editable">
+      <div 
+        v-if="sanitizedHtml" 
+        class="text-cell-view"
+        :class="{
+          'compact-content': compactMode && !isExpanded,
+          'expanded-content': compactMode && isExpanded
+        }"
+        v-html="sanitizedHtml"
+      ></div>
+      
+      <!-- 预览模式下的展开/折叠按钮 -->
+      <div 
+        v-if="compactMode && sanitizedHtml" 
+        class="flex flex-col items-center gap-2 mt-2 pt-2 border-t border-gray-200"
       >
-        <svg 
-          v-if="!isExpanded" 
-          class="w-4 h-4" 
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
+        <button
+          @click="isExpanded = !isExpanded"
+          class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
         >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-        </svg>
-        <svg 
-          v-else 
-          class="w-4 h-4" 
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
+          <svg 
+            v-if="!isExpanded" 
+            class="w-4 h-4" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+          <svg 
+            v-else 
+            class="w-4 h-4" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+          </svg>
+          <span>{{ isExpanded ? '收起' : '展开查看全部' }}</span>
+        </button>
+        <button
+          @click="scrollToTop"
+          class="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+          title="点击滚动到顶部"
         >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-        </svg>
-        <span>{{ isExpanded ? '收起' : '展开查看全部' }}</span>
-      </button>
-      <button
-        @click="scrollToTop"
-        class="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
-        title="点击滚动到顶部"
-      >
-        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span>紧凑模式已启用，<span class="underline">点击前往顶部切换</span></span>
-      </button>
-    </div>
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>紧凑模式已启用，<span class="underline">点击前往顶部切换</span></span>
+        </button>
+      </div>
+    </template>
     
+    <!-- 可编辑模式：编辑器容器 -->
     <div v-else class="text-cell-editor">
       <div class="flex justify-between items-center mb-2">
         <input
@@ -265,12 +269,56 @@ const sanitizedHtml = computed(() => {
     html = props.cell.content.html || ''
   }
   
+  // 过滤占位符文本：在非编辑模式下，移除占位符文本
+  if (!props.editable && html) {
+    // 定义占位符文本
+    const placeholderTexts = [
+      '在此输入文本内容...',
+      'Enter text content here...'
+    ]
+    
+    // 先检查是否有图片或其他实际内容
+    const hasImage = /<img[^>]*>/i.test(html)
+    const hasFile = /<a[^>]*class="file-[^"]*"[^>]*>/i.test(html)
+    const hasOtherContent = /<(?:h[1-6]|ul|ol|li|blockquote|code|pre|table|div|span)[^>]*>/i.test(html)
+    
+    // 如果有实际内容（图片、文件等），移除占位符文本但保留实际内容
+    if (hasImage || hasFile || hasOtherContent) {
+      // 从HTML中移除占位符文本
+      placeholderTexts.forEach(placeholder => {
+        // 转义占位符文本中的特殊字符
+        const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        
+        // 匹配并移除占位符文本（无论它在什么位置）
+        // 例如：<p>在此输入文本内容...</p> 或 <p>图片 <img> 在此输入文本内容...</p>
+        const placeholderPattern = new RegExp(escapedPlaceholder, 'gi')
+        html = html.replace(placeholderPattern, '')
+      })
+      
+      // 清理可能产生的只包含空白字符的p标签
+      html = html.replace(/<p[^>]*>\s*<\/p>/gi, '')
+      
+      // 清理p标签开头或结尾的多余空白
+      html = html.replace(/(<p[^>]*>)\s+/g, '$1')
+      html = html.replace(/\s+(<\/p>)/g, '$1')
+    } else {
+      // 如果只有占位符文本，检查是否完全是占位符
+      const textContent = html.replace(/<[^>]*>/g, '').trim()
+      
+      // 如果内容只是占位符，返回空字符串
+      if (placeholderTexts.some(placeholder => {
+        return textContent === placeholder || html.trim() === `<p>${placeholder}</p>` || html.trim() === placeholder
+      })) {
+        return ''
+      }
+    }
+  }
+  
   const isDev = import.meta.env.DEV
   const baseURL = getServerBaseUrl()
   
   // 处理图片URL：将相对路径转换为绝对路径
   if (html) {
-    
     // 匹配所有img标签，处理src属性
     html = html.replace(/<img([^>]*?)>/gi, (match, attrs) => {
       // 提取src属性值（支持单引号、双引号，以及无引号的情况）
@@ -402,6 +450,125 @@ const sanitizedHtml = computed(() => {
         }
       }
       return match
+    })
+    
+    // URL处理完成后，再次去重：移除重复的图片（相同的src或相同的文件名）
+    // 使用 matchAll 方法更可靠地收集所有图片
+    const imageMatches: Array<{ match: string; normalizedSrc: string; filename: string; startIndex: number; endIndex: number; originalSrc: string; resourcePath: string; resourceId: string }> = []
+    
+    // 收集所有图片及其标准化src和位置信息
+    const imgRegex = /<img([^>]*?)>/gi
+    const allMatches = Array.from(html.matchAll(imgRegex))
+    
+    allMatches.forEach((match) => {
+      const fullMatch = match[0]
+      const attrs = match[1]
+      const startIndex = match.index!
+      const endIndex = startIndex + fullMatch.length
+      
+      const srcMatch = attrs.match(/\ssrc\s*=\s*(["'])([^"']+)\1/i) || 
+                       attrs.match(/\ssrc\s*=\s*([^\s>]+)/i) ||
+                       attrs.match(/src\s*=\s*(["'])([^"']+)\1/i) ||
+                       attrs.match(/src\s*=\s*([^\s>]+)/i)
+      if (srcMatch) {
+        let src = srcMatch[2] || srcMatch[1]
+        const originalSrc = src
+        
+        // 标准化src用于比较（移除查询参数和hash）
+        let normalizedSrc = src.split('?')[0].split('#')[0].toLowerCase()
+        // 提取资源路径用于比较（移除协议、域名和端口，只保留路径）
+        let resourcePath = normalizedSrc
+        let resourceId = '' // 用于提取资源ID（如UUID）
+        
+        try {
+          if (normalizedSrc.startsWith('http://') || normalizedSrc.startsWith('https://')) {
+            const url = new URL(normalizedSrc)
+            resourcePath = url.pathname.toLowerCase()
+            normalizedSrc = url.pathname.toLowerCase()
+          } else if (normalizedSrc.startsWith('/')) {
+            // 已经是路径，直接使用
+            resourcePath = normalizedSrc.toLowerCase()
+            normalizedSrc = normalizedSrc.toLowerCase()
+          } else {
+            // 尝试提取路径部分
+            resourcePath = normalizedSrc.replace(/^https?:\/\/[^\/]+/i, '').toLowerCase()
+            if (!resourcePath.startsWith('/')) {
+              resourcePath = '/' + resourcePath
+            }
+          }
+          
+          // 尝试从路径中提取资源ID（通常是UUID格式）
+          // 匹配 /uploads/resources/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.扩展名
+          const resourceIdMatch = resourcePath.match(/\/uploads\/resources\/([a-f0-9\-]{36})/i)
+          if (resourceIdMatch) {
+            resourceId = resourceIdMatch[1].toLowerCase()
+          }
+        } catch {
+          // URL解析失败，使用原始路径
+          resourcePath = normalizedSrc.replace(/^https?:\/\/[^\/]+/i, '').toLowerCase()
+          if (!resourcePath.startsWith('/')) {
+            resourcePath = '/' + resourcePath
+          }
+          normalizedSrc = resourcePath
+          
+          // 尝试提取资源ID
+          const resourceIdMatch = resourcePath.match(/\/uploads\/resources\/([a-f0-9\-]{36})/i)
+          if (resourceIdMatch) {
+            resourceId = resourceIdMatch[1].toLowerCase()
+          }
+        }
+        
+        // 提取文件名用于比较
+        const filename = normalizedSrc.split('/').pop() || ''
+        
+        imageMatches.push({ 
+          match: fullMatch, 
+          normalizedSrc: resourcePath, // 使用resourcePath作为标准化src
+          filename, 
+          startIndex, 
+          endIndex,
+          originalSrc,
+          resourcePath,
+          resourceId
+        })
+      }
+    })
+    
+    // 按位置从前往后排序，标记哪些是重复的（保留第一个出现的）
+    const seenPaths = new Set<string>()
+    const seenFilenames = new Set<string>()
+    const seenResourceIds = new Set<string>()
+    const duplicatesToRemove: Array<{ startIndex: number; endIndex: number }> = []
+    
+    imageMatches.forEach(({ normalizedSrc, filename, startIndex, endIndex, resourcePath, resourceId }) => {
+      // 检查是否已经见过相同的路径、文件名或资源ID
+      // 优先使用资源ID进行比较（最准确），其次是资源路径，最后是文件名
+      const isDuplicate = 
+        (resourceId && resourceId.length > 0 && seenResourceIds.has(resourceId)) ||
+        seenPaths.has(resourcePath) || 
+        seenPaths.has(normalizedSrc) ||
+        (filename && filename.length > 0 && seenFilenames.has(filename))
+      
+      if (isDuplicate) {
+        // 标记为需要移除
+        duplicatesToRemove.push({ startIndex, endIndex })
+      } else {
+        // 记录这个图片（保留第一个出现的）
+        if (resourceId && resourceId.length > 0) {
+          seenResourceIds.add(resourceId)
+        }
+        seenPaths.add(resourcePath)
+        seenPaths.add(normalizedSrc)
+        if (filename && filename.length > 0 && filename !== resourcePath) {
+          seenFilenames.add(filename)
+        }
+      }
+    })
+    
+    // 按位置从后往前排序，然后移除重复的图片（这样不会影响前面的索引）
+    duplicatesToRemove.sort((a, b) => b.startIndex - a.startIndex)
+    duplicatesToRemove.forEach(({ startIndex, endIndex }) => {
+      html = html.substring(0, startIndex) + html.substring(endIndex)
     })
   }
   

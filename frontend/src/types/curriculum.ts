@@ -202,7 +202,9 @@ export interface StageTreeNode {
 }
 
 export interface CurriculumTree {
-  subjects: SubjectTreeNode[]
+  subjects?: SubjectTreeNode[]
+  stages?: StageTreeNode[]
+  total_stages?: number
   total_subjects: number
   total_grades: number
   total_courses: number
