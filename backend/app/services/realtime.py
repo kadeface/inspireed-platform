@@ -170,7 +170,8 @@ async def fetch_teachers_by_lesson(
     """
     获取有权访问指定教案的所有教师ID
     
-    通过 lesson -> classroom -> teacher 关系查询
+    目前直接从教案创建者获取教师ID
+    未来可以扩展为通过 ClassSession 关联查询
     
     参数:
         db: 数据库会话
@@ -179,15 +180,20 @@ async def fetch_teachers_by_lesson(
     返回:
         教师ID列表
     """
-    # 查询所有使用该教案的班级
-    result = await db.execute(
-        select(Classroom.teacher_id)
-        .where(Classroom.lesson_id == lesson_id)
-        .distinct()
-    )
-    teacher_ids = [row[0] for row in result.all() if row[0] is not None]
+    teacher_ids = []
     
-    # 如果没有班级，尝试从 lesson 的创建者获取
+    # 方案1: 通过 ClassSession 获取教师（推荐）
+    try:
+        result = await db.execute(
+            select(ClassSession.teacher_id)
+            .where(ClassSession.lesson_id == lesson_id)
+            .distinct()
+        )
+        teacher_ids = [row[0] for row in result.all() if row[0] is not None]
+    except Exception:
+        pass  # 如果 ClassSession 表结构不匹配，忽略错误
+    
+    # 方案2: 从 Lesson 的创建者获取
     if not teacher_ids:
         lesson = await db.get(Lesson, lesson_id)
         if lesson and lesson.teacher_id:
@@ -236,49 +242,75 @@ async def get_submission_statistics(
         total_students = 0
     
     # 统计各状态的提交数
+    # 注意：需要对每个学生只统计优先级最高的提交
     from app.models.activity import ActivitySubmission
     
+    # 查询所有提交，按优先级排序
     query = (
-        select(
-            ActivitySubmission.status,
-            func.count(ActivitySubmission.id).label("count")
-        )
+        select(ActivitySubmission)
         .where(ActivitySubmission.cell_id == cell_id)
         .where(ActivitySubmission.lesson_id == lesson_id)
+        .order_by(ActivitySubmission.updated_at.desc())
     )
     
     if session_id:
         query = query.where(ActivitySubmission.session_id == session_id)
     
-    query = query.group_by(ActivitySubmission.status)
+    submissions_result = await db.execute(query)
+    all_submissions = submissions_result.scalars().all()
     
-    status_counts_result = await db.execute(query)
-    status_dict: dict[str, int] = {
-        row.status.value: cast(int, row.count)
-        for row in status_counts_result.all()
+    # 对每个学生，只保留优先级最高的提交
+    status_priority = {
+        ActivitySubmissionStatus.DRAFT: 1,
+        ActivitySubmissionStatus.RETURNED: 2,
+        ActivitySubmissionStatus.SUBMITTED: 3,
+        ActivitySubmissionStatus.GRADED: 4,
     }
     
-    # 计算平均分和平均用时
-    avg_query = (
-        select(
-            func.avg(ActivitySubmission.score).label("avg_score"),
-            func.avg(ActivitySubmission.time_spent).label("avg_time")
-        )
-        .where(ActivitySubmission.cell_id == cell_id)
-        .where(ActivitySubmission.lesson_id == lesson_id)
-        .where(
-            ActivitySubmission.status.in_([
-                ActivitySubmissionStatus.SUBMITTED,
-                ActivitySubmissionStatus.GRADED
-            ])
-        )
-    )
+    student_best_submission = {}  # student_id -> submission
+    for submission in all_submissions:
+        student_id = submission.student_id
+        if student_id not in student_best_submission:
+            student_best_submission[student_id] = submission
+        else:
+            # 使用 cast 进行类型转换
+            current_status = cast(ActivitySubmissionStatus, submission.status)
+            existing_status = cast(ActivitySubmissionStatus, student_best_submission[student_id].status)
+            
+            current_priority = status_priority.get(current_status, 0)
+            existing_priority = status_priority.get(existing_status, 0)
+            
+            # 如果当前记录优先级更高，或优先级相同但更新时间更晚
+            if current_priority > existing_priority or (
+                current_priority == existing_priority and 
+                submission.updated_at > student_best_submission[student_id].updated_at
+            ):
+                student_best_submission[student_id] = submission
     
-    if session_id:
-        avg_query = avg_query.where(ActivitySubmission.session_id == session_id)
+    # 统计各状态的数量
+    status_dict: dict[str, int] = {}
+    for submission in student_best_submission.values():
+        status = cast(ActivitySubmissionStatus, submission.status)
+        status_value = status.value
+        status_dict[status_value] = status_dict.get(status_value, 0) + 1
     
-    avg_result = await db.execute(avg_query)
-    avg_row = avg_result.first()
+    # 计算平均分和平均用时（基于已筛选的最佳提交）
+    submitted_or_graded = [
+        s for s in student_best_submission.values()
+        if s.status in [ActivitySubmissionStatus.SUBMITTED, ActivitySubmissionStatus.GRADED]
+    ]
+    
+    avg_score = None
+    avg_time = None
+    
+    if submitted_or_graded:
+        scores = [s.score for s in submitted_or_graded if s.score is not None]
+        times = [s.time_spent for s in submitted_or_graded if s.time_spent is not None]
+        
+        if scores:
+            avg_score = sum(scores) / len(scores)
+        if times:
+            avg_time = sum(times) / len(times)
     
     # 计算已处理的提交数（已提交+已评分+已退回）
     submitted_count = status_dict.get("submitted", 0)
@@ -296,7 +328,7 @@ async def get_submission_statistics(
         "submitted_count": submitted_count + graded_count,  # 已提交包括已评分
         "draft_count": draft_count,
         "not_started_count": not_started_count,
-        "average_score": float(avg_row.avg_score) if avg_row and avg_row.avg_score else None,
-        "average_time_spent": int(avg_row.avg_time) if avg_row and avg_row.avg_time else 0,
+        "average_score": float(avg_score) if avg_score is not None else None,
+        "average_time_spent": int(avg_time) if avg_time is not None else 0,
     }
 

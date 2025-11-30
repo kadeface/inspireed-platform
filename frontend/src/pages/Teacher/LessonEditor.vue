@@ -76,9 +76,15 @@
             <button
               @click="handleManualSave"
               :disabled="saveStatus === 'saving'"
-              class="px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-50 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+              :class="[
+                'px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-50',
+                isPreviewMode
+                  ? 'text-amber-700 bg-amber-50 border border-amber-300 hover:bg-amber-100'
+                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+              ]"
+              :title="isPreviewMode ? '授课模式下无法保存，点击将提示切换到编辑模式' : '保存教案'"
             >
-              保存
+              {{ isPreviewMode ? '保存（需切换模式）' : '保存' }}
             </button>
 
             <!-- 发布按钮 -->
@@ -638,7 +644,8 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLessonStore } from '../../store/lesson'
-import { useAutoSave } from '../../composables/useAutoSave'
+// 已删除自动保存功能，避免并发保存导致数据覆盖
+// import { useAutoSave } from '../../composables/useAutoSave'
 import { v4 as uuidv4 } from 'uuid'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -694,6 +701,9 @@ const publishError = ref<string | null>(null)
 const showLessonAssistant = ref(false)
 const showClassroomPanel = ref(false)
 
+// 保存锁，防止并发保存
+const isSavingOnUnmount = ref(false)
+
 // Toast 提示
 const toast = ref({
   show: false,
@@ -748,20 +758,57 @@ const lessonOutline = computed(() => {
 // 标记是否最近从未发布状态切换的
 const isRecentlyUnpublished = ref(false)
 
-// 自动保存
-const { saveStatus, lastSavedAt, manualSave } = useAutoSave({
-  data: computed(() => lessonStore.currentLesson),
-  saveFn: async () => {
-    if (currentLesson.value) {
-      // 更新标题
-      currentLesson.value.title = lessonTitle.value
-      await lessonStore.saveCurrentLesson()
+// 手动保存功能（已删除自动保存，避免并发保存导致数据覆盖）
+const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
+const lastSavedAt = ref<Date | null>(null)
+
+// 手动保存函数
+async function manualSave() {
+  if (!currentLesson.value || isPreviewMode.value) return
+  
+  saveStatus.value = 'saving'
+  try {
+    // 更新标题
+    currentLesson.value.title = lessonTitle.value
+    // 确保使用最新的 cells 数据
+    currentLesson.value.content = [...cells.value]
+    await lessonStore.saveCurrentLesson()
+    saveStatus.value = 'saved'
+    lastSavedAt.value = new Date()
+    // 2秒后重置为 idle
+    setTimeout(() => {
+      if (saveStatus.value === 'saved') {
+        saveStatus.value = 'idle'
+      }
+    }, 2000)
+  } catch (error: any) {
+    saveStatus.value = 'error'
+    console.error('保存失败:', error)
+    throw error
+  }
+}
+
+// 标记是否有未保存的更改
+const hasUnsavedChanges = ref(false)
+
+// 监听教案变化，标记为有未保存更改
+// 注意：在保存过程中（saveStatus === 'saving'）不触发此标记，避免保存完成后的状态更新被误判为"未保存更改"
+watch(
+  [() => currentLesson.value?.content, () => lessonTitle.value],
+  () => {
+    // 只有在非预览模式、非保存中状态下才标记为有未保存更改
+    if (currentLesson.value && !isPreviewMode.value && saveStatus.value !== 'saving') {
+      hasUnsavedChanges.value = true
     }
   },
-  delay: 3000,
-  enabled: computed(
-    () => !isPreviewMode.value && !!currentLesson.value && !isFlowInteractionActive.value
-  ),
+  { deep: true }
+)
+
+// 监听保存状态，清除未保存标记
+watch(saveStatus, (status) => {
+  if (status === 'saved') {
+    hasUnsavedChanges.value = false
+  }
 })
 
 // 格式化保存时间
@@ -1038,7 +1085,40 @@ function handleMoveDown(cellId: string) {
 
 // 手动保存
 async function handleManualSave() {
+  // 如果在预览模式下，提示切换到编辑模式
+  if (isPreviewMode.value) {
+    const confirmed = confirm(
+      '当前处于授课模式（预览模式），无法保存教案。\n\n' +
+      '是否切换到编辑模式以保存更改？\n\n' +
+      '提示：切换到编辑模式后，您可以继续编辑和保存教案。'
+    )
+    if (confirmed) {
+      // 切换到编辑模式
+      isPreviewMode.value = false
+      // 等待模式切换完成后再保存
+      await nextTick()
+      try {
+        // 更新标题
+        if (currentLesson.value) {
+          currentLesson.value.title = lessonTitle.value
+        }
+        await manualSave()
+        showToast('success', '已切换到编辑模式并保存成功')
+      } catch (error: any) {
+        showToast('error', error.message || '保存失败')
+      }
+    } else {
+      // 用户取消，不显示提示（避免干扰）
+    }
+    return
+  }
+
+  // 编辑模式下正常保存
   try {
+    // 确保标题已更新
+    if (currentLesson.value) {
+      currentLesson.value.title = lessonTitle.value
+    }
     await manualSave()
     showToast('success', '保存成功')
   } catch (error: any) {
@@ -1091,7 +1171,63 @@ function handlePublishCancel() {
 }
 
 // 返回
-function handleBack() {
+async function handleBack() {
+  // 在导航前保存未保存的更改（确保数据不丢失）
+  if (currentLesson.value && !isPreviewMode.value) {
+    // 检查是否有实际的未保存更改（通过对比 cells 和 currentLesson.content）
+    const currentCellsCount = cells.value.length
+    const lessonContentCount = currentLesson.value.content?.length || 0
+    
+    // 只有在以下情况下才保存：
+    // 1. 明确标记了有未保存的更改（hasUnsavedChanges）
+    // 2. cells 数量与教案内容数量不一致（说明有添加或删除操作）
+    const hasActualChanges = currentCellsCount !== lessonContentCount || hasUnsavedChanges.value
+    
+    if (hasActualChanges) {
+      isSavingOnUnmount.value = true
+      try {
+        // 先保存最新的 cells 数据到本地变量，避免在保存过程中被覆盖
+        const latestCells = [...cells.value]
+        const latestCellsCount = latestCells.length
+        
+        console.log('💾 返回前保存未保存的更改...', {
+          cellsCount: latestCellsCount,
+          lessonContentCount: lessonContentCount,
+          hasUnsavedChanges: hasUnsavedChanges.value,
+          hasActualChanges: hasActualChanges
+        })
+        
+        // 更新标题和内容
+        if (currentLesson.value) {
+          currentLesson.value.title = lessonTitle.value
+          // 确保使用最新的 cells 数据（使用之前保存的副本，避免在保存过程中被覆盖）
+          currentLesson.value.content = latestCells
+        }
+        
+        // 强制保存，确保使用最新的数据
+        const savedLesson = await lessonStore.saveCurrentLesson()
+        hasUnsavedChanges.value = false
+        
+        console.log('✅ 返回前已保存更改', {
+          savedContentLength: savedLesson.content?.length || 0,
+          expectedLength: latestCellsCount,
+          match: savedLesson.content?.length === latestCellsCount
+        })
+        
+        // 等待保存完全提交
+        await new Promise(resolve => setTimeout(resolve, 200))
+      } catch (error) {
+        console.error('❌ 返回前保存失败:', error)
+        // 即使保存失败，也允许用户返回（避免阻塞）
+        // 但记录错误以便调试
+      } finally {
+        isSavingOnUnmount.value = false
+      }
+    } else {
+      console.log('✅ 无未保存的更改，直接返回')
+    }
+  }
+  
   router.push('/teacher')
 }
 
@@ -1552,6 +1688,10 @@ function handleAiInsert(content: string) {
 
 // 页面加载
 onMounted(async () => {
+  // 添加页面卸载和可见性变化监听
+  window.addEventListener('beforeunload', handleBeforeUnload)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  
   window.addEventListener('flowchart-interaction-start', handleFlowInteractionStartEvent)
   window.addEventListener('flowchart-interaction-end', handleFlowInteractionEndEvent)
 
@@ -1650,8 +1790,71 @@ onMounted(async () => {
   }
 })
 
+// 页面卸载前提示用户
+const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (hasUnsavedChanges.value && currentLesson.value && !isPreviewMode.value) {
+    // 提示用户有未保存的更改
+    // 注意：现代浏览器会忽略自定义消息，只显示默认提示
+    event.preventDefault()
+    event.returnValue = ''
+    return event.returnValue
+  }
+}
+
+// 页面可见性变化时（切换标签页、最小化窗口等）
+// 已删除自动保存，避免并发保存导致数据覆盖
+// 用户需要手动点击保存按钮
+const handleVisibilityChange = async () => {
+  // 不再自动保存，避免并发保存导致数据覆盖
+  // 用户需要手动点击保存按钮
+}
+
 // 组件卸载
-onUnmounted(() => {
+onUnmounted(async () => {
+  // 如果已经在 handleBack 中保存了，跳过
+  if (isSavingOnUnmount.value) {
+    console.log('⏭️ 已在返回时保存，跳过卸载时保存')
+    return
+  }
+  
+  // 在卸载前保存未保存的更改
+  if (currentLesson.value && !isPreviewMode.value) {
+    // 检查是否有实际的未保存更改（通过对比 cells 和 currentLesson.content）
+    const currentCellsCount = cells.value.length
+    const lessonContentCount = currentLesson.value.content?.length || 0
+    const hasActualChanges = currentCellsCount !== lessonContentCount || hasUnsavedChanges.value
+    
+    if (hasActualChanges) {
+      isSavingOnUnmount.value = true
+      try {
+        console.log('💾 组件卸载前保存未保存的更改...', {
+          cellsCount: currentCellsCount,
+          lessonContentCount: lessonContentCount,
+          hasUnsavedChanges: hasUnsavedChanges.value,
+          hasActualChanges: hasActualChanges
+        })
+        // 更新标题
+        if (currentLesson.value) {
+          currentLesson.value.title = lessonTitle.value
+          // 确保使用最新的 cells 数据
+          currentLesson.value.content = [...cells.value]
+        }
+        await lessonStore.saveCurrentLesson()
+        hasUnsavedChanges.value = false
+        console.log('✅ 组件卸载前已保存更改')
+      } catch (error) {
+        console.error('❌ 组件卸载前保存失败:', error)
+        // 保存失败时记录错误，但继续卸载流程
+      } finally {
+        isSavingOnUnmount.value = false
+      }
+    }
+  }
+  
+  // 移除事件监听
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  
   destroySortable()
   // 确保恢复body滚动
   document.body.style.overflow = ''

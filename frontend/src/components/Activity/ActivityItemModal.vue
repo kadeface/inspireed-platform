@@ -16,7 +16,7 @@
           <label class="form-label">题型 *</label>
           <select v-model="itemData.type" class="form-input" :disabled="isEditing">
             <option value="" disabled>请选择题型</option>
-            <optgroup label="客观题（自动评分）">
+            <optgroup :label="isSurvey ? '客观题（无对错，仅统计）' : '客观题（自动评分）'">
               <option value="single-choice">单选题</option>
               <option value="multiple-choice">多选题</option>
               <option value="true-false">判断题</option>
@@ -47,7 +47,7 @@
 
         <!-- 基本设置 -->
         <div class="form-row">
-          <div class="form-group flex-1">
+          <div class="form-group flex-1" v-if="!isSurvey">
             <label class="form-label">分值</label>
             <input
               v-model.number="itemData.points"
@@ -74,16 +74,26 @@
             <div class="form-group">
               <label class="form-label">
                 选项 <span class="text-red-500">*</span>
-                <span class="text-sm text-gray-500 ml-2">（点击左侧单选按钮设置正确答案）</span>
+                <span
+                  v-if="!isSurvey"
+                  class="text-sm text-gray-500 ml-2"
+                >（点击左侧单选按钮设置正确答案）</span>
+                <span
+                  v-else
+                  class="text-sm text-gray-500 ml-2"
+                >（问卷模式下无需设置正确答案）</span>
               </label>
               <div class="space-y-2">
                 <div
                   v-for="(option, index) in singleChoiceConfig.options"
                   :key="option.id"
                   class="option-row"
-                  :class="{ 'border-green-300 bg-green-50': singleChoiceConfig.correctAnswer === option.id }"
+                  :class="{
+                    'border-green-300 bg-green-50': !isSurvey && singleChoiceConfig.correctAnswer === option.id
+                  }"
                 >
                   <input
+                    v-if="!isSurvey"
                     type="radio"
                     :name="'correct-answer'"
                     :checked="singleChoiceConfig.correctAnswer === option.id"
@@ -96,7 +106,10 @@
                     class="flex-1 form-input"
                     :placeholder="`选项 ${String.fromCharCode(65 + index)}`"
                   />
-                  <span v-if="singleChoiceConfig.correctAnswer === option.id" class="text-green-600 font-semibold text-sm">
+                  <span
+                    v-if="!isSurvey && singleChoiceConfig.correctAnswer === option.id"
+                    class="text-green-600 font-semibold text-sm"
+                  >
                     ✓ 正确答案
                   </span>
                   <button @click="removeOption(index)" class="btn-icon text-red-600" type="button">
@@ -109,7 +122,10 @@
               <button @click="addOption" class="btn-secondary mt-2" type="button">
                 + 添加选项
               </button>
-              <p v-if="!singleChoiceConfig.correctAnswer" class="text-sm text-red-600 mt-2">
+              <p
+                v-if="!isSurvey && !singleChoiceConfig.correctAnswer"
+                class="text-sm text-red-600 mt-2"
+              >
                 ⚠️ 请选择一个选项作为正确答案
               </p>
             </div>
@@ -130,16 +146,26 @@
             <div class="form-group">
               <label class="form-label">
                 选项 <span class="text-red-500">*</span>
-                <span class="text-sm text-gray-500 ml-2">（勾选左侧复选框设置正确答案）</span>
+                <span
+                  v-if="!isSurvey"
+                  class="text-sm text-gray-500 ml-2"
+                >（勾选左侧复选框设置正确答案）</span>
+                <span
+                  v-else
+                  class="text-sm text-gray-500 ml-2"
+                >（问卷模式下无需设置正确答案）</span>
               </label>
               <div class="space-y-2">
                 <div
                   v-for="(option, index) in multipleChoiceConfig.options"
                   :key="option.id"
                   class="option-row"
-                  :class="{ 'border-green-300 bg-green-50': multipleChoiceConfig.correctAnswers?.includes(option.id) }"
+                  :class="{
+                    'border-green-300 bg-green-50': !isSurvey && multipleChoiceConfig.correctAnswers?.includes(option.id)
+                  }"
                 >
                   <input
+                    v-if="!isSurvey"
                     type="checkbox"
                     :checked="multipleChoiceConfig.correctAnswers?.includes(option.id)"
                     @change="toggleMultipleAnswer(option.id)"
@@ -151,7 +177,10 @@
                     class="flex-1 form-input"
                     :placeholder="`选项 ${String.fromCharCode(65 + index)}`"
                   />
-                  <span v-if="multipleChoiceConfig.correctAnswers?.includes(option.id)" class="text-green-600 font-semibold text-sm">
+                  <span
+                    v-if="!isSurvey && multipleChoiceConfig.correctAnswers?.includes(option.id)"
+                    class="text-green-600 font-semibold text-sm"
+                  >
                     ✓ 正确答案
                   </span>
                   <button @click="removeOption(index)" class="btn-icon text-red-600" type="button">
@@ -164,7 +193,10 @@
               <button @click="addOption" class="btn-secondary mt-2" type="button">
                 + 添加选项
               </button>
-              <p v-if="!multipleChoiceConfig.correctAnswers || multipleChoiceConfig.correctAnswers.length === 0" class="text-sm text-red-600 mt-2">
+              <p
+                v-if="!isSurvey && (!multipleChoiceConfig.correctAnswers || multipleChoiceConfig.correctAnswers.length === 0)"
+                class="text-sm text-red-600 mt-2"
+              >
                 ⚠️ 请至少选择一个选项作为正确答案
               </p>
             </div>
@@ -182,10 +214,16 @@
           <!-- 判断题 -->
           <div v-if="itemData.type === 'true-false'" class="space-y-4">
             <div class="form-group">
-              <label class="form-label">正确答案</label>
-              <select v-model="trueFalseConfig.correctAnswer" class="form-input">
-                <option :value="true">正确 (True)</option>
-                <option :value="false">错误 (False)</option>
+              <label class="form-label">
+                {{ isSurvey ? '学生选择（无对错，仅统计）' : '正确答案' }}
+              </label>
+              <select
+                v-model="trueFalseConfig.correctAnswer"
+                class="form-input"
+                :disabled="isSurvey"
+              >
+                <option :value="true">是 / 正确</option>
+                <option :value="false">否 / 错误</option>
               </select>
             </div>
 
@@ -371,10 +409,11 @@ const emit = defineEmits<{
 }>()
 
 const isEditing = computed(() => !!props.initialItem)
+const isSurvey = computed(() => props.activityType === 'survey')
 
 // 基础题目数据
 const itemData = reactive<Partial<ActivityItem>>({
-  type: props.initialItem?.type || '',
+  type: props.initialItem?.type || 'single-choice',
   question: props.initialItem?.question || '',
   required: props.initialItem?.required ?? true,
   points: props.initialItem?.points || 10,
@@ -537,10 +576,15 @@ function handleSubmit() {
       alert('请填写所有选项的内容')
       return
     }
-    // 检查是否设置了正确答案
-    if (!singleChoiceConfig.correctAnswer) {
-      alert('请选择正确答案（点击选项前的单选按钮）')
-      return
+    // 问卷模式下不要求设置正确答案
+    if (!isSurvey.value) {
+      if (!singleChoiceConfig.correctAnswer) {
+        alert('请选择正确答案（点击选项前的单选按钮）')
+        return
+      }
+    } else {
+      // 清空可能残留的正确答案，避免被当成自动评分
+      singleChoiceConfig.correctAnswer = undefined as any
     }
   } else if (itemData.type === 'multiple-choice') {
     // 检查选项是否为空
@@ -554,13 +598,17 @@ function handleSubmit() {
       alert('请填写所有选项的内容')
       return
     }
-    // 检查是否设置了正确答案
-    if (!multipleChoiceConfig.correctAnswers || multipleChoiceConfig.correctAnswers.length === 0) {
-      alert('请至少选择一个正确答案（勾选选项前的复选框）')
-      return
+    // 问卷模式下不要求设置正确答案
+    if (!isSurvey.value) {
+      if (!multipleChoiceConfig.correctAnswers || multipleChoiceConfig.correctAnswers.length === 0) {
+        alert('请至少选择一个正确答案（勾选选项前的复选框）')
+        return
+      }
+    } else {
+      multipleChoiceConfig.correctAnswers = []
     }
   } else if (itemData.type === 'true-false') {
-    // 判断题的正确答案总是有默认值，不需要验证
+    // 判断题在问卷模式下也不需要验证正确答案
   }
 
   // 组装配置
@@ -573,7 +621,7 @@ function handleSubmit() {
         id: opt.id,
         text: opt.text,
       })),
-      correctAnswer: singleChoiceConfig.correctAnswer,
+      correctAnswer: isSurvey.value ? undefined : singleChoiceConfig.correctAnswer,
       explanation: singleChoiceConfig.explanation || '',
     }
   } else if (itemData.type === 'multiple-choice') {
@@ -583,7 +631,7 @@ function handleSubmit() {
         id: opt.id,
         text: opt.text,
       })),
-      correctAnswers: multipleChoiceConfig.correctAnswers || [],
+      correctAnswers: isSurvey.value ? undefined : (multipleChoiceConfig.correctAnswers || []),
       explanation: multipleChoiceConfig.explanation || '',
     }
   } else if (itemData.type === 'true-false') {

@@ -531,6 +531,15 @@ const {
   updateProgress,  // 🆕 导入进度更新函数
 } = useClassroomSession(lessonId.value, handleFullscreenRequest)
 
+// 🔍 调试：监听 classroomSession 变化
+watch(classroomSession, (newSession) => {
+  console.log('🔍 LessonView classroomSession 变化:', {
+    sessionId: newSession?.id,
+    status: newSession?.status,
+    lessonId: newSession?.lesson_id,
+  })
+}, { immediate: true, deep: true })
+
 // 自动保存定时器
 let notesAutoSaveTimer: ReturnType<typeof setTimeout> | null = null
 // Watch停止函数

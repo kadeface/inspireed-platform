@@ -37,6 +37,14 @@ export const activityService = {
       responses: data.responses || {}, // 确保 responses 始终存在
     }
     
+    // 添加 sessionId（课堂模式）
+    if (data.sessionId !== undefined) {
+      requestData.session_id = data.sessionId
+      console.log('✅ 添加 session_id 到请求:', data.sessionId)
+    } else {
+      console.warn('⚠️ data.sessionId 是 undefined，未添加到请求')
+    }
+    
     // started_at 需要是 ISO 字符串格式，Pydantic 会自动转换为 datetime
     if (data.startedAt !== undefined) {
       // 确保是有效的 ISO 字符串
@@ -64,6 +72,7 @@ export const activityService = {
     console.log('📤 Creating submission:', {
       cell_id: requestData.cell_id,
       lesson_id: requestData.lesson_id,
+      session_id: requestData.session_id,  // 🔍 添加 session_id 到日志
       responses_count: Object.keys(requestData.responses).length,
       started_at: requestData.started_at,
     })
@@ -104,6 +113,9 @@ export const activityService = {
     if (data.status !== undefined) {
       requestData.status = data.status
     }
+    if (data.sessionId !== undefined) {
+      requestData.session_id = data.sessionId  // ✅ 支持更新 session_id
+    }
     if (data.timeSpent !== undefined) {
       requestData.time_spent = data.timeSpent
     }
@@ -135,6 +147,9 @@ export const activityService = {
     const requestData: any = {
       responses: data.responses,
     }
+    if (data.sessionId !== undefined) {
+      requestData.session_id = data.sessionId
+    }
     if (data.timeSpent !== undefined) {
       requestData.time_spent = data.timeSpent
     }
@@ -151,11 +166,32 @@ export const activityService = {
       requestData.attempt_no = data.attemptNo
     }
     
-    const response = await api.post<ActivitySubmission>(
-      `/activities/submissions/${submissionId}/submit`,
-      requestData
-    )
-    return response
+    console.log('📤 Submitting activity:', {
+      submissionId,
+      sessionId: requestData.session_id,
+      timeSpent: requestData.time_spent,
+      responsesCount: Object.keys(requestData.responses).length,
+    })
+    
+    try {
+      const response = await api.post<ActivitySubmission>(
+        `/activities/submissions/${submissionId}/submit`,
+        requestData
+      )
+      console.log('✅ Activity submitted successfully:', { 
+        submissionId: response.id, 
+        status: response.status 
+      })
+      return response
+    } catch (error: any) {
+      console.error('❌ Submit activity failed:', {
+        submissionId,
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      })
+      throw error
+    }
   },
 
   /**

@@ -43,6 +43,7 @@ class ActivitySubmissionUpdate(BaseModel):
 
     responses: Optional[Dict[str, Any]] = None
     status: Optional[ActivitySubmissionStatus] = None
+    session_id: Optional[int] = None  # ✅ 允许更新 session_id（当会话加载延迟时）
     time_spent: Optional[int] = None
     process_trace: Optional[List[Dict[str, Any]]] = None
     context: Optional[Dict[str, Any]] = None

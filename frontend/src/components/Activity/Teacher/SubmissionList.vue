@@ -146,11 +146,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { ActivitySubmission } from '../../../types/activity'
 import type { ActivityCellContent } from '../../../types/activity'
 import activityService from '../../../services/activity'
 import GradingModal from './GradingModal.vue'
+import { useRealtimeChannel } from '@/composables/useRealtimeChannel'
+import type { WebSocketMessage } from '@/composables/useRealtimeChannel'
 
 interface Props {
   cellId: number
@@ -317,8 +319,77 @@ async function handleBulkReturn() {
   }
 }
 
-onMounted(() => {
+// WebSocket 实时更新
+const channelDescriptor = computed(() => {
+  if (props.sessionId) {
+    return { scope: 'session' as const, id: props.sessionId }
+  }
+  return { scope: 'lesson' as const, id: props.lessonId! }
+})
+
+const {
+  isConnected,
+  connect: connectRealtime,
+  disconnect: disconnectRealtime,
+  registerListener,
+  unregisterAll,
+} = useRealtimeChannel(channelDescriptor)
+
+// 监听新提交通知
+function handleNewSubmission(message: WebSocketMessage) {
+  if (message.data.cell_id !== props.cellId) return
+  
+  console.log('📬 收到新提交通知，刷新列表...', {
+    submissionId: message.data.submission_id,
+    cellId: message.data.cell_id,
+    studentId: message.data.student_id,
+  })
+  
+  // 自动刷新列表
   loadSubmissions()
+}
+
+// 监听统计更新通知（也会触发列表刷新）
+function handleStatisticsUpdate(message: WebSocketMessage) {
+  if (message.data.cell_id !== props.cellId) return
+  
+  console.log('📊 收到统计更新通知，刷新列表...')
+  
+  // 自动刷新列表
+  loadSubmissions()
+}
+
+let pollingInterval: ReturnType<typeof setInterval> | null = null
+
+onMounted(async () => {
+  // 初始加载
+  await loadSubmissions()
+  
+  // 连接 WebSocket（如果有 sessionId）
+  if (props.sessionId) {
+    try {
+      await connectRealtime()
+      registerListener('new_submission', handleNewSubmission)
+      registerListener('submission_statistics_updated', handleStatisticsUpdate)
+      console.log('✅ SubmissionList: WebSocket 连接成功，将使用实时推送')
+    } catch (error) {
+      console.warn('⚠️ SubmissionList: WebSocket 连接失败，降级到轮询模式', error)
+      // WebSocket 失败时，定期刷新（每5秒）
+      pollingInterval = setInterval(() => {
+        loadSubmissions()
+      }, 5000)
+    }
+  }
+})
+
+onUnmounted(() => {
+  unregisterAll()
+  disconnectRealtime()
+  // 清理轮询定时器
+  if (pollingInterval) {
+    clearInterval(pollingInterval)
+    pollingInterval = null
+  }
 })
 </script>
 

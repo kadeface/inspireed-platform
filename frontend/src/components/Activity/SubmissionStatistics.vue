@@ -218,8 +218,9 @@ onMounted(async () => {
       console.log('📊 延迟请求统计，isConnected =', isConnected.value)
       if (isConnected.value) {
         requestStats(props.cellId, props.lessonId)
+        console.log('✅ 使用 WebSocket 实时推送')
       } else {
-        console.warn('⚠️ WebSocket 未连接，将使用 API 定期刷新')
+        console.warn('⚠️ WebSocket 未连接，将使用 API 定期刷新（每5秒）')
         // 如果 WebSocket 未连接，定期通过 API 刷新
         pollingInterval = setInterval(() => {
           loadStatisticsFromAPI()

@@ -401,6 +401,7 @@ export interface FormativeAssessmentRecord {
 export interface CreateActivitySubmissionRequest {
   cellId: number
   lessonId: number
+  sessionId?: number  // 课堂会话ID（课堂模式必须传递）
   responses?: Record<string, ItemAnswer>
   startedAt?: string
   processTrace?: ProcessTraceEvent[]
@@ -413,6 +414,7 @@ export interface CreateActivitySubmissionRequest {
 export interface UpdateActivitySubmissionRequest {
   responses?: Record<string, ItemAnswer>
   status?: ActivitySubmissionStatus
+  sessionId?: number  // ✅ 允许更新 session_id（当会话加载延迟时）
   timeSpent?: number
   processTrace?: ProcessTraceEvent[]
   context?: Record<string, any>
@@ -423,6 +425,7 @@ export interface UpdateActivitySubmissionRequest {
 // ========== 提交活动请求 ==========
 export interface SubmitActivityRequest {
   responses: Record<string, ItemAnswer>
+  sessionId?: number  // 课堂会话ID（课堂模式必须传递）
   timeSpent?: number
   processTrace?: ProcessTraceEvent[]
   context?: Record<string, any>

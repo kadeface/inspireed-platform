@@ -405,6 +405,96 @@ function handleIframeLoad() {
         `
         iframeDoc.head.appendChild(style)
         
+        // 添加全局错误处理脚本（使用严格模式兼容的方式，避免访问被限制的属性）
+        const errorHandlerScript = iframeDoc.createElement('script')
+        errorHandlerScript.textContent = `
+          (function() {
+            'use strict';
+            
+            // 安全的错误处理函数
+            function handleError(event) {
+              try {
+                var errorMsg = 'Unknown error';
+                try {
+                  if (event && event.error) {
+                    errorMsg = event.error.message || String(event.error);
+                  } else if (event && event.message) {
+                    errorMsg = event.message;
+                  }
+                } catch (e) {
+                  // 如果无法读取错误信息，使用默认值
+                }
+                
+                var filename = (event && event.filename) ? event.filename : 'unknown';
+                var lineno = (event && typeof event.lineno === 'number') ? event.lineno : 0;
+                
+                // 安全地输出警告（避免访问原型链上的限制属性）
+                if (console && typeof console.warn === 'function') {
+                  console.warn('Error in iframe content:', errorMsg, filename, lineno);
+                }
+              } catch (e) {
+                // 如果错误处理本身出错，静默忽略
+              }
+              
+              // 阻止错误冒泡到父窗口
+              try {
+                if (event && typeof event.preventDefault === 'function') {
+                  event.preventDefault();
+                }
+              } catch (e) {
+                // 忽略 preventDefault 的错误
+              }
+            }
+            
+            // 安全的 Promise 拒绝处理函数
+            function handleRejection(event) {
+              try {
+                var reason = 'Unknown rejection';
+                try {
+                  if (event && event.reason) {
+                    reason = event.reason.message || String(event.reason);
+                  }
+                } catch (e) {
+                  // 如果无法读取拒绝原因，使用默认值
+                }
+                
+                if (console && typeof console.warn === 'function') {
+                  console.warn('Unhandled promise rejection in iframe:', reason);
+                }
+              } catch (e) {
+                // 如果错误处理本身出错，静默忽略
+              }
+              
+              try {
+                if (event && typeof event.preventDefault === 'function') {
+                  event.preventDefault();
+                }
+              } catch (e) {
+                // 忽略 preventDefault 的错误
+              }
+            }
+            
+            // 捕获未处理的错误
+            try {
+              if (window && typeof window.addEventListener === 'function') {
+                window.addEventListener('error', handleError, true);
+              }
+            } catch (e) {
+              // 如果无法添加错误监听器，忽略
+            }
+            
+            // 捕获 Promise 拒绝
+            try {
+              if (window && typeof window.addEventListener === 'function') {
+                window.addEventListener('unhandledrejection', handleRejection);
+              }
+            } catch (e) {
+              // 如果无法添加拒绝监听器，忽略
+            }
+          })();
+        `
+        iframeDoc.head.appendChild(errorHandlerScript)
+        
         // 计算高度的函数
         const calculateHeight = () => {
           const body = iframeDoc.body

@@ -4,6 +4,7 @@
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union, cast
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,12 +63,21 @@ async def _get_lesson_with_relations(
 
 def _lesson_to_response(lesson: Lesson) -> LessonResponse:
     """将教案对象转换为响应字典"""
+    # 导入日志记录器
+    import logging
+    logger = logging.getLogger(__name__)
+    
     lesson_data = {
         k: v
         for k, v in lesson.__dict__.items()
         if not k.startswith("_") and k not in {"lesson_classrooms", "creator"}
     }
-    lesson_data.setdefault("content", lesson.content or [])
+    
+    # 获取原始 content 数据
+    raw_content = lesson.content or []
+    raw_content_length = len(raw_content) if isinstance(raw_content, list) else 0
+    
+    lesson_data.setdefault("content", raw_content)
     lesson_data.setdefault("tags", lesson.tags or [])
     lesson_data.update(
         {
@@ -87,7 +97,36 @@ def _lesson_to_response(lesson: Lesson) -> LessonResponse:
         lesson_data["content"] = []
     if lesson_data.get("tags") is None:
         lesson_data["tags"] = []
-    return LessonResponse.model_validate(lesson_data)
+    
+    # 在验证前记录原始数据
+    content_before_validate = lesson_data["content"]
+    content_before_length = len(content_before_validate) if isinstance(content_before_validate, list) else 0
+    
+    try:
+        response = LessonResponse.model_validate(lesson_data)
+        content_after_length = len(response.content) if isinstance(response.content, list) else 0
+        
+        # 如果验证前后数量不一致，记录警告
+        if content_before_length != content_after_length:
+            logger.warning(
+                f"⚠️ 教案 {lesson.id} 在 _lesson_to_response 验证时 content 数量变化: "
+                f"{content_before_length} -> {content_after_length}"
+            )
+            # 记录详细信息
+            if isinstance(content_before_validate, list):
+                before_ids = [cell.get('id') if isinstance(cell, dict) else None for cell in content_before_validate]
+                logger.warning(f"  验证前的IDs: {before_ids}")
+            if isinstance(response.content, list):
+                after_ids = [cell.get('id') if isinstance(cell, dict) else None for cell in response.content]
+                logger.warning(f"  验证后的IDs: {after_ids}")
+        
+        return response
+    except Exception as e:
+        logger.error(
+            f"❌ 教案 {lesson.id} 在 _lesson_to_response 验证时出错: {e}, "
+            f"content长度={content_before_length}"
+        )
+        raise
 
 
 @router.post("/", response_model=LessonResponse, status_code=201)
@@ -524,7 +563,32 @@ async def update_lesson(
         raise HTTPException(status_code=403, detail="无权修改该教案")
 
     # 如果更新 course_id，验证课程存在
+    # 使用 exclude_unset=True 只包含明确设置的字段
+    # 注意：空数组 [] 会被视为已设置，所以会被包含
     update_data = lesson_in.model_dump(exclude_unset=True)
+    
+    # 调试日志：记录更新数据（包括原始请求数据）
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # 记录原始请求数据（在 Pydantic 验证之前）
+    raw_content = getattr(lesson_in, 'content', None)
+    raw_content_length = len(raw_content) if isinstance(raw_content, list) else (0 if raw_content is None else 'N/A')
+    logger.info(
+        f"更新教案 {lesson_id}: 原始请求 content长度={raw_content_length}, "
+        f"更新字段={list(update_data.keys())}, "
+        f"处理后content长度={len(update_data.get('content', [])) if 'content' in update_data else '未更新'}"
+    )
+    
+    # 如果 content 在原始请求中但不在 update_data 中，说明可能有问题
+    if hasattr(lesson_in, 'content') and lesson_in.content is not None and 'content' not in update_data:
+        logger.error(
+            f"❌ 严重错误：教案 {lesson_id} 的 content 字段在请求中存在但未包含在 update_data 中！"
+            f"原始content类型={type(lesson_in.content)}, 值={lesson_in.content}"
+        )
+        # 强制包含 content 字段
+        update_data['content'] = lesson_in.content
+    
     if "course_id" in update_data:
         course_result = await db.execute(
             select(Course).where(Course.id == update_data["course_id"])
@@ -540,13 +604,156 @@ async def update_lesson(
     if "content" in update_data:
         old_content = lesson.content
         new_content = update_data["content"]
+        
+        # 确保 new_content 是列表类型
+        if new_content is not None and not isinstance(new_content, list):
+            logger.error(
+                f"❌ 教案 {lesson_id} content 字段类型错误: 期望 list，实际 {type(new_content)}"
+            )
+            # 尝试转换或使用空列表
+            if isinstance(new_content, (str, bytes)):
+                try:
+                    new_content = json.loads(new_content)
+                except:
+                    new_content = []
+            else:
+                new_content = []
+            update_data["content"] = new_content
+        
+        # 详细日志：记录保存前后的内容对比
+        old_count = len(old_content) if isinstance(old_content, list) else (0 if old_content is None else 0)
+        new_count = len(new_content) if isinstance(new_content, list) else (0 if new_content is None else 0)
+        logger.info(
+            f"教案 {lesson_id} 内容更新详情: "
+            f"保存前长度={old_count}, "
+            f"保存后长度={new_count}"
+        )
+        
+        # 检查每个cell的详细信息并验证数据完整性（但不过滤，避免数据丢失）
+        if new_content and isinstance(new_content, list):
+            cell_ids = []
+            invalid_cells = []
+            for idx, cell in enumerate(new_content):
+                if not isinstance(cell, dict):
+                    logger.warning(
+                        f"⚠️ 教案 {lesson_id} Cell[{idx}] 不是字典类型: {type(cell)}, 值={cell}"
+                    )
+                    # 尝试修复：如果是其他类型，转换为字典
+                    if hasattr(cell, '__dict__'):
+                        cell = cell.__dict__
+                    elif hasattr(cell, 'model_dump'):
+                        cell = cell.model_dump()
+                    else:
+                        invalid_cells.append(idx)
+                        cell_ids.append(f"invalid_{idx}")
+                        continue
+                    # 更新列表中的 cell
+                    new_content[idx] = cell
+                
+                cell_id = cell.get('id')
+                cell_type = cell.get('type')
+                has_content = bool(cell.get('content'))
+                cell_ids.append(str(cell_id) if cell_id else f"no_id_{idx}")
+                
+                # 验证必需的字段（只记录警告，不过滤）
+                if not cell_id:
+                    logger.warning(
+                        f"⚠️ 教案 {lesson_id} Cell[{idx}] 缺少 id 字段，将使用索引作为临时ID"
+                    )
+                    # 如果没有 id，生成一个临时 ID（但这不是最佳实践，应该由前端提供）
+                    if not cell_id:
+                        import uuid
+                        cell['id'] = str(uuid.uuid4())
+                        logger.info(f"  已为 Cell[{idx}] 生成临时ID: {cell['id']}")
+                
+                if not cell_type:
+                    logger.warning(
+                        f"⚠️ 教案 {lesson_id} Cell[{idx}] 缺少 type 字段，将使用默认值 'text'"
+                    )
+                    # 如果没有 type，使用默认值
+                    if not cell_type:
+                        cell['type'] = 'text'
+                        logger.info(f"  已为 Cell[{idx}] 设置默认type: text")
+                
+                logger.debug(
+                    f"  保存Cell[{idx}]: id={cell.get('id')}, type={cell.get('type')}, "
+                    f"has_content={has_content}"
+                )
+            
+            # 移除无效的 cell（如果无法修复）
+            if invalid_cells:
+                logger.error(
+                    f"❌ 教案 {lesson_id} 发现 {len(invalid_cells)} 个无法修复的无效 cell，索引: {invalid_cells}"
+                )
+                # 记录每个被移除的 cell 的详细信息
+                for idx in invalid_cells:
+                    if idx < len(new_content):
+                        invalid_cell = new_content[idx]
+                        logger.error(
+                            f"  被移除的 Cell[{idx}]: type={type(invalid_cell)}, "
+                            f"value={invalid_cell if not isinstance(invalid_cell, dict) else f'dict with keys: {list(invalid_cell.keys())}'}"
+                        )
+                # 从后往前删除，避免索引变化
+                for idx in reversed(invalid_cells):
+                    new_content.pop(idx)
+                logger.info(f"  已移除无效 cell，剩余 {len(new_content)} 个 cells")
+            
+            logger.info(
+                f"教案 {lesson_id} 准备保存 {len(new_content)} 个 cells, IDs={cell_ids[:10]}{'...' if len(cell_ids) > 10 else ''}"
+            )
+            # 更新 update_data 中的 content
+            update_data["content"] = new_content
+        
         # 比较内容是否真正发生变化（简单比较长度和结构）
-        if old_content != new_content:
+        # 确保类型安全：old_content 和 new_content 都应该是列表或 None
+        old_content_list: list = old_content if isinstance(old_content, list) else ([] if old_content is None else [])
+        new_content_list: list = new_content if isinstance(new_content, list) else ([] if new_content is None else [])
+        
+        # 使用明确的比较方式避免类型检查问题
+        content_changed = bool(old_content_list != new_content_list)
+        if content_changed:
             content_updated = True
+            
+            # 如果数量不一致，记录警告
+            old_count = len(old_content_list)
+            new_count = len(new_content_list)
+            if old_count != new_count:
+                logger.warning(
+                    f"⚠️ 教案 {lesson_id} 内容数量变化: {old_count} -> {new_count}"
+                )
 
     # 更新字段
     for field, value in update_data.items():
+        # 对于 content 字段，确保它是列表类型
+        if field == "content":
+            if value is not None and not isinstance(value, list):
+                logger.error(
+                    f"❌ 教案 {lesson_id} 在设置 content 字段时类型错误: "
+                    f"期望 list，实际 {type(value)}"
+                )
+                # 尝试修复
+                if isinstance(value, (str, bytes)):
+                    try:
+                        value = json.loads(value)
+                    except:
+                        value = []
+                else:
+                    value = []
+            # 确保 content 是列表（即使是空列表）
+            if value is None:
+                value = []
+            logger.info(
+                f"教案 {lesson_id} 设置 content 字段: 类型={type(value)}, 长度={len(value) if isinstance(value, list) else 'N/A'}"
+            )
         setattr(lesson, field, value)
+        
+        # 验证设置后的值
+        if field == "content":
+            set_value = getattr(lesson, field, None)
+            logger.info(
+                f"教案 {lesson_id} 设置后验证: content类型={type(set_value)}, "
+                f"长度={len(set_value) if isinstance(set_value, list) else 'N/A'}"
+            )
 
     # 如果更新了已发布教案的内容，自动更新版本号
     # 这样学生端可以通过版本号判断是否有新内容
@@ -558,11 +765,94 @@ async def update_lesson(
         setattr(lesson, "published_at", datetime.utcnow())
 
     await db.commit()
+    # 刷新对象以确保获取最新数据
+    await db.refresh(lesson)
+    
+    # 调试日志：记录提交后的数据
+    content_after_save = lesson.content if isinstance(lesson.content, list) else ([] if lesson.content is None else [])
+    logger.info(
+        f"教案 {lesson_id} 已提交并刷新: content长度={len(content_after_save)}, "
+        f"version={lesson.version}, content类型={type(lesson.content)}"
+    )
+    
+    # 检查数据库中的实际内容 - 详细记录每个 cell
+    if isinstance(lesson.content, list) and len(lesson.content) > 0:
+        cell_details = []
+        for idx, cell in enumerate(lesson.content):
+            if isinstance(cell, dict):
+                cell_details.append({
+                    'index': idx,
+                    'id': cell.get('id'),
+                    'type': cell.get('type'),
+                    'order': cell.get('order'),
+                })
+            else:
+                cell_details.append({'index': idx, 'raw_type': type(cell).__name__})
+        logger.info(
+            f"  数据库中的content详情: 长度={len(lesson.content)}, "
+            f"所有cell信息={cell_details}"
+        )
+    elif not isinstance(lesson.content, list):
+        logger.warning(
+            f"⚠️ 教案 {lesson_id} 刷新后 content 不是列表类型: {type(lesson.content)}"
+        )
+    
     lesson_id_value = cast(int, lesson.id)
     lesson = await _get_lesson_with_relations(db, lesson_id_value)
     if not lesson:
         raise HTTPException(status_code=500, detail="教案更新后加载失败")
-    return _lesson_to_response(lesson)
+    
+    # 检查重新加载后的内容
+    reloaded_content = lesson.content if isinstance(lesson.content, list) else ([] if lesson.content is None else [])
+    reloaded_count = len(reloaded_content)
+    logger.info(
+        f"教案 {lesson_id} 重新加载后: content长度={reloaded_count}"
+    )
+    
+    # 调试日志：记录返回前的数据
+    response_lesson = _lesson_to_response(lesson)
+    response_count = len(response_lesson.content) if response_lesson.content else 0
+    logger.info(
+        f"教案 {lesson_id} 返回数据: content长度={response_count}, "
+        f"version={response_lesson.version}"
+    )
+    
+    # 如果数量不一致，记录警告
+    if "content" in update_data:
+        saved_count = len(update_data["content"]) if update_data["content"] else 0
+        if saved_count != response_count:
+            logger.error(
+                f"❌ 严重警告：教案 {lesson_id} 保存前后数量不一致！"
+                f"保存时={saved_count}, 返回时={response_count}"
+            )
+            # 记录详细信息
+            if update_data["content"] and isinstance(update_data["content"], list):
+                saved_ids = [
+                    cell.get('id') if isinstance(cell, dict) else None 
+                    for cell in update_data["content"]
+                ]
+                logger.error(f"  保存时的IDs: {saved_ids}")
+                # 记录最后一个 cell 的详细信息
+                if len(update_data["content"]) > 0:
+                    last_cell = update_data["content"][-1]
+                    logger.error(f"  保存时的最后一个cell: {json.dumps(last_cell, ensure_ascii=False, default=str)}")
+            if response_lesson.content and isinstance(response_lesson.content, list):
+                returned_ids = [
+                    cell.get('id') if isinstance(cell, dict) else None 
+                    for cell in response_lesson.content
+                ]
+                logger.error(f"  返回时的IDs: {returned_ids}")
+                # 记录最后一个 cell 的详细信息
+                if len(response_lesson.content) > 0:
+                    last_cell = response_lesson.content[-1]
+                    logger.error(f"  返回时的最后一个cell: {json.dumps(last_cell, ensure_ascii=False, default=str)}")
+            # 记录数据库中的实际内容
+            logger.error(f"  数据库中的content长度: {len(reloaded_content)}")
+            if isinstance(reloaded_content, list) and len(reloaded_content) > 0:
+                db_last_cell = reloaded_content[-1]
+                logger.error(f"  数据库中的最后一个cell: {json.dumps(db_last_cell, ensure_ascii=False, default=str) if isinstance(db_last_cell, dict) else str(db_last_cell)}")
+    
+    return response_lesson
 
 
 @router.delete("/{lesson_id}", status_code=204)

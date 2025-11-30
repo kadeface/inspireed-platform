@@ -9,6 +9,15 @@
           <div v-if="lesson" class="lesson-info">
             <span class="lesson-title">{{ lesson.title }}</span>
           </div>
+          <!-- 学生人数显示 -->
+          <div v-if="session" class="student-count-info">
+            <span class="student-count-icon">👥</span>
+            <span class="student-count-text">
+              <span class="student-count-value">{{ activeStudents.length }}</span>
+              <span v-if="totalStudents > 0" class="student-count-total">/{{ totalStudents }}</span>
+              <span class="student-count-label">人已进入</span>
+            </span>
+          </div>
         </div>
         <div class="header-controls">
           <!-- 导播台全屏按钮 -->
@@ -982,8 +991,11 @@ function handleModuleItemClick(cell: Cell, index: number) {
   const cellId = getCellId(cell)
   const cellOrder = cell.order !== undefined ? cell.order : index
   
+  // 🆕 对于活动模块，使用 'add' 而不是 'toggle'，确保不会误操作取消选中
+  const action = cell.type === 'activity' ? 'add' : 'toggle'
+  
   // 使用 handleControlBoardNavigate 处理导航
-  handleControlBoardNavigate(cellId, cellOrder, 'toggle', false)
+  handleControlBoardNavigate(cellId, cellOrder, action, false)
 }
 
 // 处理复选框点击（防止事件冒泡）
@@ -2257,6 +2269,40 @@ onUnmounted(() => {
 
 .lesson-title {
   @apply font-medium text-gray-800;
+}
+
+.student-count-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  @apply bg-emerald-50 border border-emerald-200 rounded-lg;
+  margin-left: 16px;
+}
+
+.student-count-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.student-count-text {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  @apply text-sm font-medium;
+}
+
+.student-count-value {
+  @apply text-emerald-700 font-bold text-base;
+}
+
+.student-count-total {
+  @apply text-emerald-600;
+}
+
+.student-count-label {
+  @apply text-emerald-600;
+  margin-left: 2px;
 }
 
 /* 关键指标行 - 首页风格卡片 */

@@ -387,8 +387,10 @@ async def end_session(
     if session_teacher_id != current_user_id:
         raise HTTPException(status_code=403, detail="无权操作")
 
+    # 🆕 幂等操作：如果会话已结束，直接返回（不报错）
     if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
-        raise HTTPException(status_code=400, detail="会话已结束")
+        print(f"ℹ️ 会话 {session_id} 已经是 ENDED 状态，直接返回（幂等操作）")
+        return session
 
     # 更新状态
     session.status = ClassSessionStatus.ENDED # type: ignore[comparison-overlap]
@@ -458,11 +460,18 @@ async def navigate_to_cell(
             raise HTTPException(status_code=403, detail="无权操作")
 
         if session.status != ClassSessionStatus.ACTIVE:  # type: ignore[comparison-overlap]
-            raise HTTPException(status_code=400, detail="只能在活跃会话中切换Cell")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"只能在活跃会话中切换Cell，当前状态: {session.status}"
+            )
 
         # 使用 display_cell_orders（直接传递 order 数组）
         if data.display_cell_orders is None:
             raise HTTPException(status_code=400, detail="必须提供 display_cell_orders 参数")
+        
+        # 🆕 记录原始状态，确保导航不会改变会话状态
+        original_status = session.status
+        print(f"🔍 导航前会话状态: {original_status}")
         
         # 保存 display_cell_orders 到 settings
         new_settings = dict(session.settings) if session.settings else {} # type: ignore[assignment]
@@ -491,29 +500,40 @@ async def navigate_to_cell(
         await db.commit()
         await db.refresh(session)
         
-        print(f"✅ 导航成功: session_id={session_id}, display_cell_orders={data.display_cell_orders}")
+        # 🆕 验证状态未被错误修改
+        # 使用 type: ignore 避免 SQLAlchemy ColumnElement 的 linter 警告
+        if session.status != original_status:  # type: ignore[comparison-overlap]
+            print(f"⚠️ 警告: 导航过程中会话状态发生了变化! 原始={original_status}, 当前={session.status}")
+            # 这不应该发生，记录错误但继续执行
+        
+        print(f"✅ 导航成功: session_id={session_id}, display_cell_orders={data.display_cell_orders}, current_cell_id={session.current_cell_id}")
+        print(f"📊 会话状态: status={session.status}, settings={session.settings}")
         
         # ✅ 新增：通过 WebSocket 广播变化
         from app.services.websocket_manager import manager as ws_manager
         
-        await ws_manager.broadcast_to_session(
-            message={
-                "type": "cell_changed",
-                "timestamp": datetime.utcnow().isoformat(),
-                "data": {
-                    "action": "navigate",
-                    "display_cell_orders": data.display_cell_orders,
-                    "current_cell_id": session.current_cell_id,
-                    "changed_by": {
-                        "user_id": current_user.id,
-                        "user_name": current_user.full_name or current_user.username,
-                    }
+        broadcast_message = {
+            "type": "cell_changed",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "action": "navigate",
+                "display_cell_orders": data.display_cell_orders,
+                "current_cell_id": session.current_cell_id,
+                "changed_by": {
+                    "user_id": current_user.id,
+                    "user_name": current_user.full_name or current_user.username,
                 }
-            },
+            }
+        }
+        
+        print(f"📤 准备广播消息: {broadcast_message}")
+        
+        await ws_manager.broadcast_to_session(
+            message=broadcast_message,
             session_id=session_id,
         )
         
-        print(f"📢 已广播内容切换（会话 {session_id}）")
+        print(f"📢 已广播内容切换（会话 {session_id}），消息类型: cell_changed")
         
         return session
     
@@ -1115,59 +1135,20 @@ async def check_teacher_status(
     # 检查是否有教师连接
     has_teacher = manager.has_teacher_connection("session", session_id)
     
-    # 如果没有教师连接，且会话处于活跃状态，自动结束会话
+    # 🚫 已禁用自动结束逻辑：教师应该主动点击"结束授课"按钮来结束会话
+    # WebSocket 断开不等于教师离开（可能是网络波动、页面刷新等）
+    # 过于激进的自动结束会导致误操作和用户体验问题
+    
+    # 🔍 仅检查和返回状态，不自动结束会话
     if not has_teacher and session.status in [ClassSessionStatus.ACTIVE, ClassSessionStatus.PAUSED]:  # type: ignore[comparison-overlap]
-        print(f"⚠️ 会话 {session_id} 没有教师连接，自动结束会话（状态：{session.status}）")
-        
-        # 更新会话状态为已结束
-        session.status = ClassSessionStatus.ENDED  # type: ignore[assignment]
-        session.ended_at = datetime.utcnow()  # type: ignore[assignment]
-        
-        # 计算时长
-        if session.actual_start:  # type: ignore[comparison-overlap]
-            duration = (session.ended_at - session.actual_start).total_seconds() / 60  # type: ignore[union-attr]
-            session.duration_minutes = int(duration)  # type: ignore[assignment]
-        
-        # 更新所有学生参与记录为离线
-        result = await db.execute(
-            select(StudentSessionParticipation).where(
-                and_(
-                    StudentSessionParticipation.session_id == session_id,
-                    StudentSessionParticipation.is_active == True,
-                )
-            )
-        )
-        participations = result.scalars().all()
-        for participation in participations:
-            participation.is_active = False  # type: ignore[assignment]
-            participation.left_at = datetime.utcnow()  # type: ignore[assignment]
-        
-        await db.commit()
-        await db.refresh(session)
-        
-        # 通知所有学生会话已结束
-        await manager.broadcast_to_session(
-            message={
-                "type": "session_ended",
-                "timestamp": datetime.utcnow().isoformat(),
-                "data": {
-                    "session_id": session_id,
-                    "ended_at": session.ended_at.isoformat() if session.ended_at else None,  # type: ignore[union-attr]
-                    "reason": "teacher_disconnected",
-                    "message": "教师已断开连接，课程已自动结束"
-                }
-            },
-            session_id=session_id
-        )
-        
-        print(f"✅ 已自动结束会话 {session_id} 并通知学生")
-        
+        print(f"⚠️ 会话 {session_id} 当前没有教师 WebSocket 连接（状态：{session.status}），但不会自动结束")
+        # 返回警告状态，但不结束会话
         return {
             "session_id": session_id,
-            "status": "ended",
+            "status": session.status,
             "has_teacher_connection": False,
-            "auto_ended": True,
-            "message": "会话已自动结束（没有教师连接）"
+            "warning": True,
+            "message": "会话正常运行，但教师 WebSocket 未连接"
         }
     
     return {
@@ -1193,8 +1174,37 @@ async def websocket_endpoint(
     
     print(f"🔌 WebSocket连接请求: session_id={session_id}, token_length={len(token) if token else 0}")
     
-    # 先接受连接，这样客户端才能收到关闭原因
+    # 🆕 手动处理 WebSocket CORS（CORSMiddleware 对 WebSocket 支持有限）
+    origin = websocket.headers.get("origin")
+    print(f"🔍 WebSocket Origin: {origin}")
+    
+    # 验证 Origin（允许局域网访问）
+    allowed = False
+    if origin:
+        import re
+        # 匹配 localhost 和局域网 IP
+        pattern = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$"
+        if re.match(pattern, origin):
+            allowed = True
+            print(f"✅ Origin 验证通过: {origin}")
+        else:
+            print(f"❌ Origin 验证失败: {origin}")
+    else:
+        # 如果没有 Origin 头（某些客户端可能不发送），也允许连接
+        allowed = True
+        print("⚠️ 没有 Origin 头，允许连接")
+    
+    # 先接受连接（必须先accept才能close并发送关闭原因）
     await websocket.accept()
+    
+    # 如果 CORS 验证失败，立即关闭连接
+    if not allowed:
+        print(f"❌ CORS 验证失败，关闭 WebSocket 连接")
+        await websocket.close(code=1008, reason="CORS validation failed")
+        return
+    
+    # 🆕 初始化 student_id 避免未绑定错误
+    student_id: Optional[int] = None
     
     try:
         # 1. 验证Token并获取用户信息
@@ -1270,7 +1280,7 @@ async def websocket_endpoint(
     
     except WebSocketDisconnect:
         # 客户端主动断开
-        print(f"🔌 学生断开连接（会话 {session_id}）")
+        print(f"🔌 学生断开连接（会话 {session_id}），student_id={student_id if student_id else 'unknown'}")
     
     except Exception as e:
         # 异常断开
@@ -1280,13 +1290,14 @@ async def websocket_endpoint(
     
     finally:
         # 9. 清理：移除连接、更新状态
-        try:
-            if 'student_id' in locals():
+        # 🆕 修复：确保 student_id 已定义再使用
+        if student_id is not None:
+            try:
                 await manager.disconnect(session_id, student_id)
                 await update_student_online_status(db, session_id, student_id, is_online=False)
                 print(f"✅ 学生 {student_id} 连接已清理（会话 {session_id}）")
-        except Exception as e:
-            print(f"⚠️ 清理连接时出错: {str(e)}")
+            except Exception as e:
+                print(f"⚠️ 清理连接时出错: {str(e)}")
 
 
 async def send_initial_state(websocket: WebSocket, session: ClassSession, db: AsyncSession):
@@ -1431,6 +1442,28 @@ async def websocket_teacher_session_endpoint(
     - 学生答题进度
     """
     
+    # 🆕 手动处理 WebSocket CORS（CORSMiddleware 对 WebSocket 支持有限）
+    origin = websocket.headers.get("origin")
+    print(f"🔍 [教师WebSocket] Origin: {origin}")
+    
+    # 验证 Origin（允许局域网访问）
+    allowed = False
+    if origin:
+        import re
+        pattern = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$"
+        if re.match(pattern, origin):
+            allowed = True
+    else:
+        allowed = True  # 没有 Origin 头也允许
+    
+    # 先接受连接（必须先accept才能close）
+    await websocket.accept()
+    
+    if not allowed:
+        print(f"❌ [教师WebSocket] CORS 验证失败")
+        await websocket.close(code=1008, reason="CORS validation failed")
+        return
+    
     # 1. 验证Token并获取用户信息
     try:
         current_user = await deps.get_current_user_from_token(token, db)
@@ -1459,9 +1492,6 @@ async def websocket_teacher_session_endpoint(
     if session_teacher_id != teacher_id:
         await websocket.close(code=1008, reason="Access denied: Not the session teacher")
         return
-    
-    # 4. 接受连接
-    await websocket.accept()
     
     # 5. 注册连接
     await manager.connect_v2(
@@ -1527,8 +1557,16 @@ async def websocket_teacher_session_endpoint(
         # 注意：此时连接还未断开，所以检查时需要排除当前教师
         has_other_teacher = manager.has_teacher_connection("session", session_id, exclude_user_id=teacher_id)
         
-        # 如果没有其他教师连接，且会话处于活跃状态，自动结束会话
+        # 🆕 修复：不要立即结束会话，因为教师可能只是WebSocket暂时断开（如网络波动、页面刷新等）
+        # 会话应该由教师主动点击"结束课程"按钮来结束，或者由定时清理任务处理长时间无人的会话
+        # 这样可以避免误结束正在进行的课程
         if not has_other_teacher:
+            print(f"⚠️ 教师 WebSocket 断开，但不会自动结束会话 {session_id}（教师可能正在重连）")
+            # 不自动结束会话，让教师有机会重新连接
+            # 如果真的需要结束，教师可以主动点击"结束课程"按钮
+            
+            # 注释掉自动结束逻辑
+            """
             try:
                 # 重新获取会话最新状态
                 session = await db.get(ClassSession, session_id)
@@ -1581,6 +1619,7 @@ async def websocket_teacher_session_endpoint(
                 print(f"❌ 自动结束会话失败: {str(end_error)}")
                 import traceback
                 traceback.print_exc()
+            """  # 自动结束逻辑已注释，避免误结束会话
     
     except Exception as e:
         print(f"❌ 教师 WebSocket 异常: {str(e)}")
@@ -1615,6 +1654,28 @@ async def websocket_teacher_lesson_endpoint(
     - 提交统计更新
     """
     
+    # 🆕 手动处理 WebSocket CORS（CORSMiddleware 对 WebSocket 支持有限）
+    origin = websocket.headers.get("origin")
+    print(f"🔍 [教师WebSocket-课后] Origin: {origin}")
+    
+    # 验证 Origin（允许局域网访问）
+    allowed = False
+    if origin:
+        import re
+        pattern = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$"
+        if re.match(pattern, origin):
+            allowed = True
+    else:
+        allowed = True
+    
+    # 先接受连接（必须先accept才能close）
+    await websocket.accept()
+    
+    if not allowed:
+        print(f"❌ [教师WebSocket-课后] CORS 验证失败")
+        await websocket.close(code=1008, reason="CORS validation failed")
+        return
+    
     # 1. 验证Token并获取用户信息
     try:
         current_user = await deps.get_current_user_from_token(token, db)
@@ -1645,9 +1706,6 @@ async def websocket_teacher_lesson_endpoint(
     if teacher_id not in authorized_teacher_ids:
         await websocket.close(code=1008, reason="Access denied: Not authorized for this lesson")
         return
-    
-    # 4. 接受连接
-    await websocket.accept()
     
     # 5. 注册连接
     await manager.connect_v2(

@@ -73,9 +73,22 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     { deep: true }
   )
 
-  // 手动保存
+  // 手动保存（忽略 enabled 状态，强制保存）
   async function manualSave() {
-    await performSave()
+    // 手动保存时，即使 enabled 为 false 也允许保存
+    const wasEnabled = enabled.value
+    try {
+      // 临时启用保存
+      if (!wasEnabled) {
+        enabled.value = true
+      }
+      await performSave()
+    } finally {
+      // 恢复原始状态
+      if (!wasEnabled) {
+        enabled.value = wasEnabled
+      }
+    }
   }
 
   return {

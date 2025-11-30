@@ -35,7 +35,7 @@
         </p>
       </div>
       
-      <!-- 学生提交列表 -->
+      <!-- 学生提交列表（仅当已经有数据库中的数值型 Cell ID 时才显示） -->
       <div v-if="actualCellId > 0">
         <SubmissionList
           :cell-id="actualCellId"
@@ -43,9 +43,13 @@
         />
       </div>
       <div v-else class="text-center py-8 text-gray-500 border border-gray-200 rounded-lg">
-        <p class="mb-2">⚠️ 无法加载学生提交列表</p>
-        <p class="text-sm">Cell ID 解析失败，请确保该活动已保存到数据库</p>
-        <p class="text-xs mt-2 text-gray-400">Cell ID: {{ cell.id }}</p>
+        <p class="mb-2">📋 当前为教案预览视图</p>
+        <p class="text-sm">
+          该活动还没有对应的数据库 Cell 记录，因此这里暂时无法显示学生提交列表。
+        </p>
+        <p class="text-sm mt-1">
+          请在「课堂控制面板」中启动课堂并打开此活动，即可实时查看学生提交和统计。
+        </p>
       </div>
     </div>
 
@@ -54,6 +58,7 @@
       <ActivityViewer
         :cell="cell"
         :lesson-id="lessonId"
+        :session-id="sessionId"
         @submit="handleSubmit"
       />
     </div>
@@ -75,11 +80,21 @@ interface Props {
   cell: ActivityCell
   editable?: boolean
   lessonId?: number  // 可选的 lessonId prop
+  sessionId?: number  // 课堂会话ID（课堂模式传递）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   editable: false,
   lessonId: undefined,
+  sessionId: undefined,
+})
+
+// 🔍 调试：打印 props
+console.log('🔍 ActivityCell Props:', {
+  cellId: props.cell.id,
+  cellType: props.cell.type,
+  lessonId: props.lessonId,
+  sessionId: props.sessionId,  // 重点检查这个值
 })
 
 const route = useRoute()

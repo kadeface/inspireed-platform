@@ -2,7 +2,7 @@
 教学活动 API
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from statistics import mean
 from typing import Any, Dict, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -171,7 +171,17 @@ async def create_submission(
             return existing
 
         # 创建新提交
-        # 注意：session_id 应该从请求上下文或参数中获取，暂时先不处理
+        # ✅ 直接使用前端传递的 session_id（学生最清楚自己在哪个会话中）
+        session_id = getattr(data, 'session_id', None)
+        print(f"🔍 前端传递的 session_id: {session_id}, Student: {current_user.id}, Lesson: {data.lesson_id}")
+        
+        # ⚠️ 不再进行推断，因为推断逻辑可能推断出错误的会话
+        # 学生在会话A中开始答题，但提交时会话A已结束、会话B已开始，推断会错误地使用会话B
+        # 正确的做法是：前端必须传递 sessionId（学生在哪个会话中开始答题就应该记录该 sessionId）
+        if not session_id:
+            # 如果前端没有传递 sessionId，说明是课后模式，这是正常的
+            print(f"ℹ️ 课后模式提交（无 session_id），Student: {current_user.id}, Lesson: {data.lesson_id}")
+        
         # 处理 started_at：如果带时区，转换为不带时区的 UTC 时间
         started_at_value = data.started_at or datetime.utcnow()
         if started_at_value and hasattr(started_at_value, 'tzinfo') and started_at_value.tzinfo is not None:
@@ -189,7 +199,7 @@ async def create_submission(
             context=data.context or {},
             activity_phase=data.activity_phase,
             attempt_no=data.attempt_no or 1,
-            session_id=None,  # 暂时为None，后续可以从请求中获取
+            session_id=session_id,  # 使用推断的或提供的 session_id
         )
 
         db.add(submission)
@@ -261,6 +271,10 @@ async def update_submission(
         setattr(submission, "responses", cast(dict[str, Any], data.responses))
     if data.status is not None:
         setattr(submission, "status", cast(ActivitySubmissionStatus, data.status))
+    if data.session_id is not None:
+        # ✅ 允许更新 session_id（当会话加载延迟时，从 NULL 更新为实际值）
+        setattr(submission, "session_id", cast(int, data.session_id))
+        print(f"✅ 更新提交的 session_id: {submission.id} -> {data.session_id}")
     if data.time_spent is not None:
         setattr(submission, "time_spent", cast(int, data.time_spent))
     if data.process_trace is not None:
@@ -474,10 +488,12 @@ async def get_cell_submissions(
         pass
     else:
         # 获取所有提交记录
+        # 注意：按更新时间倒序，这样后续处理时会优先取到最新的记录
         query = (
             select(ActivitySubmission, User)
             .join(User, ActivitySubmission.student_id == User.id)
             .where(ActivitySubmission.cell_id == cell_id)
+            .order_by(ActivitySubmission.updated_at.desc())
         )
 
         if status and status != "not_started":
@@ -496,7 +512,37 @@ async def get_cell_submissions(
         rows = result.all()
 
         # 组装已有提交的响应
+        # 对于每个学生，只保留优先级最高的提交（已提交 > 已评分 > 草稿）
+        student_submission_map = {}  # student_id -> (priority, submission, user)
+        
+        # 定义状态优先级（数字越大优先级越高）
+        status_priority = {
+            ActivitySubmissionStatus.DRAFT: 1,
+            ActivitySubmissionStatus.SUBMITTED: 3,
+            ActivitySubmissionStatus.GRADED: 4,
+            ActivitySubmissionStatus.RETURNED: 2,
+        }
+        
         for submission, user in rows:
+            student_id = submission.student_id
+            current_priority = status_priority.get(submission.status, 0)
+            
+            if student_id not in student_submission_map:
+                # 首次遇到这个学生，直接添加
+                student_submission_map[student_id] = (current_priority, submission, user)
+            else:
+                # 已存在记录，比较优先级
+                existing_priority, existing_submission, existing_user = student_submission_map[student_id]
+                
+                # 如果当前记录优先级更高，或优先级相同但更新时间更晚，则替换
+                if current_priority > existing_priority or (
+                    current_priority == existing_priority and 
+                    submission.updated_at > existing_submission.updated_at
+                ):
+                    student_submission_map[student_id] = (current_priority, submission, user)
+        
+        # 将筛选后的提交添加到结果列表
+        for priority, submission, user in student_submission_map.values():
             # 使用 Pydantic 模型序列化，确保所有字段符合模型要求
             submission_data = ActivitySubmissionWithStudent.model_validate({
                 **submission.__dict__,

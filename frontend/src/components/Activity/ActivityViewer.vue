@@ -1,17 +1,6 @@
 <template>
   <div class="activity-viewer">
-    <!-- 在线状态指示器 -->
-    <div v-if="!isOnline || hasUnsyncedChanges" class="status-banner">
-      <div v-if="!isOnline" class="offline-banner">
-        📱 离线模式 - 您的答案将保存在本地，联网后自动同步
-      </div>
-      <div v-else-if="hasUnsyncedChanges && !isSyncing" class="unsync-banner">
-        ⚠️ 有未同步的更改 - 正在自动同步...
-      </div>
-      <div v-else-if="isSyncing" class="syncing-banner">
-        🔄 同步中...
-      </div>
-    </div>
+    <!-- 注意：已移除离线模式和自动同步相关UI（简化版） -->
 
     <!-- 活动标题和信息 -->
     <div class="activity-header">
@@ -39,6 +28,11 @@
           <span class="info-value">{{ cell.content.items.length }}题</span>
         </div>
       </div>
+
+      <!-- 问卷专用提示 -->
+      <p v-if="props.cell.content.activityType === 'survey'" class="survey-hint">
+        📊 当前为问卷活动：仅用于收集和统计学生反馈，不计入分数。
+      </p>
 
       <!-- 截止时间提示 -->
       <div v-if="cell.content.timing.deadline" class="deadline-alert">
@@ -80,7 +74,6 @@
             :is-submitted="isSubmitted"
             :answer-data="getItemAnswer(item.id)"
             @update:model-value="answers[item.id] = $event"
-            @change="saveAnswer(item.id)"
           />
         </div>
       </div>
@@ -88,9 +81,6 @@
 
     <!-- 提交按钮 -->
     <div class="submit-section">
-      <button v-if="!isSubmitted" @click="handleSaveDraft" class="btn-secondary" :disabled="submitting">
-        💾 保存草稿
-      </button>
       <button v-if="!isSubmitted" @click="handleSubmit" class="btn-primary" :disabled="!canSubmit || submitting">
         {{ submitting ? '提交中...' : '✅ 提交答案' }}
       </button>
@@ -125,10 +115,35 @@ import ItemRenderer from './ItemTypes/ItemRenderer.vue'
 interface Props {
   cell: ActivityCell
   lessonId?: number  // 从父组件传递 lessonId
+  sessionId?: number  // 课堂会话ID（课堂模式必须传递）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   lessonId: undefined,
+  sessionId: undefined,
+})
+
+// 🔍 调试：打印 props
+console.log('🔍 ActivityViewer Props:', {
+  cellId: props.cell.id,
+  lessonId: props.lessonId,
+  sessionId: props.sessionId,  // 重点检查这个值
+})
+
+// 🔧 本地保存 sessionId（因为 props.sessionId 可能在组件加载时还是 undefined）
+const localSessionId = ref<number | undefined>(props.sessionId)
+
+// 监听 props.sessionId 变化，更新本地状态
+watch(() => props.sessionId, (newSessionId) => {
+  if (newSessionId !== undefined) {
+    localSessionId.value = newSessionId
+    console.log('✅ Session ID 已加载:', newSessionId)
+  }
+}, { immediate: true })
+
+// 🔧 动态获取最新的 sessionId
+const currentSessionId = computed(() => {
+  return localSessionId.value
 })
 
 const emit = defineEmits<{
@@ -439,68 +454,8 @@ const loadFromIndexedDB = async () => {
   const activity = initOfflineActivity()
   return activity ? await activity.loadFromIndexedDB() : null
 }
-const syncToServer = async (responses: Record<string, any>, status: string = 'draft') => {
-  const actualCellId = getActualCellId()
-  
-  // 验证 cellId 是否有效
-  if (!actualCellId) {
-    console.error('❌ Cannot sync: invalid cellId')
-    return null
-  }
-  
-  const cellIdType = typeof actualCellId
-  const isZero = cellIdType === 'number' && actualCellId === 0
-  if (isZero) {
-    console.error('❌ Cannot sync: cellId is 0')
-    return null
-  }
-  
-  // 如果是 UUID 字符串，直接调用 API
-  if (cellIdType === 'string') {
-    try {
-      const submission = await activityService.createSubmission({
-        cellId: actualCellId as any, // 后端支持 number 或 string (UUID)
-        lessonId: lessonId.value,
-        responses,
-        startedAt: new Date().toISOString(),
-      })
-      return submission
-    } catch (error) {
-      console.error('❌ UUID sync failed:', error)
-      return null
-    }
-  }
-  
-  // 如果是数字 ID，使用离线支持
-  const activity = initOfflineActivity()
-  if (!activity) {
-    console.warn('⚠️ Offline activity not initialized yet, using direct API call')
-    try {
-      const submission = await activityService.createSubmission({
-        cellId: actualCellId as any, // 后端支持 number 或 string (UUID)
-        lessonId: lessonId.value,
-        responses,
-        startedAt: new Date().toISOString(),
-      })
-      return submission
-    } catch (error) {
-      console.error('❌ Direct API call failed:', error)
-      return null
-    }
-  }
-  
-  return await activity.syncToServer(responses, status)
-}
-const setupAutoSave = (responses: Record<string, any>, interval: number = 30000) => {
-  const activity = initOfflineActivity()
-  if (!activity) {
-    return () => {}
-  }
-  return activity.setupAutoSave(responses, interval)
-}
-
-// 设置自动保存
-let cleanupAutoSave: (() => void) | null = null
+// 注意：已移除 syncToServer、setupAutoSave 等自动保存相关函数
+// 简化版只支持点击提交按钮时一次性提交
 
 // 计算属性
 const activityTypeLabel = computed(() => {
@@ -536,36 +491,9 @@ function formatDeadline(deadline: string): string {
   return new Date(deadline).toLocaleString('zh-CN')
 }
 
-// 保存单个答案（草稿） - 集成离线支持
-async function saveAnswer(itemId: string) {
-  console.log('💾 Auto-saving answer:', itemId, answers.value[itemId])
-  
-  try {
-    // 使用离线支持自动保存
-    await syncToServer(answers.value, 'draft')
-  } catch (error) {
-    // 保存失败会自动存到 IndexedDB
-    console.log('📱 Saved offline')
-  }
-}
+// 注意：已移除自动保存和草稿保存功能，只在点击提交按钮时一次性提交
 
-// 保存草稿
-async function handleSaveDraft() {
-  try {
-    submitting.value = true
-    
-    await syncToServer(answers.value, 'draft')
-    
-    alert('草稿已保存' + (isOnline.value ? '' : '（离线模式）'))
-  } catch (error) {
-    console.error('Save draft failed:', error)
-    alert('保存成功（离线模式）')
-  } finally {
-    submitting.value = false
-  }
-}
-
-// 提交答案
+// 提交答案（简化版：直接提交，不保存草稿）
 async function handleSubmit() {
   if (!canSubmit.value) {
     alert('请完成所有必答题')
@@ -588,34 +516,48 @@ async function handleSubmit() {
     submitting.value = true
     
     const timeSpent = Math.floor((new Date().getTime() - startTime.value.getTime()) / 1000)
-
-    let submittedSubmission: any
     
-    if (submissionId.value) {
-      // 如果已有提交ID，调用正式提交API
-      submittedSubmission = await activityService.submitActivity(submissionId.value, {
-        responses: answers.value,
-        timeSpent,
-      })
-    } else {
-      // 先创建提交再提交
-      const submission = await activityService.createSubmission({
-        cellId: getActualCellId() as any,  // 可能是数字或 UUID 字符串，后端都支持
-        lessonId: lessonId.value,
-        responses: answers.value,
-        startedAt: startTime.value.toISOString(),
-      })
-      submissionId.value = submission.id
-      
-      // 正式提交
-      submittedSubmission = await activityService.submitActivity(submission.id, {
-        responses: answers.value,
-        timeSpent,
-      })
+    // 🔍 获取当前最新的 sessionId
+    const sessionIdToUse = currentSessionId.value
+    console.log('📤 提交时的 sessionId:', sessionIdToUse)
+    
+    // 简化流程：直接创建并提交（一步完成）
+    // 1. 先创建提交记录（状态为DRAFT）
+    console.log('📝 步骤1: 创建提交记录...', {
+      cellId: getActualCellId(),
+      lessonId: lessonId.value,
+      sessionId: sessionIdToUse,
+      responsesCount: Object.keys(answers.value).length,
+      answers: answers.value,  // 打印实际答案内容
+    })
+    
+    // 确保 answers 不是空对象
+    if (!answers.value || Object.keys(answers.value).length === 0) {
+      alert('请先完成答题再提交')
+      return
     }
+    
+    const submission = await activityService.createSubmission({
+      cellId: getActualCellId() as any,  // 可能是数字或 UUID 字符串，后端都支持
+      lessonId: lessonId.value,
+      sessionId: sessionIdToUse,  // 使用动态获取的 sessionId
+      responses: answers.value,
+      startedAt: startTime.value.toISOString(),
+    })
+    console.log('✅ 步骤1完成: 提交记录已创建', { submissionId: submission.id, status: submission.status })
+    
+    // 2. 立即提交（状态改为SUBMITTED）
+    console.log('📤 步骤2: 提交活动...', { submissionId: submission.id, timeSpent })
+    const submittedSubmission = await activityService.submitActivity(submission.id, {
+      responses: answers.value,
+      timeSpent,
+      sessionId: sessionIdToUse,  // 使用动态获取的 sessionId
+    })
+    console.log('✅ 步骤2完成: 活动已提交', { submissionId: submittedSubmission.id, status: submittedSubmission.status })
     
     // 保存提交后的数据（包含正确答案）
     submissionData.value = submittedSubmission
+    submissionId.value = submittedSubmission.id
     isSubmitted.value = true
     
     // 更新 answers 为包含正确答案的完整数据
@@ -623,70 +565,52 @@ async function handleSubmit() {
       answers.value = submittedSubmission.responses
     }
     
+    console.log('✅ 提交流程完成:', { 
+      submissionId: submittedSubmission.id, 
+      status: submittedSubmission.status,
+      score: submittedSubmission.score,
+    })
     alert('提交成功！')
     emit('submit', { responses: answers.value, timeSpent })
-  } catch (error) {
-    console.error('Submit failed:', error)
-    alert('提交失败，请重试')
+  } catch (error: any) {
+    console.error('❌ Submit failed:', {
+      error,
+      message: error?.message,
+      response: error?.response?.data,
+      status: error?.response?.status,
+    })
+    alert(`提交失败：${error?.response?.data?.detail || error?.message || '请重试'}`)
   } finally {
     submitting.value = false
   }
 }
 
-// 加载已保存的答案
+// 加载已提交的答案（仅检查是否已经提交过，不加载草稿）
 onMounted(async () => {
   console.log('📂 Loading activity...')
   
   // 0. 首先解析 cellId（如果是 UUID）
   await initCellId()
   
-  // 1. 尝试从 IndexedDB 加载离线数据
-  const offlineData = await loadFromIndexedDB()
-  if (offlineData) {
-    answers.value = offlineData
-    console.log('✅ Loaded from offline storage')
-  }
-  
-  // 2. 如果在线，尝试从服务器加载最新数据
+  // 1. 如果在线，检查是否已经提交过（只加载已提交的内容，不加载草稿）
   if (isOnline.value) {
     try {
-      // getMyCellSubmission 需要数字 ID，如果是 UUID，跳过这个调用
       const actualCellId = getActualCellId()
       if (typeof actualCellId === 'number' && actualCellId > 0) {
         const submission = await activityService.getMyCellSubmission(actualCellId)
         
         if (submission) {
-          submissionId.value = submission.id
-          answers.value = submission.responses || {}
-          
-          // 检查是否已提交
+          // 只加载已提交或已评分的内容（不加载草稿）
           if (submission.status === 'submitted' || submission.status === 'graded') {
+            submissionId.value = submission.id
+            answers.value = submission.responses || {}
             isSubmitted.value = true
             submissionData.value = submission
+            console.log('✅ Loaded submitted content from server')
+          } else {
+            // 如果是草稿状态，忽略它（简化版不加载草稿）
+            console.log('ℹ️ Found draft submission, ignoring (simplified flow)')
           }
-          
-          // 保存 submissionId 到 IndexedDB
-          try {
-            const database = await (await import('idb')).openDB('inspireed-activity', 1)
-            // 对于 UUID，使用哈希值作为 key 的一部分
-            // actualCellId 在这里一定是 number（因为上面的 if 条件）
-            const cellIdForKey = String(actualCellId)
-            const key = `${cellIdForKey}-${currentStudentId.value}`
-            const existing = await database.get('submissions', key).catch(() => null)
-            if (existing) {
-              await database.put('submissions', {
-                ...existing,
-                submissionId: submission.id,
-                lessonId: lessonId.value,
-                responses: submission.responses || {},
-                synced: true,
-              })
-            }
-          } catch (dbError) {
-            console.warn('Failed to save submissionId to IndexedDB:', dbError)
-          }
-          
-          console.log('✅ Loaded from server')
         } else {
           console.log('ℹ️ No existing submission found, starting fresh')
         }
@@ -701,30 +625,13 @@ onMounted(async () => {
     }
   }
   
-  // 3. 设置自动保存（每30秒）
-  cleanupAutoSave = setupAutoSave(answers.value, 30000)
+  // 注意：已移除自动保存和草稿加载功能，只在点击提交按钮时一次性提交
 })
 
 // 组件卸载时清理
 onUnmounted(() => {
-  if (cleanupAutoSave) {
-    cleanupAutoSave()
-  }
+  // 已移除自动保存清理逻辑
 })
-
-// 监听答案变化，防抖保存
-let saveTimeout: number | null = null
-watch(answers, () => {
-  if (saveTimeout) {
-    clearTimeout(saveTimeout)
-  }
-  saveTimeout = window.setTimeout(() => {
-    // 答案改变后 3 秒自动保存
-    syncToServer(answers.value, 'draft').catch(() => {
-      console.log('📱 Auto-save to offline storage')
-    })
-  }, 3000)
-}, { deep: true })
 </script>
 
 <style scoped>
@@ -842,6 +749,10 @@ watch(answers, () => {
 
 .score-display {
   @apply text-lg font-semibold text-gray-900;
+}
+
+.survey-hint {
+  @apply mt-2 text-sm text-gray-600 italic;
 }
 
 

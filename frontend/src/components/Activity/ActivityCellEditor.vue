@@ -142,8 +142,16 @@
       
       <div class="form-group">
         <label class="checkbox-label">
-          <input v-model="localContent.grading.enabled" type="checkbox" @change="emitUpdate" />
-          <span>启用评分</span>
+          <input
+            v-model="localContent.grading.enabled"
+            type="checkbox"
+            @change="emitUpdate"
+            :disabled="isSurveyActivity"
+          />
+          <span>
+            启用评分
+            <span v-if="isSurveyActivity" class="text-xs text-gray-500 ml-1">(问卷活动默认不评分)</span>
+          </span>
         </label>
       </div>
 
@@ -321,7 +329,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { v4 as uuidv4 } from 'uuid'
 import type { ActivityCell } from '../../types/cell'
 import type { ActivityCellContent, ActivityItem, ActivityItemType } from '../../types/activity'
@@ -343,6 +351,9 @@ const localContent = reactive<ActivityCellContent>({
   ...props.cell.content,
 })
 
+// 是否为问卷活动
+const isSurveyActivity = computed(() => localContent.activityType === 'survey')
+
 const showAddItemModal = ref(false)
 const editingItemIndex = ref<number | null>(null)
 const activityTemplates = ACTIVITY_TEMPLATES
@@ -351,6 +362,18 @@ const activityTemplates = ACTIVITY_TEMPLATES
 watch(() => props.cell.content, (newContent) => {
   Object.assign(localContent, newContent)
 }, { deep: true })
+
+// 当活动类型切换为问卷时，自动关闭评分，避免出现分值和正确答案相关设置
+watch(() => localContent.activityType, (type) => {
+  if (type === 'survey') {
+    if (localContent.grading) {
+      localContent.grading.enabled = false
+      localContent.grading.totalPoints = 0
+      localContent.grading.autoGrade = false
+      localContent.grading.passingScore = undefined
+    }
+  }
+}, { immediate: true })
 
 // 题型标签映射
 function getItemTypeLabel(type: ActivityItemType): string {
