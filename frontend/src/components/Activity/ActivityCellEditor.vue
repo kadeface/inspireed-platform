@@ -30,7 +30,12 @@
       <!-- 活动类型 -->
       <div class="form-group">
         <label class="form-label">活动类型 *</label>
-        <select v-model="localContent.activityType" class="form-input" @change="emitUpdate">
+        <select 
+          v-model="localContent.activityType" 
+          class="form-input" 
+          @change="handleActivityTypeChange"
+        >
+          <option value="" disabled>请选择活动类型</option>
           <option value="quiz">测验 (Quiz)</option>
           <option value="survey">问卷 (Survey)</option>
           <option value="assignment">作业 (Assignment)</option>
@@ -349,6 +354,8 @@ const emit = defineEmits<{
 // 本地状态
 const localContent = reactive<ActivityCellContent>({
   ...props.cell.content,
+  // 确保 activityType 有默认值
+  activityType: props.cell.content.activityType || 'quiz',
 })
 
 // 是否为问卷活动
@@ -358,22 +365,40 @@ const showAddItemModal = ref(false)
 const editingItemIndex = ref<number | null>(null)
 const activityTemplates = ACTIVITY_TEMPLATES
 
-// 监听变化
+// 处理活动类型变化
+function handleActivityTypeChange() {
+  // 确保值已更新后再触发其他逻辑
+  emitUpdate()
+}
+
+// 监听 props 变化
 watch(() => props.cell.content, (newContent) => {
+  // 如果 activityType 有值且与当前不同，才更新
+  if (newContent.activityType && newContent.activityType !== localContent.activityType) {
+    localContent.activityType = newContent.activityType
+  }
+  // 更新其他字段
+  const currentActivityType = localContent.activityType
   Object.assign(localContent, newContent)
+  // 保留当前的 activityType（如果新内容没有或为空）
+  if (!newContent.activityType || newContent.activityType === '') {
+    localContent.activityType = currentActivityType || 'quiz'
+  }
 }, { deep: true })
 
 // 当活动类型切换为问卷时，自动关闭评分，避免出现分值和正确答案相关设置
-watch(() => localContent.activityType, (type) => {
-  if (type === 'survey') {
+watch(() => localContent.activityType, (type, oldType) => {
+  // 只在类型真正改变时执行（避免初始化时的干扰）
+  if (type && type !== oldType && type === 'survey') {
     if (localContent.grading) {
       localContent.grading.enabled = false
       localContent.grading.totalPoints = 0
       localContent.grading.autoGrade = false
       localContent.grading.passingScore = undefined
+      emitUpdate()
     }
   }
-}, { immediate: true })
+})
 
 // 题型标签映射
 function getItemTypeLabel(type: ActivityItemType): string {

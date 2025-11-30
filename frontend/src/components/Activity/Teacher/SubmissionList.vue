@@ -337,11 +337,18 @@ const {
 
 // 监听新提交通知
 function handleNewSubmission(message: WebSocketMessage) {
-  if (message.data.cell_id !== props.cellId) return
+  const messageCellId = message.data.cell_id
+  const propsCellId = props.cellId
+  
+  // 支持数字和字符串比较
+  if (String(messageCellId) !== String(propsCellId)) {
+    return
+  }
   
   console.log('📬 收到新提交通知，刷新列表...', {
     submissionId: message.data.submission_id,
-    cellId: message.data.cell_id,
+    messageCellId,
+    propsCellId,
     studentId: message.data.student_id,
   })
   
@@ -351,9 +358,18 @@ function handleNewSubmission(message: WebSocketMessage) {
 
 // 监听统计更新通知（也会触发列表刷新）
 function handleStatisticsUpdate(message: WebSocketMessage) {
-  if (message.data.cell_id !== props.cellId) return
+  const messageCellId = message.data.cell_id
+  const propsCellId = props.cellId
   
-  console.log('📊 收到统计更新通知，刷新列表...')
+  // 支持数字和字符串比较
+  if (String(messageCellId) !== String(propsCellId)) {
+    return
+  }
+  
+  console.log('📊 收到统计更新通知，刷新列表...', {
+    messageCellId,
+    propsCellId,
+  })
   
   // 自动刷新列表
   loadSubmissions()
@@ -372,6 +388,11 @@ onMounted(async () => {
       registerListener('new_submission', handleNewSubmission)
       registerListener('submission_statistics_updated', handleStatisticsUpdate)
       console.log('✅ SubmissionList: WebSocket 连接成功，将使用实时推送')
+      
+      // 即使 WebSocket 连接成功，也启动轮询作为备用（每10秒）
+      pollingInterval = setInterval(() => {
+        loadSubmissions()
+      }, 10000)
     } catch (error) {
       console.warn('⚠️ SubmissionList: WebSocket 连接失败，降级到轮询模式', error)
       // WebSocket 失败时，定期刷新（每5秒）
@@ -379,6 +400,12 @@ onMounted(async () => {
         loadSubmissions()
       }, 5000)
     }
+  } else {
+    // 没有 sessionId 时，也启动轮询（每5秒）
+    console.log('⚠️ SubmissionList: 没有 sessionId，使用轮询模式')
+    pollingInterval = setInterval(() => {
+      loadSubmissions()
+    }, 5000)
   }
 })
 

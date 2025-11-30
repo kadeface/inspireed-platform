@@ -528,82 +528,47 @@
             </div>
           </div>
           
-          <!-- 分隔线 -->
-          <div class="monitoring-divider"></div>
-          
-          <!-- 下半部分：实时数据统计 -->
-          <div class="monitoring-stats-section">
-            <h4 class="stats-section-title">实时数据</h4>
-            <div class="stats-grid-compact">
-              <div class="stat-card-compact">
-                <div class="stat-icon-compact">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <div class="stat-content-compact">
-                  <div class="stat-label-compact">互动次数</div>
-                  <div class="stat-value-compact">{{ interactionCount }}次</div>
-                </div>
+          <!-- 活动统计部分（当当前模块是活动类型时显示） -->
+          <div v-if="currentCell && currentCell.type === 'activity' && currentActivityDbCell" class="activity-statistics-section">
+            <div class="activity-stats-header">
+              <span class="activity-stats-title">📝 活动统计</span>
+              <span class="activity-stats-submission">
+                {{ activityStatistics.submittedCount }} / {{ activityStatistics.totalStudents }}
+              </span>
               </div>
               
-              <div class="stat-card-compact">
-                <div class="stat-icon-compact stat-icon-red">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+            <!-- 选择题选项分布 -->
+            <div v-if="choiceItemsWithStats.length > 0" class="activity-choice-stats">
+              <div 
+                v-for="itemStat in choiceItemsWithStats" 
+                :key="itemStat.itemId"
+                class="activity-choice-item"
+              >
+                <div class="activity-choice-header">
+                  <span class="activity-choice-order">第 {{ itemStat.order + 1 }} 题</span>
+                  <span class="activity-choice-type">{{ getItemTypeLabel(itemStat.type) }}</span>
                 </div>
-                <div class="stat-content-compact">
-                  <div class="stat-label-compact">提问数量</div>
-                  <div class="stat-value-compact">{{ questionCount }}个</div>
-                </div>
-              </div>
-              
-              <div class="stat-card-compact">
-                <div class="stat-icon-compact stat-icon-green">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div class="stat-content-compact">
-                  <div class="stat-label-compact">正确率</div>
-                  <div class="stat-value-compact">{{ accuracyRate }}%</div>
-                </div>
-              </div>
-              
-              <div class="stat-card-compact">
-                <div class="stat-icon-compact stat-icon-blue">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div class="stat-content-compact">
-                  <div class="stat-label-compact">参与度</div>
-                  <div class="stat-value-compact">{{ participationRate }}%</div>
+                <div class="activity-choice-options">
+                  <div 
+                    v-for="option in itemStat.options" 
+                    :key="option.id"
+                    class="activity-option-item"
+                    :class="{ 'is-correct': option.isCorrect }"
+                  >
+                    <span class="activity-option-label">{{ option.label }}</span>
+                    <span class="activity-option-percentage">{{ option.percentage }}%</span>
                 </div>
               </div>
+                </div>
+                </div>
+            <div v-else-if="loadingActivityStats" class="activity-stats-loading">
+              <p>加载中...</p>
+              </div>
+            <div v-else class="activity-stats-empty">
+              <p>暂无选择题数据</p>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- 活动统计面板（当前 Cell 是 activity 类型时显示，放在三栏布局下方） -->
-    <div v-if="session && currentCell && currentCell.type === 'activity' && currentActivityDbCell" class="activity-panel">
-      <SubmissionStatistics
-        :cell-id="currentActivityDbCell.id"
-        :lesson-id="lesson?.id || lessonId"
-        :session-id="session.id"
-      />
-      
-      <!-- 学生提交详细列表 -->
-      <div class="mt-4">
-        <SubmissionList
-          :cell-id="currentActivityDbCell.id"
-          :activity="currentCell.content"
-          :session-id="session.id"
-          :lesson-id="lesson?.id || lessonId"
-        />
       </div>
     </div>
   </div>
@@ -617,9 +582,8 @@ import type { Cell, ActivityCell } from '../../types/cell'
 import classroomSessionService from '../../services/classroomSession'
 import ClassroomSwitcher from './ClassroomSwitcher.vue'
 import ClassroomControlBoard from './ClassroomControlBoard.vue'
-import SubmissionStatistics from '../Activity/SubmissionStatistics.vue'
-import SubmissionList from '../Activity/Teacher/SubmissionList.vue'
 import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
+import activityService from '../../services/activity'
 
 // Cell类型图标组件
 const CellTypeIcon = (props: { type: string }) => {
@@ -715,6 +679,25 @@ const displayStudents = computed(() => {
 
 // 学生状态类
 function getStudentStatusClass(student: any): string {
+  // 如果当前是活动模块，根据提交状态显示颜色
+  if (currentCell.value && currentCell.value.type === 'activity' && studentSubmissionStatus.value.size > 0) {
+    // 尝试多种可能的ID字段
+    const studentId = student.id || student.userId || student.user_id || student.studentId || student.student_id
+    const submissionStatus = studentId ? studentSubmissionStatus.value.get(String(studentId)) : null
+    
+    // 已提交：绿色
+    if (submissionStatus === 'submitted' || submissionStatus === 'graded') {
+      return 'indicator-green'
+    }
+    // 未提交（包括 not_started, draft）：红色
+    if (submissionStatus === 'not_started' || submissionStatus === 'draft' || !submissionStatus) {
+      return 'indicator-red'
+    }
+    // 其他状态：黄色
+    return 'indicator-yellow'
+  }
+  
+  // 非活动模块，根据进度显示颜色
   const progress = student.progressPercentage || student.progress_percentage || 0
   if (progress >= 80) return 'indicator-green'
   if (progress >= 50) return 'indicator-yellow'
@@ -726,6 +709,23 @@ function getStudentTooltip(student: any): string {
   const name = student.studentName || student.student_name || '学生'
   const account = getStudentAccount(student)
   const progress = Math.round(student.progressPercentage || student.progress_percentage || 0)
+  
+  // 如果当前是活动模块，添加提交状态信息
+  if (currentCell.value && currentCell.value.type === 'activity' && studentSubmissionStatus.value.size > 0) {
+    // 尝试多种可能的ID字段
+    const studentId = student.id || student.userId || student.user_id || student.studentId || student.student_id
+    const submissionStatus = studentId ? studentSubmissionStatus.value.get(String(studentId)) : null
+    const statusLabels: Record<string, string> = {
+      'not_started': '未开始',
+      'draft': '草稿',
+      'submitted': '已提交',
+      'graded': '已评分',
+      'returned': '已退回',
+    }
+    const statusLabel = submissionStatus ? statusLabels[submissionStatus] || submissionStatus : '未开始'
+    return `${name} (${account}) - 进度: ${progress}% - 提交状态: ${statusLabel}`
+  }
+  
   return `${name} (${account}) - 进度: ${progress}%`
 }
 
@@ -763,42 +763,6 @@ const averageScore = computed(() => {
   return Math.round(avgProgress * 0.8) // 假设进度和得分有一定相关性
 })
 
-// 互动次数（基于活动模块的提交数）
-const interactionCount = computed(() => {
-  // 可以从sessionStatistics或其他数据源获取
-  return sessionStatistics.value?.interaction_count || 12
-})
-
-// 提问数量
-const questionCount = computed(() => {
-  return sessionStatistics.value?.question_count || 8
-})
-
-// 正确率
-const accuracyRate = computed(() => {
-  if (sessionStatistics.value?.accuracy_rate !== undefined) {
-    return Math.round(sessionStatistics.value.accuracy_rate)
-  }
-  // 如果没有数据，基于平均进度估算
-  const avgProgress = sessionStatistics.value?.average_progress || 0
-  return Math.round(avgProgress * 0.95) // 假设正确率略高于进度
-})
-
-// 进度条数据（示例数据，可以根据实际需求调整）
-const progress1 = computed(() => {
-  const avgProgress = sessionStatistics.value?.average_progress || 0
-  return Math.min(100, Math.round(avgProgress * 0.9))
-})
-
-const progress2 = computed(() => {
-  const participation = participationRate.value
-  return Math.min(100, Math.round(participation * 0.85))
-})
-
-const progress3 = computed(() => {
-  const accuracy = accuracyRate.value
-  return Math.min(100, Math.round(accuracy * 0.95))
-})
 
 
 const currentCell = computed(() => {
@@ -1101,7 +1065,7 @@ const studentsBehindCount = computed(() => {
 
 // 是否有预警（用于高亮预警栏）
 const hasAlerts = computed(() => {
-  return studentsBehindCount.value > 0 || questionCount.value > 0 || hasLowSubmissionRate.value
+  return studentsBehindCount.value > 0 || hasLowSubmissionRate.value
 })
 
 // 是否有低提交率（活动模块）
@@ -1112,6 +1076,186 @@ const hasLowSubmissionRate = computed(() => {
   // 这里需要根据实际的提交统计数据来判断
   return false // TODO: 根据实际数据实现
 })
+
+// 活动统计相关
+const activityStatistics = ref({
+  totalStudents: 0,
+  submittedCount: 0,
+  itemStatistics: null as Record<string, any> | null,
+})
+
+const loadingActivityStats = ref(false)
+
+// 学生提交状态映射（studentId -> submissionStatus）
+const studentSubmissionStatus = ref<Map<number | string, string>>(new Map())
+
+// 获取选择题及其统计
+const choiceItemsWithStats = computed(() => {
+  try {
+    if (!currentCell.value || currentCell.value.type !== 'activity' || !currentCell.value.content?.items || !activityStatistics.value.itemStatistics) {
+      return []
+    }
+    
+    const choiceTypes = ['single-choice', 'multiple-choice', 'true-false']
+    const items = currentCell.value.content.items.filter((item: any) => item && choiceTypes.includes(item.type))
+    
+    if (items.length === 0) {
+      return []
+    }
+    
+    return items.map((item: any, index: number) => {
+      const itemId = item.id
+      const itemStats = activityStatistics.value.itemStatistics?.[itemId]
+      const optionDistribution = itemStats?.option_distribution || itemStats?.options || {}
+      
+      // 获取选项列表
+      let options: Array<{ id: string; label: string; isCorrect?: boolean; count: number; percentage: number }> = []
+      
+      try {
+        if (item.type === 'single-choice' && 'config' in item && item.config && Array.isArray(item.config.options)) {
+          // 单选题：从配置中获取选项
+          const totalResponses: number = (Object.values(optionDistribution).reduce((sum: number, count: any) => sum + (Number(count) || 0), 0) as number) || activityStatistics.value.submittedCount || 1
+          options = item.config.options.map((opt: any) => {
+            const count = Number(optionDistribution[opt.id] || optionDistribution[String(opt.id)] || 0)
+            return {
+              id: opt.id,
+              label: opt.text || opt.label || opt.id,
+              isCorrect: opt.isCorrect,
+              count,
+              percentage: totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0,
+            }
+          })
+        } else if (item.type === 'multiple-choice' && 'config' in item && item.config && Array.isArray(item.config.options)) {
+          // 多选题：从配置中获取选项
+          const totalResponses = activityStatistics.value.submittedCount || 1
+          options = item.config.options.map((opt: any) => {
+            const count = Number(optionDistribution[opt.id] || optionDistribution[String(opt.id)] || 0)
+            return {
+              id: opt.id,
+              label: opt.text || opt.label || opt.id,
+              isCorrect: opt.isCorrect,
+              count,
+              percentage: totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0,
+            }
+          })
+        } else if (item.type === 'true-false') {
+          // 判断题：固定两个选项
+          const totalResponses: number = (Object.values(optionDistribution).reduce((sum: number, count: any) => sum + (Number(count) || 0), 0) as number) || activityStatistics.value.submittedCount || 1
+          const config = 'config' in item ? item.config : null
+          options = [
+            {
+              id: 'true',
+              label: '正确',
+              isCorrect: config && 'correctAnswer' in config ? config.correctAnswer === true : false,
+              count: Number(optionDistribution.true || optionDistribution['true'] || 0),
+              percentage: totalResponses > 0 ? Math.round((Number(optionDistribution.true || optionDistribution['true'] || 0) / totalResponses) * 100) : 0,
+            },
+            {
+              id: 'false',
+              label: '错误',
+              isCorrect: config && 'correctAnswer' in config ? config.correctAnswer === false : false,
+              count: Number(optionDistribution.false || optionDistribution['false'] || 0),
+              percentage: totalResponses > 0 ? Math.round((Number(optionDistribution.false || optionDistribution['false'] || 0) / totalResponses) * 100) : 0,
+            },
+          ]
+        }
+      } catch (error) {
+        console.error('处理选择题选项时出错:', error, item)
+        options = []
+      }
+      
+      return {
+        itemId,
+        order: index,
+        type: item.type,
+        question: item.question || `题目 ${index + 1}`,
+        options,
+      }
+    }).filter((item: any) => item && item.options && item.options.length > 0)
+  } catch (error) {
+    console.error('计算选择题统计时出错:', error)
+    return []
+  }
+})
+
+// 获取题目类型标签
+function getItemTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    'single-choice': '单选题',
+    'multiple-choice': '多选题',
+    'true-false': '判断题',
+  }
+  return labels[type] || type
+}
+
+// 加载活动统计
+async function loadActivityStatistics() {
+  if (!currentCell.value || currentCell.value.type !== 'activity' || !currentActivityDbCell.value || !session.value) {
+    activityStatistics.value = {
+      totalStudents: 0,
+      submittedCount: 0,
+      itemStatistics: null,
+    }
+    studentSubmissionStatus.value.clear()
+    return
+  }
+  
+  loadingActivityStats.value = true
+  try {
+    const numericCellId = typeof currentActivityDbCell.value.id === 'number' 
+      ? currentActivityDbCell.value.id 
+      : toNumericId(currentActivityDbCell.value.id)
+    
+    if (numericCellId === null) {
+      console.warn('⚠️ CellId 是 UUID，无法获取统计数据（需要数字 ID）')
+      return
+    }
+    
+    // 并行加载统计数据和提交列表
+    const [stats, submissions] = await Promise.all([
+      activityService.getStatistics(
+        numericCellId,
+        session.value.id,
+        props.lessonId
+      ),
+      activityService.getCellSubmissions(
+        numericCellId,
+        undefined, // 不过滤状态
+        session.value.id,
+        props.lessonId
+      ).catch(() => []) // 如果失败，返回空数组
+    ])
+    
+    // 转换 API 返回的格式
+    const statsAny = stats as any
+    activityStatistics.value = {
+      totalStudents: stats.totalStudents || statsAny.total_students || 0,
+      submittedCount: stats.submittedCount || statsAny.submitted_count || 0,
+      itemStatistics: stats.itemStatistics ?? statsAny.item_statistics ?? null,
+    }
+    
+    // 建立学生ID到提交状态的映射
+    // 支持多种ID字段：studentId, student_id, userId, user_id
+    studentSubmissionStatus.value.clear()
+    submissions.forEach((submission: any) => {
+      const studentId = submission.studentId || submission.student_id || submission.userId || submission.user_id
+      if (studentId !== null && studentId !== undefined) {
+        const status = submission.status || 'not_started'
+        // 使用字符串作为key，确保类型一致
+        studentSubmissionStatus.value.set(String(studentId), status)
+      }
+    })
+    
+    console.log('✅ 活动统计和提交状态已加载:', {
+      statistics: activityStatistics.value,
+      submissionStatusCount: studentSubmissionStatus.value.size,
+    })
+  } catch (error: any) {
+    console.error('❌ 加载活动统计失败:', error)
+  } finally {
+    loadingActivityStats.value = false
+  }
+}
 
 // 滚动到落后学生区域
 function scrollToStudentsBehind() {
@@ -2022,6 +2166,21 @@ watch(() => session.value, (newSession) => {
   }
 }, { immediate: true, deep: true })
 
+// 监听 currentCell 变化，自动加载活动统计
+watch([currentCell, currentActivityDbCell, session], () => {
+  if (currentCell.value && currentCell.value.type === 'activity' && currentActivityDbCell.value && session.value) {
+    loadActivityStatistics()
+  } else {
+    // 如果不是活动模块，清空统计数据
+    activityStatistics.value = {
+      totalStudents: 0,
+      submittedCount: 0,
+      itemStatistics: null,
+    }
+    studentSubmissionStatus.value.clear()
+  }
+}, { immediate: true })
+
 // 加载数据库中的 Cell 记录
 async function loadDbCells() {
   try {
@@ -2140,6 +2299,10 @@ onMounted(async () => {
         if (session.value && (session.value.status === 'active' || session.value.status === 'paused')) {
           loadParticipants()
           loadStatistics()
+          // 如果当前是活动模块，也刷新活动统计
+          if (currentCell.value && currentCell.value.type === 'activity' && currentActivityDbCell.value) {
+            loadActivityStatistics()
+          }
         } else {
           clearInterval(refreshInterval)
         }
@@ -2871,8 +3034,7 @@ onUnmounted(() => {
 
 /* 监控模块：合并的课堂监控和实时数据 */
 .monitoring-module {
-  height: calc(100vh - 320px);
-  min-height: 500px;
+  min-height: 400px;
   max-height: calc(100vh - 320px);
   display: flex;
   flex-direction: column;
@@ -2887,7 +3049,7 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
   overflow: hidden;
   min-height: 0;
 }
@@ -2913,11 +3075,11 @@ onUnmounted(() => {
 .monitoring-students-section {
   flex: 1 1 auto;
   min-height: 0;
-  max-height: calc(100% - 200px);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
+  gap: 12px;
 }
 
 .monitoring-students-section::-webkit-scrollbar {
@@ -3509,7 +3671,8 @@ onUnmounted(() => {
 .student-indicators {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .indicator-item {
@@ -3619,13 +3782,13 @@ onUnmounted(() => {
 
 /* 学生列表样式 */
 .student-list-extra {
-  margin-top: 16px;
-  margin-bottom: 16px;
-  @apply border-t border-gray-200 pt-4;
+  margin-top: 12px;
+  margin-bottom: 12px;
+  @apply border-t border-gray-200 pt-3;
 }
 
 .student-list-header {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .student-list-title {
@@ -3751,9 +3914,9 @@ onUnmounted(() => {
 }
 
 .students-behind-section {
-  margin-top: 16px;
-  margin-bottom: 16px;
-  @apply border-t border-orange-200 pt-4;
+  margin-top: 12px;
+  margin-bottom: 12px;
+  @apply border-t border-orange-200 pt-3;
 }
 
 .students-behind-section .student-list-header {
@@ -3768,6 +3931,74 @@ onUnmounted(() => {
   margin-top: 16px;
   margin-bottom: 16px;
   text-align: center;
+}
+
+/* 活动统计部分样式 */
+.activity-statistics-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  @apply border-t border-gray-200;
+}
+
+.activity-stats-header {
+  @apply flex items-center justify-between mb-3;
+}
+
+.activity-stats-title {
+  @apply text-sm font-semibold text-gray-700;
+}
+
+.activity-stats-submission {
+  @apply text-sm font-medium text-blue-600;
+}
+
+.activity-choice-stats {
+  @apply space-y-3;
+}
+
+.activity-choice-item {
+  @apply bg-gray-50 rounded-lg p-3 border border-gray-200;
+}
+
+.activity-choice-header {
+  @apply flex items-center justify-between mb-2;
+}
+
+.activity-choice-order {
+  @apply text-xs font-medium text-gray-700;
+}
+
+.activity-choice-type {
+  @apply text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full;
+}
+
+.activity-choice-options {
+  @apply space-y-1.5;
+}
+
+.activity-option-item {
+  @apply flex items-center justify-between px-2 py-1 bg-white rounded border border-gray-200;
+}
+
+.activity-option-item.is-correct {
+  @apply border-green-300 bg-green-50;
+}
+
+.activity-option-label {
+  @apply text-xs text-gray-800;
+}
+
+.activity-option-percentage {
+  @apply text-xs font-semibold text-blue-600;
+}
+
+.activity-option-item.is-correct .activity-option-percentage {
+  @apply text-green-600;
+}
+
+.activity-stats-loading,
+.activity-stats-empty {
+  @apply text-center py-4 text-sm text-gray-500;
   padding: 20px;
   @apply text-gray-500 text-sm;
   @apply border-t border-gray-200 pt-4;
