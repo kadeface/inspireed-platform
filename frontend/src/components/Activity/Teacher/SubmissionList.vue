@@ -20,6 +20,43 @@
       </div>
     </div>
 
+    <!-- 提交统计 -->
+    <div v-if="submissions.length > 0 || !loading" class="submission-stats">
+      <div class="stats-grid">
+        <div class="stat-card stat-total">
+          <div class="stat-icon">👥</div>
+          <div class="stat-content">
+            <div class="stat-label">总学生数</div>
+            <div class="stat-value">{{ statistics.totalStudents }}</div>
+          </div>
+        </div>
+        <div class="stat-card stat-submitted">
+          <div class="stat-icon">✅</div>
+          <div class="stat-content">
+            <div class="stat-label">已提交</div>
+            <div class="stat-value">{{ statistics.submittedCount }}</div>
+            <div class="stat-percentage">{{ statistics.submittedPercent }}%</div>
+          </div>
+        </div>
+        <div class="stat-card stat-draft">
+          <div class="stat-icon">📝</div>
+          <div class="stat-content">
+            <div class="stat-label">草稿中</div>
+            <div class="stat-value">{{ statistics.draftCount }}</div>
+            <div class="stat-percentage">{{ statistics.draftPercent }}%</div>
+          </div>
+        </div>
+        <div class="stat-card stat-graded">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-content">
+            <div class="stat-label">已评分</div>
+            <div class="stat-value">{{ statistics.gradedCount }}</div>
+            <div class="stat-percentage">{{ statistics.gradedPercent }}%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 批量操作 -->
     <div v-if="selectedSubmissions.length > 0" class="bulk-actions">
       <span class="text-sm text-gray-600">已选择 {{ selectedSubmissions.length }} 项</span>
@@ -77,8 +114,8 @@
             </td>
             <td class="table-cell">
               <div class="student-info">
-                <div class="font-medium">{{ submission.studentName }}</div>
-                <div class="text-xs text-gray-500">{{ submission.studentEmail }}</div>
+                <div class="font-medium">{{ submission.studentName || submission.student_name || '未知学生' }}</div>
+                <div class="text-xs text-gray-500">{{ submission.studentEmail || submission.student_email || '' }}</div>
               </div>
             </td>
             <td class="table-cell">
@@ -103,7 +140,7 @@
             <td class="table-cell">
               <div class="flex gap-2">
                 <button
-                  v-if="submission.status !== 'not_started' && submission.id"
+                  v-if="submission.id && submission.id !== 0 && submission.status !== 'draft'"
                   @click="viewSubmission(submission)"
                   class="btn-xs btn-view"
                   title="查看详情"
@@ -111,14 +148,14 @@
                   查看
                 </button>
                 <button
-                  v-if="submission.status === 'submitted' && submission.id"
+                  v-if="submission.status === 'submitted' && submission.id && submission.id !== 0"
                   @click="gradeSubmission(submission)"
                   class="btn-xs btn-grade"
                   title="评分"
                 >
                   评分
                 </button>
-                <span v-if="submission.status === 'not_started'" class="text-xs text-gray-400">
+                <span v-if="!submission.id || submission.id === 0" class="text-xs text-gray-400">
                   暂无操作
                 </span>
               </div>
@@ -132,6 +169,44 @@
     <div v-else class="empty-state">
       <div class="text-4xl mb-4">📭</div>
       <p class="text-gray-500">暂无提交记录</p>
+    </div>
+
+    <!-- 选择题选项统计 -->
+    <div v-if="choiceItemsWithStats.length > 0" class="choice-statistics-section">
+      <h4 class="choice-section-title">📊 选择题选项分布</h4>
+      <div class="choice-items-grid">
+        <div 
+          v-for="itemStat in choiceItemsWithStats" 
+          :key="itemStat.itemId"
+          class="choice-item-card"
+        >
+          <div class="choice-item-header">
+            <span class="choice-item-order">第 {{ itemStat.order + 1 }} 题</span>
+            <span class="choice-item-type">{{ getItemTypeLabel(itemStat.type) }}</span>
+          </div>
+          <div class="choice-item-question">{{ itemStat.question }}</div>
+          <div class="choice-options-list">
+            <div 
+              v-for="option in itemStat.options" 
+              :key="option.id"
+              class="choice-option-item"
+              :class="{ 'is-correct': option.isCorrect }"
+            >
+              <div class="option-header">
+                <span class="option-label">{{ option.label }}</span>
+                <span class="option-count">{{ option.count }}人</span>
+                <span class="option-percentage">{{ option.percentage }}%</span>
+              </div>
+              <div class="option-progress-bar">
+                <div 
+                  class="option-progress-fill" 
+                  :style="{ width: `${option.percentage}%` }"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 评分模态框 -->
@@ -154,6 +229,14 @@ import GradingModal from './GradingModal.vue'
 import { useRealtimeChannel } from '@/composables/useRealtimeChannel'
 import type { WebSocketMessage } from '@/composables/useRealtimeChannel'
 
+// 扩展 ActivitySubmission 类型，包含学生信息（API 返回的数据包含这些字段）
+interface ActivitySubmissionWithStudent extends ActivitySubmission {
+  studentName?: string
+  studentEmail?: string
+  student_name?: string  // 支持 snake_case（向后兼容）
+  student_email?: string  // 支持 snake_case（向后兼容）
+}
+
 interface Props {
   cellId: number
   activity: ActivityCellContent
@@ -163,7 +246,7 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const submissions = ref<any[]>([])
+const submissions = ref<ActivitySubmissionWithStudent[]>([])
 const loading = ref(false)
 const statusFilter = ref('')
 const selectedSubmissions = ref<number[]>([])
@@ -173,6 +256,204 @@ const gradingSubmission = ref<any | null>(null)
 const allSelected = computed(() => {
   return submissions.value.length > 0 && selectedSubmissions.value.length === submissions.value.length
 })
+
+// 提交统计
+const statistics = computed(() => {
+  const total = submissions.value.length
+  const submitted = submissions.value.filter(s => s.status === 'submitted').length
+  const draft = submissions.value.filter(s => s.status === 'draft').length
+  const graded = submissions.value.filter(s => s.status === 'graded').length
+  const notStarted = submissions.value.filter(s => !s.id || s.id === 0).length
+  
+  // 总学生数（包括未开始的）
+  const totalStudents = total
+  
+  return {
+    totalStudents,
+    submittedCount: submitted,
+    draftCount: draft,
+    gradedCount: graded,
+    notStartedCount: notStarted,
+    submittedPercent: totalStudents > 0 ? Math.round((submitted / totalStudents) * 100) : 0,
+    draftPercent: totalStudents > 0 ? Math.round((draft / totalStudents) * 100) : 0,
+    gradedPercent: totalStudents > 0 ? Math.round((graded / totalStudents) * 100) : 0,
+  }
+})
+
+// 获取选择题及其统计（从提交数据中计算）
+const choiceItemsWithStats = computed(() => {
+  try {
+    if (!props.activity?.items || submissions.value.length === 0) {
+      console.log('📊 choiceItemsWithStats: 缺少数据', {
+        hasItems: !!props.activity?.items,
+        itemsCount: props.activity?.items?.length,
+        submissionsCount: submissions.value.length,
+      })
+      return []
+    }
+    
+    const choiceTypes = ['single-choice', 'multiple-choice', 'true-false']
+    const items = props.activity.items.filter((item: any) => item && choiceTypes.includes(item.type))
+    
+    if (items.length === 0) {
+      console.log('📊 choiceItemsWithStats: 没有选择题')
+      return []
+    }
+    
+    console.log('📊 choiceItemsWithStats: 开始计算', {
+      itemsCount: items.length,
+      submissionsCount: submissions.value.length,
+      submissions: submissions.value.map(s => ({
+        id: s.id,
+        status: s.status,
+        hasResponses: !!s.responses,
+        responseKeys: s.responses ? Object.keys(s.responses) : [],
+      })),
+    })
+    
+    return items.map((item: any, index: number) => {
+      const itemId = item.id
+      const itemIdStr = String(itemId)
+      
+      // 从提交数据中统计选项分布
+      const optionDistribution: Record<string, number> = {}
+      let totalResponses = 0
+      
+      // 统计已提交和已评分的答案（也包括草稿，因为草稿也可能有答案）
+      const allAnswers = submissions.value
+        .filter(s => {
+          // 只统计有实际提交ID的（排除未开始的占位符）
+          return s.id && s.id !== 0 && s.responses
+        })
+        .map(s => {
+          // 尝试多种可能的 key 格式
+          const answer = s.responses?.[itemId] || 
+                        s.responses?.[itemIdStr] || 
+                        s.responses?.[String(itemId)] ||
+                        null
+          return { submission: s, answer }
+        })
+        .filter(({ answer }) => answer !== null && answer !== undefined)
+      
+      totalResponses = allAnswers.length
+      
+      console.log(`📊 题目 ${index + 1} (${itemId}):`, {
+        itemId,
+        itemIdStr,
+        totalResponses,
+        answers: allAnswers.map(({ submission, answer }) => ({
+          submissionId: submission.id,
+          status: submission.status,
+          answer,
+        })),
+      })
+      
+      allAnswers.forEach(({ answer }: any) => {
+        if (item.type === 'single-choice' || item.type === 'true-false') {
+          // 单选题或判断题：答案是单个选项ID
+          // 答案可能是对象 { answer: "A" } 或直接是字符串 "A"
+          const optionId = (answer && typeof answer === 'object' && answer.answer) 
+            ? String(answer.answer) 
+            : String(answer || '')
+          
+          if (optionId) {
+            optionDistribution[optionId] = (optionDistribution[optionId] || 0) + 1
+          }
+        } else if (item.type === 'multiple-choice') {
+          // 多选题：答案是选项ID数组
+          const optionIds = (answer && typeof answer === 'object' && answer.answer)
+            ? (Array.isArray(answer.answer) ? answer.answer : [answer.answer])
+            : (Array.isArray(answer) ? answer : [answer])
+          
+          optionIds.forEach((optId: any) => {
+            const optIdStr = String(optId)
+            if (optIdStr) {
+              optionDistribution[optIdStr] = (optionDistribution[optIdStr] || 0) + 1
+            }
+          })
+        }
+      })
+      
+      console.log(`📊 题目 ${index + 1} 选项分布:`, optionDistribution)
+      
+      // 获取选项列表
+      let options: Array<{ id: string; label: string; isCorrect?: boolean; count: number; percentage: number }> = []
+      
+      try {
+        if (item.type === 'single-choice' && 'config' in item && item.config && Array.isArray(item.config.options)) {
+          // 单选题：从配置中获取选项
+          options = item.config.options.map((opt: any) => {
+            const optId = String(opt.id)
+            const count = Number(optionDistribution[optId] || optionDistribution[opt.id] || 0)
+            return {
+              id: opt.id,
+              label: opt.text || opt.label || opt.id,
+              isCorrect: opt.isCorrect,
+              count,
+              percentage: totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0,
+            }
+          })
+        } else if (item.type === 'multiple-choice' && 'config' in item && item.config && Array.isArray(item.config.options)) {
+          // 多选题：从配置中获取选项
+          options = item.config.options.map((opt: any) => {
+            const optId = String(opt.id)
+            const count = Number(optionDistribution[optId] || optionDistribution[opt.id] || 0)
+            return {
+              id: opt.id,
+              label: opt.text || opt.label || opt.id,
+              isCorrect: opt.isCorrect,
+              count,
+              percentage: totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0,
+            }
+          })
+        } else if (item.type === 'true-false') {
+          // 判断题：固定两个选项
+          const config = 'config' in item ? item.config : null
+          options = [
+            {
+              id: 'true',
+              label: '正确',
+              isCorrect: config && 'correctAnswer' in config ? config.correctAnswer === true : false,
+              count: Number(optionDistribution.true || optionDistribution['true'] || 0),
+              percentage: totalResponses > 0 ? Math.round((Number(optionDistribution.true || optionDistribution['true'] || 0) / totalResponses) * 100) : 0,
+            },
+            {
+              id: 'false',
+              label: '错误',
+              isCorrect: config && 'correctAnswer' in config ? config.correctAnswer === false : false,
+              count: Number(optionDistribution.false || optionDistribution['false'] || 0),
+              percentage: totalResponses > 0 ? Math.round((Number(optionDistribution.false || optionDistribution['false'] || 0) / totalResponses) * 100) : 0,
+            },
+          ]
+        }
+      } catch (error) {
+        console.error('处理选择题选项时出错:', error, item)
+        options = []
+      }
+      
+      return {
+        itemId,
+        order: index,
+        type: item.type,
+        question: item.question || `题目 ${index + 1}`,
+        options,
+      }
+    }).filter((item: any) => item && item.options && item.options.length > 0)
+  } catch (error) {
+    console.error('计算选择题统计时出错:', error)
+    return []
+  }
+})
+
+// 获取题目类型标签
+function getItemTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    'single-choice': '单选题',
+    'multiple-choice': '多选题',
+    'true-false': '判断题',
+  }
+  return labels[type] || type
+}
 
 // 切换全选
 function toggleSelectAll() {
@@ -242,7 +523,7 @@ async function loadSubmissions() {
     
     console.log('✅ 提交列表加载成功:', {
       count: data.length,
-      submissions: data.map(s => ({
+      submissions: data.map((s: ActivitySubmissionWithStudent) => ({
         id: s.id,
         studentName: s.studentName || s.student_name,
         status: s.status,
@@ -250,7 +531,7 @@ async function loadSubmissions() {
       })),
     })
     
-    submissions.value = data
+    submissions.value = data as ActivitySubmissionWithStudent[]
   } catch (error: any) {
     console.error('❌ 加载提交列表失败:', error)
     console.error('错误详情:', {
@@ -445,6 +726,55 @@ onUnmounted(() => {
   @apply flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50;
 }
 
+/* 提交统计样式 */
+.submission-stats {
+  @apply px-6 py-4 border-b border-gray-200 bg-gray-50;
+}
+
+.stats-grid {
+  @apply grid grid-cols-2 md:grid-cols-4 gap-4;
+}
+
+.stat-card {
+  @apply bg-white rounded-lg p-4 border border-gray-200 flex items-center gap-3 transition-all hover:shadow-md;
+}
+
+.stat-icon {
+  @apply text-2xl flex-shrink-0;
+}
+
+.stat-content {
+  @apply flex-1 min-w-0;
+}
+
+.stat-label {
+  @apply text-xs text-gray-600 mb-1;
+}
+
+.stat-value {
+  @apply text-xl font-bold text-gray-900;
+}
+
+.stat-percentage {
+  @apply text-xs text-gray-500 mt-0.5;
+}
+
+.stat-total .stat-icon {
+  @apply text-blue-500;
+}
+
+.stat-submitted .stat-icon {
+  @apply text-green-500;
+}
+
+.stat-draft .stat-icon {
+  @apply text-yellow-500;
+}
+
+.stat-graded .stat-icon {
+  @apply text-purple-500;
+}
+
 .bulk-actions {
   @apply flex items-center justify-between px-6 py-3 bg-blue-50 border-b border-blue-200;
 }
@@ -535,6 +865,83 @@ onUnmounted(() => {
 
 .empty-state {
   @apply flex flex-col items-center justify-center py-16 text-center;
+}
+
+/* 选择题选项统计样式 */
+.choice-statistics-section {
+  @apply px-6 py-6 border-t border-gray-200;
+}
+
+.choice-section-title {
+  @apply text-lg font-semibold text-gray-900 mb-4;
+}
+
+.choice-items-grid {
+  @apply grid grid-cols-1 lg:grid-cols-2 gap-4;
+}
+
+.choice-item-card {
+  @apply bg-gray-50 rounded-lg p-4 border border-gray-200;
+}
+
+.choice-item-header {
+  @apply flex items-center justify-between mb-2;
+}
+
+.choice-item-order {
+  @apply text-sm font-medium text-gray-700;
+}
+
+.choice-item-type {
+  @apply text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full;
+}
+
+.choice-item-question {
+  @apply text-sm text-gray-800 mb-3 line-clamp-2;
+}
+
+.choice-options-list {
+  @apply space-y-2;
+}
+
+.choice-option-item {
+  @apply bg-white rounded p-2 border border-gray-200;
+}
+
+.choice-option-item.is-correct {
+  @apply border-green-300 bg-green-50;
+}
+
+.option-header {
+  @apply flex items-center justify-between mb-1;
+}
+
+.option-label {
+  @apply text-sm font-medium text-gray-800 flex-1;
+}
+
+.option-count {
+  @apply text-xs text-gray-600 mr-2;
+}
+
+.option-percentage {
+  @apply text-xs font-semibold text-blue-600 min-w-[3rem] text-right;
+}
+
+.option-progress-bar {
+  @apply w-full h-2 bg-gray-200 rounded-full overflow-hidden;
+}
+
+.option-progress-fill {
+  @apply h-full bg-blue-500 transition-all duration-300;
+}
+
+.choice-option-item.is-correct .option-progress-fill {
+  @apply bg-green-500;
+}
+
+.choice-option-item.is-correct .option-percentage {
+  @apply text-green-600;
 }
 </style>
 
