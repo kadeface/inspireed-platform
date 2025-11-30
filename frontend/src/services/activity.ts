@@ -328,9 +328,26 @@ export const activityService = {
 
   /**
    * 获取活动统计数据
+   * @param cellId Cell ID
+   * @param sessionId 可选的会话ID（课堂模式，用于按session筛选）
+   * @param lessonId 可选的教案ID（如果提供了sessionId，建议也提供lessonId）
    */
-  async getStatistics(cellId: number): Promise<ActivityStatistics> {
-    const response = await api.get<ActivityStatistics>(`/activities/cells/${cellId}/statistics`)
+  async getStatistics(
+    cellId: number,
+    sessionId?: number,
+    lessonId?: number
+  ): Promise<ActivityStatistics> {
+    const params: Record<string, any> = {}
+    if (sessionId !== undefined) {
+      params.session_id = sessionId
+    }
+    if (lessonId !== undefined) {
+      params.lesson_id = lessonId
+    }
+    const response = await api.get<ActivityStatistics>(
+      `/activities/cells/${cellId}/statistics`,
+      { params }
+    )
     return response
   },
 

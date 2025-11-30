@@ -1149,15 +1149,62 @@ async def submit_peer_review(
 @router.get("/cells/{cell_id}/statistics", response_model=ActivityStatisticsResponse)
 async def get_cell_statistics(
     cell_id: int,
+    session_id: Optional[int] = None,
+    lesson_id: Optional[int] = None,
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """获取活动统计数据"""
+    """获取活动统计数据
+    
+    如果提供了 session_id，则返回该会话的实时统计（按 session 筛选）
+    否则返回全局统计（所有课程的提交）
+    """
 
     current_role = cast(UserRole, current_user.role)
     if current_role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="权限不足")
 
+    # 如果提供了 session_id，使用实时统计函数（按 session 筛选）
+    if session_id is not None:
+        from app.services.realtime import get_submission_statistics
+        
+        # 需要 lesson_id，如果没有提供则从 cell 获取
+        if lesson_id is None:
+            cell = await db.get(Cell, cell_id)
+            if not cell:
+                raise HTTPException(status_code=404, detail="Cell 不存在")
+            lesson_id = cast(int, cell.lesson_id)
+        
+        # 使用实时统计函数，它会按 session_id 筛选
+        stats = await get_submission_statistics(
+            db,
+            cell_id=cell_id,
+            lesson_id=lesson_id,
+            session_id=session_id
+        )
+        
+        # 转换为 ActivityStatisticsResponse 格式
+        return ActivityStatisticsResponse(
+            id=0,  # 临时ID，因为这是实时计算的统计，不存储在数据库中
+            cell_id=cell_id,
+            lesson_id=lesson_id,
+            total_students=stats.get("total_students", 0),
+            draft_count=stats.get("draft_count", 0),
+            submitted_count=stats.get("submitted_count", 0),
+            graded_count=0,  # get_submission_statistics 返回的 submitted_count 已包含 graded
+            average_score=stats.get("average_score"),
+            average_time_spent=stats.get("average_time_spent", 0),
+            highest_score=None,
+            lowest_score=None,
+            median_score=None,
+            peer_review_count=0,
+            avg_peer_review_score=None,
+            item_statistics=None,
+            flowchart_metrics=None,
+            updated_at=datetime.utcnow(),
+        )
+
+    # 没有 session_id，返回全局统计（原有逻辑）
     result = await db.execute(
         select(ActivityStatistics).where(ActivityStatistics.cell_id == cell_id)
     )

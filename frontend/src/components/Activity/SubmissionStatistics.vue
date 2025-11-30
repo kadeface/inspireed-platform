@@ -141,8 +141,23 @@ const {
 } = useRealtimeChannel(channelDescriptor)
 
 function handleStatisticsUpdate(message: WebSocketMessage) {
-  if (message.data.cell_id !== props.cellId) return
+  console.log('📊 收到统计更新消息:', {
+    messageCellId: message.data.cell_id,
+    propsCellId: props.cellId,
+    submittedCount: message.data.submitted_count,
+    totalStudents: message.data.total_students,
+  })
   
+  // 检查 cell_id 是否匹配（支持数字和字符串比较）
+  const messageCellId = String(message.data.cell_id)
+  const propsCellId = String(props.cellId)
+  
+  if (messageCellId !== propsCellId) {
+    console.log('⚠️ Cell ID 不匹配，忽略消息:', { messageCellId, propsCellId })
+    return
+  }
+  
+  console.log('✅ 更新统计数据:', message.data)
   statistics.value = {
     totalStudents: message.data.total_students || 0,
     submittedCount: message.data.submitted_count || 0,
@@ -157,9 +172,17 @@ function handleStatisticsUpdate(message: WebSocketMessage) {
 async function loadStatisticsFromAPI() {
   refreshing.value = true
   try {
-    console.log('📊 通过 API 直接加载统计数据...', { cellId: props.cellId })
+    console.log('📊 通过 API 直接加载统计数据...', { 
+      cellId: props.cellId, 
+      lessonId: props.lessonId, 
+      sessionId: props.sessionId 
+    })
     const { activityService } = await import('../../services/activity')
-    const stats = await activityService.getStatistics(props.cellId)
+    const stats = await activityService.getStatistics(
+      props.cellId,
+      props.sessionId,
+      props.lessonId
+    )
     
     // 转换 API 返回的格式到组件需要的格式（后端可能返回 snake_case 或 camelCase）
     const statsAny = stats as any
@@ -216,17 +239,19 @@ onMounted(async () => {
     // 3. 等待一小段时间确保连接稳定，然后请求统计（用于实时更新）
     setTimeout(() => {
       console.log('📊 延迟请求统计，isConnected =', isConnected.value)
-      if (isConnected.value) {
-        requestStats(props.cellId, props.lessonId)
-        console.log('✅ 使用 WebSocket 实时推送')
-      } else {
+      // 无论连接状态如何，都尝试请求统计（requestStatistics 内部会检查连接状态）
+      requestStats(props.cellId, props.lessonId)
+      
+      // 如果 WebSocket 未连接，定期通过 API 刷新作为备用
+      if (!isConnected.value) {
         console.warn('⚠️ WebSocket 未连接，将使用 API 定期刷新（每5秒）')
-        // 如果 WebSocket 未连接，定期通过 API 刷新
         pollingInterval = setInterval(() => {
           loadStatisticsFromAPI()
         }, 5000) // 每5秒刷新一次
+      } else {
+        console.log('✅ 使用 WebSocket 实时推送')
       }
-    }, 100)
+    }, 500) // 增加延迟时间，确保连接稳定
   } catch (error) {
     console.error('❌ 连接实时通道失败:', error)
     // 如果 WebSocket 连接失败，使用 API 定期刷新
@@ -237,13 +262,19 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  unregisterAll()
-  disconnectRealtime()
+  console.log('🧹 SubmissionStatistics 组件卸载，清理资源...')
+  
   // 清理轮询定时器
   if (pollingInterval) {
     clearInterval(pollingInterval)
     pollingInterval = null
   }
+  
+  // 清理实时通道
+  unregisterAll()
+  disconnectRealtime()
+  
+  console.log('✅ SubmissionStatistics 资源清理完成')
 })
 </script>
 

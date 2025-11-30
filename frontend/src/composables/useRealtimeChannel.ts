@@ -36,6 +36,7 @@ export class RealtimeChannelManager {
   private heartbeatInterval: number = 30000
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private isManualClose: boolean = false
+  private isDisposed: boolean = false  // 标记是否已销毁
   
   // 消息去重
   private processedMessages: Set<string> = new Set()
@@ -94,6 +95,7 @@ export class RealtimeChannelManager {
       try {
         this.ws = new WebSocket(this.url)
         this.isManualClose = false
+        this.isDisposed = false  // 重置销毁标志
         
         // 连接成功
         this.ws.onopen = () => {
@@ -140,6 +142,7 @@ export class RealtimeChannelManager {
    */
   disconnect() {
     this.isManualClose = true
+    this.isDisposed = true
     this.stopHeartbeat()
     
     if (this.ws) {
@@ -150,6 +153,10 @@ export class RealtimeChannelManager {
     // 清理监听器
     this.eventListeners.clear()
     this.processedMessages.clear()
+    
+    // 清理连接参数
+    this.channelDescriptor = null
+    this.token = ''
     
     // 实时通道已断开
   }
@@ -183,12 +190,24 @@ export class RealtimeChannelManager {
    * 发送消息
    */
   send(message: any) {
-    // 准备发送消息
+    // 如果已销毁，静默返回
+    if (this.isDisposed) {
+      return
+    }
+    
+    // 如果已手动关闭，静默返回（避免在退出模式后产生警告）
+    if (this.isManualClose) {
+      return
+    }
     
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message))
     } else {
-      console.warn('Realtime channel not connected, cannot send message')
+      // 只在开发环境或非手动关闭时输出警告
+      // 避免在正常退出模式时产生大量警告
+      if (!this.isManualClose && process.env.NODE_ENV === 'development') {
+        console.debug('Realtime channel not connected, cannot send message')
+      }
     }
   }
 
@@ -265,11 +284,26 @@ export class RealtimeChannelManager {
    * 开始心跳
    */
   private startHeartbeat() {
+    // 清理旧的心跳定时器
+    this.stopHeartbeat()
+    
     this.heartbeatTimer = setInterval(() => {
-      this.send({
-        type: 'ping',
-        timestamp: new Date().toISOString(),
-      })
+      // 检查是否已销毁或手动关闭
+      if (this.isDisposed || this.isManualClose) {
+        this.stopHeartbeat()
+        return
+      }
+      
+      // 只有在连接时才发送心跳
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.send({
+          type: 'ping',
+          timestamp: new Date().toISOString(),
+        })
+      } else {
+        // 如果连接已断开，停止心跳
+        this.stopHeartbeat()
+      }
     }, this.heartbeatInterval)
   }
 
@@ -311,6 +345,7 @@ export function useRealtimeChannel(
   
   let manager: RealtimeChannelManager | null = null
   const offFns = new Map<string, () => void>()
+  let statusCheckInterval: ReturnType<typeof setInterval> | null = null
   
   // 判断是否为教师
   const isTeacher = computed(() => userStore.user?.role === 'teacher')
@@ -352,11 +387,35 @@ export function useRealtimeChannel(
       
       console.log('🔌 准备连接，isTeacher =', isTeacher.value)
       await manager.connect(channel, token, isTeacher.value)
+      
+      // 使用 getter 实时获取连接状态
       isConnected.value = manager.isConnected
       console.log('✅ 连接完成，isConnected =', isConnected.value)
+      
+      // 清理旧的检查定时器
+      if (statusCheckInterval) {
+        clearInterval(statusCheckInterval)
+      }
+      
+      // 定期检查连接状态（用于同步）
+      statusCheckInterval = setInterval(() => {
+        if (manager) {
+          const currentState = manager.isConnected
+          if (isConnected.value !== currentState) {
+            console.log('🔄 连接状态变化:', isConnected.value, '->', currentState)
+            isConnected.value = currentState
+          }
+        } else {
+          if (statusCheckInterval) {
+            clearInterval(statusCheckInterval)
+            statusCheckInterval = null
+          }
+        }
+      }, 1000)
     } catch (e) {
       error.value = e as Error
       console.error('❌ 连接实时通道失败:', e)
+      isConnected.value = false
     } finally {
       isConnecting.value = false
     }
@@ -366,6 +425,12 @@ export function useRealtimeChannel(
    * 断开通道
    */
   function disconnect() {
+    // 清理状态检查定时器
+    if (statusCheckInterval) {
+      clearInterval(statusCheckInterval)
+      statusCheckInterval = null
+    }
+    
     if (manager) {
       manager.disconnect()
       manager = null
@@ -404,8 +469,32 @@ export function useRealtimeChannel(
    */
   function requestStatistics(cellId: number, lessonId: number) {
     if (manager) {
-      console.log('📊 请求统计信息:', { cellId, lessonId, isConnected: isConnected.value })
-      manager.requestStatistics(cellId, lessonId)
+      // 实时检查连接状态
+      const actuallyConnected = manager.isConnected
+      console.log('📊 请求统计信息:', { 
+        cellId, 
+        lessonId, 
+        isConnected: isConnected.value,
+        actuallyConnected,
+        wsState: manager['ws']?.readyState 
+      })
+      
+      if (actuallyConnected) {
+        manager.requestStatistics(cellId, lessonId)
+        // 同步状态
+        if (!isConnected.value) {
+          isConnected.value = true
+        }
+      } else {
+        console.warn('⚠️ WebSocket 未连接，无法请求统计信息')
+        // 尝试重新连接
+        if (!isConnecting.value) {
+          console.log('🔄 尝试重新连接...')
+          connect().catch(err => {
+            console.error('❌ 重连失败:', err)
+          })
+        }
+      }
     } else {
       console.warn('⚠️ 管理器未初始化，无法请求统计信息')
     }
