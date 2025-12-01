@@ -329,6 +329,15 @@ async def submit_activity(
     if submission_student_id != current_user_id:
         raise HTTPException(status_code=403, detail="无权操作")
 
+    # 🔍 调试：检查提交的 responses 数据
+    print(f"🔍 submit_activity: 收到提交数据", {
+        "submission_id": submission_id,
+        "student_id": current_user.id,
+        "responses_count": len(data.responses) if data.responses else 0,
+        "responses_keys": list(data.responses.keys()) if data.responses else [],
+        "responses_sample": dict(list(data.responses.items())[:2]) if data.responses else {},
+    })
+    
     # 更新提交数据
     setattr(submission, "responses", cast(dict[str, Any], data.responses))
     setattr(submission, "status", ActivitySubmissionStatus.SUBMITTED)
@@ -356,8 +365,18 @@ async def submit_activity(
         cell_content
     )
     
-    # 更新 responses（包含正确性判断）
-    setattr(submission, "responses", graded_responses)
+    # 🔧 更新 responses（包含正确性判断）
+    # 确保保留所有原始答案，即使无法自动评分
+    final_responses = graded_responses.copy() if graded_responses else {}
+    
+    # 如果 graded_responses 为空或缺少某些答案，保留原始答案
+    if not graded_responses or len(graded_responses) < len(data.responses):
+        for key, value in data.responses.items():
+            if key not in final_responses:
+                # 保留原始答案（可能是非选择题或其他无法自动评分的题目）
+                final_responses[key] = value
+    
+    setattr(submission, "responses", final_responses)
     
     # 如果启用了自动评分，更新分数
     grading_config = cell_content.get("grading", {})
@@ -505,6 +524,13 @@ async def get_cell_submissions(
                 # 如果状态值无效，忽略筛选
                 pass
         
+        # 🔧 添加 lesson_id 过滤，确保只返回本节课的提交
+        if lesson_id:
+            query = query.where(ActivitySubmission.lesson_id == lesson_id)
+        
+        # 🔧 如果有 session_id，严格过滤到该会话的提交
+        # 注意：这只会返回 session_id 完全匹配的提交，不会返回 NULL 或其他 session_id 的提交
+        # 这样可以确保同一课程被多个班级上时，只显示当前会话的提交
         if session_id:
             query = query.where(ActivitySubmission.session_id == session_id)
 
@@ -1395,12 +1421,25 @@ def _auto_grade_submission(
         item_points = item.get("points", 0)
         max_score += float(item_points) if item_points else 0.0
         
-        # 获取学生答案
-        student_answer = responses.get(item_id)
+        # 🔧 获取学生答案：尝试多种 key 格式（支持 UUID、数字、字符串等）
+        student_answer = None
+        # 首先尝试精确匹配
+        if item_id in responses:
+            student_answer = responses[item_id]
+        else:
+            # 尝试其他可能的 key 格式
+            item_id_variants = [
+                item.get("id"),  # 原始 ID（可能是 UUID 对象或其他类型）
+                str(item.get("id", "")),  # 字符串格式
+                int(item.get("id")) if isinstance(item.get("id"), (int, str)) and str(item.get("id")).isdigit() else None,  # 数字格式
+            ]
+            for variant in item_id_variants:
+                if variant is not None and variant in responses:
+                    student_answer = responses[variant]
+                    break
+        
         if student_answer is None:
-            # 未作答，跳过
-            if item_id in responses:
-                graded_responses[item_id] = responses[item_id]
+            # 未作答，跳过（但保留 responses 中已有的其他答案）
             continue
         
         # 初始化答案对象（如果还不是字典）

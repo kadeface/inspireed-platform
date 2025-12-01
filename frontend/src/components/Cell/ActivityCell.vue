@@ -40,6 +40,8 @@
         <SubmissionList
           :cell-id="actualCellId"
           :activity="cell.content"
+          :session-id="sessionId"
+          :lesson-id="lessonId"
         />
       </div>
       <div v-else class="text-center py-8 text-gray-500 border border-gray-200 rounded-lg">
@@ -59,6 +61,7 @@
         :cell="cell"
         :lesson-id="lessonId"
         :session-id="sessionId"
+        :use-survey-js="useSurveyJS"
         @submit="handleSubmit"
       />
     </div>
@@ -75,18 +78,21 @@ import ActivityCellEditor from '../Activity/ActivityCellEditor.vue'
 import ActivityViewer from '../Activity/ActivityViewer.vue'
 import SubmissionList from '../Activity/Teacher/SubmissionList.vue'
 import { useFullscreen } from '@/composables/useFullscreen'
+import { useFeatureFlag } from '@/composables/useFeatureFlag'
 
 interface Props {
   cell: ActivityCell
   editable?: boolean
   lessonId?: number  // 可选的 lessonId prop
   sessionId?: number  // 课堂会话ID（课堂模式传递）
+  useSurveyJS?: boolean  // 是否使用 SurveyJS 渲染（默认根据活动类型自动选择）
 }
 
 const props = withDefaults(defineProps<Props>(), {
   editable: false,
   lessonId: undefined,
   sessionId: undefined,
+  useSurveyJS: undefined,  // undefined 表示自动选择
 })
 
 // 🔍 调试：打印 props
@@ -103,6 +109,24 @@ const userStore = useUserStore()
 // 判断是否为教师
 const isTeacher = computed(() => {
   return userStore.user?.role === UserRole.TEACHER
+})
+
+// 获取全局特性开关
+const { isEnabled } = useFeatureFlag()
+
+// 决定是否使用 SurveyJS
+// 优先级：1. props.useSurveyJS（明确指定） 2. 全局特性开关 3. 自动选择（问卷类型）
+const useSurveyJS = computed(() => {
+  // 如果明确指定了 useSurveyJS，使用指定值
+  if (props.useSurveyJS !== undefined) {
+    return props.useSurveyJS
+  }
+  // 如果全局特性开关启用，所有活动都使用 SurveyJS
+  if (isEnabled('use-surveyjs')) {
+    return true
+  }
+  // 自动选择：问卷类型默认使用 SurveyJS
+  return props.cell.content.activityType === 'survey'
 })
 
 // 从 props 或 route 获取 lessonId

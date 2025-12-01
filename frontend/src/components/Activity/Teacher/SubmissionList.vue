@@ -132,10 +132,14 @@
               <span v-else class="text-gray-400">-</span>
             </td>
             <td class="table-cell text-sm text-gray-600">
-              {{ formatDateTime(submission.submittedAt) }}
+              {{ formatDateTime(submission.submittedAt || (submission as any).submitted_at) }}
             </td>
             <td class="table-cell text-sm text-gray-600">
-              {{ submission.timeSpent ? formatTime(submission.timeSpent) : '-' }}
+              {{ (submission.timeSpent !== undefined && submission.timeSpent !== null) 
+                  ? formatTime(submission.timeSpent) 
+                  : ((submission as any).time_spent !== undefined && (submission as any).time_spent !== null)
+                    ? formatTime((submission as any).time_spent)
+                    : '-' }}
             </td>
             <td class="table-cell">
               <div class="flex gap-2">
@@ -235,6 +239,8 @@ interface ActivitySubmissionWithStudent extends ActivitySubmission {
   studentEmail?: string
   student_name?: string  // 支持 snake_case（向后兼容）
   student_email?: string  // 支持 snake_case（向后兼容）
+  sessionId?: number  // 课堂会话ID
+  session_id?: number  // 支持 snake_case（向后兼容）
 }
 
 interface Props {
@@ -308,7 +314,10 @@ const choiceItemsWithStats = computed(() => {
         status: s.status,
         hasResponses: !!s.responses,
         responseKeys: s.responses ? Object.keys(s.responses) : [],
+        responsesSample: s.responses ? Object.entries(s.responses).slice(0, 2) : [], // 显示前2个答案的 key-value
+        responsesFull: s.responses, // 完整 responses 对象（用于调试）
       })),
+      itemIds: items.map((item: any) => item.id), // 显示所有题目的 ID
     })
     
     return items.map((item: any, index: number) => {
@@ -323,15 +332,35 @@ const choiceItemsWithStats = computed(() => {
       const allAnswers = submissions.value
         .filter(s => {
           // 只统计有实际提交ID的（排除未开始的占位符）
-          return s.id && s.id !== 0 && s.responses
+          const hasValidId = s.id && s.id !== 0
+          const hasResponses = s.responses && typeof s.responses === 'object' && Object.keys(s.responses).length > 0
+          
+          if (!hasValidId || !hasResponses) {
+            return false
+          }
+          
+          return true
         })
         .map(s => {
           // 尝试多种可能的 key 格式
-          const answer = s.responses?.[itemId] || 
-                        s.responses?.[itemIdStr] || 
-                        s.responses?.[String(itemId)] ||
-                        null
-          return { submission: s, answer }
+          let answer = s.responses?.[itemId] || 
+                       s.responses?.[itemIdStr] || 
+                       s.responses?.[String(itemId)] ||
+                       null
+          
+          // 🔍 如果还是找不到，尝试遍历所有 key 看看是否有匹配的
+          if (!answer && s.responses) {
+            const allKeys = Object.keys(s.responses)
+            // 尝试模糊匹配（比如 itemId 是 UUID，但 key 可能是其他格式）
+            for (const key of allKeys) {
+              if (key === itemId || key === itemIdStr || key === String(itemId)) {
+                answer = s.responses[key]
+                break
+              }
+            }
+          }
+          
+          return { submission: s, answer, responseKeys: s.responses ? Object.keys(s.responses) : [] }
         })
         .filter(({ answer }) => answer !== null && answer !== undefined)
       
@@ -341,10 +370,18 @@ const choiceItemsWithStats = computed(() => {
         itemId,
         itemIdStr,
         totalResponses,
-        answers: allAnswers.map(({ submission, answer }) => ({
+        allResponseKeys: submissions.value
+          .filter(s => s.id && s.id !== 0 && s.responses)
+          .flatMap(s => Object.keys(s.responses || {})),
+        uniqueResponseKeys: [...new Set(submissions.value
+          .filter(s => s.id && s.id !== 0 && s.responses)
+          .flatMap(s => Object.keys(s.responses || {})))],
+        answers: allAnswers.map(({ submission, answer, responseKeys }) => ({
           submissionId: submission.id,
           status: submission.status,
           answer,
+          responseKeys,
+          hasMatchingKey: responseKeys.includes(itemId) || responseKeys.includes(itemIdStr),
         })),
       })
       
@@ -489,14 +526,19 @@ function getStatusBadgeClass(status: string): string {
 }
 
 // 格式化时间
-function formatDateTime(dateStr: string | null): string {
+function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  try {
+    return new Date(dateStr).toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch (error) {
+    console.error('格式化时间失败:', dateStr, error)
+    return '-'
+  }
 }
 
 function formatTime(seconds: number): string {
@@ -511,6 +553,8 @@ async function loadSubmissions() {
   try {
     console.log('📥 加载提交列表...', {
       cellId: props.cellId,
+      sessionId: props.sessionId,
+      lessonId: props.lessonId,
       statusFilter: statusFilter.value,
     })
     
@@ -521,17 +565,176 @@ async function loadSubmissions() {
       props.lessonId
     )
     
-    console.log('✅ 提交列表加载成功:', {
+    // 🔍 调试：检查原始数据
+    console.log('🔍 原始 API 数据:', {
       count: data.length,
-      submissions: data.map((s: ActivitySubmissionWithStudent) => ({
+      allSubmissions: data.map((s: any) => ({
+        id: s.id,
+        status: s.status,
+        hasResponses: !!s.responses,
+        responsesType: typeof s.responses,
+        responsesIsObject: s.responses && typeof s.responses === 'object',
+        responsesKeys: s.responses && typeof s.responses === 'object' ? Object.keys(s.responses) : [],
+        responsesValue: s.responses,
+        allKeys: Object.keys(s), // 查看所有字段
+      })),
+      sampleSubmission: data.length > 0 ? {
+        id: data[0].id,
+        status: data[0].status,
+        hasResponses: !!data[0].responses,
+        responsesType: typeof data[0].responses,
+        responsesKeys: data[0].responses ? Object.keys(data[0].responses) : [],
+        responsesValue: data[0].responses,
+        rawData: data[0], // 完整的原始数据
+      } : null,
+    })
+    
+    // 🔧 转换字段名：将 snake_case 转换为 camelCase
+    const normalizedData = data.map((s: any) => {
+      // 🔍 确保 responses 字段被正确保留
+      const responses = s.responses !== undefined && s.responses !== null 
+        ? s.responses 
+        : (s.response || {}) // 兼容可能的拼写错误
+      
+      return {
+        ...s,
+        // 学生信息字段（支持两种格式）
+        studentName: s.studentName || s.student_name || '',
+        studentEmail: s.studentEmail || s.student_email || '',
+        // 时间字段转换
+        submittedAt: s.submittedAt || s.submitted_at || null,
+        startedAt: s.startedAt || s.started_at || null,
+        gradedAt: s.gradedAt || s.graded_at || null,
+        // 用时字段转换
+        timeSpent: s.timeSpent !== undefined ? s.timeSpent : (s.time_spent !== undefined ? s.time_spent : null),
+        // 其他字段（保持兼容）
+        cellId: s.cellId || s.cell_id,
+        lessonId: s.lessonId || s.lesson_id,
+        studentId: s.studentId || s.student_id,
+        sessionId: s.sessionId || s.session_id,
+        maxScore: s.maxScore || s.max_score,
+        autoGraded: s.autoGraded !== undefined ? s.autoGraded : (s.auto_graded !== undefined ? s.auto_graded : false),
+        teacherFeedback: s.teacherFeedback || s.teacher_feedback,
+        gradedBy: s.gradedBy || s.graded_by,
+        processTrace: s.processTrace || s.process_trace,
+        submissionCount: s.submissionCount !== undefined ? s.submissionCount : (s.submission_count !== undefined ? s.submission_count : 1),
+        attemptNo: s.attemptNo !== undefined ? s.attemptNo : (s.attempt_no !== undefined ? s.attempt_no : 1),
+        isLate: s.isLate !== undefined ? s.isLate : (s.is_late !== undefined ? s.is_late : false),
+        activityPhase: s.activityPhase || s.activity_phase,
+        createdAt: s.createdAt || s.created_at,
+        updatedAt: s.updatedAt || s.updated_at,
+        // 🔧 确保 responses 字段存在且正确保留
+        responses: responses,
+      }
+    })
+    
+    // 🔍 调试：检查转换后的数据
+    console.log('🔍 转换后的数据:', {
+      count: normalizedData.length,
+      sampleSubmission: normalizedData.length > 0 ? {
+        id: normalizedData[0].id,
+        hasResponses: !!normalizedData[0].responses,
+        responsesType: typeof normalizedData[0].responses,
+        responsesKeys: normalizedData[0].responses ? Object.keys(normalizedData[0].responses) : [],
+        responsesValue: normalizedData[0].responses,
+      } : null,
+    })
+    
+    // 🔧 客户端过滤：确保只显示当前会话的提交（双重保险）
+    // 如果有 sessionId，严格过滤，不显示其他会话或课后提交
+    let finalData = normalizedData
+    if (props.sessionId) {
+      finalData = normalizedData.filter((s: any) => {
+        const submissionSessionId = s.sessionId || s.session_id
+        // 严格匹配：只显示当前 sessionId 的提交
+        return submissionSessionId === props.sessionId
+      })
+      
+      // 如果过滤后数据减少，说明后端可能没有正确过滤
+      if (finalData.length !== normalizedData.length) {
+        console.warn('⚠️ 发现不属于当前会话的提交，已过滤！', {
+          beforeFilter: normalizedData.length,
+          afterFilter: finalData.length,
+          expectedSessionId: props.sessionId,
+          filteredOut: normalizedData
+            .filter((s: any) => {
+              const submissionSessionId = s.sessionId || s.session_id
+              return submissionSessionId !== props.sessionId
+            })
+            .map((s: any) => ({
+              id: s.id,
+              studentName: s.studentName || s.student_name,
+              sessionId: s.sessionId || s.session_id,
+              lessonId: s.lessonId || s.lesson_id,
+            })),
+        })
+      }
+    }
+    
+    // 🔍 验证过滤结果：检查返回的提交是否都属于本节课
+    const filteredByLesson = finalData.filter((s: any) => {
+      const submissionLessonId = s.lessonId || s.lesson_id
+      return props.lessonId ? submissionLessonId === props.lessonId : true
+    })
+    
+    const filteredBySession = finalData.filter((s: any) => {
+      const submissionSessionId = s.sessionId || s.session_id
+      if (props.sessionId) {
+        return submissionSessionId === props.sessionId
+      }
+      // 如果没有 sessionId，也包含课后提交（session_id 为 null）
+      return submissionSessionId === null || submissionSessionId === undefined
+    })
+    
+    console.log('✅ 提交列表加载成功:', {
+      count: finalData.length,
+      beforeClientFilter: normalizedData.length,
+      filteredByLessonCount: filteredByLesson.length,
+      filteredBySessionCount: filteredBySession.length,
+      expectedLessonId: props.lessonId,
+      expectedSessionId: props.sessionId,
+      submissions: finalData.map((s: ActivitySubmissionWithStudent) => ({
         id: s.id,
         studentName: s.studentName || s.student_name,
         status: s.status,
         score: s.score,
+        lessonId: s.lessonId || (s as any).lesson_id,
+        sessionId: s.sessionId || (s as any).session_id,
+        submittedAt: s.submittedAt,
+        timeSpent: s.timeSpent,
+        hasResponses: !!s.responses && Object.keys(s.responses).length > 0,
+        responsesKeys: s.responses ? Object.keys(s.responses) : [],
       })),
+      sampleSubmission: finalData.length > 0 ? {
+        id: finalData[0].id,
+        lessonId: finalData[0].lessonId || (finalData[0] as any).lesson_id,
+        sessionId: finalData[0].sessionId || (finalData[0] as any).session_id,
+        submittedAt: finalData[0].submittedAt,
+        timeSpent: finalData[0].timeSpent,
+        responses: finalData[0].responses,
+      } : null,
     })
     
-    submissions.value = data as ActivitySubmissionWithStudent[]
+    // ⚠️ 如果发现不属于本节课的提交，发出警告
+    if (props.lessonId && filteredByLesson.length !== finalData.length) {
+      console.warn('⚠️ 发现不属于本节课的提交！', {
+        totalCount: finalData.length,
+        correctLessonCount: filteredByLesson.length,
+        expectedLessonId: props.lessonId,
+        incorrectSubmissions: finalData
+          .filter((s: any) => {
+            const submissionLessonId = s.lessonId || s.lesson_id
+            return props.lessonId && submissionLessonId !== props.lessonId
+          })
+          .map((s: any) => ({
+            id: s.id,
+            lessonId: s.lessonId || s.lesson_id,
+            sessionId: s.sessionId || s.session_id,
+          })),
+      })
+    }
+    
+    submissions.value = finalData as ActivitySubmissionWithStudent[]
   } catch (error: any) {
     console.error('❌ 加载提交列表失败:', error)
     console.error('错误详情:', {
