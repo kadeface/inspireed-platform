@@ -124,13 +124,78 @@ async def _process_zip_import(zip_content: bytes, current_user: User) -> tuple[D
         with open(zip_path, "wb") as f:
             f.write(zip_content)
         
-        with zipfile.ZipFile(zip_path, 'r') as zip_file:
+        try:
+            zip_file = zipfile.ZipFile(zip_path, 'r')
+        except zipfile.BadZipFile as e:
+            raise HTTPException(400, f"ZIP文件格式错误或已损坏: {str(e)}")
+        except Exception as e:
+            raise HTTPException(400, f"无法打开ZIP文件: {str(e)}")
+        
+        with zip_file:
             # 读取JSON数据
-            if "data.json" not in zip_file.namelist():
-                raise HTTPException(400, "ZIP文件中缺少data.json")
+            try:
+                file_list = zip_file.namelist()
+            except Exception as e:
+                raise HTTPException(400, f"无法读取ZIP文件列表: {str(e)}")
+            
+            if file_list is None:
+                raise HTTPException(400, "ZIP文件损坏或格式不正确")
+            
+            if "data.json" not in file_list:
+                available_files = ", ".join(file_list[:10])  # 显示前10个文件名
+                if len(file_list) > 10:
+                    available_files += f" ... (共 {len(file_list)} 个文件)"
+                raise HTTPException(400, f"ZIP文件中缺少data.json。可用文件: {available_files}")
             
             json_content = zip_file.read("data.json")
-            import_data = json.loads(json_content.decode("utf-8"))
+            
+            # 根据导出函数的实现，data.json 使用 UTF-8 编码
+            # 优先尝试 UTF-8，如果失败再尝试其他编码
+            import_data = None
+            last_decode_error = None
+            last_json_error = None
+            
+            # 优先使用 UTF-8（导出时使用的编码）
+            try:
+                decoded_content = json_content.decode('utf-8')
+                import_data = json.loads(decoded_content)
+            except UnicodeDecodeError as e:
+                last_decode_error = f"UTF-8解码失败: {str(e)}"
+                # 如果 UTF-8 失败，尝试其他编码
+                encodings = ['utf-8-sig', 'gbk', 'gb2312', 'gb18030']
+                for encoding in encodings:
+                    try:
+                        decoded_content = json_content.decode(encoding)
+                        try:
+                            import_data = json.loads(decoded_content)
+                            break  # 成功解析，跳出循环
+                        except json.JSONDecodeError as e:
+                            last_json_error = f"编码 {encoding}: JSON解析失败 - {str(e)}"
+                            continue
+                    except UnicodeDecodeError as e:
+                        continue  # 尝试下一个编码
+            except json.JSONDecodeError as e:
+                last_json_error = f"UTF-8编码JSON解析失败: {str(e)}"
+                # 显示错误位置附近的内容
+                try:
+                    decoded_content = json_content.decode('utf-8', errors='replace')
+                    if hasattr(e, 'pos') and e.pos is not None:
+                        start = max(0, e.pos - 100)
+                        end = min(len(decoded_content), e.pos + 100)
+                        context = decoded_content[start:end].replace('\n', '\\n').replace('\r', '\\r')
+                        last_json_error += f" (位置 {e.pos} 附近: ...{context}...)"
+                except:
+                    pass
+            
+            if import_data is None:
+                error_msg = "无法解析ZIP文件中的data.json。"
+                if last_json_error:
+                    error_msg += f" {last_json_error}"
+                elif last_decode_error:
+                    error_msg += f" {last_decode_error}"
+                else:
+                    error_msg += " 请确保文件是有效的JSON格式。"
+                raise HTTPException(400, error_msg)
             
             # 处理资源文件
             resources_dir = os.path.join(temp_dir, "resources")
@@ -159,16 +224,29 @@ async def _process_zip_import(zip_content: bytes, current_user: User) -> tuple[D
                     )
                     
                     # 上传文件
-                    upload_result = await upload_service.upload_file(upload_file)
-                    
-                    # 记录URL映射
-                    old_url = f"/uploads/resources/{original_filename}"
-                    new_url = upload_result["file_url"]
-                    url_mapping[old_url] = new_url
+                    try:
+                        upload_result = await upload_service.upload_file(upload_file)
+                        
+                        # 检查上传结果
+                        if not upload_result or "file_url" not in upload_result:
+                            print(f"警告: 文件 {original_filename} 上传失败或返回格式不正确")
+                            continue
+                        
+                        # 记录URL映射
+                        old_url = f"/uploads/resources/{original_filename}"
+                        new_url = upload_result["file_url"]
+                        url_mapping[old_url] = new_url
+                    except Exception as e:
+                        print(f"警告: 上传文件 {original_filename} 时出错: {str(e)}")
+                        continue
                     
                     # 也映射文件名（不包含路径）
                     url_mapping[original_filename] = new_url
                     url_mapping[f"resources/{original_filename}"] = new_url
+        
+        # 确保 import_data 不为 None
+        if import_data is None:
+            raise HTTPException(400, "ZIP文件处理失败：无法解析data.json")
     
     return import_data, url_mapping
 
@@ -177,6 +255,11 @@ def _update_urls_in_data(data: Dict, url_mapping: Dict[str, str]) -> Dict:
     """
     更新数据中的URL引用
     """
+    if data is None:
+        raise ValueError("data 不能为 None")
+    if url_mapping is None:
+        url_mapping = {}
+    
     import copy
     data = copy.deepcopy(data)
     
@@ -215,20 +298,24 @@ def _update_urls_in_data(data: Dict, url_mapping: Dict[str, str]) -> Dict:
     # 更新教案内容
     for lesson in data.get("lessons", []):
         lesson["content"] = update_urls_in_content(lesson.get("content", []))
-        if "cover_image_url" in lesson:
-            for old_url, new_url in url_mapping.items():
-                if old_url in lesson["cover_image_url"]:
-                    lesson["cover_image_url"] = new_url
-                    break
+        if "cover_image_url" in lesson and lesson["cover_image_url"]:
+            cover_image_url = lesson["cover_image_url"]
+            if isinstance(cover_image_url, str):
+                for old_url, new_url in url_mapping.items():
+                    if old_url in cover_image_url:
+                        lesson["cover_image_url"] = new_url
+                        break
     
     # 更新资源URL
     for resource in data.get("resources", []):
         for key in ["file_url", "thumbnail_url"]:
-            if key in resource:
-                for old_url, new_url in url_mapping.items():
-                    if old_url in resource[key]:
-                        resource[key] = new_url
-                        break
+            if key in resource and resource[key]:
+                resource_url = resource[key]
+                if isinstance(resource_url, str):
+                    for old_url, new_url in url_mapping.items():
+                        if old_url in resource_url:
+                            resource[key] = new_url
+                            break
     
     return data
 
@@ -742,18 +829,66 @@ async def import_courses(
     if not file.filename:
         raise HTTPException(400, "文件名不能为空")
     
-    is_zip = file.filename.endswith(".zip")
-    is_json = file.filename.endswith(".json")
+    # 先读取文件内容以检测实际格式
+    content = await file.read()
+    
+    if len(content) == 0:
+        raise HTTPException(400, "上传的文件为空")
+    
+    # 通过文件头（魔数）检测实际文件格式
+    # ZIP 文件签名: PK\x03\x04 或 PK\x05\x06 (空ZIP) 或 PK\x07\x08
+    is_zip_by_content = (
+        len(content) >= 4 and 
+        content[:2] == b'PK' and 
+        content[2:4] in [b'\x03\x04', b'\x05\x06', b'\x07\x08', b'\x50\x4b']
+    )
+    
+    # JSON 文件通常以 { 或 [ 开头（去除BOM后）
+    is_json_by_content = False
+    if len(content) > 0:
+        # 尝试检测 UTF-8 BOM
+        if content.startswith(b'\xef\xbb\xbf'):
+            content_start = content[3:].lstrip()
+        else:
+            content_start = content.lstrip()
+        
+        # 检查是否以 JSON 字符开头
+        try:
+            first_char = content_start[0:1]
+            is_json_by_content = first_char in [b'{', b'[']
+        except (IndexError, TypeError):
+            pass
+    
+    # 根据扩展名和实际内容判断文件类型
+    is_zip_by_ext = file.filename.lower().endswith(".zip")
+    is_json_by_ext = file.filename.lower().endswith(".json")
+    
+    # 如果扩展名和实际内容不匹配，给出警告并使用实际内容类型
+    if is_zip_by_ext and not is_zip_by_content and is_json_by_content:
+        # 扩展名是 .zip 但内容是 JSON
+        is_zip = False
+        is_json = True
+    elif is_json_by_ext and not is_json_by_content and is_zip_by_content:
+        # 扩展名是 .json 但内容是 ZIP（这是当前的情况）
+        is_zip = True
+        is_json = False
+    else:
+        # 使用扩展名判断，但优先使用实际内容
+        if is_zip_by_content:
+            is_zip = True
+            is_json = False
+        elif is_json_by_content:
+            is_zip = False
+            is_json = True
+        else:
+            # 使用扩展名
+            is_zip = is_zip_by_ext
+            is_json = is_json_by_ext
     
     if not (is_zip or is_json):
-        raise HTTPException(400, "文件必须是ZIP或JSON格式")
+        raise HTTPException(400, "文件必须是ZIP或JSON格式。检测到文件扩展名: " + file.filename)
 
     try:
-        # 读取文件内容
-        content = await file.read()
-
-        if len(content) == 0:
-            raise HTTPException(400, "上传的文件为空")
 
         # URL映射：旧URL -> 新URL（用于更新导入后的文件引用）
         url_mapping = {}
@@ -762,17 +897,103 @@ async def import_courses(
         if is_zip:
             import_data, url_mapping = await _process_zip_import(content, current_user)
         else:
-            # JSON文件，直接解析
-            try:
-                import_data = json.loads(content.decode("utf-8"))
-            except json.JSONDecodeError as e:
-                raise HTTPException(400, f"JSON解析失败: {str(e)}")
+            # JSON文件，尝试多种编码格式解析
+            # 注意：latin-1 可以解码任何字节，但可能产生乱码，所以放在最后
+            import_data = None
+            encodings = ['utf-8', 'utf-8-sig', 'gbk', 'gb2312', 'gb18030', 'latin-1']
+            last_decode_error = None
+            last_json_error = None
+            successful_decodings = []  # 记录成功解码但JSON解析失败的编码
+            decoded_preview = None  # 记录解码后的内容预览
+            
+            for encoding in encodings:
+                try:
+                    decoded_content = content.decode(encoding)
+                    # 检查解码后的内容是否看起来像JSON（以 { 或 [ 开头）
+                    stripped_content = decoded_content.strip()
+                    
+                    # 对于 latin-1，额外检查是否包含乱码字符（如果包含大量非ASCII且不是中文，可能是乱码）
+                    if encoding == 'latin-1':
+                        # 检查是否包含中文字符或常见的JSON字符
+                        has_chinese = any('\u4e00' <= char <= '\u9fff' for char in decoded_content[:500])
+                        has_json_chars = '{' in decoded_content[:100] or '[' in decoded_content[:100]
+                        # 如果既没有中文也没有JSON字符，可能是乱码
+                        if not has_chinese and not has_json_chars:
+                            continue
+                    
+                    if not (stripped_content.startswith('{') or stripped_content.startswith('[')):
+                        # 解码成功但内容不像JSON，记录并继续
+                        successful_decodings.append(encoding)
+                        if not decoded_preview:
+                            decoded_preview = decoded_content[:200]  # 保存前200个字符用于调试
+                        continue
+                    
+                    try:
+                        import_data = json.loads(decoded_content)
+                        break  # 成功解析，跳出循环
+                    except json.JSONDecodeError as e:
+                        last_json_error = f"编码 {encoding}: JSON解析失败 - {str(e)}"
+                        if hasattr(e, 'pos') and e.pos is not None:
+                            # 显示错误位置附近的内容
+                            start = max(0, e.pos - 50)
+                            end = min(len(decoded_content), e.pos + 50)
+                            context = decoded_content[start:end].replace('\n', '\\n').replace('\r', '\\r')
+                            last_json_error += f" (位置 {e.pos} 附近: ...{context}...)"
+                        successful_decodings.append(encoding)
+                        if not decoded_preview:
+                            decoded_preview = decoded_content[:200]  # 保存前200个字符用于调试
+                        continue
+                except UnicodeDecodeError as e:
+                    last_decode_error = f"编码 {encoding}: 解码失败 - {str(e)}"
+                    continue  # 尝试下一个编码
+            
+            if import_data is None:
+                # 构建详细的错误信息
+                error_msg = "无法解析JSON文件。"
+                
+                if successful_decodings:
+                    # 过滤掉 latin-1，因为它可能产生乱码
+                    valid_encodings = [e for e in successful_decodings if e != 'latin-1']
+                    if valid_encodings:
+                        error_msg += f" 文件可以解码为: {', '.join(valid_encodings)}，但JSON格式无效。"
+                    elif 'latin-1' in successful_decodings:
+                        error_msg += " 文件可能使用了非标准编码，解码后内容可能不正确。"
+                    
+                    if last_json_error:
+                        error_msg += f" {last_json_error}"
+                    
+                    # 显示解码后的内容预览（如果有）
+                    if decoded_preview:
+                        preview = decoded_preview.replace('\n', '\\n').replace('\r', '\\r')
+                        if len(preview) > 100:
+                            preview = preview[:100] + "..."
+                        error_msg += f" 文件开头内容: {preview}"
+                elif last_decode_error:
+                    error_msg += f" 无法解码文件内容。最后尝试: {last_decode_error}"
+                else:
+                    error_msg += " 请确保文件是有效的JSON格式且使用UTF-8或GBK编码。"
+                
+                raise HTTPException(400, error_msg)
 
         # 验证数据格式
+        if import_data is None:
+            raise HTTPException(400, "导入数据为空，请检查文件格式")
+        
+        if not isinstance(import_data, dict):
+            raise HTTPException(400, f"无效的导入文件格式：期望字典类型，实际为 {type(import_data).__name__}")
+        
+        # 确保 import_data 是字典类型后再检查 "data" 字段
         if not isinstance(import_data, dict) or "data" not in import_data:
-            raise HTTPException(400, "无效的导入文件格式")
+            raise HTTPException(400, "无效的导入文件格式：缺少 'data' 字段")
 
-        data = import_data["data"]
+        data = import_data.get("data")
+        
+        # 验证 data 字段
+        if data is None:
+            raise HTTPException(400, "无效的导入文件格式：'data' 字段为空")
+        
+        if not isinstance(data, dict):
+            raise HTTPException(400, f"无效的导入文件格式：'data' 字段必须是字典类型，实际为 {type(data).__name__}")
         
         # 更新URL引用（如果有文件映射）
         if url_mapping:
@@ -796,7 +1017,10 @@ async def import_courses(
         chapter_code_map = {}
 
         # 1. 导入学科
-        for subject_data in data.get("subjects", []):
+        # 注意：学科是共享的基础数据，即使overwrite_existing=True也不应该更新现有学科
+        # 避免因为导入某个课程而污染系统中其他课程使用的学科数据
+        subjects = data.get("subjects") or []
+        for subject_data in subjects:
             try:
                 # 检查是否已存在
                 existing = await db.execute(
@@ -807,15 +1031,8 @@ async def import_courses(
                 subject_id_value = None
 
                 if existing_subject:
-                    if overwrite_existing:
-                        # 更新现有学科
-                        for key, value in subject_data.items():
-                            if key != "code":
-                                setattr(existing_subject, key, value)
-                        await db.commit()
-                        import_result["subjects"]["skipped"] += 1
-                    else:
-                        import_result["subjects"]["skipped"] += 1
+                    # 学科已存在，直接使用现有学科，不更新（避免污染共享数据）
+                    import_result["subjects"]["skipped"] += 1
                     subject_id_value = existing_subject.id
                 else:
                     # 创建新学科
@@ -835,7 +1052,10 @@ async def import_courses(
                 )
 
         # 2. 导入年级
-        for grade_data in data.get("grades", []):
+        # 注意：年级是共享的基础数据，即使overwrite_existing=True也不应该更新现有年级
+        # 避免因为导入某个课程而污染系统中其他课程使用的年级数据
+        grades = data.get("grades") or []
+        for grade_data in grades:
             try:
                 # 验证必需字段
                 if "level" not in grade_data:
@@ -862,15 +1082,8 @@ async def import_courses(
                 grade_id_value = None
 
                 if existing_grade:
-                    if overwrite_existing:
-                        # 更新现有年级
-                        for key, value in grade_data.items():
-                            if key != "level":
-                                setattr(existing_grade, key, value)
-                        await db.commit()
-                        import_result["grades"]["skipped"] += 1
-                    else:
-                        import_result["grades"]["skipped"] += 1
+                    # 年级已存在，直接使用现有年级，不更新（避免污染共享数据）
+                    import_result["grades"]["skipped"] += 1
                     grade_id_value = existing_grade.id
                 else:
                     # 创建新年级，确保使用转换后的整数 level
@@ -892,7 +1105,8 @@ async def import_courses(
                 )
 
         # 3. 导入课程
-        for course_data in data.get("courses", []):
+        courses = data.get("courses") or []
+        for course_data in courses:
             try:
                 # 验证必需字段
                 if "subject_code" not in course_data:
@@ -1013,7 +1227,8 @@ async def import_courses(
                 )
 
         # 4. 导入章节
-        for chapter_data in data.get("chapters", []):
+        chapters = data.get("chapters") or []
+        for chapter_data in chapters:
             try:
                 # 获取课程ID
                 course_id = course_code_map.get(chapter_data["course_code"])
@@ -1082,7 +1297,8 @@ async def import_courses(
                 )
 
         # 5. 导入教案
-        for lesson_data in data.get("lessons", []):
+        lessons = data.get("lessons") or []
+        for lesson_data in lessons:
             try:
                 # 获取课程ID
                 course_id = course_code_map.get(lesson_data["course_code"])
@@ -1128,11 +1344,15 @@ async def import_courses(
                     # 因为教师导出教案就表示愿意与他人分享
                     imported_status = lesson_data.get("status", "draft")
                     # 如果导出时是已发布状态，保持已发布；如果是草稿，也设为已发布（共享）
-                    final_status = (
-                        LessonStatus.PUBLISHED 
-                        if imported_status in ["published", "draft"] 
-                        else LessonStatus(imported_status)
-                    )
+                    if imported_status and imported_status in ["published", "draft"]:
+                        final_status = LessonStatus.PUBLISHED
+                    elif imported_status:
+                        try:
+                            final_status = LessonStatus(imported_status)
+                        except (ValueError, TypeError):
+                            final_status = LessonStatus.PUBLISHED
+                    else:
+                        final_status = LessonStatus.PUBLISHED
                     
                     lesson = Lesson(
                         course_id=course_id,
@@ -1162,7 +1382,8 @@ async def import_courses(
                 )
 
         # 6. 导入资源
-        for resource_data in data.get("resources", []):
+        resources = data.get("resources") or []
+        for resource_data in resources:
             try:
                 # 获取章节ID
                 chapter_id = chapter_code_map.get(resource_data["chapter_code"])
@@ -1248,5 +1469,12 @@ async def import_courses(
             },
         }
 
+    except HTTPException:
+        # 重新抛出 HTTPException，保持原始错误信息
+        raise
     except Exception as e:
+        # 记录详细错误信息用于调试
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"导入失败 - 详细错误信息:\n{error_trace}")
         raise HTTPException(400, f"导入失败: {str(e)}")
