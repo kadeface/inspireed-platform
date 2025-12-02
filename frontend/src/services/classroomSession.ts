@@ -3,6 +3,7 @@
  */
 
 import api from './api'
+import logger from '../utils/logger'
 import type {
   ClassSession,
   ClassSessionCreate,
@@ -395,20 +396,20 @@ export const classroomSessionService = {
    */
   async getParticipants(sessionId: number, isActive?: boolean): Promise<StudentParticipation[]> {
     try {
-      console.log('👥 获取参与者列表:', { sessionId, isActive })
+      logger.poll('获取参与者列表', { sessionId, isActive })
       const params = isActive !== undefined ? { is_active: isActive } : {}
       // api.get 已经返回 response.data，所以 response 就是数据本身
       const response = await api.get(`/classroom-sessions/sessions/${sessionId}/participants`, { params })
-      console.log('📥 参与者列表响应:', response)
+      logger.debug('参与者列表响应', response)
       
       if (!response) {
-        console.warn('⚠️ 参与者列表为空')
+        logger.warn('参与者列表为空')
         return []
       }
       
       // 确保是数组
       const participants = Array.isArray(response) ? response : []
-      console.log(`📊 找到 ${participants.length} 个参与者`)
+      logger.debug(`找到 ${participants.length} 个参与者`)
       
       // 处理字段映射（snake_case 到 camelCase）
       return participants.map((p: any) => {
@@ -441,8 +442,8 @@ export const classroomSessionService = {
         return participant
       })
     } catch (error: any) {
-      console.error('❌ 获取参与者列表失败:', error)
-      console.error('❌ 错误详情:', {
+      logger.error('获取参与者列表失败:', error)
+      logger.error('错误详情:', {
         message: error.message,
         response: error.response,
         status: error.response?.status,

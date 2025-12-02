@@ -584,6 +584,7 @@ import ClassroomSwitcher from './ClassroomSwitcher.vue'
 import ClassroomControlBoard from './ClassroomControlBoard.vue'
 import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
 import activityService from '../../services/activity'
+import logger from '@/utils/logger'
 
 // Cell类型图标组件
 const CellTypeIcon = (props: { type: string }) => {
@@ -2023,7 +2024,7 @@ async function loadParticipants() {
     return
   }
   
-  console.log('🔄 开始加载在线学生列表，会话ID:', session.value.id)
+  logger.poll('开始加载在线学生列表', { sessionId: session.value.id })
   loadingStudents.value = true
   try {
     // 获取所有在线学生（is_active=true）
@@ -2035,7 +2036,7 @@ async function loadParticipants() {
       : []
     
     activeStudents.value = activeParticipants
-    console.log(`👥 加载在线学生完成: ${activeStudents.value.length} 人`, activeStudents.value.map(s => ({
+    logger.debug(`加载在线学生完成: ${activeStudents.value.length} 人`, activeStudents.value.map(s => ({
       id: s.id,
       name: s.studentName || s.student_name,
       isActive: s.isActive || s.is_active,
@@ -2044,7 +2045,7 @@ async function loadParticipants() {
     // 更新会话统计中的在线学生数
     if (session.value) {
       session.value.activeStudents = activeStudents.value.length
-      console.log('📊 更新会话统计，在线学生数:', session.value.activeStudents)
+      logger.debug('更新会话统计，在线学生数:', session.value.activeStudents)
     }
   } catch (error: any) {
     console.error('❌ 加载学生列表失败:', error)

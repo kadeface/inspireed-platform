@@ -9,6 +9,7 @@ interface FeatureFlags {
   'use-x6-editor': boolean
   'use-mindmap': boolean
   'use-auto-save': boolean
+  'use-surveyjs': boolean  // 是否使用 SurveyJS 渲染活动模块
   [key: string]: boolean
 }
 
@@ -18,6 +19,7 @@ const defaultFlags: FeatureFlags = {
   'use-x6-editor': import.meta.env.VITE_USE_X6_EDITOR !== 'false', // 默认 true，除非环境变量明确设为 false
   'use-mindmap': import.meta.env.VITE_USE_MINDMAP === 'true' || true, // 默认启用思维导图
   'use-auto-save': import.meta.env.VITE_USE_AUTO_SAVE === 'true' || true,
+  'use-surveyjs': import.meta.env.VITE_USE_SURVEYJS === 'true' || false, // 默认 false，可通过环境变量启用
 }
 
 // 从 localStorage 读取用户自定义的特性开关

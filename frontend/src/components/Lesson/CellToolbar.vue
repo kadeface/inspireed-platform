@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="rootRef"
     :class="[
       'bg-white border-r border-gray-200 transition-all duration-300',
       collapsed ? 'w-16' : 'w-64',
@@ -33,7 +34,7 @@
     </div>
 
     <!-- Cell 类型列表 -->
-    <div class="p-2 space-y-2 overflow-y-auto" style="max-height: calc(100vh - 180px)">
+    <div ref="scrollContainerRef" class="p-2 space-y-2 overflow-y-auto" style="max-height: calc(100vh - 80px)">
       <button
         v-for="cellType in cellTypes"
         :key="cellType.type"
@@ -92,6 +93,15 @@ const emit = defineEmits<{
 
 const isAdding = ref(false)
 const addingCellType = ref<CellType | null>(null)
+const scrollContainerRef = ref<HTMLElement | null>(null)
+const rootRef = ref<HTMLElement | null>(null)
+
+// 暴露滚动容器引用给父组件
+defineExpose({
+  scrollContainer: scrollContainerRef,
+  getScrollContainer: () => scrollContainerRef.value,
+  rootElement: rootRef,
+})
 
 // Cell 类型定义
 const cellTypes = [

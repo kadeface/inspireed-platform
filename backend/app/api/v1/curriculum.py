@@ -24,6 +24,8 @@ from app.schemas.curriculum import (
     CourseTreeNode,
     CourseWithChaptersResponse,
     ChapterTreeNode,
+    CourseMergeRequest,
+    CourseMergeResponse,
 )
 from app.api.v1.auth import get_current_active_user
 
@@ -273,6 +275,42 @@ async def update_course(
 
     # 更新字段
     update_data = course_in.model_dump(exclude_unset=True)
+    
+    # 如果更新年级，需要验证
+    if "grade_id" in update_data:
+        new_grade_id = update_data["grade_id"]
+        if new_grade_id != course.grade_id:
+            # 验证新年级是否存在且启用
+            grade_result = await db.execute(
+                select(Grade).where(Grade.id == new_grade_id)
+            )
+            new_grade = grade_result.scalar_one_or_none()
+            if not new_grade:
+                raise HTTPException(status_code=404, detail="年级不存在")
+            if not new_grade.is_active:
+                raise HTTPException(status_code=400, detail="目标年级已被禁用，无法调整")
+            
+            # 检查课程下是否有教案或章节（仅作为警告，不阻止操作）
+            lesson_count_result = await db.execute(
+                select(func.count(Lesson.id)).where(Lesson.course_id == course_id)
+            )
+            lesson_count = lesson_count_result.scalar() or 0
+            
+            chapter_count_result = await db.execute(
+                select(func.count(Chapter.id)).where(Chapter.course_id == course_id)
+            )
+            chapter_count = chapter_count_result.scalar() or 0
+            
+            # 如果有数据，记录警告信息（可以通过响应头或日志记录）
+            if lesson_count > 0 or chapter_count > 0:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"课程 {course_id} 调整年级从 {course.grade_id} 到 {new_grade_id}，"
+                    f"课程下有 {lesson_count} 个教案和 {chapter_count} 个章节"
+                )
+    
+    # 更新所有字段
     for field, value in update_data.items():
         setattr(course, field, value)
 
@@ -304,6 +342,82 @@ async def delete_course(
 
     await db.delete(course)
     await db.commit()
+
+
+@router.get("/courses/by-code/{course_code}", response_model=List[CourseResponse])
+async def get_courses_by_code(
+    course_code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> Any:
+    """根据课程代码查找所有具有相同代码的课程（用于合并）
+    支持去除首尾空格后的模糊匹配，以处理代码中的空格差异
+    """
+    from sqlalchemy import func
+    
+    # 去除输入代码的首尾空格
+    normalized_code = course_code.strip()
+    
+    # 使用 func.trim 去除数据库中的首尾空格后比较
+    result = await db.execute(
+        select(Course)
+        .options(selectinload(Course.subject), selectinload(Course.grade))
+        .where(func.trim(Course.code) == normalized_code)
+        .order_by(Course.created_at)
+    )
+    courses = result.scalars().all()
+    return courses
+
+
+@router.post("/courses/merge", response_model=CourseMergeResponse)
+async def merge_courses(
+    merge_request: CourseMergeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> Any:
+    """合并课程（将源课程的数据合并到目标课程）"""
+    from app.utils.course_merge import merge_courses_impl
+    
+    # 验证源课程和目标课程
+    source_result = await db.execute(
+        select(Course)
+        .options(selectinload(Course.subject), selectinload(Course.grade))
+        .where(Course.id == merge_request.source_course_id)
+    )
+    source_course = source_result.scalar_one_or_none()
+    
+    target_result = await db.execute(
+        select(Course)
+        .options(selectinload(Course.subject), selectinload(Course.grade))
+        .where(Course.id == merge_request.target_course_id)
+    )
+    target_course = target_result.scalar_one_or_none()
+    
+    if not source_course:
+        raise HTTPException(status_code=404, detail="源课程不存在")
+    if not target_course:
+        raise HTTPException(status_code=404, detail="目标课程不存在")
+    if source_course.id == target_course.id:
+        raise HTTPException(status_code=400, detail="源课程和目标课程不能相同")
+    
+    # 验证课程代码是否相同（去除首尾空格后比较）
+    from sqlalchemy import func
+    source_code_normalized = (source_course.code or '').strip()
+    target_code_normalized = (target_course.code or '').strip()
+    
+    if source_code_normalized != target_code_normalized:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"课程代码不匹配：源课程代码为 '{source_course.code}'，目标课程代码为 '{target_course.code}'"
+        )
+    
+    try:
+        result = await merge_courses_impl(merge_request, db, source_course, target_course)
+        await db.commit()
+        return result
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"合并课程失败: {str(e)}")
 
 
 # ==================== Curriculum Tree Endpoint ====================

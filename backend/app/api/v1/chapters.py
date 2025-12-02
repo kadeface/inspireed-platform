@@ -337,6 +337,21 @@ async def get_course_chapters(
     chapters = [row[0] for row in chapters_with_counts]
     resource_counts = {row[0].id: row[1] for row in chapters_with_counts}
 
+    # 获取每个章节的教案数量
+    from app.models.lesson import Lesson
+    lesson_count_query = (
+        select(Lesson.chapter_id, func.count(Lesson.id).label("count"))
+        .where(Lesson.course_id == course_id)
+        .group_by(Lesson.chapter_id)
+    )
+    lesson_count_result = await db.execute(lesson_count_query)
+    lesson_counts: dict[int, int] = {}
+    for row in lesson_count_result:
+        chapter_id_val = row[0]
+        if chapter_id_val is not None:
+            count_value = row[1]
+            lesson_counts[int(chapter_id_val)] = int(count_value or 0)
+
     # 如果需要树形结构
     if include_children:
         # 构建章节树
@@ -354,6 +369,7 @@ async def get_course_chapters(
                 updated_at=ch.updated_at,
                 children=[],
                 resources_count=resource_counts.get(ch.id, 0),
+                lesson_count=lesson_counts.get(ch.id, 0),
             )
             for ch in chapters
         }
@@ -385,6 +401,7 @@ async def get_course_chapters(
                 updated_at=ch.updated_at,
                 children=[],
                 resources_count=resource_counts.get(ch.id, 0),
+                lesson_count=lesson_counts.get(ch.id, 0),
             )
             for ch in chapters
         ]

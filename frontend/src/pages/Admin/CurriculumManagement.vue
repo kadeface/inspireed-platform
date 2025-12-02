@@ -154,6 +154,14 @@
                     </div>
                     <div class="flex gap-2" @click.stop>
                       <button
+                        v-if="course.code"
+                        @click="openMergeModal(course)"
+                        class="px-2 py-1 text-sm bg-purple-100 text-purple-600 rounded hover:bg-purple-200"
+                        title="合并相同代码的课程"
+                      >
+                        合并
+                      </button>
+                      <button
                         @click="editCourse(course, subject, grade)"
                         class="px-2 py-1 text-sm bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
                       >
@@ -202,8 +210,16 @@
                         <div class="chapter-node flex items-center justify-between gap-2 p-2 bg-purple-50 rounded hover:bg-purple-100">
                           <div class="flex items-center gap-2">
                             <button
+                              @click.stop="toggleChapterLessons(chapter.id)"
+                              class="text-purple-600 hover:text-purple-800"
+                              title="展开/收起教案"
+                            >
+                              <span>{{ expandedLessons.has(chapter.id) ? '▼' : '▶' }}</span>
+                            </button>
+                            <button
                               @click.stop="toggleChapterResources(chapter.id)"
                               class="text-purple-600 hover:text-purple-800"
+                              title="展开/收起资源"
                             >
                               <span>{{ expandedResources.has(chapter.id) ? '▼' : '▶' }}</span>
                             </button>
@@ -212,8 +228,18 @@
                             <span v-if="chapter.code" class="text-sm text-gray-500">({{ chapter.code }})</span>
                             <span v-if="chapter.description" class="text-sm text-gray-600">{{ chapter.description }}</span>
                             <span v-if="!chapter.is_active" class="px-1 py-0.5 bg-red-100 text-red-600 text-xs rounded">已禁用</span>
+                            <span v-if="chapter.lesson_count !== undefined && chapter.lesson_count > 0" class="text-sm text-orange-600">
+                              {{ chapter.lesson_count }} 个教案
+                            </span>
                           </div>
                           <div class="flex gap-1" @click.stop>
+                            <button
+                              @click="associateLessonToChapter(chapter, course)"
+                              class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200 font-medium"
+                              title="关联教案"
+                            >
+                              📄 关联教案
+                            </button>
                             <button
                               @click="uploadResourceToChapter(chapter)"
                               class="px-2 py-1 text-xs bg-green-100 text-green-600 rounded hover:bg-green-200"
@@ -238,6 +264,16 @@
                           </div>
                         </div>
                         
+                        <!-- 主章节教案列表 -->
+                        <div v-if="expandedLessons.has(chapter.id)" class="ml-8 mt-1">
+                          <ChapterLessonList
+                            :chapter-id="chapter.id"
+                            :can-unlink="true"
+                            @refresh="handleChapterLessonRefresh(chapter.id)"
+                            @view="handleViewLesson"
+                          />
+                        </div>
+                        
                         <!-- 主章节资源列表 -->
                         <div v-if="expandedResources.has(chapter.id)" class="ml-8 mt-1">
                           <ChapterResourceList
@@ -258,8 +294,16 @@
                             <div class="chapter-node flex items-center justify-between gap-2 p-2 bg-purple-25 rounded hover:bg-purple-75">
                               <div class="flex items-center gap-2">
                                 <button
+                                  @click.stop="toggleChapterLessons(child.id)"
+                                  class="text-gray-400 hover:text-gray-600"
+                                  title="展开/收起教案"
+                                >
+                                  <span>{{ expandedLessons.has(child.id) ? '▼' : '▶' }}</span>
+                                </button>
+                                <button
                                   @click.stop="toggleChapterResources(child.id)"
                                   class="text-gray-400 hover:text-gray-600"
+                                  title="展开/收起资源"
                                 >
                                   <span>{{ expandedResources.has(child.id) ? '▼' : '▶' }}</span>
                                 </button>
@@ -269,8 +313,18 @@
                                 <span v-if="child.code" class="text-sm text-gray-500">({{ child.code }})</span>
                                 <span v-if="child.description" class="text-sm text-gray-600">{{ child.description }}</span>
                                 <span v-if="!child.is_active" class="px-1 py-0.5 bg-red-100 text-red-600 text-xs rounded">已禁用</span>
+                                <span v-if="child.lesson_count !== undefined && child.lesson_count > 0" class="text-sm text-orange-600">
+                                  {{ child.lesson_count }} 个教案
+                                </span>
                               </div>
                               <div class="flex gap-1" @click.stop>
+                                <button
+                                  @click="associateLessonToChapter(child, course)"
+                                  class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200 font-medium"
+                                  title="关联教案"
+                                >
+                                  📄 关联教案
+                                </button>
                                 <button
                                   @click="uploadResourceToChapter(child)"
                                   class="px-2 py-1 text-xs bg-green-100 text-green-600 rounded hover:bg-green-200"
@@ -295,6 +349,16 @@
                               </div>
                             </div>
                             
+                            <!-- 子章节教案列表 -->
+                            <div v-if="expandedLessons.has(child.id)" class="ml-8 mt-1">
+                              <ChapterLessonList
+                                :chapter-id="child.id"
+                                :can-unlink="true"
+                                @refresh="handleChapterLessonRefresh(child.id)"
+                                @view="handleViewLesson"
+                              />
+                            </div>
+                            
                             <!-- 子章节资源列表 -->
                             <div v-if="expandedResources.has(child.id)" class="ml-8 mt-1">
                               <ChapterResourceList
@@ -310,9 +374,12 @@
                     </div>
                     
                     <!-- Empty State -->
-                    <div v-else class="flex items-center gap-2 p-2 text-gray-500">
-                      <span>📄</span>
-                      <span class="text-sm">暂无章节</span>
+                    <div v-else class="flex flex-col items-start gap-2 p-3 text-gray-500 bg-gray-50 rounded">
+                      <div class="flex items-center gap-2">
+                        <span>📄</span>
+                        <span class="text-sm font-medium">暂无章节</span>
+                      </div>
+                      <p class="text-xs text-gray-400 ml-6">请先添加章节，然后可以在章节上关联教案</p>
                     </div>
                   </div>
                 </div>
@@ -368,6 +435,23 @@
       @close="closeChapterResourceUploadModal"
       @success="handleResourceUploadSuccess"
     />
+
+    <!-- Associate Lesson Modal -->
+    <AssociateLessonModal
+      :is-open="showAssociateLessonModal"
+      :chapter="associatingToChapter"
+      :course-id="associatingToCourseId"
+      @close="closeAssociateLessonModal"
+      @success="handleAssociateLessonSuccess"
+    />
+    
+    <CourseMergeModal
+      :is-open="showMergeModal"
+      :course-code="mergeCourseCode"
+      :current-course-id="mergeCurrentCourseId"
+      @close="closeMergeModal"
+      @success="handleMergeSuccess"
+    />
   </div>
 </template>
 
@@ -381,6 +465,9 @@ import ImportChaptersModal from '@/components/Curriculum/ImportChaptersModal.vue
 import ChapterEditModal from '../../components/Curriculum/ChapterEditModal.vue'
 import ChapterResourceUploadModal from '../../components/Curriculum/ChapterResourceUploadModal.vue'
 import ChapterResourceList from '../../components/Curriculum/ChapterResourceList.vue'
+import ChapterLessonList from '../../components/Curriculum/ChapterLessonList.vue'
+import AssociateLessonModal from '../../components/Curriculum/AssociateLessonModal.vue'
+import CourseMergeModal from '../../components/Curriculum/CourseMergeModal.vue'
 import { useToast } from '@/composables/useToast'
 
 const toast = useToast()
@@ -395,6 +482,7 @@ const expandedSubjects = ref(new Set<number>())
 const expandedGrades = ref(new Set<string>())
 const expandedCourses = ref(new Set<number>())
 const expandedResources = ref(new Set<number>())
+const expandedLessons = ref(new Set<number>())
 const courseChapters = ref<Map<number, any[]>>(new Map())
 const loadingChapters = ref(new Set<number>())
 
@@ -411,6 +499,12 @@ const showChapterEditModal = ref(false)
 const editingChapter = ref<any>(null)
 const showChapterResourceUploadModal = ref(false)
 const uploadingToChapter = ref<any>(null)
+const showAssociateLessonModal = ref(false)
+const showMergeModal = ref(false)
+const mergeCourseCode = ref('')
+const mergeCurrentCourseId = ref<number | undefined>(undefined)
+const associatingToChapter = ref<any>(null)
+const associatingToCourseId = ref<number>(0)
 
 // 计算所有课程的扁平列表
 const allCourses = computed(() => {
@@ -452,6 +546,14 @@ function toggleChapterResources(chapterId: number) {
     expandedResources.value.delete(chapterId)
   } else {
     expandedResources.value.add(chapterId)
+  }
+}
+
+function toggleChapterLessons(chapterId: number) {
+  if (expandedLessons.value.has(chapterId)) {
+    expandedLessons.value.delete(chapterId)
+  } else {
+    expandedLessons.value.add(chapterId)
   }
 }
 
@@ -740,6 +842,88 @@ function handleResourceUploadSuccess(resourceId: number) {
   console.log('Resource uploaded successfully:', resourceId)
   toast.success('资源上传成功！')
   closeChapterResourceUploadModal()
+}
+
+// 关联教案相关方法
+function associateLessonToChapter(chapter: any, course: any) {
+  associatingToChapter.value = chapter
+  associatingToCourseId.value = course.id
+  showAssociateLessonModal.value = true
+}
+
+function closeAssociateLessonModal() {
+  showAssociateLessonModal.value = false
+  associatingToChapter.value = null
+  associatingToCourseId.value = 0
+}
+
+function handleAssociateLessonSuccess() {
+  console.log('Lessons associated successfully')
+  // 重新加载相关课程的章节（以更新教案数量）
+  if (associatingToChapter.value?.course_id) {
+    courseChapters.value.delete(associatingToChapter.value.course_id)
+    loadCourseChapters(associatingToChapter.value.course_id)
+  }
+  closeAssociateLessonModal()
+}
+
+function handleChapterLessonRefresh(chapterId: number) {
+  // 重新加载相关课程的章节（以更新教案数量）
+  const chapter = findChapterById(chapterId)
+  if (chapter?.course_id) {
+    courseChapters.value.delete(chapter.course_id)
+    loadCourseChapters(chapter.course_id)
+  }
+}
+
+// 课程合并相关方法
+function openMergeModal(course: any) {
+  if (!course.code) {
+    toast.warning('该课程没有课程代码，无法合并')
+    return
+  }
+  mergeCourseCode.value = course.code
+  mergeCurrentCourseId.value = course.id
+  showMergeModal.value = true
+}
+
+function closeMergeModal() {
+  showMergeModal.value = false
+  mergeCourseCode.value = ''
+  mergeCurrentCourseId.value = undefined
+}
+
+async function handleMergeSuccess() {
+  console.log('Courses merged successfully')
+  // 重新加载课程树
+  await loadCurriculumTree()
+  closeMergeModal()
+}
+
+function findChapterById(chapterId: number): any {
+  for (const chapters of courseChapters.value.values()) {
+    const found = findChapterInTree(chapters, chapterId)
+    if (found) return found
+  }
+  return null
+}
+
+function findChapterInTree(chapters: any[], chapterId: number): any {
+  for (const chapter of chapters) {
+    if (chapter.id === chapterId) return chapter
+    if (chapter.children) {
+      const found = findChapterInTree(chapter.children, chapterId)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+// 查看教案
+function handleViewLesson(lesson: any) {
+  // 在新窗口中打开教案编辑页面
+  const lessonUrl = `/lessons/${lesson.id}`
+  window.open(lessonUrl, '_blank')
 }
 
 </script>

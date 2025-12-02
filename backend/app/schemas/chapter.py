@@ -52,6 +52,7 @@ class ChapterWithChildren(ChapterResponse):
 
     children: List["ChapterWithChildren"] = []
     resources_count: int = Field(default=0, description="资源数量")
+    lesson_count: int = Field(default=0, description="教案数量")
 
 
 class ChapterListResponse(BaseModel):

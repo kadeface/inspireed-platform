@@ -232,6 +232,7 @@ import activityService from '../../../services/activity'
 import GradingModal from './GradingModal.vue'
 import { useRealtimeChannel } from '@/composables/useRealtimeChannel'
 import type { WebSocketMessage } from '@/composables/useRealtimeChannel'
+import logger from '@/utils/logger'
 
 // 扩展 ActivitySubmission 类型，包含学生信息（API 返回的数据包含这些字段）
 interface ActivitySubmissionWithStudent extends ActivitySubmission {
@@ -290,11 +291,11 @@ const statistics = computed(() => {
 const choiceItemsWithStats = computed(() => {
   try {
     if (!props.activity?.items || submissions.value.length === 0) {
-      console.log('📊 choiceItemsWithStats: 缺少数据', {
-        hasItems: !!props.activity?.items,
-        itemsCount: props.activity?.items?.length,
-        submissionsCount: submissions.value.length,
-      })
+    logger.debug('choiceItemsWithStats: 缺少数据', {
+      hasItems: !!props.activity?.items,
+      itemsCount: props.activity?.items?.length,
+      submissionsCount: submissions.value.length,
+    })
       return []
     }
     
@@ -302,11 +303,11 @@ const choiceItemsWithStats = computed(() => {
     const items = props.activity.items.filter((item: any) => item && choiceTypes.includes(item.type))
     
     if (items.length === 0) {
-      console.log('📊 choiceItemsWithStats: 没有选择题')
+      logger.debug('choiceItemsWithStats: 没有选择题')
       return []
     }
     
-    console.log('📊 choiceItemsWithStats: 开始计算', {
+    logger.debug('choiceItemsWithStats: 开始计算', {
       itemsCount: items.length,
       submissionsCount: submissions.value.length,
       submissions: submissions.value.map(s => ({
@@ -366,7 +367,7 @@ const choiceItemsWithStats = computed(() => {
       
       totalResponses = allAnswers.length
       
-      console.log(`📊 题目 ${index + 1} (${itemId}):`, {
+      logger.debug(`题目 ${index + 1} (${itemId}):`, {
         itemId,
         itemIdStr,
         totalResponses,
@@ -411,7 +412,7 @@ const choiceItemsWithStats = computed(() => {
         }
       })
       
-      console.log(`📊 题目 ${index + 1} 选项分布:`, optionDistribution)
+      logger.debug(`题目 ${index + 1} 选项分布:`, optionDistribution)
       
       // 获取选项列表
       let options: Array<{ id: string; label: string; isCorrect?: boolean; count: number; percentage: number }> = []
@@ -464,7 +465,7 @@ const choiceItemsWithStats = computed(() => {
           ]
         }
       } catch (error) {
-        console.error('处理选择题选项时出错:', error, item)
+        logger.error('处理选择题选项时出错:', error, item)
         options = []
       }
       
@@ -477,7 +478,7 @@ const choiceItemsWithStats = computed(() => {
       }
     }).filter((item: any) => item && item.options && item.options.length > 0)
   } catch (error) {
-    console.error('计算选择题统计时出错:', error)
+    logger.error('计算选择题统计时出错:', error)
     return []
   }
 })
@@ -551,7 +552,7 @@ function formatTime(seconds: number): string {
 async function loadSubmissions() {
   loading.value = true
   try {
-    console.log('📥 加载提交列表...', {
+    logger.poll('加载提交列表', {
       cellId: props.cellId,
       sessionId: props.sessionId,
       lessonId: props.lessonId,
@@ -566,7 +567,7 @@ async function loadSubmissions() {
     )
     
     // 🔍 调试：检查原始数据
-    console.log('🔍 原始 API 数据:', {
+    logger.debug('原始 API 数据:', {
       count: data.length,
       allSubmissions: data.map((s: any) => ({
         id: s.id,
@@ -629,7 +630,7 @@ async function loadSubmissions() {
     })
     
     // 🔍 调试：检查转换后的数据
-    console.log('🔍 转换后的数据:', {
+    logger.debug('转换后的数据:', {
       count: normalizedData.length,
       sampleSubmission: normalizedData.length > 0 ? {
         id: normalizedData[0].id,
@@ -652,7 +653,7 @@ async function loadSubmissions() {
       
       // 如果过滤后数据减少，说明后端可能没有正确过滤
       if (finalData.length !== normalizedData.length) {
-        console.warn('⚠️ 发现不属于当前会话的提交，已过滤！', {
+        logger.warn('发现不属于当前会话的提交，已过滤！', {
           beforeFilter: normalizedData.length,
           afterFilter: finalData.length,
           expectedSessionId: props.sessionId,
@@ -686,7 +687,7 @@ async function loadSubmissions() {
       return submissionSessionId === null || submissionSessionId === undefined
     })
     
-    console.log('✅ 提交列表加载成功:', {
+    logger.info('提交列表加载成功:', {
       count: finalData.length,
       beforeClientFilter: normalizedData.length,
       filteredByLessonCount: filteredByLesson.length,
@@ -717,7 +718,7 @@ async function loadSubmissions() {
     
     // ⚠️ 如果发现不属于本节课的提交，发出警告
     if (props.lessonId && filteredByLesson.length !== finalData.length) {
-      console.warn('⚠️ 发现不属于本节课的提交！', {
+      logger.warn('发现不属于本节课的提交！', {
         totalCount: finalData.length,
         correctLessonCount: filteredByLesson.length,
         expectedLessonId: props.lessonId,
@@ -736,8 +737,8 @@ async function loadSubmissions() {
     
     submissions.value = finalData as ActivitySubmissionWithStudent[]
   } catch (error: any) {
-    console.error('❌ 加载提交列表失败:', error)
-    console.error('错误详情:', {
+    logger.error('加载提交列表失败:', error)
+    logger.error('错误详情:', {
       message: error.message,
       response: error.response?.data,
       status: error.response?.status,
@@ -782,7 +783,7 @@ async function handleBulkGrade() {
     selectedSubmissions.value = []
     loadSubmissions()
   } catch (error) {
-    console.error('Bulk grade failed:', error)
+    logger.error('Bulk grade failed:', error)
     alert('批量评分失败')
   }
 }
@@ -798,7 +799,7 @@ async function handleBulkReturn() {
     selectedSubmissions.value = []
     loadSubmissions()
   } catch (error) {
-    console.error('Bulk return failed:', error)
+    logger.error('Bulk return failed:', error)
     alert('批量退回失败')
   }
 }
@@ -829,7 +830,7 @@ function handleNewSubmission(message: WebSocketMessage) {
     return
   }
   
-  console.log('📬 收到新提交通知，刷新列表...', {
+  logger.info('收到新提交通知，刷新列表', {
     submissionId: message.data.submission_id,
     messageCellId,
     propsCellId,
@@ -850,7 +851,7 @@ function handleStatisticsUpdate(message: WebSocketMessage) {
     return
   }
   
-  console.log('📊 收到统计更新通知，刷新列表...', {
+  logger.info('收到统计更新通知，刷新列表', {
     messageCellId,
     propsCellId,
   })
@@ -871,14 +872,14 @@ onMounted(async () => {
       await connectRealtime()
       registerListener('new_submission', handleNewSubmission)
       registerListener('submission_statistics_updated', handleStatisticsUpdate)
-      console.log('✅ SubmissionList: WebSocket 连接成功，将使用实时推送')
+      logger.info('SubmissionList: WebSocket 连接成功，将使用实时推送')
       
       // 即使 WebSocket 连接成功，也启动轮询作为备用（每10秒）
       pollingInterval = setInterval(() => {
         loadSubmissions()
       }, 10000)
     } catch (error) {
-      console.warn('⚠️ SubmissionList: WebSocket 连接失败，降级到轮询模式', error)
+      logger.warn('SubmissionList: WebSocket 连接失败，降级到轮询模式', error)
       // WebSocket 失败时，定期刷新（每5秒）
       pollingInterval = setInterval(() => {
         loadSubmissions()
@@ -886,7 +887,7 @@ onMounted(async () => {
     }
   } else {
     // 没有 sessionId 时，也启动轮询（每5秒）
-    console.log('⚠️ SubmissionList: 没有 sessionId，使用轮询模式')
+    logger.poll('SubmissionList: 没有 sessionId，使用轮询模式')
     pollingInterval = setInterval(() => {
       loadSubmissions()
     }, 5000)

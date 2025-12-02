@@ -559,13 +559,34 @@ async def update_lesson(
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
 
-    if cast(Optional[int], lesson.creator_id) != current_user.id:
-        raise HTTPException(status_code=403, detail="无权修改该教案")
-
+    # 权限检查：创建者可以修改，管理员和研究员也可以修改（用于课程管理）
+    role_value = cast(str, getattr(current_user.role, "value", current_user.role))
+    try:
+        user_role = UserRole(role_value)
+    except ValueError:
+        user_role = None
+    
+    is_admin = user_role == UserRole.ADMIN
+    is_researcher = user_role == UserRole.RESEARCHER
+    is_creator = cast(Optional[int], lesson.creator_id) == current_user.id
+    
     # 如果更新 course_id，验证课程存在
     # 使用 exclude_unset=True 只包含明确设置的字段
     # 注意：空数组 [] 会被视为已设置，所以会被包含
     update_data = lesson_in.model_dump(exclude_unset=True)
+    
+    # 如果只是更新 chapter_id（关联到章节），管理员和研究员也可以操作
+    is_only_chapter_update = len(update_data) == 1 and 'chapter_id' in update_data
+    
+    if not is_creator:
+        if not (is_admin or is_researcher):
+            raise HTTPException(status_code=403, detail="无权修改该教案")
+        # 管理员和研究员只能更新章节关联，不能修改其他内容
+        if not is_only_chapter_update:
+            raise HTTPException(
+                status_code=403, 
+                detail="管理员和研究员只能关联教案到章节，不能修改教案的其他内容"
+            )
     
     # 调试日志：记录更新数据（包括原始请求数据）
     import logging

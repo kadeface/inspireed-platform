@@ -12,7 +12,9 @@ import type {
   Chapter,
   ChapterCreate,
   ChapterUpdate,
-  CourseWithChapters
+  CourseWithChapters,
+  CourseMergeRequest,
+  CourseMergeResponse
 } from '@/types/curriculum'
 
 export const curriculumService = {
@@ -88,6 +90,27 @@ export const curriculumService = {
    */
   async deleteCourse(courseId: number): Promise<void> {
     await api.delete(`/curriculum/courses/${courseId}`)
+  },
+
+  /**
+   * 获取课程详情及其章节（包含统计数据）
+   */
+  async getCourseWithChapters(courseId: number): Promise<CourseWithChapters> {
+    return await api.get(`/curriculum/courses/${courseId}/with-chapters`)
+  },
+
+  /**
+   * 根据课程代码查找所有具有相同代码的课程
+   */
+  async getCoursesByCode(courseCode: string): Promise<Course[]> {
+    return await api.get(`/curriculum/courses/by-code/${courseCode}`)
+  },
+
+  /**
+   * 合并课程
+   */
+  async mergeCourses(mergeRequest: CourseMergeRequest): Promise<CourseMergeResponse> {
+    return await api.post('/curriculum/courses/merge', mergeRequest)
   },
 
   // ==================== Curriculum Tree API ====================

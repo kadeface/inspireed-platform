@@ -9,6 +9,7 @@ import { websocketService, type WebSocketMessage } from '../services/websocket'
 import { getAuthToken } from '../utils/auth'
 import { useUserStore } from '../store/user'
 import type { ClassSession, StudentParticipation } from '../types/classroomSession'
+import logger from '../utils/logger'
 
 export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mode: 'fullscreen' | 'window') => void) {
   const route = useRoute()

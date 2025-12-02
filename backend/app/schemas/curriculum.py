@@ -87,6 +87,7 @@ class CourseUpdate(BaseModel):
     description: Optional[str] = Field(None, description="课程描述")
     display_order: Optional[int] = Field(None, description="显示顺序")
     is_active: Optional[bool] = Field(None, description="是否启用")
+    grade_id: Optional[int] = Field(None, description="年级ID（调整课程年级）")
 
 
 class CourseResponse(CourseBase):
@@ -104,6 +105,28 @@ class CourseResponse(CourseBase):
 
     class Config:
         from_attributes = True
+
+
+class CourseMergeRequest(BaseModel):
+    """课程合并请求模型"""
+    
+    source_course_id: int = Field(..., description="源课程ID（将被合并的课程）")
+    target_course_id: int = Field(..., description="目标课程ID（保留的课程）")
+    merge_lessons: bool = Field(True, description="是否合并教案")
+    merge_chapters: bool = Field(True, description="是否合并章节")
+    handle_conflicts: str = Field("rename", description="冲突处理方式: rename(重命名), skip(跳过), overwrite(覆盖)")
+
+
+class CourseMergeResponse(BaseModel):
+    """课程合并响应模型"""
+    
+    success: bool
+    target_course: CourseResponse
+    merged_lessons_count: int = 0
+    merged_chapters_count: int = 0
+    skipped_lessons_count: int = 0
+    skipped_chapters_count: int = 0
+    errors: List[str] = []
 
 
 # Curriculum Tree Schemas

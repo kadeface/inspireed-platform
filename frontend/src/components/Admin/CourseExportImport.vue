@@ -134,7 +134,7 @@
               class="hidden"
             >
             <button
-              @click="$refs.fileInput.click()"
+              @click="() => { const input = $refs.fileInput as HTMLInputElement; input?.click(); }"
               class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center"
             >
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -380,8 +380,65 @@ const importCourses = async () => {
     await loadCourses()
   } catch (error: any) {
     console.error('Failed to import courses:', error)
-    const errorMessage = error.response?.data?.detail || error.message || '课程导入失败'
+    console.error('Error response:', error.response)
+    console.error('Error data:', error.response?.data)
+    console.error('Error detail:', error.response?.data?.detail)
+    
+    // 强制输出完整的错误信息
+    let errorDetail = ''
+    if (error.response?.data) {
+      console.error('=== 完整错误信息 ===')
+      console.error(JSON.stringify(error.response.data, null, 2))
+      console.error('=== 错误详情 ===')
+      if (error.response.data.detail) {
+        errorDetail = typeof error.response.data.detail === 'string' 
+          ? error.response.data.detail 
+          : JSON.stringify(error.response.data.detail)
+        console.error('Detail:', errorDetail)
+      }
+      if (error.response.data.message) {
+        console.error('Message:', error.response.data.message)
+      }
+    }
+    
+    // 提取详细的错误信息
+    let errorMessage = '课程导入失败'
+    
+    if (error.response?.data) {
+      // FastAPI 错误格式：{ detail: "错误信息" }
+      if (error.response.data.detail) {
+        if (typeof error.response.data.detail === 'string') {
+          errorMessage = `导入失败: ${error.response.data.detail}`
+        } else if (Array.isArray(error.response.data.detail)) {
+          // 处理验证错误数组
+          const errors = error.response.data.detail.map((err: any) => {
+            if (err.loc && err.msg) {
+              return `${err.loc.join('.')}: ${err.msg}`
+            }
+            return err.msg || err
+          })
+          errorMessage = `导入失败: ${errors.join('; ')}`
+        } else {
+          errorMessage = `导入失败: ${JSON.stringify(error.response.data.detail)}`
+        }
+      } else if (error.response.data.message) {
+        errorMessage = `导入失败: ${error.response.data.message}`
+      } else if (typeof error.response.data === 'string') {
+        errorMessage = `导入失败: ${error.response.data}`
+      } else {
+        errorMessage = `导入失败: ${JSON.stringify(error.response.data)}`
+      }
+    } else if (error.message) {
+      errorMessage = `导入失败: ${error.message}`
+    }
+    
+    // 显示错误信息
     toast.error(errorMessage)
+    
+    // 如果是开发环境，也显示详细的错误信息
+    if (import.meta.env.DEV && errorDetail) {
+      console.error('详细错误信息:', errorDetail)
+    }
   } finally {
     importing.value = false
   }

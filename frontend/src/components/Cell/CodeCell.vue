@@ -29,9 +29,9 @@
           @change="handleLanguageChange"
           class="text-sm px-2 py-1 border border-gray-300 rounded bg-white hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
+          <option value="html">HTML</option>
           <option value="python">Python</option>
           <option value="javascript">JavaScript</option>
-          <option value="html">HTML</option>
         </select>
         
         <span

@@ -1,142 +1,183 @@
 <template>
   <div class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="modal-content bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-      <h2 class="text-2xl font-bold mb-4">
+    <div class="modal-content bg-white rounded-lg shadow-xl p-5 w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <h2 class="text-xl font-bold mb-3">
         {{ course ? '编辑课程' : '创建课程' }}
       </h2>
 
       <form @submit.prevent="handleSubmit">
-        <!-- Subject Selection -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            学科 <span class="text-red-500">*</span>
-          </label>
-          <select
-            v-model="formData.subject_id"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            :disabled="!!course"
-            required
-          >
-            <option value="">请选择学科</option>
-            <option 
-              v-for="subject in activeSubjects" 
-              :key="subject.id" 
-              :value="subject.id"
+        <!-- Subject and Grade in one row -->
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              学科 <span class="text-red-500">*</span>
+            </label>
+            <select
+              v-model="formData.subject_id"
+              class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              :disabled="!!course"
+              required
             >
-              {{ subject.name }}
-            </option>
-          </select>
-          <p v-if="course" class="text-xs text-gray-500 mt-1">学科不可修改</p>
-        </div>
+              <option value="">请选择学科</option>
+              <option 
+                v-for="subject in activeSubjects" 
+                :key="subject.id" 
+                :value="subject.id"
+              >
+                {{ subject.name }}
+              </option>
+            </select>
+          </div>
 
-        <!-- Grade Selection -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            年级 <span class="text-red-500">*</span>
-          </label>
-          <select
-            v-model="formData.grade_id"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            :disabled="!!course"
-            required
-          >
-            <option value="">请选择年级</option>
-            <option 
-              v-for="grade in activeGrades" 
-              :key="grade.id" 
-              :value="grade.id"
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              年级 <span class="text-red-500">*</span>
+            </label>
+            <select
+              v-model="formData.grade_id"
+              class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              :class="{ 'border-orange-300': course && originalGradeId && formData.grade_id !== originalGradeId }"
+              required
             >
-              {{ grade.name }}
-            </option>
-          </select>
-          <p v-if="course" class="text-xs text-gray-500 mt-1">年级不可修改</p>
+              <option value="">请选择年级</option>
+              <option 
+                v-for="grade in activeGrades" 
+                :key="grade.id" 
+                :value="grade.id"
+              >
+                {{ grade.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <p v-if="course" class="text-xs text-gray-500 mb-3 -mt-2">学科不可修改</p>
+        
+        <!-- 年级变更警告 -->
+        <div 
+          v-if="course && originalGradeId && formData.grade_id !== originalGradeId && (courseStats.lesson_count > 0 || courseStats.chapter_count > 0)"
+          class="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg"
+        >
+          <div class="flex items-start gap-2">
+            <span class="text-orange-600 text-lg">⚠️</span>
+            <div class="flex-1">
+              <p class="text-sm font-medium text-orange-800 mb-1">年级变更警告</p>
+              <p class="text-xs text-orange-700">
+                该课程下有 <strong>{{ courseStats.lesson_count }}</strong> 个教案和 
+                <strong>{{ courseStats.chapter_count }}</strong> 个章节。
+                调整年级后，这些数据将保留在当前课程下。
+              </p>
+            </div>
+          </div>
         </div>
 
         <!-- Course Name -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
             课程名称 <span class="text-red-500">*</span>
           </label>
-          <input
-            v-model="formData.name"
-            type="text"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="例如：一年级数学"
-            required
-          />
-          <button
-            v-if="!course && formData.subject_id && formData.grade_id"
-            type="button"
-            @click="autoGenerateName"
-            class="text-xs text-blue-600 hover:text-blue-700 mt-1"
-          >
-            自动生成名称
-          </button>
-        </div>
-
-        <!-- Course Code -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            课程代码
-          </label>
-          <input
-            v-model="formData.code"
-            type="text"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="例如：grade1-math"
-          />
-        </div>
-
-        <!-- Description -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            课程描述
-          </label>
-          <textarea
-            v-model="formData.description"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows="3"
-            placeholder="课程简介..."
-          ></textarea>
-        </div>
-
-        <!-- Display Order -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            显示顺序
-          </label>
-          <input
-            v-model.number="formData.display_order"
-            type="number"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            min="0"
-          />
-        </div>
-
-        <!-- Is Active (only for edit mode) -->
-        <div v-if="course" class="mb-4">
-          <label class="flex items-center">
+          <div class="flex gap-2">
             <input
-              v-model="formData.is_active"
-              type="checkbox"
-              class="mr-2"
+              v-model="formData.name"
+              type="text"
+              class="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="例如：一年级数学"
+              required
             />
-            <span class="text-sm font-medium text-gray-700">启用该课程</span>
-          </label>
+            <button
+              v-if="!course && formData.subject_id && formData.grade_id"
+              type="button"
+              @click="autoGenerateName"
+              class="px-3 py-1.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg whitespace-nowrap"
+            >
+              自动生成
+            </button>
+          </div>
+        </div>
+
+        <!-- Advanced Options (Collapsible) -->
+        <div class="mb-3">
+          <button
+            type="button"
+            @click="showAdvanced = !showAdvanced"
+            class="flex items-center text-sm text-gray-600 hover:text-gray-800 w-full"
+          >
+            <span>高级选项</span>
+            <svg
+              :class="['ml-1 w-4 h-4 transition-transform', showAdvanced ? 'rotate-180' : '']"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div v-show="showAdvanced" class="mt-2 space-y-3">
+            <!-- Course Code -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                课程代码
+              </label>
+              <input
+                v-model="formData.code"
+                type="text"
+                class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="例如：grade1-math"
+              />
+            </div>
+
+            <!-- Description -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                课程描述
+              </label>
+              <textarea
+                v-model="formData.description"
+                class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows="2"
+                placeholder="课程简介..."
+              ></textarea>
+            </div>
+
+            <!-- Display Order -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                显示顺序
+              </label>
+              <input
+                v-model.number="formData.display_order"
+                type="number"
+                class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="0"
+              />
+            </div>
+
+            <!-- Is Active (only for edit mode) -->
+            <div v-if="course">
+              <label class="flex items-center">
+                <input
+                  v-model="formData.is_active"
+                  type="checkbox"
+                  class="mr-2"
+                />
+                <span class="text-sm font-medium text-gray-700">启用该课程</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <!-- Action Buttons -->
-        <div class="flex justify-end gap-2 mt-6">
+        <div class="flex justify-end gap-2 mt-4 pt-3 border-t">
           <button
             type="button"
             @click="$emit('close')"
-            class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
           >
             取消
           </button>
           <button
             type="submit"
-            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             {{ course ? '保存' : '创建' }}
           </button>
@@ -170,6 +211,10 @@ const emit = defineEmits<{
   save: [data: CourseCreate | CourseUpdate]
 }>()
 
+const showAdvanced = ref(false)
+const originalGradeId = ref<number | null>(null)
+const courseStats = ref({ lesson_count: 0, chapter_count: 0 })
+
 const formData = ref<{
   subject_id: number | string
   grade_id: number | string
@@ -196,9 +241,25 @@ const activeGrades = computed(() =>
   props.grades?.filter(g => g.is_active) || []
 )
 
-onMounted(() => {
+// 获取课程统计数据
+async function loadCourseStats(courseId: number) {
+  try {
+    const courseWithChapters = await curriculumService.getCourseWithChapters(courseId)
+    courseStats.value = {
+      lesson_count: courseWithChapters.total_lessons || 0,
+      chapter_count: courseWithChapters.total_chapters || 0
+    }
+  } catch (error) {
+    console.error('Failed to load course stats:', error)
+    // 如果获取失败，使用默认值
+    courseStats.value = { lesson_count: 0, chapter_count: 0 }
+  }
+}
+
+onMounted(async () => {
   if (props.course?.course) {
     const c = props.course.course
+    originalGradeId.value = c.grade_id
     formData.value = {
       subject_id: c.subject_id,
       grade_id: c.grade_id,
@@ -208,6 +269,11 @@ onMounted(() => {
       display_order: c.display_order,
       is_active: c.is_active
     }
+    // Show advanced options by default when editing if there's any data
+    showAdvanced.value = !!(c.code || c.description || c.display_order)
+    
+    // 加载课程统计数据
+    await loadCourseStats(c.id)
   }
 })
 
@@ -235,6 +301,12 @@ function handleSubmit() {
       display_order: formData.value.display_order,
       is_active: formData.value.is_active
     }
+    
+    // 如果年级改变了，包含 grade_id
+    if (originalGradeId.value !== null && formData.value.grade_id !== originalGradeId.value) {
+      updateData.grade_id = Number(formData.value.grade_id)
+    }
+    
     emit('save', updateData)
   } else {
     // Create mode

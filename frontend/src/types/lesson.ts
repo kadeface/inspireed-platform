@@ -73,6 +73,7 @@ export interface LessonUpdate {
   title?: string
   description?: string
   course_id?: number
+  chapter_id?: number  // 所属章节ID
   content?: Cell[]
   tags?: string[]
   status?: LessonStatus

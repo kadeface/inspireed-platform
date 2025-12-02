@@ -57,6 +57,7 @@ export interface Chapter {
   updated_at: string
   children?: Chapter[]
   resources_count?: number
+  lesson_count?: number
 }
 
 export interface ChapterCreate {
@@ -158,6 +159,25 @@ export interface CourseUpdate {
   description?: string
   display_order?: number
   is_active?: boolean
+  grade_id?: number  // 年级ID（调整课程年级）
+}
+
+export interface CourseMergeRequest {
+  source_course_id: number
+  target_course_id: number
+  merge_lessons: boolean
+  merge_chapters: boolean
+  handle_conflicts: 'rename' | 'skip' | 'overwrite'
+}
+
+export interface CourseMergeResponse {
+  success: boolean
+  target_course: Course
+  merged_lessons_count: number
+  merged_chapters_count: number
+  skipped_lessons_count: number
+  skipped_chapters_count: number
+  errors: string[]
 }
 
 // 树形结构节点

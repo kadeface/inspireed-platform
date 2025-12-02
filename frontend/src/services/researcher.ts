@@ -12,7 +12,10 @@ import type {
   CurriculumTree,
   Chapter,
   ChapterCreate,
-  ChapterUpdate
+  ChapterUpdate,
+  CourseWithChapters,
+  CourseMergeRequest,
+  CourseMergeResponse
 } from '@/types/curriculum'
 
 export const researcherService = {
@@ -99,6 +102,27 @@ export const researcherService = {
     return await api.get('/researcher/curriculum/tree', {
       params: { include_inactive: includeInactive }
     })
+  },
+
+  /**
+   * 获取课程详情及其章节（包含统计数据）
+   */
+  async getCourseWithChapters(courseId: number): Promise<CourseWithChapters> {
+    return await api.get(`/researcher/curriculum/courses/${courseId}/with-chapters`)
+  },
+
+  /**
+   * 根据课程代码查找所有具有相同代码的课程
+   */
+  async getCoursesByCode(courseCode: string): Promise<Course[]> {
+    return await api.get(`/researcher/curriculum/courses/by-code/${courseCode}`)
+  },
+
+  /**
+   * 合并课程
+   */
+  async mergeCourses(mergeRequest: CourseMergeRequest): Promise<CourseMergeResponse> {
+    return await api.post('/researcher/curriculum/courses/merge', mergeRequest)
   },
 
   // ==================== Helper Functions ====================
