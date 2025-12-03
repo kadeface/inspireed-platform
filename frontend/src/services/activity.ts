@@ -71,6 +71,10 @@ export const activityService = {
     
     console.log('📤 Creating submission:', {
       cell_id: requestData.cell_id,
+      cell_id_type: typeof requestData.cell_id,
+      cell_id_is_uuid: typeof requestData.cell_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestData.cell_id),
+      original_cellId: data.cellId,
+      original_cellId_type: typeof data.cellId,
       lesson_id: requestData.lesson_id,
       session_id: requestData.session_id,  // 🔍 添加 session_id 到日志
       responses_count: Object.keys(requestData.responses).length,

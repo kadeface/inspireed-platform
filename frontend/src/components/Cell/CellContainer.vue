@@ -126,6 +126,8 @@
           :cell="cell as any"
           :editable="editable"
           :compact-mode="compactMode"
+          :lesson-id="finalLessonId"
+          :session-id="finalSessionId"
           @update="handleUpdate"
         />
       </div>
@@ -134,7 +136,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch } from 'vue'
+import { computed, ref, nextTick, watch, inject, onMounted, type ComputedRef, type Ref } from 'vue'
 import type { Cell } from '../../types/cell'
 import { CellType } from '../../types/cell'
 import TextCell from './TextCell.vue'
@@ -159,6 +161,8 @@ interface Props {
   showMoveButtons?: boolean
   index?: number
   compactMode?: boolean // 紧凑模式：限制长内容的高度
+  sessionId?: number // 课堂会话ID（课堂模式传递）
+  lessonId?: number // 教案ID
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -168,6 +172,74 @@ const props = withDefaults(defineProps<Props>(), {
   showMoveButtons: false,
   index: 0,
   compactMode: false,
+})
+
+// 🔧 尝试从 provide/inject 获取 sessionId（如果父组件提供了）
+const injectedSessionId = inject<ComputedRef<number | undefined> | undefined>('classroomSessionId', undefined)
+const injectedSession = inject<Ref<any> | undefined>('classroomSession', undefined)
+
+// 计算最终的 sessionId：优先使用 props，否则使用注入的值
+const finalSessionId = computed(() => {
+  if (props.sessionId !== undefined) {
+    return props.sessionId
+  }
+  if (injectedSessionId?.value !== undefined) {
+    return injectedSessionId.value
+  }
+  if (injectedSession?.value?.id !== undefined) {
+    return injectedSession.value.id
+  }
+  return undefined
+})
+
+// 使用 watch 监听 sessionId 变化，只在值变化时输出日志
+watch(() => finalSessionId.value, (newId, oldId) => {
+  if (newId !== oldId) {
+    if (newId !== undefined) {
+      console.log('✅ CellContainer: sessionId 已设置:', newId, {
+        source: props.sessionId !== undefined ? 'props' : 
+                injectedSessionId?.value !== undefined ? 'injectedSessionId' : 'injectedSession',
+        oldId,
+        propsSessionId: props.sessionId,
+        injectedSessionIdValue: injectedSessionId?.value,
+        cellType: props.cell.type,
+        timestamp: new Date().toLocaleTimeString(),
+      })
+    } else if (oldId !== undefined) {
+      console.warn('⚠️ CellContainer: sessionId 已移除（从', oldId, '变为 undefined）', {
+        propsSessionId: props.sessionId,
+        injectedSessionIdValue: injectedSessionId?.value,
+        cellType: props.cell.type,
+      })
+    }
+  }
+}, { immediate: true })
+
+// 组件挂载时输出初始状态
+onMounted(() => {
+  if (props.cell.type === 'activity') {
+    console.log('🔍 CellContainer (Activity) 已挂载:', {
+      cellId: props.cell.id,
+      finalSessionId: finalSessionId.value,
+      propsSessionId: props.sessionId,
+      injectedSessionIdValue: injectedSessionId?.value,
+      timestamp: new Date().toLocaleTimeString(),
+    })
+  }
+})
+
+// 计算最终的 lessonId：优先使用 props，否则从注入的 session 获取
+const finalLessonId = computed(() => {
+  if (props.lessonId !== undefined) {
+    return props.lessonId
+  }
+  if (injectedSession?.value?.lessonId !== undefined) {
+    return injectedSession.value.lessonId
+  }
+  if (injectedSession?.value?.lesson_id !== undefined) {
+    return injectedSession.value.lesson_id
+  }
+  return undefined
 })
 
 const emit = defineEmits<{

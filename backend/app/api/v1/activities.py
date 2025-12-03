@@ -172,7 +172,7 @@ async def create_submission(
 
         # 创建新提交
         # ✅ 直接使用前端传递的 session_id（学生最清楚自己在哪个会话中）
-        session_id = getattr(data, 'session_id', None)
+        session_id = data.session_id if hasattr(data, 'session_id') else None
         print(f"🔍 前端传递的 session_id: {session_id}, Student: {current_user.id}, Lesson: {data.lesson_id}")
         
         # ⚠️ 不再进行推断，因为推断逻辑可能推断出错误的会话
@@ -342,6 +342,10 @@ async def submit_activity(
     setattr(submission, "responses", cast(dict[str, Any], data.responses))
     setattr(submission, "status", ActivitySubmissionStatus.SUBMITTED)
     setattr(submission, "submitted_at", datetime.utcnow())
+    # ✅ 更新 session_id（如果提供了，确保提交记录关联到正确的会话）
+    if data.session_id is not None:
+        setattr(submission, "session_id", cast(int, data.session_id))
+        print(f"✅ 提交时更新 session_id: {submission.id} -> {data.session_id}")
     if data.time_spent:
         setattr(submission, "time_spent", cast(int, data.time_spent))
     if data.process_trace is not None:
@@ -1230,7 +1234,10 @@ async def get_cell_statistics(
             updated_at=datetime.utcnow(),
         )
 
-    # 没有 session_id，返回全局统计（原有逻辑）
+    # 没有 session_id，返回全局统计（所有会话的提交）
+    # ⚠️ 注意：这会导致同一 lesson 被多次使用时，统计会混在一起
+    # 建议：在课堂模式下，应该总是提供 session_id 来获取特定会话的统计
+    print(f"⚠️ 统计接口未提供 session_id，返回全局统计（cell_id={cell_id}，可能包含多个会话的提交）")
     result = await db.execute(
         select(ActivityStatistics).where(ActivityStatistics.cell_id == cell_id)
     )

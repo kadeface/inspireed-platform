@@ -123,12 +123,6 @@ const props = withDefaults(defineProps<Props>(), {
   sessionId: undefined,
 })
 
-// 🔍 调试：打印 props
-console.log('🔍 ActivityViewer Props:', {
-  cellId: props.cell.id,
-  lessonId: props.lessonId,
-  sessionId: props.sessionId,  // 重点检查这个值
-})
 
 // 🔧 本地保存 sessionId（因为 props.sessionId 可能在组件加载时还是 undefined）
 const localSessionId = ref<number | undefined>(props.sessionId)
@@ -137,7 +131,6 @@ const localSessionId = ref<number | undefined>(props.sessionId)
 watch(() => props.sessionId, (newSessionId) => {
   if (newSessionId !== undefined) {
     localSessionId.value = newSessionId
-    console.log('✅ Session ID 已加载:', newSessionId)
   }
 }, { immediate: true })
 
@@ -207,8 +200,6 @@ let activitySubmission: ReturnType<typeof useActivitySubmission> | null = null
 // 安全地解析 cellId
 // 注意：如果 cell.id 是 UUID，我们需要通过 API 查找对应的数字 ID
 async function resolveCellId(cellId: number | string | undefined): Promise<number> {
-  console.log('🔍 Resolving cellId:', { cellId, type: typeof cellId, cell: props.cell })
-  
   if (typeof cellId === 'number') {
     if (isNaN(cellId)) {
       console.error('❌ cellId is NaN')
@@ -228,7 +219,6 @@ async function resolveCellId(cellId: number | string | undefined): Promise<numbe
     // UUID 格式: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (uuidPattern.test(cellId)) {
-      console.warn('⚠️ cellId is UUID, need to find numeric ID. Using lesson content to find cell.')
       // 如果 cell.id 是 UUID，尝试从 lesson 的 content 中找到对应的 cell
       // 这需要从父组件或 context 获取 lesson 数据
       // 暂时抛出错误，提示需要实现 UUID 到数字 ID 的映射
@@ -262,13 +252,6 @@ async function resolveCellIdFromApi(uuid: string): Promise<number | null> {
 
   try {
     resolvingCellId.value = true
-    console.log('🔍 Resolving UUID to numeric ID:', uuid, 'for lesson:', lessonId.value)
-    console.log('📋 Current cell info:', {
-      uuid,
-      order: props.cell.order,
-      type: props.cell.type,
-      title: props.cell.title,
-    })
     
     // 首先尝试从 API 获取 lesson 的所有 cells
     const { api } = await import('../../services/api')
@@ -281,7 +264,6 @@ async function resolveCellIdFromApi(uuid: string): Promise<number | null> {
     }
     
     const cells = response.data || []
-    console.log('📦 Fetched cells from API:', cells.length, 'cells')
     
     // 尝试通过 order 和 type 匹配 cell
     const currentCellOrder = props.cell.order
@@ -310,13 +292,11 @@ async function resolveCellIdFromApi(uuid: string): Promise<number | null> {
       const numericId = typeof matchedCell.id === 'number' ? matchedCell.id : parseInt(matchedCell.id, 10)
       if (!isNaN(numericId)) {
         cellIdMap.value.set(uuid, numericId)
-        console.log('✅ Resolved UUID to numeric ID:', uuid, '->', numericId)
         return numericId
       }
     }
     
     // 如果找不到匹配的 cell，尝试创建一个新的 cell 记录
-    console.log('⚠️ No matching cell found, attempting to create cell record...')
     try {
       const cellCreateData = {
         lesson_id: lessonId.value,
@@ -328,7 +308,6 @@ async function resolveCellIdFromApi(uuid: string): Promise<number | null> {
         editable: props.cell.editable ?? false,
       }
       
-      console.log('📤 Creating cell:', cellCreateData)
       const createResponse = await api.post('/cells', cellCreateData) as any
       const newCell = createResponse.data
       
@@ -336,28 +315,16 @@ async function resolveCellIdFromApi(uuid: string): Promise<number | null> {
         const numericId = typeof newCell.id === 'number' ? newCell.id : parseInt(newCell.id, 10)
         if (!isNaN(numericId)) {
           cellIdMap.value.set(uuid, numericId)
-          console.log('✅ Created new cell and resolved UUID to numeric ID:', uuid, '->', numericId)
           return numericId
         }
       }
     } catch (createError: any) {
-      console.error('❌ Failed to create cell:', createError)
-      console.error('Create error details:', {
-        message: createError.message,
-        response: createError.response?.data,
-        status: createError.response?.status,
-      })
+      console.error('Failed to create cell:', createError)
     }
     
-    console.warn('⚠️ Could not resolve or create cell for UUID:', uuid)
     return null
   } catch (error: any) {
-    console.error('❌ Failed to resolve cell ID from API:', error)
-    console.error('Error details:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-    })
+    console.error('Failed to resolve cell ID from API:', error)
     return null
   } finally {
     resolvingCellId.value = false
@@ -371,12 +338,10 @@ const cellId = ref<number>(0)
 // 注意：后端现在支持 UUID 字符串，所以如果无法解析为数字，我们可以直接使用 UUID
 async function initCellId() {
   const id = props.cell.id
-  console.log('🔍 Initializing cellId, input:', id, 'type:', typeof id, 'cell:', props.cell)
   
   if (typeof id === 'number') {
     if (!isNaN(id)) {
       cellId.value = id
-      console.log('✅ Using numeric cellId:', id)
       return
     }
   }
@@ -385,30 +350,23 @@ async function initCellId() {
     const parsed = parseInt(id, 10)
     if (!isNaN(parsed)) {
       cellId.value = parsed
-      console.log('✅ Parsed string cellId to number:', parsed)
       return
     }
     
     // 如果是 UUID，后端现在支持直接使用 UUID
-    // 但为了兼容性，我们仍然尝试解析为数字 ID
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (uuidPattern.test(id)) {
-      console.log('🔍 Detected UUID, backend will handle it. Using UUID directly.')
-      // 后端现在支持 UUID，所以我们可以直接使用 UUID 字符串
-      // 但为了保持类型一致性，我们使用一个特殊值表示 UUID
-      // 实际上，我们应该修改前端代码，直接传递 UUID 字符串给后端
-      // 但为了最小化改动，我们暂时使用 0，然后在 API 调用时传递 UUID
-      cellId.value = 0  // 使用 0 作为标记，表示需要使用 UUID
+      // 使用 0 作为标记，表示需要使用 UUID
+      cellId.value = 0
       // 存储原始 UUID
       ;(cellId as any).uuid = id
-      console.log('✅ Will use UUID string for API calls:', id)
       return
     }
     
-    console.error('❌ Invalid cellId string (not UUID and not numeric):', id)
+    console.error('Invalid cellId string (not UUID and not numeric):', id)
   }
   
-  console.error('❌ Invalid cellId:', id, 'cell:', props.cell)
+  console.error('Invalid cellId:', id)
   cellId.value = 0
 }
 
@@ -500,10 +458,20 @@ async function handleSubmit() {
     return
   }
 
-  // 验证 cellId 是否有效（可以是数字或 UUID 字符串）
-  const actualCellId = getActualCellId()
-  if (!actualCellId || (typeof actualCellId === 'number' && actualCellId === 0)) {
-    console.error('❌ Invalid cellId:', actualCellId, 'cell.id:', props.cell.id)
+  // ✅ 直接使用 props.cell.id（UUID 或数字），让后端处理映射
+  // 从 lesson.content 来的 cell，id 应该是 UUID；从数据库 API 来的，id 是数字
+  const cellIdToSubmit = props.cell.id
+  
+  console.log('🔍 ActivityViewer 准备提交:', {
+    cellIdToSubmit,
+    cellIdType: typeof cellIdToSubmit,
+    isUUID: typeof cellIdToSubmit === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cellIdToSubmit),
+    cellObject: props.cell,
+    cellIdFromCell: props.cell.id,
+  })
+  
+  if (!cellIdToSubmit) {
+    console.error('❌ Invalid cellId: cell.id is empty', props.cell)
     alert('无法提交：Cell ID 无效。请刷新页面重试。')
     return
   }
@@ -517,19 +485,26 @@ async function handleSubmit() {
     
     const timeSpent = Math.floor((new Date().getTime() - startTime.value.getTime()) / 1000)
     
-    // 🔍 获取当前最新的 sessionId
+    // 获取当前最新的 sessionId
     const sessionIdToUse = currentSessionId.value
-    console.log('📤 提交时的 sessionId:', sessionIdToUse)
     
-    // 简化流程：直接创建并提交（一步完成）
-    // 1. 先创建提交记录（状态为DRAFT）
-    console.log('📝 步骤1: 创建提交记录...', {
-      cellId: getActualCellId(),
-      lessonId: lessonId.value,
-      sessionId: sessionIdToUse,
-      responsesCount: Object.keys(answers.value).length,
-      answers: answers.value,  // 打印实际答案内容
-    })
+    // ✅ 方案2：在课堂模式下，确保总是传递 session_id
+    // 判断是否在课堂模式：如果 sessionIdToUse 有值，说明在课堂模式
+    const isInClassroomMode = sessionIdToUse !== undefined
+    
+    // 如果 localSessionId 曾经被设置过（不是初始的 undefined），但现在又是 undefined
+    // 说明可能在课堂模式但 sessionId 丢失了，这种情况应该阻止提交
+    // 注意：localSessionId 初始值是 props.sessionId，如果 props.sessionId 是 undefined，localSessionId 也是 undefined
+    // 但如果 props.sessionId 曾经有值，localSessionId 也会有值
+    const hadSessionIdBefore = localSessionId.value !== undefined
+    
+    if (hadSessionIdBefore && sessionIdToUse === undefined) {
+      // 曾经有 sessionId 但现在丢失了，可能是课堂模式但 sessionId 异常
+      console.error('课堂模式下 sessionId 丢失，无法提交')
+      alert('无法提交：课堂会话信息异常。请刷新页面重试。\n\n这可以确保提交记录正确关联到当前课堂会话，避免统计混乱。')
+      submitting.value = false
+      return
+    }
     
     // 确保 answers 不是空对象
     if (!answers.value || Object.keys(answers.value).length === 0) {
@@ -538,22 +513,19 @@ async function handleSubmit() {
     }
     
     const submission = await activityService.createSubmission({
-      cellId: getActualCellId() as any,  // 可能是数字或 UUID 字符串，后端都支持
+      cellId: cellIdToSubmit as any,  // ✅ 直接传递 UUID 后端会处理映射
       lessonId: lessonId.value,
       sessionId: sessionIdToUse,  // 使用动态获取的 sessionId
       responses: answers.value,
       startedAt: startTime.value.toISOString(),
     })
-    console.log('✅ 步骤1完成: 提交记录已创建', { submissionId: submission.id, status: submission.status })
     
     // 2. 立即提交（状态改为SUBMITTED）
-    console.log('📤 步骤2: 提交活动...', { submissionId: submission.id, timeSpent })
     const submittedSubmission = await activityService.submitActivity(submission.id, {
       responses: answers.value,
       timeSpent,
       sessionId: sessionIdToUse,  // 使用动态获取的 sessionId
     })
-    console.log('✅ 步骤2完成: 活动已提交', { submissionId: submittedSubmission.id, status: submittedSubmission.status })
     
     // 保存提交后的数据（包含正确答案）
     submissionData.value = submittedSubmission
@@ -565,20 +537,10 @@ async function handleSubmit() {
       answers.value = submittedSubmission.responses
     }
     
-    console.log('✅ 提交流程完成:', { 
-      submissionId: submittedSubmission.id, 
-      status: submittedSubmission.status,
-      score: submittedSubmission.score,
-    })
     alert('提交成功！')
     emit('submit', { responses: answers.value, timeSpent })
   } catch (error: any) {
-    console.error('❌ Submit failed:', {
-      error,
-      message: error?.message,
-      response: error?.response?.data,
-      status: error?.response?.status,
-    })
+    console.error('Submit failed:', error)
     alert(`提交失败：${error?.response?.data?.detail || error?.message || '请重试'}`)
   } finally {
     submitting.value = false
@@ -587,12 +549,10 @@ async function handleSubmit() {
 
 // 加载已提交的答案（仅检查是否已经提交过，不加载草稿）
 onMounted(async () => {
-  console.log('📂 Loading activity...')
-  
-  // 0. 首先解析 cellId（如果是 UUID）
+  // 首先解析 cellId（如果是 UUID）
   await initCellId()
   
-  // 1. 如果在线，检查是否已经提交过（只加载已提交的内容，不加载草稿）
+  // 如果在线，检查是否已经提交过（只加载已提交的内容，不加载草稿）
   if (isOnline.value) {
     try {
       const actualCellId = getActualCellId()
@@ -606,26 +566,19 @@ onMounted(async () => {
             answers.value = submission.responses || {}
             isSubmitted.value = true
             submissionData.value = submission
-            console.log('✅ Loaded submitted content from server')
-          } else {
-            // 如果是草稿状态，忽略它（简化版不加载草稿）
-            console.log('ℹ️ Found draft submission, ignoring (simplified flow)')
           }
-        } else {
-          console.log('ℹ️ No existing submission found, starting fresh')
         }
       }
     } catch (error: any) {
-      // 404 错误是正常的（表示还没有提交），其他错误才需要记录
-      if (error.response?.status !== 404) {
-        console.error('❌ Failed to load submission from server:', error)
-      } else {
-        console.log('ℹ️ No existing submission found (404)')
+      // 404 错误是正常的（表示还没有提交），静默处理，不输出日志
+      if (error.response?.status === 404) {
+        // 静默处理，不输出日志（这是正常情况：学生还没有提交）
+        return
       }
+      // 其他错误才需要记录
+      console.error('Failed to load submission from server:', error)
     }
   }
-  
-  // 注意：已移除自动保存和草稿加载功能，只在点击提交按钮时一次性提交
 })
 
 // 组件卸载时清理

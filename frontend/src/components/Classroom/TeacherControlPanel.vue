@@ -1,5 +1,5 @@
 <template>
-  <div class="teacher-control-panel" :class="{ 'panel-fullscreen': isPanelFullscreen }">
+  <div ref="containerRef" class="teacher-control-panel" :class="{ 'panel-fullscreen': isPanelFullscreen }">
     <!-- 🎯 优化后的顶部控制栏（固定，始终可见） -->
     <div class="top-control-bar">
       <!-- 第一行：标题和操作按钮 -->
@@ -55,11 +55,12 @@
             ▶️ 开始上课
           </button>
           <button 
-            @click="handleCancelSession"
+            @click="handleEnd"
             :disabled="loading"
-            class="btn btn-secondary"
+            class="btn btn-danger"
+            title="结束当前会话，以便创建新会话"
           >
-            ❌ 取消
+            ⏹️ 结束
           </button>
         </template>
         
@@ -357,37 +358,75 @@
             <div class="preview-item-body-compact">
               <!-- 文本模块预览 -->
               <div v-if="getCellByOrder(order)?.type === 'text'" class="preview-text-compact">
+                <div class="preview-thumbnail-wrapper">
+                  <div class="preview-thumbnail preview-thumbnail-text">
+                    <div class="preview-thumbnail-content">
+                      <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
                 <div class="preview-text-snippet" v-html="getTextPreview(getCellByOrder(order)!, 60)"></div>
               </div>
               
               <!-- 视频模块预览 -->
               <div v-else-if="getCellByOrder(order)?.type === 'video'" class="preview-video-compact">
-                <svg class="preview-icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
+                <div class="preview-thumbnail-wrapper">
+                  <div class="preview-thumbnail preview-thumbnail-video">
+                    <img 
+                      v-if="(getCellByOrder(order) as any)?.content?.thumbnail || (getCellByOrder(order) as any)?.thumbnail"
+                      :src="(getCellByOrder(order) as any)?.content?.thumbnail || (getCellByOrder(order) as any)?.thumbnail"
+                      :alt="(getCellByOrder(order) as any)?.content?.title || '视频'"
+                      class="preview-thumbnail-image"
+                      @error="handleThumbnailError"
+                    />
+                    <div v-else class="preview-thumbnail-content">
+                      <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
                 <span class="preview-icon-label">{{ (getCellByOrder(order) as any)?.content?.title || '视频' }}</span>
               </div>
               
               <!-- 代码模块预览 -->
               <div v-else-if="getCellByOrder(order)?.type === 'code'" class="preview-code-compact">
-                <svg class="preview-icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                </svg>
+                <div class="preview-thumbnail-wrapper">
+                  <div class="preview-thumbnail preview-thumbnail-code">
+                    <div class="preview-thumbnail-content">
+                      <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
                 <span class="preview-icon-label">代码内容</span>
               </div>
               
               <!-- 活动模块预览 -->
               <div v-else-if="getCellByOrder(order)?.type === 'activity'" class="preview-activity-compact">
-                <svg class="preview-icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
+                <div class="preview-thumbnail-wrapper">
+                  <div class="preview-thumbnail preview-thumbnail-activity">
+                    <div class="preview-thumbnail-content">
+                      <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
                 <span class="preview-icon-label">{{ (getCellByOrder(order) as any)?.content?.title || '活动' }}</span>
               </div>
               
               <!-- 默认预览 -->
               <div v-else class="preview-default-compact">
-                <div class="preview-icon-wrapper-small">
-                  <CellTypeIcon :type="getCellByOrder(order)?.type || 'text'" />
+                <div class="preview-thumbnail-wrapper">
+                  <div class="preview-thumbnail preview-thumbnail-default">
+                    <div class="preview-thumbnail-content">
+                      <CellTypeIcon :type="getCellByOrder(order)?.type || 'text'" class="preview-thumbnail-icon" />
+                    </div>
+                  </div>
                 </div>
                 <span class="preview-icon-label">{{ getCellTypeLabel(getCellByOrder(order)?.type || '') }}</span>
               </div>
@@ -575,7 +614,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, h } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, h, provide, defineExpose } from 'vue'
 import { useRoute } from 'vue-router'
 import type { Lesson } from '../../types/lesson'
 import type { Cell, ActivityCell } from '../../types/cell'
@@ -620,8 +659,29 @@ interface Props {
 
 const props = defineProps<Props>()
 
+// 🔧 定义事件，通知父组件 session 变化
+const emit = defineEmits<{
+  'session-changed': [session: any | null]
+}>()
+
 const route = useRoute()
 const session = ref<any>(null)
+const containerRef = ref<HTMLElement | null>(null) // 用于检查组件是否在 DOM 中
+
+// 🔧 提供 sessionId 给子组件（通过 provide/inject）
+provide('classroomSessionId', computed(() => session.value?.id))
+provide('classroomSession', session)
+
+// 🔧 监听 session 变化，通知父组件
+watch(session, (newSession) => {
+  console.log('🔔 TeacherControlPanel: session 变化，通知父组件', {
+    sessionId: newSession?.id,
+    status: newSession?.status,
+    timestamp: new Date().toLocaleTimeString(),
+  })
+  emit('session-changed', newSession)
+}, { immediate: true, deep: true })
+
 const loading = ref(false)
 const activeStudents = ref<any[]>([])
 const loadingStudents = ref(false)
@@ -768,33 +828,17 @@ const averageScore = computed(() => {
 
 const currentCell = computed(() => {
   if (!props.lesson?.content || !session.value) {
-    console.log('🔍 currentCell: 缺少必要数据', {
-      hasLesson: !!props.lesson,
-      hasContent: !!props.lesson?.content,
-      hasSession: !!session.value,
-    })
     return null
   }
   
   // 如果 selectedCellIndex 有效，优先使用它
   if (selectedCellIndex.value >= 0 && selectedCellIndex.value < props.lesson.content.length) {
-    const cell = props.lesson.content[selectedCellIndex.value]
-    console.log('✅ currentCell: 使用 selectedCellIndex', {
-      selectedCellIndex: selectedCellIndex.value,
-      cellType: cell?.type,
-      cellTitle: cell?.title,
-      cellOrder: cell?.order,
-    })
-    return cell
+    return props.lesson.content[selectedCellIndex.value]
   }
   
   // 否则使用 current_cell_id 查找
   const currentId = session.value.current_cell_id
   if (!currentId || currentId === 0) {
-    console.log('🔍 currentCell: current_cell_id 无效', {
-      currentId,
-      selectedCellIndex: selectedCellIndex.value,
-    })
     return null
   }
   
@@ -815,11 +859,6 @@ const currentCell = computed(() => {
     return false
   })
   
-  console.log('🔍 currentCell: 通过 current_cell_id 查找', {
-    currentId,
-    foundCell: foundCell ? { type: foundCell.type, title: foundCell.title } : null,
-  })
-  
   return foundCell || null
 })
 
@@ -836,26 +875,16 @@ const displayCellOrders = computed(() => {
 
 const currentActivityDbCell = computed(() => {
   if (!currentCell.value || currentCell.value.type !== 'activity') {
-    console.log('🔍 currentActivityDbCell: 不是活动模块', {
-      hasCurrentCell: !!currentCell.value,
-      cellType: currentCell.value?.type,
-    })
     return null
   }
   
   if (!dbCells.value || dbCells.value.length === 0) {
-    console.log('🔍 currentActivityDbCell: dbCells 为空', {
-      dbCellsLength: dbCells.value?.length || 0,
-    })
     return null
   }
   
   // 通过 order 查找对应的数据库 Cell
   const order = currentCell.value.order
   if (order === undefined) {
-    console.log('🔍 currentActivityDbCell: currentCell.order 未定义', {
-      currentCell: currentCell.value,
-    })
     return null
   }
   
@@ -865,12 +894,6 @@ const currentActivityDbCell = computed(() => {
                           dbCell.cell_type === 'activity' ||
                           dbCell.cell_type?.toUpperCase() === 'ACTIVITY'
     return dbCell.order === order && cellTypeMatch
-  })
-  
-  console.log('🔍 currentActivityDbCell 查找结果:', {
-    currentCellOrder: order,
-    dbCells: dbCells.value.map(c => ({ id: c.id, order: c.order, type: c.cell_type })),
-    matchedDbCell: matchedDbCell ? { id: matchedDbCell.id, order: matchedDbCell.order } : null,
   })
   
   return matchedDbCell || null
@@ -966,15 +989,11 @@ function handleModuleItemClick(cell: Cell, index: number) {
 // 处理复选框点击（防止事件冒泡）
 function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
   event.stopPropagation()
-  console.log('🖱️ 复选框区域被点击:', { index, cellId: cell.id })
 }
 
 // 处理复选框变化
 function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
-  console.log('🔘 复选框 change 事件触发:', { index, cellId: cell.id, loading: loading.value })
-  
   if (loading.value) {
-    console.warn('⏸️ 切换中，请稍候...')
     return
   }
   
@@ -982,58 +1001,28 @@ function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
   const isChecked = target.checked
   const isCurrentlyActive = isModuleActive(cell, index)
   
-  console.log('🔍 复选框状态检查:', {
-    isChecked,
-    isCurrentlyActive,
-    displayCellOrders: displayCellOrders.value,
-  })
-  
   // 如果状态没有变化，不需要操作
   if (isChecked === isCurrentlyActive) {
-    console.log('⏭️ 状态未变化，跳过操作')
     return
   }
   
   // 确定操作类型：如果勾选则添加，否则移除
   const action: 'add' | 'remove' = isChecked ? 'add' : 'remove'
   
-  console.log('☑️ 复选框状态变化:', {
-    index,
-    cellId: cell.id,
-    isChecked,
-    action,
-    cellType: cell.type,
-    cellOrder: cell.order,
-  })
-  
   const cellId = getCellId(cell)
   const cellOrder = cell.order !== undefined ? cell.order : index
   
-  console.log('📤 准备发送导航事件:', {
-    cellId,
-    cellOrder,
-    action,
-    multiSelect: true,
-    cellIdType: typeof cellId,
-    isUUID: cellId && typeof cellId === 'string' ? isUUID(cellId) : false,
-  })
-  
   // 发送导航事件（多选模式）
   if (cellId && typeof cellId === 'string' && isUUID(cellId)) {
-    console.log('✅ 使用 cellOrder (UUID):', cellOrder)
     handleControlBoardNavigate(null, cellOrder, action, true)
   } else {
     const numericId = toNumericId(cellId)
     if (numericId) {
-      console.log('✅ 使用 numericId:', numericId)
       handleControlBoardNavigate(numericId, null, action, true)
     } else {
-      console.log('✅ 使用 cellOrder (fallback):', cellOrder)
       handleControlBoardNavigate(null, cellOrder, action, true)
     }
   }
-  
-  console.log('✅ 导航事件已发送 (emit 调用完成)')
 }
 
 // 获取模块提示信息
@@ -1246,11 +1235,6 @@ async function loadActivityStatistics() {
         studentSubmissionStatus.value.set(String(studentId), status)
       }
     })
-    
-    console.log('✅ 活动统计和提交状态已加载:', {
-      statistics: activityStatistics.value,
-      submissionStatusCount: studentSubmissionStatus.value.size,
-    })
   } catch (error: any) {
     console.error('❌ 加载活动统计失败:', error)
   } finally {
@@ -1270,7 +1254,6 @@ function scrollToStudentsBehind() {
 // 滚动到提问区域
 function scrollToQuestions() {
   // TODO: 实现滚动到提问列表的逻辑
-  console.log('滚动到提问列表')
 }
 
 // 根据 order 获取 Cell
@@ -1301,6 +1284,26 @@ function getCodePreview(cell: Cell): string {
   
   const lines = content.code.split('\n')
   return lines.slice(0, 10).join('\n') + (lines.length > 10 ? '\n...' : '')
+}
+
+// 处理缩略图加载错误
+function handleThumbnailError(event: Event) {
+  const img = event.target as HTMLImageElement
+  if (img) {
+    img.style.display = 'none'
+    // 显示默认图标
+    const parent = img.parentElement
+    if (parent && !parent.querySelector('.preview-thumbnail-content')) {
+      const content = document.createElement('div')
+      content.className = 'preview-thumbnail-content'
+      content.innerHTML = `
+        <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+      `
+      parent.appendChild(content)
+    }
+  }
 }
 
 // 切换模块面板全屏
@@ -1386,233 +1389,96 @@ async function handleCreateSession() {
     const classroomId = route.params.classroomId as string || '1'
     
     try {
-      console.log('🚀 Creating session...')
       // 创建会话（状态为 PENDING）
       const newSession = await classroomSessionService.createSession(props.lessonId, {
         classroom_id: parseInt(classroomId),
       })
       
-      console.log('✅ Session created, received:', newSession)
-      
       // 检查响应
       if (!newSession || !newSession.id) {
-        console.error('❌ Invalid session response:', newSession)
+        console.error('Invalid session response:', newSession)
         throw new Error('创建会话失败：服务器返回的数据格式不正确')
       }
       
       // 保持 PENDING 状态，不立即开始
       session.value = newSession
-      console.log('✅ Session created in PENDING state, waiting for students...')
       
-      // 加载学生列表（开始轮询）
+      // 🔧 添加调试日志，确认 sessionId 已生成
+      console.log('✅ TeacherControlPanel: 会话已创建，sessionId =', newSession.id, '状态 =', newSession.status)
+      
+      // 加载学生列表（仅加载一次，不立即轮询）
       loadParticipants()
       
-      // 设置定时刷新学生列表（每3秒）
-      const refreshInterval = setInterval(() => {
-        if (session.value && session.value.status === 'pending') {
-          loadParticipants()
-        } else {
-          clearInterval(refreshInterval)
-        }
-      }, 3000)
-      
-      // 组件卸载时清除定时器
-      onUnmounted(() => {
-        clearInterval(refreshInterval)
-      })
+      // 启动轮询（根据会话状态）
+      startPollingIfNeeded()
     } catch (createError: any) {
-      // 如果创建失败，检查是否是因为已有活跃会话
-      const errorDetail = createError.response?.data?.detail || createError.message || ''
+      console.log('🔍 捕获到创建会话错误:', {
+        message: createError.message,
+        responseStatus: createError.response?.status,
+        responseData: createError.response?.data,
+      })
       
-      if (errorDetail.includes('已有活跃的课堂会话') || createError.response?.status === 400) {
-        // 尝试查找并加载现有会话
-        console.log('检测到已有活跃会话，尝试加载...')
+      // 如果创建失败，检查是否是因为已有活跃会话
+      // 需要同时检查 error.response?.data?.detail 和 error.message，因为错误可能被包装
+      const errorDetail = createError.response?.data?.detail || createError.message || ''
+      console.log('🔍 错误详情:', errorDetail)
+      
+      // 检查错误消息中是否包含"已有活跃的课堂会话"
+      const hasActiveSessionError = errorDetail.includes('已有活跃的课堂会话') || 
+                                    errorDetail.includes('已有活跃会话')
+      
+      if (hasActiveSessionError && (createError.response?.status === 400 || createError.message)) {
+        console.log('✅ 检测到"已有活跃会话"错误，尝试提取会话ID...')
         
-        // 首先尝试从错误信息中提取会话ID
-        const sessionIdMatch = errorDetail.match(/ID:\s*(\d+)/)
-        let activeSessions: any[] = []
+        // 从错误信息中提取会话ID（支持多种格式）
+        // 错误消息格式可能是：
+        // - 该班级已有活跃的课堂会话（ID: 139）
+        // - 该班级已有活跃的课堂会话(ID:139)
+        // - 创建会话失败:该班级已有活跃的课堂会话(ID:139),请先结束或使用现有会话
+        const sessionIdMatch = errorDetail.match(/\(ID\s*[：:]\s*(\d+)\)/) ||
+                               errorDetail.match(/（ID\s*[：:]\s*(\d+)）/) ||
+                               errorDetail.match(/ID\s*[：:]\s*(\d+)/) ||
+                               errorDetail.match(/ID\s*[：:]\s*(\d+)/)
         
-        if (sessionIdMatch) {
-          // 如果错误信息中包含会话ID，直接使用它
-          const sessionId = parseInt(sessionIdMatch[1])
-          console.log(`从错误信息中提取到会话ID: ${sessionId}`)
-          try {
-            const existingSession = await classroomSessionService.getSession(sessionId)
-            if (existingSession) {
-              activeSessions = [existingSession]
-              console.log(`成功通过ID获取会话:`, existingSession)
-            }
-          } catch (getError: any) {
-            console.error('通过ID获取会话失败:', getError)
-            // 如果通过ID获取失败，尝试查询列表
-          }
+        console.log('🔍 会话ID匹配结果:', sessionIdMatch)
+        
+        if (!sessionIdMatch) {
+          console.error('❌ 无法从错误信息中提取会话ID。错误信息:', errorDetail)
+          // 如果无法提取会话ID，显示错误
+          throw createError
         }
         
-        // 如果通过ID获取失败或没有提取到ID，尝试查询列表
-        if (activeSessions.length === 0) {
-          try {
-            const allSessions = await classroomSessionService.listSessions(props.lessonId)
-            console.log(`📋 查询到 ${allSessions.length} 个会话`)
-            // 过滤活跃会话，并且如果知道classroomId，也按classroomId过滤
-            activeSessions = allSessions.filter(s => {
-              const isActive = s.status === 'active' || s.status === 'paused' || s.status === 'pending'
-              if (!isActive) return false
-              // 尝试匹配 classroomId（如果有的话）
-              const sessionClassroomId = s.classroomId || (s as any).classroom_id
-              const targetClassroomId = parseInt(classroomId)
-              if (sessionClassroomId && targetClassroomId) {
-                return sessionClassroomId === targetClassroomId
-              }
-              // 如果没有 classroomId，匹配所有活跃会话
-              return true
-            })
-            console.log(`✅ 通过列表查询找到 ${activeSessions.length} 个活跃会话（classroom_id=${classroomId}）`)
-          } catch (e: any) {
-            console.error('查询会话列表失败:', e)
-            const listErrorDetail = e.response?.data?.detail || e.message || ''
-            console.error('查询失败详情:', listErrorDetail)
-            // 如果列表查询也失败，尝试再次从错误信息中提取ID
-            if (!sessionIdMatch) {
-              const fallbackIdMatch = listErrorDetail.match(/ID:\s*(\d+)/) || errorDetail.match(/ID:\s*(\d+)/)
-              if (fallbackIdMatch) {
-                const fallbackSessionId = parseInt(fallbackIdMatch[1])
-                try {
-                  const existingSession = await classroomSessionService.getSession(fallbackSessionId)
-                  if (existingSession) {
-                    activeSessions = [existingSession]
-                    console.log(`通过备用方法获取会话成功`)
-                  }
-                } catch (fallbackError: any) {
-                  console.error('备用方法也失败:', fallbackError)
-                  // 检查是否是权限问题
-                  if (fallbackError.response?.status === 403) {
-                    console.warn('⚠️ 无权限访问该会话，可能是会话不属于当前用户')
-                  } else if (fallbackError.response?.status === 404) {
-                    console.warn('⚠️ 会话不存在，可能已被删除')
-                  }
-                }
-              }
-            }
-          }
-        }
+        const existingSessionId = parseInt(sessionIdMatch[1])
+        console.log('✅ 从错误信息中提取到会话ID:', existingSessionId)
         
-        if (activeSessions.length > 0) {
-          // 找到现有会话，直接使用
-          const existingSession = activeSessions[0]
-          session.value = existingSession
-          
-          // 如果会话是pending状态，不自动开始，保持等待状态
-          // 让教师手动点击"开始上课"按钮
-          
-          // 注意：不在这里自动启动计时器
-          // 只有在用户点击"开始上课"或"继续"按钮时才启动计时器
-          loadParticipants()
-          loadStatistics()
-          
-          // 如果会话是 pending 状态，设置定时刷新学生列表
-          if (session.value.status === 'pending') {
-            const refreshInterval = setInterval(() => {
-              if (session.value && session.value.status === 'pending') {
-                loadParticipants()
-              } else {
-                clearInterval(refreshInterval)
-              }
-            }, 3000)
+        // 直接加载现有会话，并提示用户
+        try {
+          const existingSession = await classroomSessionService.getSession(existingSessionId)
+          if (existingSession) {
+            session.value = existingSession
+            loadParticipants()
+            loadStatistics()
+            startPollingIfNeeded()
+            console.log('✅ 已自动加载现有会话:', existingSession.id)
             
-            onUnmounted(() => {
-              clearInterval(refreshInterval)
-            })
+            // 提示用户：已加载现有会话，如需创建新会话请先结束当前会话
+            const sessionStatusText = {
+              pending: '待开始',
+              active: '进行中',
+              paused: '已暂停',
+            }[existingSession.status] || existingSession.status
+            
+            alert(
+              `📢 检测到已有活跃的课堂会话（ID: ${existingSessionId}，状态：${sessionStatusText}）\n\n` +
+              `已自动加载现有会话。如需创建新会话，请先点击"结束"按钮结束当前会话。`
+            )
+            return
           }
-          
-          // 提示用户已加载现有会话
-          const statusText = {
-            'active': '进行中',
-            'paused': '已暂停',
-            'pending': '等待学生加入'
-          }[existingSession.status] || '未知'
-          console.log(`✅ 已自动加载现有会话 (ID: ${existingSession.id}, 状态: ${statusText})`)
-          
-          // 如果会话是暂停状态，提示用户
-          if (existingSession.status === 'paused') {
-            // 不显示alert，让用户看到界面状态即可
-            console.log('💡 会话当前处于暂停状态，可以点击"继续"按钮恢复')
-          }
-          
-          return // 成功加载，退出函数
-        } else {
-          // 没有找到活跃会话
-          console.warn('⚠️ 虽然检测到已有活跃会话，但无法加载会话详情')
-          console.warn('原始错误:', createError.response?.data || createError.message)
-          
-          // 尝试最后一次：直接从错误信息中提取ID
-          const finalIdMatch = errorDetail.match(/ID:\s*(\d+)/)
-          if (finalIdMatch) {
-            const finalSessionId = parseInt(finalIdMatch[1])
-            console.log(`🔄 最后尝试：直接使用会话ID ${finalSessionId}`)
-            try {
-              const finalSession = await classroomSessionService.getSession(finalSessionId)
-              if (finalSession) {
-                session.value = finalSession
-                
-                // 如果会话是pending状态，不自动开始，保持等待状态
-                
-          // 注意：不在这里自动启动计时器
-          // 只有在用户点击"开始上课"或"继续"按钮时才启动计时器
-          loadParticipants()
-          loadStatistics()
-                
-                // 如果会话是 pending 状态，设置定时刷新学生列表
-                if (session.value.status === 'pending') {
-                  const refreshInterval = setInterval(() => {
-                    if (session.value && session.value.status === 'pending') {
-                      loadParticipants()
-                    } else {
-                      clearInterval(refreshInterval)
-                    }
-                  }, 3000)
-                  
-                  onUnmounted(() => {
-                    clearInterval(refreshInterval)
-                  })
-                }
-                
-                console.log(`✅ 成功！已加载会话 ID: ${finalSessionId}`)
-                return
-              }
-            } catch (finalError: any) {
-              console.error('❌ 最后尝试也失败:', finalError)
-              console.error('❌ 错误详情:', {
-                message: finalError.message,
-                response: finalError.response,
-                status: finalError.response?.status,
-                data: finalError.response?.data,
-              })
-              // 检查具体错误类型
-              if (finalError.response?.status === 403) {
-                console.error('⚠️ 无权限访问该会话，可能是会话不属于当前用户')
-                throw new Error('无权限访问该会话。会话可能属于其他教师，请确保您是该会话的创建者。')
-              } else if (finalError.response?.status === 404) {
-                console.error('⚠️ 会话不存在，可能已被删除')
-                throw new Error('会话不存在，可能已被删除。请刷新页面重试。')
-              } else if (finalError.response?.status === 400) {
-                // 400 错误可能包含详细信息
-                const errorDetail = finalError.response?.data?.detail || finalError.message || '无法加载会话'
-                console.error('⚠️ 请求错误 (400):', errorDetail)
-                throw new Error(`无法加载现有会话：${errorDetail}`)
-              } else {
-                // 其他错误，抛出更友好的错误信息
-                const finalErrorMessage = finalError.response?.data?.detail || finalError.message || '无法加载会话'
-                console.error('⚠️ 未知错误:', finalErrorMessage)
-                throw new Error(`无法加载现有会话：${finalErrorMessage}`)
-              }
-            }
-          }
-          
-          // 如果所有方法都失败，抛出更友好的错误信息
-          const friendlyError = new Error(
-            '无法加载现有活跃会话。请尝试刷新页面，或联系管理员检查会话状态。'
-          )
-          throw friendlyError
+        } catch (loadError: any) {
+          console.error('加载现有会话失败:', loadError)
+          const loadErrorDetail = loadError.response?.data?.detail || loadError.message || '加载会话失败'
+          alert(`检测到已有活跃会话，但无法加载：${loadErrorDetail}\n\n会话ID: ${existingSessionId}`)
+          throw loadError
         }
       } else {
         // 其他错误，直接抛出
@@ -1646,9 +1512,7 @@ async function handleBeginClass() {
   
   loading.value = true
   try {
-    console.log('🎬 Starting session with id:', session.value.id)
     session.value = await classroomSessionService.startSession(session.value.id)
-    console.log('✅ Session started successfully:', session.value)
     
     // 检查开始会话的响应
     if (!session.value) {
@@ -1669,20 +1533,8 @@ async function handleBeginClass() {
     // 加载统计信息
     loadStatistics()
     
-    // 设置定时刷新学生列表和统计（每5秒）
-    const refreshInterval = setInterval(() => {
-      if (session.value && (session.value.status === 'active' || session.value.status === 'paused')) {
-        loadParticipants()
-        loadStatistics()
-      } else {
-        clearInterval(refreshInterval)
-      }
-    }, 5000)
-    
-    // 组件卸载时清除定时器
-    onUnmounted(() => {
-      clearInterval(refreshInterval)
-    })
+    // 启动轮询（根据会话状态）
+    startPollingIfNeeded()
   } catch (error: any) {
     console.error('Failed to start session:', error)
     const errorMessage = error.message || error.response?.data?.detail || '开始上课失败'
@@ -1695,19 +1547,40 @@ async function handleBeginClass() {
 // 取消课堂（删除 PENDING 状态的会话）
 async function handleCancelSession() {
   if (!session.value || session.value.status !== 'pending') return
-  if (!confirm('确定要取消课堂吗？这将删除当前会话。')) return
+  
+  // 根据是否有学生进入，显示不同的提示
+  const hasStudents = activeStudents.value.length > 0
+  const confirmMessage = hasStudents 
+    ? '确定要取消课堂吗？当前已有学生进入，这将结束当前会话。'
+    : '确定要取消课堂吗？这将删除当前会话。'
+  
+  if (!confirm(confirmMessage)) return
   
   loading.value = true
   try {
-    // 注意：这里可能需要一个删除会话的API，如果没有，可以结束会话
-    // 暂时先提示用户
-    alert('取消课堂功能需要后端支持删除会话API')
-    // TODO: 实现删除会话的逻辑
-    // await classroomSessionService.deleteSession(session.value.id)
-    // session.value = null
+    // 如果没有学生进入，直接清除本地会话状态，不需要调用后端API
+    if (!hasStudents) {
+      session.value = null
+      activeStudents.value = []
+      stopDurationTimer()
+      return
+    }
+    
+    // 如果有学生进入，调用 endSession API 来结束会话
+    session.value = await classroomSessionService.endSession(session.value.id)
+    stopDurationTimer()
+    // 会话结束后，可以选择清除本地状态或保持 ended 状态
+    // 这里保持 ended 状态，让用户可以看到会话已结束
   } catch (error: any) {
     console.error('Failed to cancel session:', error)
-    alert('取消课堂失败')
+    // 如果 API 调用失败，但如果没有学生，仍然清除本地状态
+    if (!hasStudents) {
+      session.value = null
+      activeStudents.value = []
+      stopDurationTimer()
+    } else {
+      alert('取消课堂失败：' + (error.message || error.response?.data?.detail || '未知错误'))
+    }
   } finally {
     loading.value = false
   }
@@ -1757,9 +1630,8 @@ async function handleToggleDisplayMode() {
   loading.value = true
   try {
     session.value = await classroomSessionService.updateDisplayMode(session.value.id, newMode)
-    console.log(`✅ 显示模式已切换为: ${newMode}`)
   } catch (error: any) {
-    console.error('❌ 切换显示模式失败:', error)
+    console.error('切换显示模式失败:', error)
     alert('切换显示模式失败')
   } finally {
     loading.value = false
@@ -1849,21 +1721,10 @@ async function handleControlBoardNavigate(
   action: 'toggle' | 'add' | 'remove' = 'toggle',
   multiSelect: boolean = false
 ) {
-  console.log('📬 收到导播台导航事件:', { cellId, cellOrder, action, multiSelect })
-  
   if (!session.value) {
-    console.warn('⚠️ 无法导航：会话不存在')
+    console.warn('无法导航：会话不存在')
     return
   }
-  
-  console.log('🎯 导播台导航请求:', { 
-    cellId, 
-    cellOrder, 
-    cellIdType: typeof cellId, 
-    action, 
-    multiSelect,
-    sessionId: session.value.id,
-  })
   
   loading.value = true
   try {
@@ -1909,7 +1770,6 @@ async function handleControlBoardNavigate(
       displayCellOrders: displayOrders,
       action,
     }
-    console.log('📤 发送导航请求（新方式）:', requestData)
     const updatedSession = await classroomSessionService.navigateToCell(session.value.id, requestData)
     
     // 确保更新后的会话状态正确（不要丢失状态）
@@ -1920,14 +1780,6 @@ async function handleControlBoardNavigate(
         status: session.value.status, // 保持原有状态，导航不应该改变会话状态
         id: session.value.id,
       }
-      
-      // 使用 display_cell_orders
-      const updatedSettings = updatedSession.settings as any
-      if (updatedSettings?.display_cell_orders) {
-        const orders = updatedSettings.display_cell_orders
-        console.log('✅ 使用 display_cell_orders:', orders)
-      }
-      console.log('✅ 更新显示 Cell 列表, settings:', updatedSession.settings)
     }
     
     // 导航后立即刷新学生列表
@@ -1941,14 +1793,12 @@ async function handleControlBoardNavigate(
       })
       
       if (clickedCell && clickedCell.type === 'activity') {
-        console.log('🎯 点击了活动模块，确保数据库记录存在...')
         const createdCellId = await ensureActivityCellExists(clickedCell, cellOrder)
         // 重新加载 dbCells 以获取最新数据
         await loadDbCells()
         
         // 🆕 如果创建成功，等待一小段时间让数据库记录生效
         if (createdCellId) {
-          console.log('✅ 活动模块数据库记录已创建，等待生效...')
           await new Promise(resolve => setTimeout(resolve, 500))
           // 再次加载确保获取到最新数据
           await loadDbCells()
@@ -1958,7 +1808,6 @@ async function handleControlBoardNavigate(
     
     // 🆕 如果 dbCells 为空，重新加载（可能活动模块刚创建）
     if (dbCells.value.length === 0) {
-      console.log('🔄 dbCells 为空，重新加载...')
       await loadDbCells()
     }
     
@@ -1973,11 +1822,9 @@ async function handleControlBoardNavigate(
       })
       if (index >= 0) {
         selectedCellIndex.value = index
-        console.log('✅ 通过 cellOrder 找到索引:', index, 'cellOrder:', cellOrder)
       } else {
         // 如果找不到，尝试使用 cellOrder 作为索引（向后兼容）
         selectedCellIndex.value = cellOrder < props.lesson.content.length ? cellOrder : -1
-        console.log('⚠️ 未找到匹配的 cell，使用 cellOrder 作为索引:', cellOrder)
       }
     } else if (cellId && props.lesson?.content) {
       // 通过 cellId 查找索引
@@ -1992,9 +1839,7 @@ async function handleControlBoardNavigate(
       })
       if (index >= 0) {
         selectedCellIndex.value = index
-        console.log('✅ 通过 cellId 找到索引:', index)
       } else {
-        console.warn('⚠️ 未找到匹配的 cell，使用 cellOrder 作为 fallback')
         // 如果找不到，尝试使用返回的 currentCellId 对应的索引
         if (updatedSession?.currentCellId) {
           const currentId = updatedSession.currentCellId
@@ -2019,12 +1864,20 @@ async function handleControlBoardNavigate(
 
 // 加载数据
 async function loadParticipants() {
-  if (!session.value) {
-    console.warn('⚠️ 无法加载学生列表：会话不存在')
+  // 🔧 首先检查组件是否还在 DOM 中（如果被 v-if 隐藏，不应该执行）
+  if (!containerRef.value || !containerRef.value.isConnected) {
+    console.log('⏸️ loadParticipants: 组件不在 DOM 中，跳过加载并清理轮询')
+    clearAllPollingIntervals()
     return
   }
   
-  logger.poll('开始加载在线学生列表', { sessionId: session.value.id })
+  if (!session.value) {
+    console.warn('⏸️ loadParticipants: 会话不存在，跳过加载')
+    return
+  }
+  
+  // 静默执行，不输出调用栈
+  
   loadingStudents.value = true
   try {
     // 获取所有在线学生（is_active=true）
@@ -2048,13 +1901,7 @@ async function loadParticipants() {
       logger.debug('更新会话统计，在线学生数:', session.value.activeStudents)
     }
   } catch (error: any) {
-    console.error('❌ 加载学生列表失败:', error)
-    console.error('❌ 错误详情:', {
-      message: error.message,
-      response: error.response,
-      status: error.response?.status,
-      data: error.response?.data,
-    })
+    console.error('加载学生列表失败:', error)
     activeStudents.value = []
   } finally {
     loadingStudents.value = false
@@ -2098,7 +1945,6 @@ function stopDurationTimer() {
 watch(() => session.value?.status, (status, oldStatus) => {
   if (status === 'active') {
     // 当状态变为 active 时，启动计时器
-    console.log('⏱️ 会话状态变为 active，启动计时器')
     if (!durationInterval.value) {
       // 如果计时器还没有启动
       // 只有在从 pending 状态变为 active（新开始）时，才重置为0
@@ -2110,11 +1956,9 @@ watch(() => session.value?.status, (status, oldStatus) => {
     }
   } else if (status === 'paused') {
     // 当状态变为 paused 时，停止计时器（但保持当前时长）
-    console.log('⏸️ 会话状态变为 paused，停止计时器')
     stopDurationTimer()
   } else if (status === 'ended') {
     // 当状态变为 ended 时，停止计时器
-    console.log('⏹️ 会话状态变为 ended，停止计时器')
     stopDurationTimer()
   } else {
     // 其他状态（如 pending），停止计时器
@@ -2130,7 +1974,6 @@ watch(() => session.value, (newSession) => {
   const settings = newSession.settings as any
   if (settings?.display_cell_orders && Array.isArray(settings.display_cell_orders)) {
     const orders = settings.display_cell_orders
-    console.log('✅ watch: 使用 display_cell_orders:', orders)
     
     // 如果有选中的 orders，使用第一个的索引
     if (orders.length > 0) {
@@ -2188,9 +2031,8 @@ async function loadDbCells() {
     const { api } = await import('../../services/api')
     const response = await api.get(`/cells/lesson/${props.lessonId}`)
     dbCells.value = Array.isArray(response) ? response : ([] as any)
-    console.log('📦 加载数据库 Cell 记录:', dbCells.value.length, '个', dbCells.value)
   } catch (error: any) {
-    console.warn('⚠️ 加载数据库 Cell 记录失败:', error)
+    console.warn('加载数据库 Cell 记录失败:', error)
     dbCells.value = []
   }
 }
@@ -2203,19 +2045,11 @@ async function ensureActivityCellExists(cell: Cell, order: number): Promise<numb
     (dbCell.cell_type === 'ACTIVITY' || dbCell.cell_type === 'activity' || dbCell.cell_type?.toUpperCase() === 'ACTIVITY')
   )
   if (existing) {
-    console.log('✅ 活动模块数据库记录已存在:', existing.id)
     return existing.id
   }
   
   // 尝试创建数据库记录
   try {
-    console.log('📤 创建活动模块数据库记录...', {
-      lessonId: props.lessonId,
-      order,
-      title: cell.title,
-      type: cell.type,
-    })
-    
     const { api } = await import('../../services/api')
     // ActivityCell 有可选的 config 属性
     const activityCell = cell as ActivityCell
@@ -2229,16 +2063,12 @@ async function ensureActivityCellExists(cell: Cell, order: number): Promise<numb
       editable: cell.editable ?? false,
     }
     
-    console.log('📤 发送创建 Cell 请求:', cellCreateData)
     const createResponse = await api.post<{ id: number | string }>('/cells', cellCreateData)
     const newCell = createResponse
-    console.log('📥 创建 Cell 响应:', newCell)
     
     if (newCell && newCell.id) {
       const cellId = typeof newCell.id === 'number' ? newCell.id : parseInt(newCell.id, 10)
       if (!isNaN(cellId)) {
-        console.log('✅ 成功创建活动模块数据库记录:', cellId)
-        
         // 添加到 dbCells 数组
         dbCells.value.push({
           id: cellId,
@@ -2250,104 +2080,132 @@ async function ensureActivityCellExists(cell: Cell, order: number): Promise<numb
       }
     }
   } catch (error: any) {
-    console.error('❌ 创建活动模块数据库记录失败:', error)
-    console.error('错误详情:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-    })
+    console.error('创建活动模块数据库记录失败:', error)
   }
   
   return null
 }
 
+// 统一管理所有轮询定时器
+const pollingIntervals = ref<Array<ReturnType<typeof setInterval>>>([])
+
+// 清理所有轮询定时器
+function clearAllPollingIntervals() {
+  pollingIntervals.value.forEach(interval => {
+    clearInterval(interval)
+  })
+  pollingIntervals.value = []
+}
+
+// 启动轮询（只在会话存在且需要时启动）
+function startPollingIfNeeded() {
+  // 🔧 检查组件是否真的可见（通过检查 DOM 元素）
+  // 如果组件被 v-if 隐藏，不应该启动轮询
+  console.log('🔍 startPollingIfNeeded 被调用，检查是否应该启动轮询')
+  
+  // 先清理旧的定时器
+  clearAllPollingIntervals()
+  
+  if (!session.value) {
+    return
+  }
+  
+  // 静默启动轮询
+  
+  // 根据会话状态启动不同的轮询
+  if (session.value.status === 'pending') {
+    // PENDING 状态：只轮询参与者列表（每3秒）
+    const interval = setInterval(() => {
+      // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
+      if (!containerRef.value || !containerRef.value.isConnected) {
+        console.log('🛑 停止轮询：组件不在 DOM 中')
+        clearAllPollingIntervals()
+        return
+      }
+      // 检查会话是否还存在且状态正确
+      if (!session.value || session.value.status !== 'pending') {
+        clearAllPollingIntervals()
+        return
+      }
+      // 只在有会话时才加载
+      loadParticipants()
+    }, 3000)
+    pollingIntervals.value.push(interval)
+  } else if (session.value.status === 'active' || session.value.status === 'paused') {
+    // ACTIVE/PAUSED 状态：轮询参与者列表和统计（每5秒）
+    const interval = setInterval(() => {
+      // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
+      if (!containerRef.value || !containerRef.value.isConnected) {
+        clearAllPollingIntervals()
+        return
+      }
+      // 检查会话是否还存在且状态正确
+      if (!session.value || (session.value.status !== 'active' && session.value.status !== 'paused')) {
+        clearAllPollingIntervals()
+        return
+      }
+      // 只在有会话时才加载
+      loadParticipants()
+      loadStatistics()
+      // 如果当前是活动模块，也刷新活动统计
+      if (currentCell.value && currentCell.value.type === 'activity' && currentActivityDbCell.value) {
+        loadActivityStatistics()
+      }
+    }, 5000)
+    pollingIntervals.value.push(interval)
+  }
+  // 其他状态不启动轮询
+}
+
 // 初始化
 onMounted(async () => {
+  // 静默执行，不输出日志
+  
   // 监听浏览器全屏状态变化
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
   document.addEventListener('mozfullscreenchange', handleFullscreenChange)
   document.addEventListener('MSFullscreenChange', handleFullscreenChange)
+  
   // 加载数据库 Cell 记录（用于 ID 匹配）
   await loadDbCells()
   
-  // 检查是否有现有的活跃会话
-  try {
-    // 查询所有会话，然后过滤出活跃的
-    const allSessions = await classroomSessionService.listSessions(props.lessonId)
-    const activeSessions = allSessions.filter(s => 
-      s.status === 'active' || s.status === 'paused' || s.status === 'pending'
-    )
-    
-    console.log('🔍 检查现有会话:', { total: allSessions.length, active: activeSessions.length })
-    
-    // 添加空值检查
-    if (activeSessions && Array.isArray(activeSessions) && activeSessions.length > 0) {
-      session.value = activeSessions[0]
-      console.log('✅ 加载现有会话:', session.value)
-      
-      // 注意：只有在用户点击"开始上课"后才会启动计时器
-      // 这里不自动启动，因为可能是之前已经开始的会话，需要从服务器获取已用时长
-      // 如果会话是 active 状态，可以考虑从服务器获取已用时长，但暂时不自动启动计时器
-      // 让用户通过"开始上课"按钮明确控制
-      
-      // 加载学生列表和统计
-      loadParticipants()
-      loadStatistics()
-      
-      // 设置定时刷新学生列表（每5秒）
-      const refreshInterval = setInterval(() => {
-        if (session.value && (session.value.status === 'active' || session.value.status === 'paused')) {
-          loadParticipants()
-          loadStatistics()
-          // 如果当前是活动模块，也刷新活动统计
-          if (currentCell.value && currentCell.value.type === 'activity' && currentActivityDbCell.value) {
-            loadActivityStatistics()
-          }
-        } else {
-          clearInterval(refreshInterval)
-        }
-      }, 5000)
-      
-      // 如果会话是 pending 状态，也设置定时刷新
-      if (session.value.status === 'pending') {
-        const pendingRefreshInterval = setInterval(() => {
-          if (session.value && session.value.status === 'pending') {
-            loadParticipants()
-          } else {
-            clearInterval(pendingRefreshInterval)
-          }
-        }, 3000)
-        
-        onUnmounted(() => {
-          clearInterval(pendingRefreshInterval)
-        })
-      }
-      
-      // 组件卸载时清除定时器
-      onUnmounted(() => {
-        clearInterval(refreshInterval)
-      })
-    } else {
-      console.log('ℹ️ 没有找到现有会话')
-    }
-  } catch (error: any) {
-    console.error('❌ 加载现有会话失败:', error)
-    // 如果是404或其他错误，不显示错误提示（可能是正常的，没有现有会话）
-    if (error.response?.status !== 404) {
-      console.warn('加载现有会话时出错，但可以继续创建新会话')
-    }
-  }
+  // ✅ 重要：不自动加载会话和启动轮询
+  // 只有在用户明确点击"创建课堂"或"准备上课"时才加载会话
+  // 这样可以避免在非授课模式下不必要的轮询
+  
+  // 确保没有遗留的轮询定时器
+  clearAllPollingIntervals()
+})
+
+// 组件卸载前清理
+onBeforeUnmount(() => {
+  clearAllPollingIntervals()
 })
 
 onUnmounted(() => {
   stopDurationTimer()
+  
+  // 清理所有轮询定时器（双重保险）
+  clearAllPollingIntervals()
   
   // 移除全屏状态监听器
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
   document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
   document.removeEventListener('mozfullscreenchange', handleFullscreenChange)
   document.removeEventListener('MSFullscreenChange', handleFullscreenChange)
+})
+
+// 🔧 暴露 session 给父组件（LessonEditor）使用
+defineExpose({
+  session,
+  sessionId: computed(() => session.value?.id),
+  // 添加调试日志
+  getSessionId: () => {
+    const id = session.value?.id
+    console.log('🔍 TeacherControlPanel defineExpose getSessionId:', id, session.value)
+    return id
+  },
 })
 </script>
 
@@ -2507,7 +2365,8 @@ onUnmounted(() => {
 
 .metric-accent-bar {
   position: absolute;
-  inset-x: 0;
+  left: 0;
+  right: 0;
   top: 0;
   height: 4px;
 }
@@ -2602,9 +2461,7 @@ onUnmounted(() => {
 }
 
 /* 📺 学生预览面板样式 */
-.student-preview-panel {
-  /* 样式已在上面定义 */
-}
+/* 样式已在上面定义，此处不再重复 */
 
 /* 预览内容样式已在上面定义 */
 
@@ -2643,22 +2500,112 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
 .preview-item-body-compact {
   @apply text-xs text-gray-600;
-  min-height: 40px;
-  max-height: 60px;
+  min-height: 60px;
+  max-height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* 缩略图包装器 */
+.preview-thumbnail-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+/* 缩略图 */
+.preview-thumbnail {
+  width: 100%;
+  height: 60px;
+  border-radius: 6px;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.preview-thumbnail-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #f3f4f6;
+}
+
+.preview-thumbnail-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.preview-thumbnail-icon {
+  width: 24px;
+  height: 24px;
+  color: white;
+}
+
+/* 不同类型模块的缩略图背景色 */
+.preview-thumbnail-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.preview-thumbnail-text .preview-thumbnail-content {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.preview-thumbnail-video {
+  background: #1f2937;
+}
+
+.preview-thumbnail-video .preview-thumbnail-content {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+}
+
+.preview-thumbnail-code {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.preview-thumbnail-code .preview-thumbnail-content {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.preview-thumbnail-activity {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.preview-thumbnail-activity .preview-thumbnail-content {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.preview-thumbnail-default {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+
+.preview-thumbnail-default .preview-thumbnail-content {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
 }
 
 /* 文本预览（紧凑版） */
 .preview-text-compact {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .preview-text-snippet {
@@ -2668,6 +2615,7 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
 }
 
@@ -2685,9 +2633,8 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  padding: 12px 0;
 }
 
 .preview-icon-small {

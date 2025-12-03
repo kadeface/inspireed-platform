@@ -284,6 +284,7 @@ export interface ActivitySubmission {
   cellId: number
   lessonId: number
   studentId: number
+  sessionId?: number  // 课堂会话ID（NULL表示课后提交）
   responses: Record<string, ItemAnswer>  // key: item_id, value: 答案
   processTrace?: ProcessTraceEvent[]
   context?: Record<string, any>

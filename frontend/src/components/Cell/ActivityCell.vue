@@ -35,23 +35,20 @@
         </p>
       </div>
       
-      <!-- 学生提交列表（仅当已经有数据库中的数值型 Cell ID 时才显示） -->
-      <div v-if="actualCellId > 0">
-        <SubmissionList
-          :cell-id="actualCellId"
-          :activity="cell.content"
-          :session-id="sessionId"
-          :lesson-id="lessonId"
-        />
+      <!-- 学生提交列表和统计（支持 UUID 和数字 ID） -->
+      <UnifiedSubmissionPanel
+        :cell-id="cell.id"
+        :activity="cell.content"
+        :session-id="sessionId"
+        :lesson-id="lessonId"
+        :cell-order="cell.order"
+      />
+      <!-- 调试信息 -->
+      <div class="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
+        🔍 调试信息: cellId={{ cell.id }}, sessionId={{ sessionId }}, lessonId={{ lessonId }}
       </div>
-      <div v-else class="text-center py-8 text-gray-500 border border-gray-200 rounded-lg">
-        <p class="mb-2">📋 当前为教案预览视图</p>
-        <p class="text-sm">
-          该活动还没有对应的数据库 Cell 记录，因此这里暂时无法显示学生提交列表。
-        </p>
-        <p class="text-sm mt-1">
-          请在「课堂控制面板」中启动课堂并打开此活动，即可实时查看学生提交和统计。
-        </p>
+      <div v-if="!sessionId" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+        ⚠️ 未提供 sessionId，将显示所有会话的提交（包括课后提交）。如果这是课堂模式，请确保传递 sessionId。
       </div>
     </div>
 
@@ -69,14 +66,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, inject, watch, onMounted, type ComputedRef, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '../../store/user'
 import { UserRole } from '../../types/user'
 import type { ActivityCell } from '../../types/cell'
 import ActivityCellEditor from '../Activity/ActivityCellEditor.vue'
 import ActivityViewer from '../Activity/ActivityViewer.vue'
-import SubmissionList from '../Activity/Teacher/SubmissionList.vue'
+import UnifiedSubmissionPanel from '../Activity/Teacher/UnifiedSubmissionPanel.vue'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useFeatureFlag } from '@/composables/useFeatureFlag'
 
@@ -95,13 +92,7 @@ const props = withDefaults(defineProps<Props>(), {
   useSurveyJS: undefined,  // undefined 表示自动选择
 })
 
-// 🔍 调试：打印 props
-console.log('🔍 ActivityCell Props:', {
-  cellId: props.cell.id,
-  cellType: props.cell.type,
-  lessonId: props.lessonId,
-  sessionId: props.sessionId,  // 重点检查这个值
-})
+// 移除频繁的 props 日志，只在必要时输出
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -129,10 +120,18 @@ const useSurveyJS = computed(() => {
   return props.cell.content.activityType === 'survey'
 })
 
-// 从 props 或 route 获取 lessonId
+// 🔧 尝试从 provide/inject 获取 sessionId 和 session（如果父组件提供了）
+const injectedSessionId = inject<ComputedRef<number | undefined> | undefined>('classroomSessionId', undefined)
+const injectedSession = inject<ComputedRef<any> | Ref<any> | undefined>('classroomSession', undefined)
+
+// 从 props、inject 或 route 获取 lessonId
 const lessonId = computed(() => {
   if (props.lessonId !== undefined) {
     return props.lessonId
+  }
+  // 从注入的 session 获取
+  if (injectedSession?.value?.lessonId !== undefined) {
+    return injectedSession.value.lessonId
   }
   // 从路由参数获取（适用于 LessonView 页面）
   const routeLessonId = route.params.id
@@ -142,35 +141,100 @@ const lessonId = computed(() => {
   return undefined
 })
 
-// 解析 cellId：如果是 UUID 字符串，需要解析为数字 ID
-// 注意：cell对象可能有两种格式：
-// 1. 从数据库返回：cell.id 是数字
-// 2. 从lesson.content返回：cell.id 可能是UUID字符串，但cell对象可能有_dbId字段存储数据库ID
-const actualCellId = computed(() => {
-  // 如果cell.id是数字，直接使用
-  if (typeof props.cell.id === 'number') {
-    return props.cell.id
+// 从 props、inject 或 route 获取 sessionId
+const sessionId = computed(() => {
+  // 优先级 1: props
+  if (props.sessionId !== undefined) {
+    console.log('📌 ActivityCell: 从 props 获取 sessionId:', props.sessionId)
+    return props.sessionId
+  }
+  // 优先级 2: 从 inject 获取 sessionId（直接提供的）
+  if (injectedSessionId?.value !== undefined) {
+    console.log('📌 ActivityCell: 从 injectedSessionId 获取 sessionId:', injectedSessionId.value)
+    return injectedSessionId.value
+  }
+  // 优先级 3: 从 inject 获取 session 对象，然后提取 id
+  if (injectedSession) {
+    const sessionValue = injectedSession.value
+    if (sessionValue?.id !== undefined) {
+      console.log('📌 ActivityCell: 从 injectedSession 获取 sessionId:', sessionValue.id)
+      return sessionValue.id
+    }
+  }
+  // 优先级 4: 从路由参数获取
+  const routeSessionId = route.params.sessionId || route.query.sessionId
+  if (routeSessionId) {
+    const sessionIdNum = Number(routeSessionId)
+    if (!isNaN(sessionIdNum)) {
+      console.log('📌 ActivityCell: 从路由获取 sessionId:', sessionIdNum)
+      return sessionIdNum
+    }
   }
   
-  // 如果是字符串，尝试转换
-  const numericId = parseInt(props.cell.id as string)
-  if (!isNaN(numericId)) {
-    return numericId
-  }
-  
-  // 如果是UUID，检查cell对象是否有_dbId字段（某些API可能返回）
-  const cellObj = props.cell as any
-  if (cellObj._dbId) {
-    return cellObj._dbId
-  }
-  
-  // 如果都没有，尝试使用cell.id（如果后端支持UUID的话）
-  // 否则返回0，会导致API调用失败，但至少不会崩溃
-  console.warn('⚠️ Cannot resolve cell ID to numeric ID, using 0 as fallback', {
-    cellId: props.cell.id,
-    cell: props.cell
+  // 如果都没有，输出调试信息
+  console.warn('⚠️ ActivityCell: 无法获取 sessionId', {
+    hasInjectedSession: !!injectedSession,
+    hasInjectedSessionId: !!injectedSessionId,
+    injectedSessionValue: injectedSession?.value,
+    injectedSessionIdValue: injectedSessionId?.value,
   })
-  return 0
+  
+  return undefined
+})
+
+// 使用 watch 监听 sessionId 变化，调试用
+// 注意：这些日志会在教师端的浏览器控制台显示
+watch(() => sessionId.value, (newId, oldId) => {
+  if (newId !== oldId) {
+    if (newId !== undefined) {
+      console.log('✅ ActivityCell: sessionId 已设置:', newId, {
+        source: props.sessionId !== undefined ? 'props' : 
+                injectedSessionId?.value !== undefined ? 'injectedSessionId' : 
+                injectedSession?.value?.id !== undefined ? 'injectedSession' : 'route',
+        cellId: props.cell.id,
+        timestamp: new Date().toLocaleTimeString(),
+      })
+    } else {
+      console.warn('⚠️ ActivityCell: sessionId 为 undefined', {
+        hasInjectedSession: !!injectedSession,
+        injectedSessionValue: injectedSession?.value,
+        injectedSessionIdValue: injectedSessionId?.value,
+        propsSessionId: props.sessionId,
+        cellId: props.cell.id,
+        timestamp: new Date().toLocaleTimeString(),
+      })
+    }
+  }
+}, { immediate: true })
+
+// 组件挂载时输出初始状态（确保能看到日志）
+onMounted(() => {
+  // 使用 console.group 让日志更明显
+  const roleLabel = isTeacher.value ? '教师端' : '学生端'
+  console.group(`🔍 ActivityCell 已挂载（${roleLabel}）`)
+  console.log('Cell ID:', props.cell.id)
+  console.log('初始 sessionId:', sessionId.value)
+  console.log('isTeacher:', isTeacher.value)
+  console.log('hasInjectedSession:', !!injectedSession)
+  console.log('hasInjectedSessionId:', !!injectedSessionId)
+  console.log('injectedSession?.value:', injectedSession?.value)
+  console.log('injectedSessionId?.value:', injectedSessionId?.value)
+  console.log('props.sessionId:', props.sessionId)
+  console.log('时间:', new Date().toLocaleTimeString())
+  console.groupEnd()
+  
+  // 如果 sessionId 为空，输出警告
+  if (!sessionId.value) {
+    console.error('❌ ActivityCell: sessionId 为空！', {
+      cellId: props.cell.id,
+      propsSessionId: props.sessionId,
+      injectedSession: injectedSession?.value,
+      injectedSessionId: injectedSessionId?.value,
+      injectedSessionIdValue: injectedSessionId?.value,
+      isTeacher: isTeacher.value,
+      timestamp: new Date().toLocaleTimeString(),
+    })
+  }
 })
 
 const emit = defineEmits<{

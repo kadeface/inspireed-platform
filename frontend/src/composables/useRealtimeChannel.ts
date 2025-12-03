@@ -247,16 +247,30 @@ export class RealtimeChannelManager {
     }
     
     // 收到实时消息
+    console.log('📨 RealtimeChannelManager: 收到 WebSocket 消息', {
+      type: message.type,
+      channel: message.channel,
+      hasListeners: this.eventListeners.has(message.type),
+      listenersCount: this.eventListeners.has(message.type) ? this.eventListeners.get(message.type)!.size : 0,
+      timestamp: new Date().toLocaleTimeString(),
+      data: message.data,
+    })
     
     // 触发对应类型的监听器
     if (this.eventListeners.has(message.type)) {
       const callbacks = this.eventListeners.get(message.type)!
+      console.log(`✅ 触发 ${message.type} 监听器，回调数量: ${callbacks.size}`)
       callbacks.forEach(callback => {
         try {
           callback(message)
         } catch (error) {
           console.error('❌ 消息处理回调错误:', error)
         }
+      })
+    } else {
+      console.warn(`⚠️ 没有注册 ${message.type} 类型的监听器`, {
+        registeredTypes: Array.from(this.eventListeners.keys()),
+        receivedType: message.type,
       })
     }
   }

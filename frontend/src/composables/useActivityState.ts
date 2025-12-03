@@ -25,12 +25,58 @@ export function useActivityState(options: UseActivityStateOptions) {
   
   /**
    * 获取题目的答案数据（包含正确性判断）
+   * 确保返回的答案格式符合组件期望（对象或 null）
    */
   function getItemAnswer(itemId: string): any {
     if (!submissionData.value || !submissionData.value.responses) {
       return null
     }
-    return submissionData.value.responses[itemId]
+    
+    const answer = submissionData.value.responses[itemId]
+    
+    // 如果答案是 null 或 undefined，直接返回 null
+    if (answer === null || answer === undefined) {
+      return null
+    }
+    
+    // 如果答案已经是对象格式，直接返回
+    if (typeof answer === 'object' && !Array.isArray(answer)) {
+      return answer
+    }
+    
+    // 如果答案是字符串或数组，需要转换为对象格式
+    // 找到对应的题目类型，以便正确转换
+    const item = cell.content.items.find(item => item.id === itemId)
+    if (!item) {
+      // 如果找不到题目，返回 null
+      return null
+    }
+    
+    // 根据题型转换答案格式
+    if (item.type === 'single-choice' || item.type === 'true-false') {
+      // 单选题或判断题：字符串 -> {answer: string}
+      return {
+        answer: answer
+      }
+    } else if (item.type === 'multiple-choice') {
+      // 多选题：数组 -> {answer: string[]}
+      return {
+        answer: Array.isArray(answer) ? answer : [answer]
+      }
+    } else if (item.type === 'short-answer' || item.type === 'long-answer') {
+      // 简答题或论述题：字符串 -> {text: string}
+      return {
+        text: String(answer)
+      }
+    } else if (item.type === 'scale') {
+      // 量表题：数字 -> {value: number}
+      return {
+        value: typeof answer === 'number' ? answer : Number(answer)
+      }
+    }
+    
+    // 其他情况，返回原答案（可能是对象格式）
+    return answer
   }
   
   /**

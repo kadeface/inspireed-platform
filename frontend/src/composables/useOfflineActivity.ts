@@ -3,7 +3,7 @@
  * 使用 IndexedDB 存储草稿和离线数据
  */
 
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { openDB } from 'idb'
 import activityService from '../services/activity'
 

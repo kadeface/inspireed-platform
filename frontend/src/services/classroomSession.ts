@@ -21,29 +21,42 @@ export const classroomSessionService = {
    */
   async createSession(lessonId: number, data: { classroom_id: number; scheduled_start?: string }): Promise<ClassSession> {
     try {
-      const response = await api.post(`/classroom-sessions/lessons/${lessonId}/sessions`, {
+      const requestBody: any = {
         lesson_id: lessonId,
         classroom_id: data.classroom_id,
-        scheduled_start: data.scheduled_start,
+      }
+      
+      // 只在有值时才添加 scheduled_start
+      if (data.scheduled_start) {
+        requestBody.scheduled_start = data.scheduled_start
+      }
+      
+      // 确保 settings 字段存在（后端需要，即使为空对象）
+      // 后端会合并默认设置
+      requestBody.settings = {}
+      
+      console.log('📤 Creating session with request:', {
+        url: `/classroom-sessions/lessons/${lessonId}/sessions`,
+        body: requestBody,
       })
+      
+      const response = await api.post(`/classroom-sessions/lessons/${lessonId}/sessions`, requestBody)
       
       // api.post 已经返回 response.data，所以 response 就是数据本身
       // 检查响应数据
       if (!response) {
-        console.error('❌ Response is null or undefined')
         throw new Error('创建会话失败：服务器未返回数据')
       }
       
       // 检查是否是空对象
       if (typeof response === 'object' && Object.keys(response).length === 0) {
-        console.error('❌ Response is empty object')
         throw new Error('创建会话失败：服务器返回了空数据')
       }
       
       // 确保返回的数据有 id 字段（可能是 id 或 _id，或者使用 snake_case 的字段名）
       const sessionId = (response as any).id || (response as any)._id || (response as any).session_id
       if (!sessionId) {
-        console.error('❌ Response missing id field:', response)
+        console.error('Response missing id field:', response)
         throw new Error('创建会话失败：服务器返回的数据格式不正确（缺少 id 字段）')
       }
       
@@ -69,10 +82,44 @@ export const classroomSessionService = {
         updatedAt: (response as any).updated_at || (response as any).updatedAt,
       } as ClassSession
       
+      console.log('✅ Session created successfully:', session.id)
       return session
     } catch (error: any) {
-      console.error('Failed to create session:', error)
-      throw error
+      // 增强错误日志，显示完整的错误信息
+      console.error('❌ Failed to create session:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        requestUrl: error.config?.url,
+        requestData: error.config?.data,
+      })
+      
+      // 提取详细的错误信息
+      const errorDetail = error.response?.data?.detail || error.response?.data?.message || error.message
+      
+      // 如果错误信息是字符串数组（Pydantic验证错误），格式化为更友好的消息
+      if (Array.isArray(errorDetail)) {
+        const formattedErrors = errorDetail.map((err: any) => {
+          const field = err.loc?.join('.') || 'field'
+          const msg = err.msg || 'validation error'
+          return `${field}: ${msg}`
+        }).join('; ')
+        throw new Error(`创建会话失败：${formattedErrors}`)
+      }
+      
+      // 如果错误信息是对象，尝试提取关键信息
+      if (typeof errorDetail === 'object') {
+        const errorMessage = errorDetail.message || JSON.stringify(errorDetail)
+        throw new Error(`创建会话失败：${errorMessage}`)
+      }
+      
+      // 对于字符串错误（如"已有活跃会话"），保留原始错误以便调用者可以访问 response
+      // 这样 TeacherControlPanel 可以提取会话ID等信息
+      const newError = new Error(`创建会话失败：${errorDetail || '未知错误'}`)
+      // 保留原始响应用于错误处理
+      ;(newError as any).response = error.response
+      throw newError
     }
   },
 
@@ -119,13 +166,7 @@ export const classroomSessionService = {
       
       return session
     } catch (error: any) {
-      console.error('❌ Get session error:', error)
-      console.error('❌ Error details:', {
-        message: error.message,
-        response: error.response,
-        status: error.response?.status,
-        data: error.response?.data,
-      })
+      console.error('Get session error:', error)
       throw error
     }
   },
@@ -156,13 +197,7 @@ export const classroomSessionService = {
         activeStudents: s.active_students || s.activeStudents || 0,
       } as StudentPendingSession))
     } catch (error: any) {
-      console.error('❌ Get student pending sessions error:', error)
-      console.error('❌ Error details:', {
-        message: error.message,
-        response: error.response,
-        status: error.response?.status,
-        data: error.response?.data,
-      })
+      console.error('Get student pending sessions error:', error)
       throw error
     }
   },
@@ -193,13 +228,7 @@ export const classroomSessionService = {
         activeStudents: s.active_students || s.activeStudents || 0,
       } as StudentPendingSession))
     } catch (error: any) {
-      console.error('❌ Get student active sessions error:', error)
-      console.error('❌ Error details:', {
-        message: error.message,
-        response: error.response,
-        status: error.response?.status,
-        data: error.response?.data,
-      })
+      console.error('Get student active sessions error:', error)
       throw error
     }
   },
@@ -209,15 +238,12 @@ export const classroomSessionService = {
    */
   async listSessions(lessonId: number, status?: string): Promise<ClassSession[]> {
     try {
-      console.log('📋 Listing sessions:', { lessonId, status })
       const params = status ? { status } : {}
       // api.get 已经返回 response.data，所以 response 就是数据本身
       const response = await api.get(`/classroom-sessions/lessons/${lessonId}/sessions`, { params })
-      console.log('📋 List sessions response:', response)
       
       // 确保返回数组
       const sessions = Array.isArray(response) ? response : []
-      console.log(`📋 Found ${sessions.length} sessions`)
       
       // 转换字段名（如果需要）
       return sessions.map((s: any) => ({
@@ -240,13 +266,7 @@ export const classroomSessionService = {
         updatedAt: s.updated_at || s.updatedAt,
       } as ClassSession))
     } catch (error: any) {
-      console.error('❌ List sessions error:', error)
-      console.error('❌ Error details:', {
-        message: error.message,
-        response: error.response,
-        status: error.response?.status,
-        data: error.response?.data,
-      })
+      console.error('List sessions error:', error)
       throw error
     }
   },
@@ -313,22 +333,12 @@ export const classroomSessionService = {
       
       // 检查响应是否为空或格式不正确
       if (!response || typeof response !== 'object') {
-        console.error('❌ 导航响应格式错误:', response)
+        console.error('导航响应格式错误:', response)
         throw new Error('导航失败：服务器返回的数据格式不正确')
       }
       
       // 处理字段映射（snake_case 到 camelCase）
       const settings = (response as any).settings || {}
-      
-      // 调试日志：检查 settings
-      // Navigate response data
-      if (false) { // 调试代码已禁用
-        console.log('📥 Navigate response data:', {
-        hasSettings: !!settings,
-        settingsKeys: Object.keys(settings),
-        displayCellOrders: settings.display_cell_orders,
-      })
-      }
       
       const session = {
         ...(response as object),
@@ -352,24 +362,16 @@ export const classroomSessionService = {
       
       return session
     } catch (error: any) {
-      console.error('❌ 导航失败:', error)
+      console.error('导航失败:', error)
       
       // 显示详细的错误信息
       if (error.response) {
-        console.error('❌ 错误响应状态:', error.response.status)
-        console.error('❌ 错误响应数据:', error.response.data)
-        console.error('❌ 错误响应头:', error.response.headers)
-        
         // 提取详细错误信息
         const errorDetail = error.response.data?.detail || error.response.data?.message || JSON.stringify(error.response.data)
-        console.error('❌ 错误详情:', errorDetail)
-        
         throw new Error(`导航失败: ${errorDetail}`)
       } else if (error.request) {
-        console.error('❌ 请求已发送但无响应:', error.request)
         throw new Error('导航失败：服务器无响应')
       } else {
-        console.error('❌ 请求配置错误:', error.config)
         throw error
       }
     }
@@ -429,16 +431,6 @@ export const classroomSessionService = {
           studentEmail: p.student_email || p.studentEmail,
         }
         
-        // 处理后的参与者
-        if (false) { // 调试代码已禁用
-          console.log('✅ 处理后的参与者:', {
-          id: participant.id,
-          studentName: participant.studentName,
-          isActive: participant.isActive,
-          studentId: participant.studentId,
-        })
-        }
-        
         return participant
       })
     } catch (error: any) {
@@ -486,7 +478,7 @@ export const classroomSessionService = {
       
       return participation
     } catch (error: any) {
-      console.error('❌ 加入会话失败:', error)
+      console.error('加入会话失败:', error)
       throw error
     }
   },
@@ -540,7 +532,7 @@ export const classroomSessionService = {
       
       return session
     } catch (error: any) {
-      console.error('❌ 更新显示模式失败:', error)
+      console.error('更新显示模式失败:', error)
       throw error
     }
   },

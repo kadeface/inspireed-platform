@@ -120,13 +120,17 @@
 
             <!-- 预览模式切换 -->
             <button
-              @click="isPreviewMode = !isPreviewMode"
+              @click="handleTogglePreviewMode"
+              :disabled="!canEnterPreviewMode && !isPreviewMode"
               :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md',
+                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
                 isPreviewMode
                   ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
+                  : canEnterPreviewMode
+                    ? 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed',
               ]"
+              :title="!canEnterPreviewMode && !isPreviewMode ? '需要先发布教案才能进入授课模式' : ''"
             >
               {{ isPreviewMode ? '编辑模式' : '授课模式' }}
             </button>
@@ -191,9 +195,11 @@
             <!-- 课堂控制面板（预览模式下） -->
             <TeacherClassroomControlPanel
               v-if="isPreviewMode && showClassroomPanel && currentLesson"
+              ref="teacherControlPanelRef"
               :lesson-id="currentLesson.id"
               :lesson="currentLesson"
               :class="isPreviewMode ? 'mb-2' : 'mb-6'"
+              @session-changed="handleSessionChanged"
             />
 
             <!-- MVP: 参考资源面板 -->
@@ -231,6 +237,7 @@
                 </div>
 
                 <!-- Cell 容器 -->
+                <!-- sessionId 和 lessonId 通过 provide/inject 传递，不需要 props -->
                 <CellContainer
                   :cell="cell"
                   :index="index"
@@ -238,11 +245,21 @@
                   :draggable="!isPreviewMode"
                   :show-move-buttons="!isPreviewMode"
                   :compact-mode="compactMode && !isPreviewMode"
+                  :lesson-id="currentLesson?.id"
                   @update="handleCellUpdate"
                   @delete="handleDeleteCell"
                   @move-up="handleMoveUp"
                   @move-down="handleMoveDown"
                 />
+                <!-- 调试信息 -->
+                <div v-if="isPreviewMode && index === 0" class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                  🔍 LessonEditor 调试: 
+                  currentSessionId = {{ currentSessionId }}, 
+                  isPreviewMode = {{ isPreviewMode }}, 
+                  showClassroomPanel = {{ showClassroomPanel }},
+                  hasTeacherPanelRef = {{ !!teacherControlPanelRef }},
+                  panelSessionId = {{ teacherControlPanelRef ? (teacherControlPanelRef as any)?.sessionId?.value : 'N/A' }}
+                </div>
 
                 <!-- Cell 之间的添加按钮 -->
                 <div v-if="!isPreviewMode" class="add-cell-menu-container">
@@ -269,7 +286,9 @@
             'rounded-lg shadow-xl p-4 border-l-4 transform transition-all duration-300',
             toast.type === 'success' 
               ? 'bg-green-50 border-green-400 border-l-green-500' 
-              : 'bg-red-50 border-red-400 border-l-red-500',
+              : toast.type === 'warning'
+                ? 'bg-amber-50 border-amber-400 border-l-amber-500'
+                : 'bg-red-50 border-red-400 border-l-red-500',
           ]"
         >
           <div class="flex items-start">
@@ -277,7 +296,11 @@
               <div
                 :class="[
                   'rounded-full p-1',
-                  toast.type === 'success' ? 'bg-green-100' : 'bg-red-100'
+                  toast.type === 'success' 
+                    ? 'bg-green-100' 
+                    : toast.type === 'warning'
+                      ? 'bg-amber-100'
+                      : 'bg-red-100'
                 ]"
               >
                 <svg
@@ -288,6 +311,15 @@
                   viewBox="0 0 24 24"
                 >
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <svg
+                  v-else-if="toast.type === 'warning'"
+                  class="h-4 w-4 text-amber-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
                 <svg
                   v-else
@@ -304,7 +336,11 @@
               <p
                 :class="[
                   'text-sm font-semibold',
-                  toast.type === 'success' ? 'text-green-800' : 'text-red-800',
+                  toast.type === 'success' 
+                    ? 'text-green-800' 
+                    : toast.type === 'warning'
+                      ? 'text-amber-800'
+                      : 'text-red-800',
                 ]"
               >
                 {{ toast.message }}
@@ -641,7 +677,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLessonStore } from '../../store/lesson'
 // 已删除自动保存功能，避免并发保存导致数据覆盖
@@ -701,19 +737,277 @@ const publishError = ref<string | null>(null)
 const showLessonAssistant = ref(false)
 const showClassroomPanel = ref(false)
 
+// 课堂会话相关
+const teacherControlPanelRef = ref<InstanceType<typeof TeacherClassroomControlPanel> | null>(null)
+
+// 从 TeacherControlPanel 获取 sessionId（使用 ref 存储，通过 watch 更新）
+const currentSessionId = ref<number | undefined>(undefined)
+
+// 🔧 处理 TeacherControlPanel 的 session 变化事件
+function handleSessionChanged(session: any | null) {
+  console.log('📨 LessonEditor: 收到 session-changed 事件', {
+    sessionId: session?.id,
+    status: session?.status,
+    timestamp: new Date().toLocaleTimeString(),
+  })
+  
+  if (session?.id) {
+    currentSessionId.value = session.id
+    providedSessionRef.value = session
+    console.log('✅ LessonEditor: 已更新 currentSessionId 和 providedSessionRef', {
+      sessionId: session.id,
+      timestamp: new Date().toLocaleTimeString(),
+    })
+  } else {
+    currentSessionId.value = undefined
+    providedSessionRef.value = null
+    console.log('⚠️ LessonEditor: session 已清除')
+  }
+}
+
+// 监听 currentSessionId 的变化，只在真正变化时输出日志
+watch(currentSessionId, (newId, oldId) => {
+  if (newId !== oldId) {
+    if (newId !== undefined) {
+      console.log('✅ LessonEditor: sessionId 已设置:', newId)
+    }
+    // 从有值变为无值时不输出（这是正常情况）
+  }
+}, { immediate: false })
+
+// 强制检查 sessionId 的函数（静默执行，不输出日志）
+function checkSessionId() {
+  if (!isPreviewMode.value || !showClassroomPanel.value || !teacherControlPanelRef.value) {
+    return
+  }
+  
+  const panel = teacherControlPanelRef.value as any
+  
+  // 尝试多种方式获取
+  const sessionIdFromComputed = panel?.sessionId?.value
+  const sessionIdFromSession = panel?.session?.value?.id
+  
+  const newSessionId = sessionIdFromComputed !== undefined ? sessionIdFromComputed : sessionIdFromSession
+  
+  if (newSessionId !== undefined && newSessionId !== currentSessionId.value) {
+    currentSessionId.value = newSessionId
+  }
+}
+
+// 在 onMounted 中立即检查
+onMounted(() => {
+  // 延迟一点，确保 TeacherControlPanel 已经挂载
+  setTimeout(() => {
+    checkSessionId()
+    // 如果还是没有，每隔 500ms 检查一次，最多检查 10 次
+    let checkCount = 0
+    const intervalId = setInterval(() => {
+      checkSessionId()
+      checkCount++
+      if (currentSessionId.value !== undefined || checkCount >= 10) {
+        clearInterval(intervalId)
+      }
+    }, 500)
+  }, 100)
+})
+
+// 监听 TeacherControlPanel 的 session 变化（使用 immediate 和 deep watch）
+watch(
+  () => {
+    if (!isPreviewMode.value || !showClassroomPanel.value) {
+      return undefined
+    }
+    // 尝试从 ref 获取（静默执行，不输出日志）
+    if (teacherControlPanelRef.value) {
+      const panel = teacherControlPanelRef.value as any
+      
+      // 优先从 sessionId computed 获取
+      if (panel?.sessionId?.value !== undefined) {
+        return panel.sessionId.value
+      }
+      // 从 session ref 获取
+      if (panel?.session?.value?.id !== undefined) {
+        return panel.session.value.id
+      }
+      // 尝试直接访问 session.value（如果是 ref）
+      if (panel?.session && typeof panel.session === 'object' && 'value' in panel.session) {
+        const sessionValue = (panel.session as any).value
+        if (sessionValue?.id !== undefined) {
+          return sessionValue.id
+        }
+      }
+    }
+    return undefined
+  },
+  (newSessionId) => {
+    if (newSessionId !== undefined && newSessionId !== currentSessionId.value) {
+      // 只在真正获取到 sessionId 时输出一次日志
+      currentSessionId.value = newSessionId
+    } else if (newSessionId === undefined && currentSessionId.value !== undefined) {
+      // 从有值变为无值时，静默处理（这是正常情况）
+      currentSessionId.value = undefined
+    }
+  },
+  { immediate: true, deep: true }
+)
+
+// 也监听 teacherControlPanelRef 的变化（当组件挂载时）
+// 🔧 修改：不要清除 sessionId，因为事件机制会处理
+watch(teacherControlPanelRef, (panel) => {
+  if (panel && isPreviewMode.value && showClassroomPanel.value) {
+    const panelAny = panel as any
+    
+    const sessionId = panelAny?.sessionId?.value || panelAny?.session?.value?.id
+    if (sessionId !== undefined && sessionId !== currentSessionId.value) {
+      // 只有在能获取到 sessionId 时才更新，不要清除
+      currentSessionId.value = sessionId
+    }
+    // 🔧 移除 else 分支，不要清除 sessionId（事件机制会处理）
+  }
+  // 🔧 移除 else if (!panel) 分支，不要清除 sessionId
+}, { immediate: true, deep: true })
+
+// 使用 ref 存储 session，通过 watch 监听变化并更新
+const providedSessionRef = ref<any>(null)
+
+// 也监听 session 对象本身的变化，使用 watch 确保能捕获异步加载
+const panelSession = computed(() => {
+  if (!teacherControlPanelRef.value) {
+    return null
+  }
+  const panel = teacherControlPanelRef.value as any
+  const sessionRef = panel?.session
+  const sessionValue = sessionRef?.value || null
+  
+  // 添加调试日志，验证 computed 是否被触发
+  if (sessionValue?.id) {
+    console.log('🔍 LessonEditor: panelSession computed 被访问，sessionId =', sessionValue.id)
+  }
+  
+  return sessionValue
+})
+
+// 用 watch 监听 panelSession 的变化，更新 providedSessionRef
+// 🔧 修改：不要清除 providedSessionRef，因为事件机制会处理
+watch(panelSession, (sessionValue) => {
+  if (sessionValue?.id) {
+    console.log('✅ LessonEditor: panelSession 变化，session 已加载:', {
+      id: sessionValue.id,
+      status: sessionValue.status,
+    })
+    providedSessionRef.value = sessionValue
+  }
+  // 🔧 移除 else 分支，不要清除 providedSessionRef（事件机制会处理）
+}, { immediate: true, deep: true })
+
+// 🔧 移除通过 ref 访问的 watch，只保留事件机制
+// 因为通过 defineExpose 暴露的 ref 无法被 Vue 的响应式系统追踪
+// 事件机制已经能正常工作，不需要这些 watch
+
+// 额外的轮询检查（作为备用方案，确保能获取到 sessionId）
+let sessionIdCheckInterval: ReturnType<typeof setInterval> | null = null
+watch([isPreviewMode, showClassroomPanel, teacherControlPanelRef], ([preview, showPanel, panel]) => {
+  if (preview && showPanel && panel && !sessionIdCheckInterval) {
+    // 如果 currentSessionId 是 undefined，每 500ms 检查一次（最多检查 10 次）
+    let checkCount = 0
+    sessionIdCheckInterval = setInterval(() => {
+      if (currentSessionId.value !== undefined || checkCount >= 10) {
+        if (sessionIdCheckInterval) {
+          clearInterval(sessionIdCheckInterval)
+          sessionIdCheckInterval = null
+        }
+        return
+      }
+      
+      const panelAny = panel as any
+      const sessionId = panelAny?.sessionId?.value || panelAny?.session?.value?.id
+      if (sessionId !== undefined) {
+        console.log('✅ LessonEditor: 通过轮询检查获取到 sessionId:', sessionId)
+        currentSessionId.value = sessionId
+        if (sessionIdCheckInterval) {
+          clearInterval(sessionIdCheckInterval)
+          sessionIdCheckInterval = null
+        }
+      }
+      checkCount++
+    }, 500)
+  } else if ((!preview || !showPanel || !panel) && sessionIdCheckInterval) {
+    clearInterval(sessionIdCheckInterval)
+    sessionIdCheckInterval = null
+  }
+}, { immediate: true })
+
+// 🔧 简化传递链路：使用 ref 存储 session，通过 watch 确保响应式更新
+// 提供 session 和 sessionId 给所有子组件（包括 CellContainer, ActivityCell 等）
+
+// 创建一个更可靠的 sessionId computed，直接从 TeacherControlPanel 获取
+const providedSessionId = computed(() => {
+  // 优先级1: 从 providedSessionRef 获取
+  if (providedSessionRef.value?.id !== undefined) {
+    return providedSessionRef.value.id
+  }
+  
+  // 优先级2: 直接从 TeacherControlPanel 获取 sessionId
+  if (teacherControlPanelRef.value) {
+    const panel = teacherControlPanelRef.value as any
+    const sessionIdFromComputed = panel?.sessionId?.value
+    if (sessionIdFromComputed !== undefined) {
+      return sessionIdFromComputed
+    }
+    
+    // 优先级3: 从 session.value.id 获取
+    const sessionIdFromSession = panel?.session?.value?.id
+    if (sessionIdFromSession !== undefined) {
+      return sessionIdFromSession
+    }
+  }
+  
+  // 优先级4: 使用 currentSessionId（作为最后的后备）
+  return currentSessionId.value
+})
+
+// 监听 providedSessionId 的变化，输出调试信息
+watch(providedSessionId, (newId, oldId) => {
+  if (newId !== oldId) {
+    if (newId !== undefined) {
+      console.log('✅ LessonEditor: providedSessionId 已更新:', newId, {
+        source: providedSessionRef.value?.id !== undefined ? 'providedSessionRef' :
+                teacherControlPanelRef.value ? 'teacherControlPanel' : 'currentSessionId',
+        timestamp: new Date().toLocaleTimeString(),
+      })
+    } else {
+      console.warn('⚠️ LessonEditor: providedSessionId 为 undefined', {
+        providedSessionRefValue: providedSessionRef.value,
+        hasTeacherPanel: !!teacherControlPanelRef.value,
+        currentSessionId: currentSessionId.value,
+        timestamp: new Date().toLocaleTimeString(),
+      })
+    }
+  }
+}, { immediate: true })
+
+provide('classroomSession', providedSessionRef)
+provide('classroomSessionId', providedSessionId)
+provide('currentLessonId', computed(() => currentLesson.value?.id))
+
 // 保存锁，防止并发保存
 const isSavingOnUnmount = ref(false)
 
 // Toast 提示
 const toast = ref({
   show: false,
-  type: 'success' as 'success' | 'error',
+  type: 'success' as 'success' | 'error' | 'warning',
   message: '',
 })
 
 // 计算属性
 const currentLesson = computed(() => lessonStore.currentLesson)
 const cells = computed(() => lessonStore.cells)
+
+// 判断是否可以进入授课模式（只有已发布的教案才能进入授课模式）
+const canEnterPreviewMode = computed(() => {
+  return currentLesson.value?.status === 'published'
+})
 
 // 幻灯片模式：当前显示的Cell
 const currentCell = computed(() => {
@@ -1083,6 +1377,24 @@ function handleMoveDown(cellId: string) {
   }
 }
 
+// 切换预览模式
+function handleTogglePreviewMode() {
+  // 如果已经在预览模式，直接切换回编辑模式
+  if (isPreviewMode.value) {
+    isPreviewMode.value = false
+    return
+  }
+
+  // 如果教案是草稿状态，提示用户需要先发布
+  if (!canEnterPreviewMode.value) {
+    showToast('warning', '需要先发布教案才能进入授课模式')
+    return
+  }
+
+  // 已发布的教案可以进入授课模式
+  isPreviewMode.value = true
+}
+
 // 手动保存
 async function handleManualSave() {
   // 如果在预览模式下，提示切换到编辑模式
@@ -1300,7 +1612,7 @@ function scrollToTop() {
 }
 
 // 显示 Toast
-function showToast(type: 'success' | 'error', message: string) {
+function showToast(type: 'success' | 'error' | 'warning', message: string) {
   toast.value = { show: true, type, message }
   setTimeout(() => {
     toast.value.show = false

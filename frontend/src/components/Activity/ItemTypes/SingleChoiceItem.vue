@@ -60,7 +60,7 @@ const emit = defineEmits<{
 const isCorrect = computed(() => props.answerData?.correct ?? false)
 
 function isCorrectOption(optionId: string): boolean {
-  if (!props.answerData) return false
+  if (!props.answerData || typeof props.answerData !== 'object') return false
   
   // 优先使用 correctAnswerId（如果存在）
   if (props.answerData.correctAnswerId) {

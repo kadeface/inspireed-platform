@@ -23,6 +23,7 @@ class ActivitySubmissionBase(BaseModel):
 class ActivitySubmissionCreate(ActivitySubmissionBase):
     """创建活动提交请求"""
 
+    session_id: Optional[int] = Field(None, description="课堂会话ID（课堂模式必须提供，用于区分不同课堂会话的提交）")
     started_at: Optional[datetime] = None
     process_trace: Optional[List[Dict[str, Any]]] = None
     context: Optional[Dict[str, Any]] = None
@@ -56,6 +57,7 @@ class ActivitySubmissionSubmit(BaseModel):
     """提交活动请求"""
 
     responses: Dict[str, Any]
+    session_id: Optional[int] = Field(None, description="课堂会话ID（课堂模式必须提供，用于区分不同课堂会话的提交）")
     time_spent: Optional[int] = None
     process_trace: Optional[List[Dict[str, Any]]] = None
     context: Optional[Dict[str, Any]] = None
@@ -77,6 +79,7 @@ class ActivitySubmissionResponse(ActivitySubmissionBase):
 
     id: int
     student_id: int
+    session_id: Optional[int] = Field(None, description="课堂会话ID（NULL表示课后提交）")
     process_trace: Optional[List[Dict[str, Any]]] = None
     context: Optional[Dict[str, Any]] = None
     score: Optional[float] = None
