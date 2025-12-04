@@ -44,9 +44,6 @@
         :cell-order="cell.order"
       />
       <!-- 调试信息 -->
-      <div class="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-        🔍 调试信息: cellId={{ cell.id }}, sessionId={{ sessionId }}, lessonId={{ lessonId }}
-      </div>
       <div v-if="!sessionId" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
         ⚠️ 未提供 sessionId，将显示所有会话的提交（包括课后提交）。如果这是课堂模式，请确保传递 sessionId。
       </div>
@@ -142,22 +139,20 @@ const lessonId = computed(() => {
 })
 
 // 从 props、inject 或 route 获取 sessionId
+// 注意：computed 内部不输出日志，避免每次访问都输出
 const sessionId = computed(() => {
   // 优先级 1: props
   if (props.sessionId !== undefined) {
-    console.log('📌 ActivityCell: 从 props 获取 sessionId:', props.sessionId)
     return props.sessionId
   }
   // 优先级 2: 从 inject 获取 sessionId（直接提供的）
   if (injectedSessionId?.value !== undefined) {
-    console.log('📌 ActivityCell: 从 injectedSessionId 获取 sessionId:', injectedSessionId.value)
     return injectedSessionId.value
   }
   // 优先级 3: 从 inject 获取 session 对象，然后提取 id
   if (injectedSession) {
     const sessionValue = injectedSession.value
     if (sessionValue?.id !== undefined) {
-      console.log('📌 ActivityCell: 从 injectedSession 获取 sessionId:', sessionValue.id)
       return sessionValue.id
     }
   }
@@ -166,73 +161,54 @@ const sessionId = computed(() => {
   if (routeSessionId) {
     const sessionIdNum = Number(routeSessionId)
     if (!isNaN(sessionIdNum)) {
-      console.log('📌 ActivityCell: 从路由获取 sessionId:', sessionIdNum)
       return sessionIdNum
     }
   }
   
-  // 如果都没有，输出调试信息
-  console.warn('⚠️ ActivityCell: 无法获取 sessionId', {
-    hasInjectedSession: !!injectedSession,
-    hasInjectedSessionId: !!injectedSessionId,
-    injectedSessionValue: injectedSession?.value,
-    injectedSessionIdValue: injectedSessionId?.value,
-  })
-  
   return undefined
 })
 
-// 使用 watch 监听 sessionId 变化，调试用
-// 注意：这些日志会在教师端的浏览器控制台显示
+// 使用 watch 监听 sessionId 变化，仅在开发环境输出日志
 watch(() => sessionId.value, (newId, oldId) => {
   if (newId !== oldId) {
-    if (newId !== undefined) {
-      console.log('✅ ActivityCell: sessionId 已设置:', newId, {
-        source: props.sessionId !== undefined ? 'props' : 
-                injectedSessionId?.value !== undefined ? 'injectedSessionId' : 
-                injectedSession?.value?.id !== undefined ? 'injectedSession' : 'route',
-        cellId: props.cell.id,
-        timestamp: new Date().toLocaleTimeString(),
-      })
-    } else {
-      console.warn('⚠️ ActivityCell: sessionId 为 undefined', {
-        hasInjectedSession: !!injectedSession,
-        injectedSessionValue: injectedSession?.value,
-        injectedSessionIdValue: injectedSessionId?.value,
-        propsSessionId: props.sessionId,
-        cellId: props.cell.id,
-        timestamp: new Date().toLocaleTimeString(),
-      })
+    const isDev = process.env.NODE_ENV === 'development'
+    if (isDev) {
+      if (newId !== undefined) {
+        console.log('✅ ActivityCell: sessionId 已设置:', newId, {
+          source: props.sessionId !== undefined ? 'props' : 
+                  injectedSessionId?.value !== undefined ? 'injectedSessionId' : 
+                  injectedSession?.value?.id !== undefined ? 'injectedSession' : 'route',
+          cellId: props.cell.id,
+        })
+      } else {
+        // 只在真正有问题时输出警告
+        if (oldId !== undefined) {
+          console.debug('ActivityCell: sessionId 已清除', { cellId: props.cell.id })
+        }
+      }
     }
   }
-}, { immediate: true })
+}, { immediate: false })
 
-// 组件挂载时输出初始状态（确保能看到日志）
+// 组件挂载时输出初始状态（仅在开发环境且 sessionId 为空时输出）
 onMounted(() => {
-  // 使用 console.group 让日志更明显
-  const roleLabel = isTeacher.value ? '教师端' : '学生端'
-  console.group(`🔍 ActivityCell 已挂载（${roleLabel}）`)
-  console.log('Cell ID:', props.cell.id)
-  console.log('初始 sessionId:', sessionId.value)
-  console.log('isTeacher:', isTeacher.value)
-  console.log('hasInjectedSession:', !!injectedSession)
-  console.log('hasInjectedSessionId:', !!injectedSessionId)
-  console.log('injectedSession?.value:', injectedSession?.value)
-  console.log('injectedSessionId?.value:', injectedSessionId?.value)
-  console.log('props.sessionId:', props.sessionId)
-  console.log('时间:', new Date().toLocaleTimeString())
-  console.groupEnd()
+  const isDev = process.env.NODE_ENV === 'development'
   
-  // 如果 sessionId 为空，输出警告
-  if (!sessionId.value) {
-    console.error('❌ ActivityCell: sessionId 为空！', {
+  // 只在开发环境且 sessionId 为空时输出警告
+  if (isDev && !sessionId.value) {
+    console.warn('⚠️ ActivityCell: 无法获取 sessionId', {
       cellId: props.cell.id,
-      propsSessionId: props.sessionId,
-      injectedSession: injectedSession?.value,
-      injectedSessionId: injectedSessionId?.value,
+      hasInjectedSession: !!injectedSession,
+      hasInjectedSessionId: !!injectedSessionId,
+      injectedSessionValue: injectedSession?.value,
       injectedSessionIdValue: injectedSessionId?.value,
+    })
+  } else if (isDev) {
+    // 有 sessionId 时使用 debug 级别
+    console.debug('ActivityCell 已挂载', {
+      cellId: props.cell.id,
+      sessionId: sessionId.value,
       isTeacher: isTeacher.value,
-      timestamp: new Date().toLocaleTimeString(),
     })
   }
 })

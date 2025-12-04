@@ -49,6 +49,7 @@ class ActivitySubmission(Base):
 
     # 关联信息
     cell_id = Column(Integer, ForeignKey("cells.id"), nullable=False, index=True)
+    cell_uuid = Column(String(36), nullable=True, index=True)  # UUID 字符串，用于前端匹配，避免转换
     lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     session_id = Column(

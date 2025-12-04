@@ -252,14 +252,6 @@
                   @move-down="handleMoveDown"
                 />
                 <!-- 调试信息 -->
-                <div v-if="isPreviewMode && index === 0" class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-                  🔍 LessonEditor 调试: 
-                  currentSessionId = {{ currentSessionId }}, 
-                  isPreviewMode = {{ isPreviewMode }}, 
-                  showClassroomPanel = {{ showClassroomPanel }},
-                  hasTeacherPanelRef = {{ !!teacherControlPanelRef }},
-                  panelSessionId = {{ teacherControlPanelRef ? (teacherControlPanelRef as any)?.sessionId?.value : 'N/A' }}
-                </div>
 
                 <!-- Cell 之间的添加按钮 -->
                 <div v-if="!isPreviewMode" class="add-cell-menu-container">

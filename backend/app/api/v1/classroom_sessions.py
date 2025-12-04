@@ -462,7 +462,7 @@ async def navigate_to_cell(
         if session.status != ClassSessionStatus.ACTIVE:  # type: ignore[comparison-overlap]
             raise HTTPException(
                 status_code=400, 
-                detail=f"只能在活跃会话中切换Cell，当前状态: {session.status}"
+                detail=f"请先点击“开始上课”按钮，等待教师开始上课"
             )
 
         # 使用 display_cell_orders（直接传递 order 数组）
@@ -1529,17 +1529,32 @@ async def websocket_teacher_session_endpoint(
             elif message_type == "request_statistics":
                 # 请求统计信息
                 from app.services.realtime import get_submission_statistics, build_event, Channel
+                from app.api.v1.activities import get_cell_uuid_from_db_id
                 
-                cell_id = message.get("data", {}).get("cell_id")
+                cell_id = message.get("data", {}).get("cell_id")  # 可能是 UUID 字符串或数字
                 lesson_id = message.get("data", {}).get("lesson_id")
                 
                 if cell_id and lesson_id:
+                    # get_submission_statistics 现在支持 UUID 字符串
                     stats = await get_submission_statistics(
                         db,
-                        cell_id=cell_id,
+                        cell_id=cell_id,  # 支持 UUID 字符串
                         lesson_id=lesson_id,
                         session_id=session_id
                     )
+                    
+                    # 确保返回的 cell_id 是 UUID 格式（前端使用 UUID）
+                    stats_cell_id = stats.get("cell_id")
+                    if stats_cell_id is not None:
+                        # 如果是数字 ID，转换为 UUID
+                        try:
+                            numeric_id = int(stats_cell_id)
+                            # 是数字 ID，需要转换为 UUID
+                            cell_uuid = await get_cell_uuid_from_db_id(db, numeric_id, lesson_id)
+                            stats["cell_id"] = cell_uuid
+                        except (ValueError, TypeError):
+                            # 已经是 UUID 字符串，保持不变
+                            pass
                     
                     event = build_event(
                         type="submission_statistics_updated",
@@ -1743,20 +1758,39 @@ async def websocket_teacher_lesson_endpoint(
             elif message_type == "request_statistics":
                 # 请求统计信息
                 from app.services.realtime import get_submission_statistics, build_event, Channel
+                from app.api.v1.activities import get_cell_uuid_from_db_id
                 
-                cell_id = message.get("data", {}).get("cell_id")
+                cell_id = message.get("data", {}).get("cell_id")  # 可能是 UUID 字符串或数字
+                lesson_id_param = message.get("data", {}).get("lesson_id")
                 
-                if cell_id:
+                # 使用参数中的 lesson_id 或路径中的 lesson_id
+                actual_lesson_id = lesson_id_param or lesson_id
+                
+                if cell_id and actual_lesson_id:
+                    # get_submission_statistics 现在支持 UUID 字符串
                     stats = await get_submission_statistics(
                         db,
-                        cell_id=cell_id,
-                        lesson_id=lesson_id,
+                        cell_id=cell_id,  # 支持 UUID 字符串
+                        lesson_id=actual_lesson_id,
                         session_id=None
                     )
                     
+                    # 确保返回的 cell_id 是 UUID 格式（前端使用 UUID）
+                    stats_cell_id = stats.get("cell_id")
+                    if stats_cell_id is not None:
+                        # 如果是数字 ID，转换为 UUID
+                        try:
+                            numeric_id = int(stats_cell_id)
+                            # 是数字 ID，需要转换为 UUID
+                            cell_uuid = await get_cell_uuid_from_db_id(db, numeric_id, actual_lesson_id)
+                            stats["cell_id"] = cell_uuid
+                        except (ValueError, TypeError):
+                            # 已经是 UUID 字符串，保持不变
+                            pass
+                    
                     event = build_event(
                         type="submission_statistics_updated",
-                        channel=Channel(scope="lesson", id=lesson_id),
+                        channel=Channel(scope="lesson", id=actual_lesson_id),
                         delivery_mode="unicast",
                         data=stats
                     )

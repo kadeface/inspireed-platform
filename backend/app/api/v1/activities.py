@@ -2,13 +2,12 @@
 教学活动 API
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from statistics import mean
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Union, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, Integer, cast as sql_cast
-from sqlalchemy.orm import selectinload
+from sqlalchemy import select, func, and_, Integer, cast as sql_cast
 
 from app.api import deps
 from app.models.user import User, UserRole
@@ -28,6 +27,7 @@ from app.schemas.activity import (
     ActivitySubmissionCreate,
     ActivitySubmissionUpdate,
     ActivitySubmissionSubmit,
+    ActivitySubmissionCreateAndSubmit,
     ActivitySubmissionGrade,
     ActivitySubmissionResponse,
     ActivitySubmissionWithStudent,
@@ -53,6 +53,333 @@ from app.services.formative_assessment import (
 router = APIRouter()
 
 
+# ========== 辅助函数 ==========
+
+async def get_cell_uuid_from_db_id(
+    db: AsyncSession,
+    cell_id: int,
+    lesson_id: int
+) -> str:
+    """
+    从数据库的 cell ID 获取对应的 UUID（从 lesson.content 中查找）
+    
+    参数:
+        db: 数据库会话
+        cell_id: 数据库中的 cell ID（数字）
+        lesson_id: 教案 ID
+    
+    返回:
+        UUID 字符串，如果找不到则返回字符串形式的数字 ID
+    """
+    try:
+        # 获取 cell 的 order
+        from app.models.cell import Cell
+        cell = await db.get(Cell, cell_id)
+        if not cell:
+            print(f"⚠️ get_cell_uuid_from_db_id: Cell {cell_id} 不存在")
+            return str(cell_id)
+        
+        cell_order = cell.order
+        cell_type = cell.cell_type
+        
+        # 从 lesson.content 中查找对应的 UUID
+        from app.models.lesson import Lesson
+        lesson = await db.get(Lesson, lesson_id)
+        if not lesson:
+            print(f"⚠️ get_cell_uuid_from_db_id: Lesson {lesson_id} 不存在")
+            return str(cell_id)
+        
+        # 检查 content 是否存在且不为空
+        lesson_content = getattr(lesson, "content", None)
+        if not lesson_content:
+            print(f"⚠️ get_cell_uuid_from_db_id: Lesson {lesson_id} 的 content 为空")
+            return str(cell_id)
+        
+        lesson_content = cast(Optional[List[Dict[str, Any]]], lesson.content)
+        if not lesson_content:
+            print(f"⚠️ get_cell_uuid_from_db_id: Lesson {lesson_id} 的 content 列表为空")
+            return str(cell_id)
+        
+        # 通过 order 和 type 匹配
+        for idx, cell_data in enumerate(lesson_content):
+            cell_order_in_content = cell_data.get("order")
+            cell_type_in_content = cell_data.get("type") or cell_data.get("cell_type")
+            cell_uuid_in_content = cell_data.get("id")
+            
+            if (cell_order_in_content == cell_order and 
+                str(cell_type_in_content).upper() == str(cell_type).upper()):
+                if cell_uuid_in_content:
+                    uuid_str = str(cell_uuid_in_content)
+                    print(f"✅ get_cell_uuid_from_db_id: 找到匹配 (cell_id={cell_id}, order={cell_order}, type={cell_type}) -> UUID={uuid_str}")
+                    return uuid_str
+                else:
+                    print(f"⚠️ get_cell_uuid_from_db_id: 找到匹配但 UUID 为空 (cell_id={cell_id}, order={cell_order}, index={idx})")
+        
+        # 如果找不到，记录详细信息
+        print(f"⚠️ get_cell_uuid_from_db_id: 未找到匹配 (cell_id={cell_id}, lesson_id={lesson_id}, cell_order={cell_order}, cell_type={cell_type})")
+        print(f"   尝试匹配的 content 项数量: {len(lesson_content)}")
+        for idx, cell_data in enumerate(lesson_content[:5]):  # 只打印前5个
+            print(f"   [{idx}] order={cell_data.get('order')}, type={cell_data.get('type') or cell_data.get('cell_type')}, id={cell_data.get('id')}")
+        
+        return str(cell_id)
+    except Exception as e:
+        print(f"⚠️ 获取 cell UUID 失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return str(cell_id)
+
+
+async def get_db_id_from_cell_uuid(
+    db: AsyncSession,
+    cell_uuid: str,
+    lesson_id: int
+) -> Optional[int]:
+    """
+    从 UUID 获取对应的数据库 cell ID（从 lesson.content 中查找）
+    
+    参数:
+        db: 数据库会话
+        cell_uuid: Cell 的 UUID 字符串
+        lesson_id: 教案 ID
+    
+    返回:
+        数据库中的 cell ID（数字），如果找不到则返回 None
+    """
+    try:
+        from app.models.lesson import Lesson
+        from app.models.cell import Cell
+        from sqlalchemy import select
+        
+        lesson = await db.get(Lesson, lesson_id)
+        if not lesson:
+            return None
+        # 检查 content 是否存在且不为空
+        lesson_content = getattr(lesson, "content", None)
+        if not lesson_content:
+            return None
+        
+        lesson_content = cast(Optional[List[Dict[str, Any]]], lesson.content)
+        if not lesson_content:
+            return None
+        
+        # 在 lesson.content 中查找匹配的 UUID
+        for cell_data in lesson_content:
+            cell_uuid_in_content = cell_data.get("id")
+            if str(cell_uuid_in_content) == cell_uuid:
+                # 找到了匹配的 UUID，通过 order 查找数据库 ID
+                cell_order = cell_data.get("order")
+                cell_type = cell_data.get("type") or cell_data.get("cell_type")
+                if cell_order is not None:
+                    cell_result = await db.execute(
+                        select(Cell)
+                        .where(Cell.lesson_id == lesson_id)
+                        .where(Cell.order == cell_order)
+                    )
+                    matched_cell = cell_result.scalar_one_or_none()
+                    if matched_cell:
+                        return cast(int, matched_cell.id)
+        
+        return None
+    except Exception as e:
+        print(f"⚠️ 从 UUID 获取 cell ID 失败: {str(e)}")
+        return None
+
+
+async def resolve_cell_id(
+    db: AsyncSession,
+    cell_id_value: Union[int, str],
+    lesson_id: int,
+    lesson: Lesson
+) -> tuple[Cell, int]:
+    """
+    解析 cell_id（支持数字 ID 或 UUID 字符串），返回 Cell 对象和数字 ID
+    
+    参数:
+        db: 数据库会话
+        cell_id_value: Cell ID（可能是 int 或 UUID 字符串）
+        lesson_id: 教案 ID
+        lesson: Lesson 对象
+    
+    返回:
+        (Cell 对象, 数字 ID)
+    
+    抛出:
+        HTTPException: 如果 Cell 不存在
+    """
+    cell: Optional[Cell] = None
+    
+    if isinstance(cell_id_value, str):
+        # UUID 格式，需要从 lesson.content 中查找并创建
+        lesson_content = cast(Optional[List[Dict[str, Any]]], getattr(lesson, "content", None))
+        if lesson_content:
+            # 在 lesson.content 中查找匹配的 cell（通过 UUID）
+            matched_cell_data = None
+            for cell_data in lesson_content:
+                cell_id_in_content = cell_data.get("id")
+                if str(cell_id_in_content) == cell_id_value:
+                    # 找到了匹配的 cell 数据
+                    matched_cell_data = cell_data
+                    break
+            
+            if matched_cell_data:
+                cell_order = matched_cell_data.get("order")
+                cell_type = matched_cell_data.get("type") or matched_cell_data.get("cell_type")
+                
+                # 检查是否已经有相同 order 和 type 的 cell
+                if cell_order is not None:
+                    # 使用 cast 进行类型转换以避免 PostgreSQL 枚举类型比较问题
+                    from sqlalchemy import Text
+                    existing_cell_query = select(Cell).where(
+                        and_(
+                            Cell.lesson_id == lesson_id,
+                            Cell.order == cell_order,
+                            sql_cast(Cell.cell_type, Text) == "ACTIVITY",
+                        )
+                    )
+                    existing_result = await db.execute(existing_cell_query)
+                    existing_cell = existing_result.scalar_one_or_none()
+                    
+                    if existing_cell:
+                        # 使用已存在的 cell
+                        cell = existing_cell
+                        cell_id_value = cast(int, cell.id)
+                    else:
+                        # 创建新的 cell 记录
+                        new_cell = Cell(
+                            lesson_id=lesson_id,
+                            cell_type=CellType.ACTIVITY,
+                            title=matched_cell_data.get("title", ""),
+                            content=matched_cell_data.get("content", {}),
+                            config=matched_cell_data.get("config", {}),
+                            order=cell_order,
+                            editable=matched_cell_data.get("editable", False),
+                        )
+                        db.add(new_cell)
+                        await db.flush()  # 获取 ID 但不提交
+                        cell = new_cell
+                        cell_id_value = cast(int, cell.id)
+    else:
+        # cell_id 是数字，直接查询
+        cell = await db.get(Cell, cell_id_value)
+    
+    # 如果仍然没有 cell，返回错误
+    if not cell:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Cell 不存在 (cell_id: {cell_id_value})"
+        )
+    
+    final_cell_id = cast(int, cell.id)
+    return cell, final_cell_id
+
+
+async def send_submission_notification(
+    db: AsyncSession,
+    submission: ActivitySubmission,
+    lesson_id: int
+) -> None:
+    """
+    发送提交通知给教师（WebSocket）
+    
+    参数:
+        db: 数据库会话
+        submission: 活动提交对象
+        lesson_id: 教案 ID
+    """
+    try:
+        from app.services.realtime import (
+            resolve_teacher_targets,
+            build_event,
+            get_submission_statistics,
+            Channel
+        )
+        from app.services.websocket_manager import manager
+        
+        # 获取学生信息
+        student = await db.get(User, submission.student_id)
+        
+        # 解析教师目标
+        teacher_target = await resolve_teacher_targets(db, submission)
+        if not teacher_target:
+            return
+        
+        # 获取 cell 的 UUID（优先使用存储的 UUID，避免转换）
+        stored_uuid = getattr(submission, "cell_uuid", None)
+        if stored_uuid:
+            # 直接使用存储的 UUID
+            cell_uuid = stored_uuid
+        else:
+            # 如果没有存储 UUID，尝试转换（向后兼容旧数据）
+            submission_cell_id = cast(int, submission.cell_id)
+            cell_uuid = await get_cell_uuid_from_db_id(
+                db,
+                submission_cell_id,
+                lesson_id
+            )
+            
+            # 调试：检查 UUID 转换结果
+            if cell_uuid == str(submission_cell_id):
+                # UUID 转换失败，返回了数字 ID，记录警告
+                print(f"⚠️ send_submission_notification: 无法将 cell_id {submission_cell_id} 转换为 UUID (lesson_id={lesson_id})，使用数字 ID")
+        
+        # 发送新提交通知
+        event = build_event(
+            type="new_submission",
+            channel=teacher_target.channel,
+            delivery_mode="cast" if teacher_target.is_broadcast else "unicast",
+            data={
+                "submission_id": submission.id,
+                "cell_id": cell_uuid,  # 使用 UUID 而不是数字 ID
+                "lesson_id": submission.lesson_id,
+                "student_id": submission.student_id,
+                "student_name": student.full_name or student.username if student else "Unknown",
+                "student_email": student.email if student else "",
+                "status": submission.status.value,
+                "score": submission.score,
+                "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at is not None else None,
+                "time_spent": submission.time_spent,
+            },
+        )
+        
+        await manager.send_to_teacher(
+            event=event,
+            scope=teacher_target.channel.scope,
+            channel_id=teacher_target.channel.id,
+            teacher_ids=teacher_target.recipient_ids if not teacher_target.is_broadcast else []
+        )
+        
+        # 发送统计更新通知
+        # 使用存储的 UUID（如果有）或转换后的 UUID 来获取统计
+        # get_submission_statistics 支持 UUID 字符串，会内部转换为数字 ID
+        stats = await get_submission_statistics(
+            db,
+            cell_id=cell_uuid,  # 使用 UUID 字符串，函数内部会处理转换
+            lesson_id=lesson_id,
+            session_id=cast(Optional[int], submission.session_id)
+        )
+        
+        # 确保统计中的 cell_id 是 UUID（函数可能返回数字 ID）
+        stats["cell_id"] = cell_uuid
+        
+        stats_event = build_event(
+            type="submission_statistics_updated",
+            channel=teacher_target.channel,
+            delivery_mode="cast",
+            data=stats
+        )
+        
+        await manager.broadcast(
+            event=stats_event,
+            scope=teacher_target.channel.scope,
+            channel_id=teacher_target.channel.id
+        )
+    except Exception as e:
+        # WebSocket 通知失败不影响主流程
+        print(f"❌ WebSocket 通知失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
 # ========== 活动提交相关 API ==========
 
 
@@ -70,77 +397,28 @@ async def create_submission(
         if not lesson:
             raise HTTPException(status_code=404, detail="教案不存在")
 
-        # 处理 cell_id：可能是 int 或 UUID 字符串
-        cell_id_value = data.cell_id
-        cell: Optional[Cell] = None
+        # 处理 cell_id：可能是 int 或 UUID 字符串（使用辅助函数）
+        cell, final_cell_id = await resolve_cell_id(
+            db, data.cell_id, data.lesson_id, lesson
+        )
         
-        # 如果 cell_id 是字符串（UUID），需要从 lesson.content 中查找并创建
-        if isinstance(cell_id_value, str):
-            # UUID 格式，需要从 lesson.content 中查找对应的 cell
-            lesson_content = cast(Optional[List[Dict[str, Any]]], getattr(lesson, "content", None))
-            if lesson_content:
-                # 在 lesson.content 中查找匹配的 cell（通过 UUID）
-                matched_cell_data = None
-                for cell_data in lesson_content:
-                    cell_id_in_content = cell_data.get("id")
-                    if str(cell_id_in_content) == cell_id_value:
-                        # 找到了匹配的 cell 数据
-                        matched_cell_data = cell_data
-                        break
-                
-                if matched_cell_data:
-                    cell_order = matched_cell_data.get("order")
-                    cell_type = matched_cell_data.get("type") or matched_cell_data.get("cell_type")
-                    
-                    # 检查是否已经有相同 order 和 type 的 cell
-                    if cell_order is not None:
-                        # 使用 cast 进行类型转换以避免 PostgreSQL 枚举类型比较问题
-                        from sqlalchemy import Text
-                        existing_cell_query = select(Cell).where(
-                            and_(
-                                Cell.lesson_id == data.lesson_id,
-                                Cell.order == cell_order,
-                                sql_cast(Cell.cell_type, Text) == "ACTIVITY",
-                            )
-                        )
-                        existing_result = await db.execute(existing_cell_query)
-                        existing_cell = existing_result.scalar_one_or_none()
-                        
-                        if existing_cell:
-                            # 使用已存在的 cell
-                            cell = existing_cell
-                            cell_id_value = cast(int, cell.id)
-                        else:
-                            # 创建新的 cell 记录
-                            new_cell = Cell(
-                                lesson_id=data.lesson_id,
-                                cell_type=CellType.ACTIVITY,
-                                title=matched_cell_data.get("title", ""),
-                                content=matched_cell_data.get("content", {}),
-                                config=matched_cell_data.get("config", {}),
-                                order=cell_order,
-                                editable=matched_cell_data.get("editable", False),
-                            )
-                            db.add(new_cell)
-                            await db.flush()  # 获取 ID 但不提交
-                            cell = new_cell
-                            cell_id_value = cast(int, cell.id)
+        # 保存原始 cell_id（如果是 UUID，直接存储；如果是数字，尝试获取 UUID）
+        cell_uuid: Optional[str] = None
+        if isinstance(data.cell_id, str):
+            # 直接是 UUID，直接存储
+            cell_uuid = data.cell_id
         else:
-            # cell_id 是数字，直接查询
-            cell = await db.get(Cell, cell_id_value)
-        
-        # 如果仍然没有 cell，返回错误
-        if not cell:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Cell 不存在 (cell_id: {cell_id_value})"
-            )
+            # 是数字 ID，尝试从 lesson.content 获取 UUID（可选，失败也不影响）
+            try:
+                cell_uuid = await get_cell_uuid_from_db_id(db, final_cell_id, data.lesson_id)
+                # 如果返回的是数字字符串，说明没找到，设为 None
+                if cell_uuid == str(final_cell_id):
+                    cell_uuid = None
+            except Exception:
+                cell_uuid = None
         
         # 更新 data.cell_id 为数字 ID（用于后续操作）
-        data.cell_id = cast(int, cell.id)
-        
-        # 确保 cell_id 是整数类型（用于后续操作）
-        final_cell_id = cast(int, data.cell_id)
+        data.cell_id = final_cell_id
         
         # 检查是否已有提交（草稿）
         result = await db.execute(
@@ -190,6 +468,7 @@ async def create_submission(
         
         submission = ActivitySubmission(
             cell_id=final_cell_id,
+            cell_uuid=cell_uuid,  # 直接存储 UUID，避免后续转换
             lesson_id=data.lesson_id,
             student_id=cast(int, current_user.id),
             responses=data.responses or {},
@@ -217,6 +496,123 @@ async def create_submission(
         raise HTTPException(
             status_code=500,
             detail=f"创建提交失败: {str(e)}"
+        )
+
+
+@router.post("/submissions/submit", response_model=ActivitySubmissionResponse, status_code=201)
+async def create_and_submit(
+    data: ActivitySubmissionCreateAndSubmit,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """创建并直接提交活动（一步完成，不经过草稿状态）"""
+    
+    try:
+        # 验证 Lesson 存在
+        lesson = await db.get(Lesson, data.lesson_id)
+        if not lesson:
+            raise HTTPException(status_code=404, detail="教案不存在")
+
+        # 处理 cell_id：可能是 int 或 UUID 字符串（使用辅助函数）
+        cell, final_cell_id = await resolve_cell_id(
+            db, data.cell_id, data.lesson_id, lesson
+        )
+        
+        # 保存原始 cell_id（如果是 UUID，直接存储；如果是数字，尝试获取 UUID）
+        cell_uuid: Optional[str] = None
+        if isinstance(data.cell_id, str):
+            # 直接是 UUID，直接存储
+            cell_uuid = data.cell_id
+        else:
+            # 是数字 ID，尝试从 lesson.content 获取 UUID（可选，失败也不影响）
+            try:
+                cell_uuid = await get_cell_uuid_from_db_id(db, final_cell_id, data.lesson_id)
+                # 如果返回的是数字字符串，说明没找到，设为 None
+                if cell_uuid == str(final_cell_id):
+                    cell_uuid = None
+            except Exception:
+                cell_uuid = None
+        
+        # 处理 started_at
+        started_at_value = data.started_at or datetime.utcnow()
+        if started_at_value and hasattr(started_at_value, 'tzinfo') and started_at_value.tzinfo is not None:
+            started_at_value = started_at_value.replace(tzinfo=None)
+        
+        # 获取 Cell 内容以进行自动评分
+        cell_content = cast(Dict[str, Any], cell.content)
+        auto_graded, total_score, max_score, graded_responses = _auto_grade_submission(
+            cast(dict[str, Any], data.responses),
+            cell_content
+        )
+        
+        # 处理 responses（包含正确性判断）
+        final_responses = graded_responses.copy() if graded_responses else {}
+        if not graded_responses or len(graded_responses) < len(data.responses):
+            for key, value in data.responses.items():
+                if key not in final_responses:
+                    final_responses[key] = value
+        
+        # 创建 SUBMITTED 状态的提交（直接提交，不经过草稿）
+        submission = ActivitySubmission(
+            cell_id=final_cell_id,
+            cell_uuid=cell_uuid,  # 直接存储 UUID，避免后续转换
+            lesson_id=data.lesson_id,
+            student_id=cast(int, current_user.id),
+            responses=final_responses,
+            status=ActivitySubmissionStatus.SUBMITTED,  # 直接是 SUBMITTED
+            started_at=started_at_value,
+            submitted_at=datetime.utcnow(),
+            time_spent=cast(int, data.time_spent) if data.time_spent else None,
+            process_trace=data.process_trace or [],
+            context=data.context or {},
+            activity_phase=data.activity_phase,
+            attempt_no=data.attempt_no or 1,
+            session_id=data.session_id,
+        )
+        
+        # 如果启用了自动评分，设置分数
+        grading_config = cell_content.get("grading", {})
+        if auto_graded and grading_config.get("autoGrade", False):
+            setattr(submission, "score", total_score)
+            setattr(submission, "max_score", max_score)
+            setattr(submission, "auto_graded", True)
+        else:
+            setattr(submission, "auto_graded", False)
+        
+        db.add(submission)
+        await db.commit()
+        await db.refresh(submission)
+        
+        # 更新统计数据
+        await _update_statistics(
+            db,
+            final_cell_id,
+            data.lesson_id,
+        )
+        
+        # 更新过程性评估
+        phase_value = data.activity_phase
+        await recompute_formative_assessment(
+            db,
+            data.lesson_id,
+            cast(int, current_user.id),
+            phase=phase_value,
+        )
+        
+        # ===== WebSocket 实时通知 =====
+        await send_submission_notification(db, submission, data.lesson_id)
+        
+        return submission
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in create_and_submit: {e}")
+        import traceback
+        traceback.print_exc()
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"创建并提交失败: {str(e)}"
         )
 
 
@@ -292,13 +688,6 @@ async def update_submission(
             data.flowchart_snapshot,
             student_id=submission_student_id,
         )
-    if data.flowchart_snapshot is not None:
-        await _save_flowchart_snapshot(
-            db,
-            submission,
-            data.flowchart_snapshot,
-            student_id=submission_student_id,
-        )
 
     setattr(submission, "updated_at", datetime.utcnow())
 
@@ -346,6 +735,20 @@ async def submit_activity(
     if data.session_id is not None:
         setattr(submission, "session_id", cast(int, data.session_id))
         print(f"✅ 提交时更新 session_id: {submission.id} -> {data.session_id}")
+    
+    # 如果还没有 cell_uuid，尝试获取并存储（向后兼容）
+    stored_uuid = getattr(submission, "cell_uuid", None)
+    if not stored_uuid:
+        try:
+            cell_uuid = await get_cell_uuid_from_db_id(
+                db,
+                cast(int, submission.cell_id),
+                cast(int, submission.lesson_id)
+            )
+            if cell_uuid and cell_uuid != str(submission.cell_id):
+                setattr(submission, "cell_uuid", cell_uuid)
+        except Exception:
+            pass  # 获取失败不影响提交
     if data.time_spent:
         setattr(submission, "time_spent", cast(int, data.time_spent))
     if data.process_trace is not None:
@@ -411,73 +814,7 @@ async def submit_activity(
     )
 
     # ===== WebSocket 实时通知 =====
-    # 发送通知给教师
-    try:
-        from app.services.realtime import (
-            resolve_teacher_targets,
-            build_event,
-            get_submission_statistics,
-            Channel
-        )
-        from app.services.websocket_manager import manager
-        
-        # 获取学生信息
-        student = await db.get(User, submission.student_id)
-        
-        # 解析教师目标
-        teacher_target = await resolve_teacher_targets(db, submission)
-        if teacher_target:
-            # 发送新提交通知
-            event = build_event(
-                type="new_submission",
-                channel=teacher_target.channel,
-                delivery_mode="cast" if teacher_target.is_broadcast else "unicast",
-                data={
-                    "submission_id": submission.id,
-                    "cell_id": submission.cell_id,
-                    "lesson_id": submission.lesson_id,
-                    "student_id": submission.student_id,
-                    "student_name": student.full_name or student.username if student else "Unknown",
-                    "student_email": student.email if student else "",
-                    "status": submission.status.value,
-                    "score": submission.score,
-                    "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at is not None else None,
-                    "time_spent": submission.time_spent,
-                },
-            )
-            
-            await manager.send_to_teacher(
-                event=event,
-                scope=teacher_target.channel.scope,
-                channel_id=teacher_target.channel.id,
-                teacher_ids=teacher_target.recipient_ids if not teacher_target.is_broadcast else []
-            )
-            
-            # 发送统计更新通知
-            stats = await get_submission_statistics(
-                db,
-                cell_id=cast(int, submission.cell_id),
-                lesson_id=cast(int, submission.lesson_id),
-                session_id=cast(Optional[int], submission.session_id)
-            )
-            
-            stats_event = build_event(
-                type="submission_statistics_updated",
-                channel=teacher_target.channel,
-                delivery_mode="cast",
-                data=stats
-            )
-            
-            await manager.broadcast(
-                event=stats_event,
-                scope=teacher_target.channel.scope,
-                channel_id=teacher_target.channel.id
-            )
-    except Exception as e:
-        # WebSocket 通知失败不影响主流程
-        print(f"❌ WebSocket 通知失败: {str(e)}")
-        import traceback
-        traceback.print_exc()
+    await send_submission_notification(db, submission, cast(int, submission.lesson_id))
 
     return submission
 
@@ -486,10 +823,10 @@ async def submit_activity(
     "/cells/{cell_id}/submissions", response_model=List[ActivitySubmissionWithStudent]
 )
 async def get_cell_submissions(
-    cell_id: int,
+    cell_id: str,  # 支持 UUID 字符串或数字 ID（作为字符串传入）
     status: Optional[str] = Query(None, description="状态筛选: draft, submitted, graded, returned, not_started"),
     session_id: Optional[int] = Query(None, description="会话ID（课堂模式）"),
-    lesson_id: Optional[int] = Query(None, description="教案ID（用于获取所有学生）"),
+    lesson_id: Optional[int] = Query(None, description="教案ID（用于获取所有学生，使用 UUID 时必需）"),
     include_not_started: bool = Query(True, description="是否包含未开始的学生"),
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
@@ -500,6 +837,21 @@ async def get_cell_submissions(
     current_role = cast(UserRole, current_user.role)
     if current_role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="权限不足")
+    
+    # 处理 cell_id：可能是 UUID 字符串或数字 ID
+    actual_cell_id: Union[int, str] = cell_id
+    try:
+        # 尝试转换为数字 ID
+        actual_cell_id = int(cell_id)
+    except ValueError:
+        # 是 UUID 字符串，需要转换为数据库 ID
+        if not lesson_id:
+            raise HTTPException(status_code=400, detail="使用 UUID 格式的 cell_id 时，必须提供 lesson_id 参数")
+        
+        db_cell_id = await get_db_id_from_cell_uuid(db, cell_id, lesson_id)
+        if db_cell_id is None:
+            raise HTTPException(status_code=404, detail=f"找不到对应的 Cell (UUID: {cell_id})")
+        actual_cell_id = db_cell_id
 
     # 初始化变量
     submissions = []
@@ -515,7 +867,7 @@ async def get_cell_submissions(
         query = (
             select(ActivitySubmission, User)
             .join(User, ActivitySubmission.student_id == User.id)
-            .where(ActivitySubmission.cell_id == cell_id)
+            .where(ActivitySubmission.cell_id == actual_cell_id)
             .order_by(ActivitySubmission.updated_at.desc())
         )
 
@@ -574,11 +926,18 @@ async def get_cell_submissions(
         # 将筛选后的提交添加到结果列表
         for priority, submission, user in student_submission_map.values():
             # 使用 Pydantic 模型序列化，确保所有字段符合模型要求
-            submission_data = ActivitySubmissionWithStudent.model_validate({
+            # 注意：如果 submission 有 cell_uuid，使用 UUID；否则使用数字 ID
+            submission_dict = {
                 **submission.__dict__,
                 "student_email": user.email,
                 "student_name": user.full_name or user.username,
-            }, from_attributes=True)
+            }
+            # 如果有 cell_uuid，使用 UUID 作为 cell_id（前端期望）
+            if hasattr(submission, "cell_uuid") and submission.cell_uuid:
+                submission_dict["cell_id"] = submission.cell_uuid
+            submission_data = ActivitySubmissionWithStudent.model_validate(
+                submission_dict, from_attributes=True
+            )
             submissions.append(submission_data)
             student_ids_with_submission.add(submission.student_id)
 
@@ -621,9 +980,10 @@ async def get_cell_submissions(
                             from datetime import datetime
                             not_started_data = ActivitySubmissionWithStudent(
                                 id=0,  # 使用 0 作为占位符，表示未开始
-                                cell_id=cell_id,
+                                cell_id=actual_cell_id,
                                 lesson_id=actual_lesson_id,
                                 student_id=participation.student_id,
+                                session_id=session_id,  # 添加 session_id 参数
                                 responses={},
                                 status=ActivitySubmissionStatus.DRAFT,  # 使用 DRAFT 状态，但前端通过 id=0 识别
                                 student_email=user.email or "",
@@ -1178,7 +1538,7 @@ async def submit_peer_review(
 
 @router.get("/cells/{cell_id}/statistics", response_model=ActivityStatisticsResponse)
 async def get_cell_statistics(
-    cell_id: int,
+    cell_id: str,  # 支持 UUID 字符串或数字 ID（作为字符串传入）
     session_id: Optional[int] = None,
     lesson_id: Optional[int] = None,
     db: AsyncSession = Depends(deps.get_db),
@@ -1188,11 +1548,28 @@ async def get_cell_statistics(
     
     如果提供了 session_id，则返回该会话的实时统计（按 session 筛选）
     否则返回全局统计（所有课程的提交）
+    
+    注意：cell_id 可以是 UUID 字符串或数字 ID（作为字符串传入）
     """
 
     current_role = cast(UserRole, current_user.role)
     if current_role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="权限不足")
+
+    # 处理 cell_id：可能是 UUID 字符串或数字 ID
+    actual_cell_id: Union[int, str] = cell_id
+    try:
+        # 尝试转换为数字 ID
+        actual_cell_id = int(cell_id)
+    except ValueError:
+        # 是 UUID 字符串，需要转换为数据库 ID
+        if not lesson_id:
+            raise HTTPException(status_code=400, detail="使用 UUID 格式的 cell_id 时，必须提供 lesson_id 参数")
+        
+        db_cell_id = await get_db_id_from_cell_uuid(db, cell_id, lesson_id)
+        if db_cell_id is None:
+            raise HTTPException(status_code=404, detail=f"找不到对应的 Cell (UUID: {cell_id})")
+        actual_cell_id = db_cell_id
 
     # 如果提供了 session_id，使用实时统计函数（按 session 筛选）
     if session_id is not None:
@@ -1200,23 +1577,28 @@ async def get_cell_statistics(
         
         # 需要 lesson_id，如果没有提供则从 cell 获取
         if lesson_id is None:
-            cell = await db.get(Cell, cell_id)
-            if not cell:
-                raise HTTPException(status_code=404, detail="Cell 不存在")
-            lesson_id = cast(int, cell.lesson_id)
+            if isinstance(actual_cell_id, int):
+                cell = await db.get(Cell, actual_cell_id)
+                if not cell:
+                    raise HTTPException(status_code=404, detail="Cell 不存在")
+                lesson_id = cast(int, cell.lesson_id)
+            else:
+                raise HTTPException(status_code=400, detail="使用 UUID 格式的 cell_id 时，必须提供 lesson_id 参数")
         
         # 使用实时统计函数，它会按 session_id 筛选
+        # 传入原始的 cell_id（可能是 UUID），函数内部会处理转换
         stats = await get_submission_statistics(
             db,
-            cell_id=cell_id,
+            cell_id=cell_id,  # 传入原始值（UUID 或数字字符串）
             lesson_id=lesson_id,
             session_id=session_id
         )
         
         # 转换为 ActivityStatisticsResponse 格式
+        # 注意：使用统计中返回的 cell_id（可能是 UUID）
         return ActivityStatisticsResponse(
             id=0,  # 临时ID，因为这是实时计算的统计，不存储在数据库中
-            cell_id=cell_id,
+            cell_id=stats.get("cell_id", cell_id),  # 使用统计中返回的 cell_id（可能是 UUID）
             lesson_id=lesson_id,
             total_students=stats.get("total_students", 0),
             draft_count=stats.get("draft_count", 0),
@@ -1229,7 +1611,7 @@ async def get_cell_statistics(
             median_score=None,
             peer_review_count=0,
             avg_peer_review_score=None,
-            item_statistics=None,
+            item_statistics=stats.get("item_statistics"),  # 使用实时计算的题目级统计
             flowchart_metrics=None,
             updated_at=datetime.utcnow(),
         )
@@ -1237,20 +1619,24 @@ async def get_cell_statistics(
     # 没有 session_id，返回全局统计（所有会话的提交）
     # ⚠️ 注意：这会导致同一 lesson 被多次使用时，统计会混在一起
     # 建议：在课堂模式下，应该总是提供 session_id 来获取特定会话的统计
-    print(f"⚠️ 统计接口未提供 session_id，返回全局统计（cell_id={cell_id}，可能包含多个会话的提交）")
+    # 注意：全局统计使用数据库 ID，需要确保 actual_cell_id 是数字
+    if not isinstance(actual_cell_id, int):
+        raise HTTPException(status_code=400, detail="全局统计模式不支持 UUID 格式的 cell_id，请提供 session_id 参数")
+    
+    print(f"⚠️ 统计接口未提供 session_id，返回全局统计（cell_id={actual_cell_id}，可能包含多个会话的提交）")
     result = await db.execute(
-        select(ActivityStatistics).where(ActivityStatistics.cell_id == cell_id)
+        select(ActivityStatistics).where(ActivityStatistics.cell_id == actual_cell_id)
     )
     statistics = result.scalar_one_or_none()
 
     if not statistics:
         # 如果不存在，创建一个
-        cell = await db.get(Cell, cell_id)
+        cell = await db.get(Cell, actual_cell_id)
         if not cell:
             raise HTTPException(status_code=404, detail="Cell 不存在")
 
         statistics = ActivityStatistics(
-            cell_id=cell_id,
+            cell_id=actual_cell_id,
             lesson_id=cast(int, cell.lesson_id),
         )
         db.add(statistics)
@@ -1258,11 +1644,11 @@ async def get_cell_statistics(
         await db.refresh(statistics)
 
         # 立即计算统计数据
-        await _update_statistics(db, cast(int, cell_id), cast(int, cell.lesson_id))
+        await _update_statistics(db, actual_cell_id, cast(int, cell.lesson_id))
 
         # 重新加载
         result = await db.execute(
-            select(ActivityStatistics).where(ActivityStatistics.cell_id == cell_id)
+            select(ActivityStatistics).where(ActivityStatistics.cell_id == actual_cell_id)
         )
         statistics = result.scalar_one()
 

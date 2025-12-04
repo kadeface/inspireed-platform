@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal, Optional, cast
+from typing import Literal, Optional, Union, cast, Dict, Any, List
 from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -204,7 +204,7 @@ async def fetch_teachers_by_lesson(
 
 async def get_submission_statistics(
     db: AsyncSession,
-    cell_id: int,
+    cell_id: Union[int, str],  # 支持数字 ID 或 UUID 字符串
     lesson_id: int,
     session_id: Optional[int] = None,
 ) -> dict:
@@ -223,7 +223,7 @@ async def get_submission_statistics(
     返回:
         统计信息字典
     """
-    from sqlalchemy import func
+    from sqlalchemy import func, select as sql_select
     from app.models.activity import ActivitySubmissionStatus
     from app.models.classroom_session import StudentSessionParticipation
     
@@ -231,7 +231,7 @@ async def get_submission_statistics(
     if session_id:
         # 课堂模式：统计参与该会话的学生数
         total_students_result = await db.execute(
-            select(func.count(StudentSessionParticipation.id))
+            sql_select(func.count(StudentSessionParticipation.id))
             .where(StudentSessionParticipation.session_id == session_id)
         )
         total_students = int(total_students_result.scalar() or 0)
@@ -245,10 +245,73 @@ async def get_submission_statistics(
     # 注意：需要对每个学生只统计优先级最高的提交
     from app.models.activity import ActivitySubmission
     
+    # 如果 cell_id 是 UUID 字符串，需要先转换为数字 ID
+    from app.models.cell import Cell
+    from app.models.lesson import Lesson
+    
+    actual_cell_id: Union[int, str] = cell_id
+    if isinstance(cell_id, str):
+        # 先尝试直接转换为整数（可能是数字字符串）
+        try:
+            actual_cell_id = int(cell_id)
+        except ValueError:
+            # 是 UUID 格式，需要从 lesson.content 中查找对应的数据库 ID
+            # 如果 lesson_id 为 None，无法进行 UUID 转换
+            if lesson_id is None:
+                # 无法转换 UUID，返回空统计
+                return {
+                    "cell_id": cell_id,  # 保持原始格式
+                    "lesson_id": lesson_id,
+                    "total_students": total_students,
+                    "submitted_count": 0,  # 已提交包括已评分
+                    "draft_count": 0,
+                    "not_started_count": max(0, total_students),
+                    "average_score": None,
+                    "average_time_spent": 0,
+                    "item_statistics": {},  # 添加空字典而不是 None
+                }
+            
+            lesson = await db.get(Lesson, lesson_id)
+            if lesson is not None and lesson.content is not None:
+                lesson_content = cast(Optional[List[Dict[str, Any]]], lesson.content)
+                if lesson_content:
+                    for cell_data in lesson_content:
+                        cell_uuid = cell_data.get("id")
+                        if str(cell_uuid) == cell_id:
+                            # 找到了匹配的 UUID，通过 order 查找数据库 ID
+                            cell_order = cell_data.get("order")
+                            cell_type = cell_data.get("type") or cell_data.get("cell_type")
+                            if cell_order is not None:
+                                cell_result = await db.execute(
+                                    sql_select(Cell)
+                                    .where(Cell.lesson_id == lesson_id)
+                                    .where(Cell.order == cell_order)
+                                )
+                                matched_cell = cell_result.scalar_one_or_none()
+                                if matched_cell:
+                                    actual_cell_id = cast(int, matched_cell.id)
+                                    break
+    
+    # 确保 actual_cell_id 是整数类型，否则无法查询数据库
+    if not isinstance(actual_cell_id, int):
+        # 如果仍然无法转换为整数，返回空统计
+        # 这通常发生在 UUID 无法在 lesson.content 中找到匹配的情况
+        return {
+            "cell_id": cell_id,  # 保持原始格式
+            "lesson_id": lesson_id,
+            "total_students": total_students,
+            "submitted_count": 0,  # 已提交包括已评分
+            "draft_count": 0,
+            "not_started_count": max(0, total_students),
+            "average_score": None,
+            "average_time_spent": 0,
+            "item_statistics": {},  # 添加空字典而不是 None
+        }
+    
     # 查询所有提交，按优先级排序
     query = (
-        select(ActivitySubmission)
-        .where(ActivitySubmission.cell_id == cell_id)
+        sql_select(ActivitySubmission)
+        .where(ActivitySubmission.cell_id == actual_cell_id)
         .where(ActivitySubmission.lesson_id == lesson_id)
         .order_by(ActivitySubmission.updated_at.desc())
     )
@@ -321,8 +384,99 @@ async def get_submission_statistics(
     processed_count = submitted_count + graded_count + returned_count
     not_started_count = max(0, total_students - processed_count - draft_count)
     
+    # 计算题目级统计（item_statistics）
+    item_aggregates: Dict[str, Dict[str, Any]] = {}
+    for submission in student_best_submission.values():
+        responses = submission.responses or {}
+        for item_id, item_value in responses.items():
+            # 处理不同的答案格式：
+            # 1. 如果 item_value 是字符串（直接是选项ID），如 "opt1"
+            # 2. 如果 item_value 是对象，如 { "answer": "opt1" } 或 { "answer": ["opt1", "opt2"] }
+            # 3. 如果 item_value 是数组（多选题），如 ["opt1", "opt2"]
+            
+            aggregate = item_aggregates.setdefault(
+                item_id,
+                {
+                    "attempts": 0,
+                    "correct_count": 0,
+                    "scores": [],
+                    "options": {},
+                    "knowledge": {},
+                    "times": [],
+                },
+            )
+            aggregate["attempts"] += 1
+            
+            # 提取答案
+            answer = None
+            if isinstance(item_value, dict):
+                # 对象格式：{ "answer": "opt1", "correct": true, ... }
+                if item_value.get("is_correct") or item_value.get("correct"):
+                    aggregate["correct_count"] += 1
+                
+                score = item_value.get("score")
+                if isinstance(score, (int, float)):
+                    aggregate["scores"].append(float(score))
+                
+                time_spent = item_value.get("time_spent")
+                if isinstance(time_spent, (int, float)):
+                    aggregate["times"].append(float(time_spent))
+                
+                answer = item_value.get("answer") or item_value.get("value") or item_value.get("text")
+            elif isinstance(item_value, (str, int, float)):
+                # 直接是选项ID字符串或数字，如 "opt1" 或 "1"
+                answer = item_value
+            elif isinstance(item_value, list):
+                # 数组格式（多选题），如 ["opt1", "opt2"]
+                answer = item_value
+            
+            # 统计选项分布
+            if isinstance(answer, list):
+                # 多选题：答案是数组
+                for option in answer:
+                    key = str(option)
+                    aggregate["options"][key] = aggregate["options"].get(key, 0) + 1
+            elif answer is not None:
+                # 单选题：答案是单个值
+                key = str(answer)
+                aggregate["options"][key] = aggregate["options"].get(key, 0) + 1
+            
+            # 处理知识标签（仅在 item_value 是字典时）
+            if isinstance(item_value, dict):
+                knowledge_tags = item_value.get("knowledge_tags") or item_value.get("tags")
+                if isinstance(knowledge_tags, list):
+                    for tag in knowledge_tags:
+                        tag_key = str(tag)
+                        aggregate["knowledge"][tag_key] = aggregate["knowledge"].get(tag_key, 0) + 1
+    
+    # 汇总题目级统计
+    item_statistics: Dict[str, Dict[str, Any]] = {}
+    for item_id, aggregate in item_aggregates.items():
+        item_stat = {
+            "attempts": aggregate["attempts"],
+            "correct_count": aggregate["correct_count"],
+            "accuracy": aggregate["correct_count"] / aggregate["attempts"] if aggregate["attempts"] > 0 else 0.0,
+        }
+        
+        if aggregate["scores"]:
+            item_stat["avg_score"] = sum(aggregate["scores"]) / len(aggregate["scores"])
+            item_stat["min_score"] = min(aggregate["scores"])
+            item_stat["max_score"] = max(aggregate["scores"])
+        
+        if aggregate["options"]:
+            item_stat["option_distribution"] = aggregate["options"]
+        
+        if aggregate["times"]:
+            item_stat["avg_time"] = sum(aggregate["times"]) / len(aggregate["times"])
+        
+        if aggregate["knowledge"]:
+            item_stat["knowledge_distribution"] = aggregate["knowledge"]
+        
+        item_statistics[item_id] = item_stat
+    
+    # 返回时使用原始的 cell_id（可能是 UUID 字符串）
     return {
-        "cell_id": cell_id,
+        "cell_id": cell_id,  # 保持原始格式（UUID 或数字 ID）
         "lesson_id": lesson_id,
         "total_students": total_students,
         "submitted_count": submitted_count + graded_count,  # 已提交包括已评分
@@ -330,5 +484,6 @@ async def get_submission_statistics(
         "not_started_count": not_started_count,
         "average_score": float(avg_score) if avg_score is not None else None,
         "average_time_spent": int(avg_time) if avg_time is not None else 0,
+        "item_statistics": item_statistics,  # 总是返回字典（可能为空），而不是 None
     }
 

@@ -253,10 +253,14 @@
                   <span v-else class="text-gray-400">-</span>
                 </td>
                 <td class="table-cell text-sm text-gray-600">
-                  {{ formatDateTime(submission.submittedAt) }}
+                  {{ formatDateTime(submission.submittedAt || (submission as any).submitted_at) }}
                 </td>
                 <td class="table-cell text-sm text-gray-600">
-                  {{ submission.timeSpent ? formatTime(submission.timeSpent) : '-' }}
+                  {{ (submission.timeSpent !== undefined && submission.timeSpent !== null) 
+                      ? formatTime(submission.timeSpent) 
+                      : ((submission as any).time_spent !== undefined && (submission as any).time_spent !== null)
+                        ? formatTime((submission as any).time_spent)
+                        : '-' }}
                 </td>
                 <td class="table-cell">
                   <div class="flex gap-2">
@@ -406,20 +410,76 @@ interface Props {
   // 获取选择题及其统计
   const choiceItemsWithStats = computed(() => {
     try {
-      if (!props.activity?.items || !statistics.value.itemStatistics) {
+      if (!props.activity?.items) {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('UnifiedSubmissionPanel: activity.items 为空')
+        }
         return []
+      }
+      
+      // 🔧 添加调试日志，检查统计数据
+      if (!statistics.value.itemStatistics) {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('UnifiedSubmissionPanel: itemStatistics 为空', {
+            submittedCount: statistics.value.submittedCount,
+            totalStudents: statistics.value.totalStudents,
+            hasActivity: !!props.activity,
+            hasItems: !!props.activity?.items,
+            itemsCount: props.activity?.items?.length || 0,
+            statisticsKeys: statistics.value.itemStatistics ? Object.keys(statistics.value.itemStatistics) : [],
+          })
+        }
+        return []
+      }
+      
+      // 开发环境下输出完整的统计数据用于调试
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('UnifiedSubmissionPanel: itemStatistics 数据', {
+          itemStatisticsKeys: Object.keys(statistics.value.itemStatistics),
+          itemStatisticsSample: Object.keys(statistics.value.itemStatistics).slice(0, 2).reduce((acc, key) => {
+            acc[key] = statistics.value.itemStatistics![key]
+            return acc
+          }, {} as Record<string, any>),
+          activityItemsCount: props.activity?.items?.length || 0,
+          activityItemsIds: props.activity?.items?.map(item => ({ id: item.id, type: item.type })) || [],
+        })
       }
       
       const choiceTypes = ['single-choice', 'multiple-choice', 'true-false']
       const items = props.activity.items.filter(item => item && choiceTypes.includes(item.type))
       
-      if (items.length === 0) {
+      if (items.length === 0 && process.env.NODE_ENV === 'development') {
+        console.debug('UnifiedSubmissionPanel: 没有找到选择题类型的题目')
         return []
       }
       
       return items.map((item, index) => {
       const itemId = item.id
-      const itemStats = statistics.value.itemStatistics?.[itemId]
+      // 🔧 尝试多种方式匹配 itemId（字符串 vs 数字）
+      // 先尝试所有可能的 key 格式
+      const itemStatsKeys = Object.keys(statistics.value.itemStatistics || {})
+      const itemStats = statistics.value.itemStatistics?.[itemId] 
+        || statistics.value.itemStatistics?.[String(itemId)]
+        || statistics.value.itemStatistics?.[Number(itemId)]
+        || (itemStatsKeys.length > 0 ? statistics.value.itemStatistics?.[itemStatsKeys[0]] : null)
+      
+      // 仅在开发环境输出详细匹配日志（只输出第一个作为示例）
+      if (process.env.NODE_ENV === 'development' && index === 0) {
+        console.debug('UnifiedSubmissionPanel: 匹配题目统计示例', {
+          itemId,
+          itemIdType: typeof itemId,
+          itemType: item.type,
+          hasItemStats: !!itemStats,
+          itemStatsKeys: itemStatsKeys.slice(0, 3), // 只显示前3个key
+          itemStats: itemStats ? {
+            attempts: itemStats.attempts,
+            correct_count: itemStats.correct_count,
+            hasOptionDist: !!itemStats.option_distribution,
+            optionDistKeys: itemStats.option_distribution ? Object.keys(itemStats.option_distribution) : [],
+          } : null,
+        })
+      }
+      
       const optionDistribution = itemStats?.option_distribution || itemStats?.options || {}
       
       // 获取选项列表
@@ -478,14 +538,35 @@ interface Props {
         options = []
       }
       
-        return {
+        const result = {
           itemId,
           order: index,
           type: item.type,
           question: item.question || `题目 ${index + 1}`,
           options,
         }
-      }).filter(item => item && item.options && item.options.length > 0)
+        
+        // 仅在开发环境输出统计结果（只输出第一个作为示例）
+        if (process.env.NODE_ENV === 'development' && index === 0) {
+          console.debug('UnifiedSubmissionPanel: 选择题统计结果示例', {
+            itemId,
+            type: item.type,
+            optionsCount: options.length,
+          })
+        }
+        
+        return result
+      }).filter(item => {
+        const hasOptions = item && item.options && item.options.length > 0
+        // 仅在开发环境输出过滤日志
+        if (!hasOptions && process.env.NODE_ENV === 'development') {
+          console.debug('UnifiedSubmissionPanel: 过滤掉没有选项的题目', {
+            itemId: item?.itemId,
+            type: item?.type,
+          })
+        }
+        return hasOptions
+      })
     } catch (error) {
       logger.error('计算选择题统计时出错:', error)
       return []
@@ -509,33 +590,12 @@ interface Props {
     return String(cellId)
   }
   
-  // 检查 cellId 是否匹配（支持数字和UUID）
+  // 检查 cellId 是否匹配（统一使用 UUID 字符串比较）
   function isCellIdMatch(cellId1: string | number, cellId2: string | number): boolean {
-    const normalized1 = normalizeCellId(cellId1)
-    const normalized2 = normalizeCellId(cellId2)
-    
-    // 直接字符串比较
-    if (normalized1 === normalized2) return true
-    
-    // 如果一个是UUID，另一个是数字，尝试转换
-    if (isUUID(normalized1) && !isUUID(normalized2)) {
-      // UUID 不能转换为数字，不匹配
-      return false
-    }
-    
-    if (!isUUID(normalized1) && isUUID(normalized2)) {
-      // UUID 不能转换为数字，不匹配
-      return false
-    }
-    
-    // 如果都是数字字符串，比较数值
-    const num1 = toNumericId(cellId1)
-    const num2 = toNumericId(cellId2)
-    if (num1 !== null && num2 !== null) {
-      return num1 === num2
-    }
-    
-    return false
+    // 统一转换为字符串进行比较
+    const str1 = String(cellId1)
+    const str2 = String(cellId2)
+    return str1 === str2
   }
   
   // 格式化时间
@@ -548,12 +608,51 @@ interface Props {
   
   function formatDateTime(dateStr: string | null): string {
     if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleString('zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    try {
+      // 处理可能没有时区信息的时间字符串
+      let processedDateStr = String(dateStr).trim()
+      
+      // 检查是否已有时区信息（Z 或 +/- 时区偏移）
+      const hasTimezone = processedDateStr.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(processedDateStr)
+      
+      if (!hasTimezone) {
+        // 如果没有时区信息，假设它是 UTC 时间并添加 Z 后缀
+        // 处理格式：YYYY-MM-DD HH:MM:SS 或 YYYY-MM-DDTHH:MM:SS
+        if (processedDateStr.includes(' ')) {
+          // 空格格式转换为 ISO 格式
+          processedDateStr = processedDateStr.replace(' ', 'T') + 'Z'
+        } else if (processedDateStr.includes('T')) {
+          // 已经是 ISO 格式，只需添加 Z
+          processedDateStr = processedDateStr + 'Z'
+        } else {
+          // 其他格式，尝试解析后再处理
+          processedDateStr = processedDateStr + 'Z'
+        }
+      }
+      
+      const date = new Date(processedDateStr)
+      
+      // 检查日期是否有效
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date string:', dateStr)
+        return '-'
+      }
+      
+      // 转换为中国时区 (UTC+8)
+      // 使用 toLocaleString 并指定时区为 Asia/Shanghai
+      return date.toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      })
+    } catch (error) {
+      console.error('格式化时间失败:', dateStr, error)
+      return '-'
+    }
   }
   
   // 获取状态标签
@@ -580,49 +679,11 @@ interface Props {
     return classes[status] || 'status-badge'
   }
   
-  // 解析 UUID cellId 到数字 ID（通过 API 或 order）
-  async function resolveCellIdToNumeric(cellId: string | number): Promise<number | null> {
-    // 如果已经是数字，直接返回
-    if (typeof cellId === 'number') {
-      return cellId
-    }
-    
-    // 尝试转换为数字
-    const numericId = toNumericId(cellId)
-    if (numericId !== null) {
-      return numericId
-    }
-    
-    // 如果是 UUID，尝试通过 order 查找对应的数据库 Cell ID
-    if (isUUID(cellId) && props.cellOrder !== undefined && props.lessonId) {
-      try {
-        // 静默解析，不输出日志（成功时会输出）
-        const { api } = await import('@/services/api')
-        const response = await api.get(`/cells/lesson/${props.lessonId}`) as any
-        const cells = response?.data || response || []
-        
-        // 通过 order 和 type 匹配
-        const matchedCell = cells.find((c: any) => {
-          const orderMatch = c.order === props.cellOrder
-          const typeMatch = c.cell_type === 'ACTIVITY' || c.cell_type === 'activity' || c.cell_type?.toUpperCase() === 'ACTIVITY'
-          return orderMatch && typeMatch
-        })
-        
-        if (matchedCell?.id) {
-          const numericId = typeof matchedCell.id === 'number' ? matchedCell.id : parseInt(matchedCell.id, 10)
-          if (!isNaN(numericId)) {
-            // 成功解析 UUID，静默执行（只在失败时输出警告）
-            return numericId
-          }
-        }
-        
-        logger.warn('⚠️ 无法通过 order 找到对应的数据库 Cell ID', { cellId, order: props.cellOrder, cellsCount: cells.length })
-      } catch (error: any) {
-        logger.error('解析 UUID cellId 失败:', error)
-      }
-    }
-    
-    return null
+  // 注意：现在统一使用 UUID，不再需要转换为数字 ID
+  // 保留此函数以兼容旧代码，但直接返回 UUID 字符串
+  async function resolveCellIdToNumeric(cellId: string | number): Promise<string | number | null> {
+    // 统一使用 UUID，直接返回
+    return cellId
   }
 
   // 加载统计数据
@@ -631,20 +692,9 @@ interface Props {
     try {
       // 移除频繁的轮询日志
       
-      // 将 cellId 转换为数字（支持 UUID 通过 order 转换）
-      const numericCellId = await resolveCellIdToNumeric(props.cellId)
-      
-      if (numericCellId === null) {
-        logger.warn('CellId 是 UUID，无法获取统计数据（需要数字 ID）', {
-          cellId: props.cellId,
-          cellOrder: props.cellOrder,
-          lessonId: props.lessonId,
-        })
-        return
-      }
-      
+      // 统一使用 UUID，直接传递
       const stats = await activityService.getStatistics(
-        numericCellId,
+        props.cellId,
         sessionId.value,
         props.lessonId
       )
@@ -678,29 +728,45 @@ interface Props {
     try {
       // 移除频繁的调试日志，只在必要时输出
       
-      // 将 cellId 转换为数字（支持 UUID 通过 order 转换）
-      const numericCellId = await resolveCellIdToNumeric(props.cellId)
-      
-      if (numericCellId === null) {
-        logger.warn('CellId 是 UUID，无法获取提交列表（需要数字 ID）', {
-          cellId: props.cellId,
-          cellOrder: props.cellOrder,
-          lessonId: props.lessonId,
-        })
-        submissions.value = []
-        return
-      }
-      
+      // 统一使用 UUID，直接传递
       const data = await activityService.getCellSubmissions(
-        numericCellId,
+        props.cellId,
         statusFilter.value || undefined,
         sessionId.value,
         props.lessonId
       )
       
-      // 移除成功日志，减少控制台噪音（只在错误时输出）
-      
-      submissions.value = data
+      // 🔧 数据转换：将后端返回的蛇形命名转换为驼峰命名
+      submissions.value = data.map((s: any) => ({
+        ...s,
+        // 学生信息字段（支持两种格式）
+        studentName: s.studentName || s.student_name || '',
+        studentEmail: s.studentEmail || s.student_email || '',
+        // 时间字段转换
+        submittedAt: s.submittedAt || s.submitted_at || null,
+        startedAt: s.startedAt || s.started_at || null,
+        gradedAt: s.gradedAt || s.graded_at || null,
+        // 用时字段转换
+        timeSpent: s.timeSpent !== undefined ? s.timeSpent : (s.time_spent !== undefined ? s.time_spent : null),
+        // 其他字段（保持兼容）
+        cellId: s.cellId || s.cell_id,
+        lessonId: s.lessonId || s.lesson_id,
+        studentId: s.studentId || s.student_id,
+        sessionId: s.sessionId || s.session_id,
+        maxScore: s.maxScore || s.max_score,
+        autoGraded: s.autoGraded !== undefined ? s.autoGraded : (s.auto_graded !== undefined ? s.auto_graded : false),
+        teacherFeedback: s.teacherFeedback || s.teacher_feedback,
+        gradedBy: s.gradedBy || s.graded_by,
+        processTrace: s.processTrace || s.process_trace,
+        submissionCount: s.submissionCount !== undefined ? s.submissionCount : (s.submission_count !== undefined ? s.submission_count : 1),
+        attemptNo: s.attemptNo !== undefined ? s.attemptNo : (s.attempt_no !== undefined ? s.attempt_no : 1),
+        isLate: s.isLate !== undefined ? s.isLate : (s.is_late !== undefined ? s.is_late : false),
+        activityPhase: s.activityPhase || s.activity_phase,
+        createdAt: s.createdAt || s.created_at,
+        updatedAt: s.updatedAt || s.updated_at,
+        // 确保 responses 字段存在
+        responses: s.responses || {},
+      }))
     } catch (error: any) {
       logger.error('加载提交列表失败:', error)
       submissions.value = []
@@ -863,29 +929,27 @@ interface Props {
     
     // 如果 sessionId 从无到有，加载数据并连接 WebSocket
     if (newSessionId && !oldSessionId) {
-      console.log('✅ UnifiedSubmissionPanel: sessionId 从无到有，开始加载数据', {
-        sessionId: newSessionId,
-        timestamp: new Date().toLocaleTimeString(),
-      })
+      const isDev = process.env.NODE_ENV === 'development'
+      if (isDev) {
+        console.log('✅ UnifiedSubmissionPanel: sessionId 从无到有，开始加载数据', {
+          sessionId: newSessionId,
+        })
+      }
       
       // 加载数据
       await refreshAll()
       
       try {
         await connectRealtime()
-        console.log('✅ UnifiedSubmissionPanel: WebSocket 连接成功（sessionId 变化触发）', {
-          sessionId: newSessionId,
-          channelDescriptor: channelDescriptor.value,
-          isConnected: isConnected.value,
-          timestamp: new Date().toLocaleTimeString(),
-        })
+        if (isDev) {
+          console.debug('UnifiedSubmissionPanel: WebSocket 连接成功', {
+            sessionId: newSessionId,
+            isConnected: isConnected.value,
+          })
+        }
         
         registerListener('new_submission', handleNewSubmission)
         registerListener('submission_statistics_updated', handleStatisticsUpdate)
-        console.log('✅ UnifiedSubmissionPanel: 已注册消息监听器（sessionId 变化触发）', {
-          listeners: ['new_submission', 'submission_statistics_updated'],
-          timestamp: new Date().toLocaleTimeString(),
-        })
         
         // 停止轮询
         if (pollingInterval) {
@@ -912,28 +976,22 @@ interface Props {
   }, { immediate: false })
 
   onMounted(async () => {
-    // 输出初始状态
-    console.log('🔍 UnifiedSubmissionPanel 已挂载:', {
-      cellId: props.cellId,
-      lessonId: props.lessonId,
-      sessionId: sessionId.value,
-      propsSessionId: props.sessionId,
-      hasInjectedSessionId: !!injectedSessionId,
-      injectedSessionIdValue: injectedSessionId?.value,
-      computedSessionId: sessionId.value,
-      timestamp: new Date().toLocaleTimeString(),
-    })
+    const isDev = process.env.NODE_ENV === 'development'
     
-    // 如果 sessionId 是 undefined，输出详细的调试信息
-    if (!sessionId.value) {
-      console.error('❌ UnifiedSubmissionPanel: sessionId 为空！', {
-        propsSessionId: props.sessionId,
-        injectedSessionIdValue: injectedSessionId?.value,
-        hasInjectedSessionId: !!injectedSessionId,
-        cellId: props.cellId,
-        lessonId: props.lessonId,
-        timestamp: new Date().toLocaleTimeString(),
-      })
+    // 只在开发环境输出初始状态
+    if (isDev) {
+      if (!sessionId.value) {
+        console.warn('⚠️ UnifiedSubmissionPanel: sessionId 为空', {
+          cellId: props.cellId,
+          lessonId: props.lessonId,
+          hasInjectedSessionId: !!injectedSessionId,
+        })
+      } else {
+        console.debug('UnifiedSubmissionPanel 已挂载', {
+          cellId: props.cellId,
+          sessionId: sessionId.value,
+        })
+      }
     }
     
     // 🔧 只有在有 sessionId 时才加载数据（课堂模式）
@@ -955,31 +1013,25 @@ interface Props {
         }
         
         await connectRealtime()
-        console.log('✅ UnifiedSubmissionPanel: WebSocket 连接成功（onMounted）', {
-          sessionId: sessionId.value,
-          channelDescriptor: channelDescriptor.value,
-          isConnected: isConnected.value,
-          timestamp: new Date().toLocaleTimeString(),
-        })
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('UnifiedSubmissionPanel: WebSocket 连接成功', {
+            sessionId: sessionId.value,
+            isConnected: isConnected.value,
+          })
+        }
         
         registerListener('new_submission', handleNewSubmission)
         registerListener('submission_statistics_updated', handleStatisticsUpdate)
-        console.log('✅ UnifiedSubmissionPanel: 已注册消息监听器（onMounted）', {
-          listeners: ['new_submission', 'submission_statistics_updated'],
-          timestamp: new Date().toLocaleTimeString(),
-        })
         
         // ✅ WebSocket 连接成功时，不启动轮询，完全依赖实时推送
         // 只在 WebSocket 失败时才降级到轮询模式
         
         // 请求统计（用于实时更新）
         setTimeout(() => {
-          // 尝试解析 cellId 为数字（支持 UUID 通过 order 转换）
-          resolveCellIdToNumeric(props.cellId).then((numericCellId) => {
-            if (numericCellId !== null && props.lessonId) {
-              requestStats(numericCellId, props.lessonId)
-            }
-          })
+          // 统一使用 UUID，直接传递
+          if (props.lessonId) {
+            requestStats(props.cellId, props.lessonId)
+          }
         }, 500)
       } catch (error) {
         logger.warn('⚠️ UnifiedSubmissionPanel: WebSocket 连接失败，降级到轮询模式（每5秒）', error)
@@ -992,11 +1044,9 @@ interface Props {
       // ✅ 没有 sessionId 时，不加载数据
       // 因为没有 sessionId 意味着不是课堂模式，不应该显示数据
       // 数据会在进入课堂模式（有 sessionId）后自动加载
-      console.log('ℹ️ UnifiedSubmissionPanel: 没有 sessionId，不加载数据（等待进入课堂模式）', {
-        cellId: props.cellId,
-        lessonId: props.lessonId,
-        timestamp: new Date().toLocaleTimeString(),
-      })
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('UnifiedSubmissionPanel: 没有 sessionId，等待进入课堂模式')
+      }
     }
   })
   

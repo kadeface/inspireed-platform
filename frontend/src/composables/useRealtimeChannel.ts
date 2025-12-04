@@ -214,12 +214,12 @@ export class RealtimeChannelManager {
   /**
    * 请求统计信息
    */
-  requestStatistics(cellId: number, lessonId: number) {
+  requestStatistics(cellId: string | number, lessonId: number) {
     this.send({
       type: 'request_statistics',
       timestamp: new Date().toISOString(),
       data: {
-        cell_id: cellId,
+        cell_id: cellId,  // 支持 UUID 字符串或数字 ID
         lesson_id: lessonId,
       },
     })
@@ -481,7 +481,7 @@ export function useRealtimeChannel(
   /**
    * 请求统计信息
    */
-  function requestStatistics(cellId: number, lessonId: number) {
+  function requestStatistics(cellId: string | number, lessonId: number) {
     if (manager) {
       // 实时检查连接状态
       const actuallyConnected = manager.isConnected

@@ -66,6 +66,22 @@ class ActivitySubmissionSubmit(BaseModel):
     flowchart_snapshot: Optional[FlowchartSnapshotPayload] = None
 
 
+class ActivitySubmissionCreateAndSubmit(BaseModel):
+    """创建并直接提交活动请求（一步完成，不经过草稿状态）"""
+
+    cell_id: Union[int, str]  # 支持数字 ID 或 UUID 字符串
+    lesson_id: int
+    responses: Dict[str, Any] = Field(default_factory=dict)
+    session_id: Optional[int] = Field(None, description="课堂会话ID（课堂模式必须提供）")
+    started_at: Optional[datetime] = None
+    time_spent: Optional[int] = None
+    process_trace: Optional[List[Dict[str, Any]]] = None
+    context: Optional[Dict[str, Any]] = None
+    activity_phase: Optional[str] = None
+    attempt_no: Optional[int] = None
+    flowchart_snapshot: Optional[FlowchartSnapshotPayload] = None
+
+
 class ActivitySubmissionGrade(BaseModel):
     """评分请求"""
 
@@ -188,7 +204,7 @@ class ActivityStatisticsResponse(BaseModel):
     """活动统计响应"""
 
     id: int
-    cell_id: int
+    cell_id: Union[int, str]  # 支持数字 ID 或 UUID 字符串
     lesson_id: int
     total_students: int
     draft_count: int

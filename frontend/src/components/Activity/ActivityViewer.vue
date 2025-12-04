@@ -512,19 +512,14 @@ async function handleSubmit() {
       return
     }
     
-    const submission = await activityService.createSubmission({
+    // 使用合并API：一步完成创建和提交
+    const submittedSubmission = await activityService.createAndSubmit({
       cellId: cellIdToSubmit as any,  // ✅ 直接传递 UUID 后端会处理映射
       lessonId: lessonId.value,
       sessionId: sessionIdToUse,  // 使用动态获取的 sessionId
       responses: answers.value,
       startedAt: startTime.value.toISOString(),
-    })
-    
-    // 2. 立即提交（状态改为SUBMITTED）
-    const submittedSubmission = await activityService.submitActivity(submission.id, {
-      responses: answers.value,
       timeSpent,
-      sessionId: sessionIdToUse,  // 使用动态获取的 sessionId
     })
     
     // 保存提交后的数据（包含正确答案）

@@ -141,6 +141,72 @@ export const activityService = {
   },
 
   /**
+   * 创建并直接提交活动（一步完成，不经过草稿状态）
+   */
+  async createAndSubmit(
+    data: CreateActivitySubmissionRequest & { timeSpent?: number }
+  ): Promise<ActivitySubmission> {
+    const requestData: any = {
+      cell_id: data.cellId,  // 可以是数字或 UUID 字符串
+      lesson_id: data.lessonId,
+      responses: data.responses || {},
+    }
+    
+    if (data.sessionId !== undefined) {
+      requestData.session_id = data.sessionId
+    }
+    if (data.startedAt !== undefined) {
+      const startedAt = typeof data.startedAt === 'string'
+        ? data.startedAt
+        : (data.startedAt as unknown) instanceof Date
+          ? (data.startedAt as unknown as Date).toISOString()
+          : String(data.startedAt)
+      requestData.started_at = startedAt
+    }
+    if (data.timeSpent !== undefined) {
+      requestData.time_spent = data.timeSpent
+    }
+    if (data.processTrace !== undefined) {
+      requestData.process_trace = data.processTrace
+    }
+    if (data.context !== undefined) {
+      requestData.context = data.context
+    }
+    if (data.activityPhase !== undefined) {
+      requestData.activity_phase = data.activityPhase
+    }
+    if (data.attemptNo !== undefined) {
+      requestData.attempt_no = data.attemptNo
+    }
+    
+    console.log('📤 Creating and submitting activity:', {
+      cellId: requestData.cell_id,
+      sessionId: requestData.session_id,
+      timeSpent: requestData.time_spent,
+      responsesCount: Object.keys(requestData.responses).length,
+    })
+    
+    try {
+      const response = await api.post<ActivitySubmission>(
+        '/activities/submissions/submit',
+        requestData
+      )
+      console.log('✅ Activity created and submitted successfully:', { 
+        submissionId: response.id, 
+        status: response.status 
+      })
+      return response
+    } catch (error: any) {
+      console.error('❌ Create and submit activity failed:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      })
+      throw error
+    }
+  },
+
+  /**
    * 正式提交活动
    */
   async submitActivity(
@@ -227,7 +293,7 @@ export const activityService = {
    * 获取 Cell 的所有提交（教师端）
    */
   async getCellSubmissions(
-    cellId: number,
+    cellId: string | number,  // 支持 UUID 字符串或数字 ID
     status?: string,
     sessionId?: number,
     lessonId?: number
@@ -337,7 +403,7 @@ export const activityService = {
    * @param lessonId 可选的教案ID（如果提供了sessionId，建议也提供lessonId）
    */
   async getStatistics(
-    cellId: number,
+    cellId: string | number,  // 支持 UUID 字符串或数字 ID
     sessionId?: number,
     lessonId?: number
   ): Promise<ActivityStatistics> {

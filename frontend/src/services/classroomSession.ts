@@ -402,7 +402,8 @@ export const classroomSessionService = {
       const params = isActive !== undefined ? { is_active: isActive } : {}
       // api.get 已经返回 response.data，所以 response 就是数据本身
       const response = await api.get(`/classroom-sessions/sessions/${sessionId}/participants`, { params })
-      logger.debug('参与者列表响应', response)
+      // 🔧 移除频繁的调试日志，避免控制台噪音（轮询时每3-5秒调用一次）
+      // logger.debug('参与者列表响应', response)
       
       if (!response) {
         logger.warn('参与者列表为空')
@@ -411,7 +412,8 @@ export const classroomSessionService = {
       
       // 确保是数组
       const participants = Array.isArray(response) ? response : []
-      logger.debug(`找到 ${participants.length} 个参与者`)
+      // 🔧 移除频繁的调试日志
+      // logger.debug(`找到 ${participants.length} 个参与者`)
       
       // 处理字段映射（snake_case 到 camelCase）
       return participants.map((p: any) => {

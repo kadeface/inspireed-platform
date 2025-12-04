@@ -195,20 +195,27 @@ const finalSessionId = computed(() => {
 // 使用 watch 监听 sessionId 变化，只在值变化时输出日志
 watch(() => finalSessionId.value, (newId, oldId) => {
   if (newId !== oldId) {
-    if (newId !== undefined) {
-      console.log('✅ CellContainer: sessionId 已设置:', newId, {
-        source: props.sessionId !== undefined ? 'props' : 
-                injectedSessionId?.value !== undefined ? 'injectedSessionId' : 'injectedSession',
-        oldId,
-        propsSessionId: props.sessionId,
-        injectedSessionIdValue: injectedSessionId?.value,
-        cellType: props.cell.type,
-        timestamp: new Date().toLocaleTimeString(),
-      })
-    } else if (oldId !== undefined) {
-      console.warn('⚠️ CellContainer: sessionId 已移除（从', oldId, '变为 undefined）', {
-        propsSessionId: props.sessionId,
-        injectedSessionIdValue: injectedSessionId?.value,
+    const isDev = process.env.NODE_ENV === 'development'
+    const isActivity = props.cell.type === 'activity'
+    
+    // 只在开发环境且是 activity 类型时输出详细日志，其他情况使用 debug
+    if (isDev && isActivity) {
+      if (newId !== undefined) {
+        console.log('✅ CellContainer: sessionId 已设置:', newId, {
+          source: props.sessionId !== undefined ? 'props' : 
+                  injectedSessionId?.value !== undefined ? 'injectedSessionId' : 'injectedSession',
+          oldId,
+          cellType: props.cell.type,
+        })
+      } else if (oldId !== undefined) {
+        console.warn('⚠️ CellContainer: sessionId 已移除（从', oldId, '变为 undefined）', {
+          cellType: props.cell.type,
+        })
+      }
+    } else if (isDev) {
+      // 非 activity 类型使用 debug 级别
+      console.debug('CellContainer: sessionId', newId !== undefined ? '已设置' : '已移除', {
+        sessionId: newId,
         cellType: props.cell.type,
       })
     }

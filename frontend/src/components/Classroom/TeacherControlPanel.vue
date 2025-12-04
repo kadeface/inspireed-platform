@@ -1889,16 +1889,18 @@ async function loadParticipants() {
       : []
     
     activeStudents.value = activeParticipants
-    logger.debug(`加载在线学生完成: ${activeStudents.value.length} 人`, activeStudents.value.map(s => ({
-      id: s.id,
-      name: s.studentName || s.student_name,
-      isActive: s.isActive || s.is_active,
-    })))
+    // 🔧 移除频繁的调试日志，避免控制台噪音（轮询时每3-5秒调用一次）
+    // logger.debug(`加载在线学生完成: ${activeStudents.value.length} 人`, activeStudents.value.map(s => ({
+    //   id: s.id,
+    //   name: s.studentName || s.student_name,
+    //   isActive: s.isActive || s.is_active,
+    // })))
     
     // 更新会话统计中的在线学生数
     if (session.value) {
       session.value.activeStudents = activeStudents.value.length
-      logger.debug('更新会话统计，在线学生数:', session.value.activeStudents)
+      // 🔧 移除频繁的调试日志
+      // logger.debug('更新会话统计，在线学生数:', session.value.activeStudents)
     }
   } catch (error: any) {
     console.error('加载学生列表失败:', error)
