@@ -31,25 +31,6 @@
     <div v-else-if="lesson" class="flex h-screen relative">
       <!-- 左侧：课程内容 -->
       <div class="flex-1 overflow-y-auto" :class="{ 'transition-all duration-300': true }">
-        <!-- 🔧 临时调试面板 -->
-        <div v-if="isInClassroomMode" class="bg-yellow-50 border-b border-yellow-200 px-6 py-3 text-xs font-mono">
-          <div class="flex items-center justify-between">
-            <div class="flex gap-6">
-              <span>📊 课堂模式: <strong>{{ isInClassroomMode ? '是' : '否' }}</strong></span>
-              <span>🔒 严格同步: <strong>{{ shouldSyncDisplay ? '是' : '否' }}</strong></span>
-              <span>📝 总Cell数: <strong>{{ lesson.content?.length || 0 }}</strong></span>
-              <span>👁️ 显示Cell数: <strong>{{ filteredCells.length }}</strong></span>
-              <span>🎯 displayOrders: <strong>{{ JSON.stringify(classroomSession?.settings?.display_cell_orders) }}</strong></span>
-              <span>🔢 第一个Cell的order: <strong>{{ lesson.content?.[0]?.order }}</strong></span>
-            </div>
-            <button 
-              class="px-2 py-1 bg-yellow-200 hover:bg-yellow-300 rounded text-xs"
-            >
-              打印完整状态
-            </button>
-          </div>
-        </div>
-        
         <!-- 全屏提示弹窗 -->
         <Transition name="fade">
           <div
@@ -89,31 +70,77 @@
 
         <!-- 顶部导航栏 -->
         <header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-10 border-b border-gray-100">
-          <div class="px-6 py-4">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-4">
+          <div class="px-4 md:px-6 py-3">
+            <div class="flex items-center justify-between gap-4">
+              <!-- 左侧：返回按钮 + 课程信息 -->
+              <div class="flex items-center gap-3 min-w-0 flex-1">
                 <button
                   @click="router.push('/student')"
-                  class="p-2 hover:bg-gray-100 rounded-xl transition-all transform hover:scale-105"
+                  class="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
                   title="返回"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                 </button>
-                <div>
-                  <h1 class="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">{{ lesson.title }}</h1>
-                  <p class="text-sm text-gray-600 mt-1 font-medium">
-                    <span v-if="lesson.course">{{ lesson.course.name }}</span>
-                    <span v-if="lesson.chapter"> / {{ lesson.chapter.name }}</span>
-                  </p>
+                <div class="min-w-0 flex-1">
+                  <!-- 课堂模式标签 -->
+                  <div v-if="isInClassroomMode && classroomSession" class="flex items-center gap-2 mb-1">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-xs font-medium">
+                      🎓 正在上课
+                    </span>
+                  </div>
+                  <!-- 课程标题 -->
+                  <h1 class="text-lg md:text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent truncate">
+                    {{ lesson.title }}
+                  </h1>
+                  <!-- 课程信息 -->
+                  <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <template v-if="isInClassroomMode && classroomSession">
+                      <span v-if="lesson.course" class="text-xs text-gray-500">{{ lesson.course.name }}</span>
+                      <span v-if="lesson.course && classroomSession.teacherName" class="text-xs text-gray-400">·</span>
+                      <span v-if="classroomSession.teacherName" class="text-xs text-gray-500">
+                        授课教师：<span class="font-medium text-gray-700">{{ classroomSession.teacherName }}</span>
+                      </span>
+                    </template>
+                    <template v-else>
+                      <span v-if="lesson.course" class="text-xs text-gray-500">{{ lesson.course.name }}</span>
+                      <span v-if="lesson.course && lesson.chapter" class="text-xs text-gray-400">/</span>
+                      <span v-if="lesson.chapter" class="text-xs text-gray-500">{{ lesson.chapter.name }}</span>
+                    </template>
+                  </div>
                 </div>
               </div>
-              <div class="flex items-center gap-4">
+              
+              <!-- 右侧：操作按钮组 -->
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <!-- 课堂模式状态组 -->
+                <template v-if="isInClassroomMode && classroomSession">
+                  <!-- 同步状态 -->
+                  <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border" :class="isWebSocketConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-200'">
+                    <div class="w-1.5 h-1.5 rounded-full" :class="isWebSocketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'"></div>
+                    <span class="text-xs font-medium">{{ isWebSocketConnected ? '同步' : '轮询' }}</span>
+                  </div>
+                  <!-- 进度 -->
+                  <div class="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100">
+                    <span class="text-xs font-medium text-emerald-600">进度</span>
+                  </div>
+                  <!-- 退出按钮 -->
+                  <button
+                    @click="handleExitClassroom"
+                    class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 text-xs font-medium transition-colors flex items-center gap-1.5"
+                    title="退出上课"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span>退出</span>
+                  </button>
+                </template>
                 <!-- 侧边栏切换按钮 -->
                 <button
                   @click="toggleSidebar"
-                  class="p-2 hover:bg-gray-100 rounded-xl transition-all transform hover:scale-105"
+                  class="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
                   :title="sidebarVisible ? '隐藏学习空间' : '显示学习空间'"
                 >
                   <svg 
@@ -135,37 +162,13 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <!-- WebSocket 连接状态指示器 -->
-                <div v-if="isInClassroomMode" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border" :class="isWebSocketConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-200'">
-                  <div class="w-2 h-2 rounded-full" :class="isWebSocketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'"></div>
-                  <span class="text-xs font-medium">{{ isWebSocketConnected ? '实时同步' : '轮询模式' }}</span>
-                </div>
-                <!-- 学习进度 -->
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <span class="text-sm text-gray-600 font-medium">学习进度:</span>
-                  <span class="text-sm font-bold text-emerald-600">{{ progress }}%</span>
-                </div>
-                <!-- 完成按钮 -->
-                <button
-                  v-if="progress < 100"
-                  @click="markAsCompleted"
-                  class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 text-sm font-medium shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all transform hover:scale-105"
-                >
-                  标记为完成
-                </button>
-                <div v-else class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-600">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span class="text-sm font-semibold">已完成</span>
-                </div>
               </div>
             </div>
           </div>
         </header>
 
         <!-- 课程描述 -->
-        <div v-if="lesson.description" class="bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500 px-6 py-4">
+        <div v-if="lesson.description && !isInClassroomMode" class="bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500 px-6 py-4">
           <p class="text-gray-700 font-medium">{{ lesson.description }}</p>
         </div>
 
@@ -530,6 +533,23 @@ const {
   leaveSession,
   updateProgress,  // 🆕 导入进度更新函数
 } = useClassroomSession(lessonId.value, handleFullscreenRequest)
+
+// 处理退出课堂
+async function handleExitClassroom() {
+  if (!classroomSession.value) return
+  
+  if (!confirm('确定要退出上课吗？退出后您将无法继续接收教师的实时同步内容。')) {
+    return
+  }
+  
+  try {
+    await leaveSession()
+    console.log('✅ 已成功退出上课')
+  } catch (error: any) {
+    console.error('❌ 退出上课失败:', error)
+    alert('退出上课失败，请稍后重试')
+  }
+}
 
 // 🔍 调试：监听 classroomSession 变化
 watch(classroomSession, (newSession) => {

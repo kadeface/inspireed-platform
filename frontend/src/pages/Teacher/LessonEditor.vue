@@ -26,6 +26,61 @@
 
           <!-- 右侧：操作按钮 -->
           <div class="flex items-center gap-3">
+            <!-- 上课模式：导播台信息 -->
+            <template v-if="isPreviewMode && classroomPanelData?.session && classroomPanelData.session.status === 'active'">
+              <div class="flex items-center gap-2.5 text-xs border-r border-gray-200 pr-3 mr-3">
+                <!-- 课程标题 -->
+                <div class="text-gray-800 font-semibold max-w-xs truncate">
+                  {{ currentLesson?.title }}
+                </div>
+                <!-- 学生人数 -->
+                <div class="flex items-center gap-1 px-2 py-0.5 bg-blue-50 rounded text-blue-700">
+                  <span>👥</span>
+                  <span class="font-medium">{{ classroomPanelData.activeStudents.length }}</span>
+                  <span v-if="classroomPanelData.totalStudents > 0" class="text-blue-500">/{{ classroomPanelData.totalStudents }}</span>
+                  <span class="text-blue-600">人已进入</span>
+                </div>
+                <!-- 模块数量 -->
+                <div v-if="currentLesson?.content" class="flex items-center gap-1 px-2 py-0.5 bg-purple-50 rounded text-purple-700">
+                  <span>📚</span>
+                  <span class="font-medium">{{ currentLesson.content.length }}</span>
+                  <span class="text-purple-600">个模块</span>
+                </div>
+                <!-- 时长 -->
+                <div class="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 rounded text-emerald-700">
+                  <span>⏱️</span>
+                  <span class="font-medium">{{ classroomPanelData.formatDuration?.(classroomPanelData.displayDuration) || '0分钟' }}</span>
+                  <span v-if="classroomPanelData.remainingTime > 0" class="text-emerald-600">
+                    剩余: {{ classroomPanelData.formatRemainingTime?.(classroomPanelData.remainingTime) || '' }}
+                  </span>
+                </div>
+                <!-- 操作按钮组 -->
+                <div class="flex items-center gap-1.5 ml-1">
+                  <button
+                    @click="classroomPanelData?.handleToggleDisplayMode?.()"
+                    class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition-colors"
+                    title="全屏显示"
+                  >
+                    全屏
+                  </button>
+                  <button
+                    @click="classroomPanelData?.handlePause?.()"
+                    class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition-colors"
+                    title="暂停课程"
+                  >
+                    ⏸️ 暂停
+                  </button>
+                  <button
+                    @click="classroomPanelData?.handleEnd?.()"
+                    class="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 rounded text-red-700 transition-colors"
+                    title="结束课程"
+                  >
+                    ⏹️ 结束
+                  </button>
+                </div>
+              </div>
+            </template>
+            
             <!-- 保存状态指示器 -->
             <div class="flex items-center gap-2 text-sm">
               <span v-if="saveStatus === 'saving'" class="text-gray-500 flex items-center gap-1">
@@ -227,7 +282,7 @@
 
             <!-- Cell 列表容器 -->
             <div ref="cellListRef" :class="isPreviewMode ? 'space-y-2' : 'space-y-4'">
-              <template v-for="(cell, index) in cells" :key="cell.id">
+              <template v-for="(cell, index) in displayCells" :key="cell.id">
                 <!-- 顶部添加按钮（第一个 Cell 前） -->
                 <div v-if="index === 0 && !isPreviewMode" class="add-cell-menu-container">
                   <AddCellMenu
@@ -466,9 +521,9 @@
             <div v-if="!slideMode" class="h-full overflow-y-auto bg-gray-50">
               <div class="w-full px-4 sm:px-6 lg:px-8 py-6">
                 <!-- Cell 列表 -->
-                <div v-if="cells.length > 0" class="space-y-4 max-w-none">
+                <div v-if="displayCells.length > 0" class="space-y-4 max-w-none">
                   <CellContainer
-                    v-for="(cell, index) in cells"
+                    v-for="(cell, index) in displayCells"
                     :key="cell.id"
                     :cell="cell"
                     :index="index"
@@ -537,7 +592,7 @@
               <!-- 全屏模式下的浮动控制按钮（自动隐藏） -->
               <Transition name="controls-fade">
                 <div 
-                  v-if="slideFullscreen && cells.length > 0 && showSlideControls" 
+                  v-if="slideFullscreen && displayCells.length > 0 && showSlideControls" 
                   class="fixed bottom-8 right-8 z-[9999] flex items-center gap-4 flex-shrink-0"
                   style="height: auto !important; width: auto !important; pointer-events: auto;"
                   @mouseenter="handleControlsMouseEnter"
@@ -563,17 +618,17 @@
                 <!-- 页码显示 -->
                 <div class="px-4 py-1.5 bg-white bg-opacity-90 rounded-full border border-gray-300 shadow-md min-w-[80px] text-center">
                   <span class="text-sm font-semibold text-gray-800">
-                    {{ currentSlideIndex + 1 }} / {{ cells.length }}
+                    {{ currentSlideIndex + 1 }} / {{ displayCells.length }}
                   </span>
                 </div>
 
                 <!-- 下一页按钮 -->
                 <button
                   @click="goToNextSlide"
-                  :disabled="currentSlideIndex >= cells.length - 1"
+                  :disabled="currentSlideIndex >= displayCells.length - 1"
                   :class="[
                     'w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md touch-manipulation',
-                    currentSlideIndex >= cells.length - 1
+                    currentSlideIndex >= displayCells.length - 1
                       ? 'bg-gray-100 bg-opacity-80 text-gray-400 cursor-not-allowed'
                       : 'bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-700 hover:shadow-lg border border-gray-300 active:scale-95',
                   ]"
@@ -602,7 +657,7 @@
 
           <!-- 底部导航栏（仅幻灯片模式显示，全屏模式下隐藏） -->
           <div
-            v-if="slideMode && cells.length > 0 && !slideFullscreen"
+            v-if="slideMode && displayCells.length > 0 && !slideFullscreen"
             class="bg-white border-t border-gray-200 flex-shrink-0 py-5 px-4"
           >
             <div class="flex items-center justify-center gap-8 max-w-4xl mx-auto">
@@ -734,6 +789,26 @@ const teacherControlPanelRef = ref<InstanceType<typeof TeacherClassroomControlPa
 
 // 从 TeacherControlPanel 获取 sessionId（使用 ref 存储，通过 watch 更新）
 const currentSessionId = ref<number | undefined>(undefined)
+
+// 从 TeacherControlPanel 获取导播台数据
+const classroomPanelData = computed(() => {
+  if (!isPreviewMode.value || !teacherControlPanelRef.value) {
+    return null
+  }
+  const panel = teacherControlPanelRef.value as any
+  return {
+    session: panel.session?.value,
+    activeStudents: panel.activeStudents?.value || [],
+    totalStudents: panel.totalStudents?.value || 0,
+    displayDuration: panel.displayDuration?.value || 0,
+    remainingTime: panel.remainingTime?.value || 0,
+    formatDuration: panel.formatDuration,
+    formatRemainingTime: panel.formatRemainingTime,
+    handleToggleDisplayMode: panel.handleToggleDisplayMode,
+    handlePause: panel.handlePause,
+    handleEnd: panel.handleEnd,
+  }
+})
 
 // 🔧 处理 TeacherControlPanel 的 session 变化事件
 function handleSessionChanged(session: any | null) {
@@ -1001,13 +1076,51 @@ const canEnterPreviewMode = computed(() => {
   return currentLesson.value?.status === 'published'
 })
 
+// 过滤Cells：在授课模式下只显示导播台选择的Cell
+const filteredCells = computed(() => {
+  if (!cells.value || cells.value.length === 0) return []
+  
+  // 如果不在授课模式，显示所有Cell
+  if (!isPreviewMode.value) {
+    return cells.value
+  }
+  
+  // 授课模式：根据导播台选择的 display_cell_orders 过滤
+  const session = providedSessionRef.value
+  if (session?.settings?.display_cell_orders) {
+    const displayOrders = session.settings.display_cell_orders
+    
+    // 如果 displayOrders 是空数组，返回空数组（隐藏所有Cell）
+    if (displayOrders.length === 0) {
+      return []
+    }
+    
+    // 根据 order 过滤
+    const filteredByOrders = cells.value.filter((cell, index) => {
+      const cellOrder = cell.order !== undefined ? cell.order : index
+      return displayOrders.includes(cellOrder)
+    })
+    
+    return filteredByOrders
+  }
+  
+  // 如果没有 display_cell_orders，显示所有Cell（兼容旧行为）
+  return cells.value
+})
+
+// 显示用的Cells：在授课模式下使用过滤后的cells，否则使用所有cells
+const displayCells = computed(() => {
+  return isPreviewMode.value ? filteredCells.value : cells.value
+})
+
 // 幻灯片模式：当前显示的Cell
 const currentCell = computed(() => {
-  if (!slideMode.value || cells.value.length === 0) {
+  const cellsToUse = isPreviewMode.value ? filteredCells.value : cells.value
+  if (!slideMode.value || cellsToUse.length === 0) {
     return null
   }
-  const index = Math.max(0, Math.min(currentSlideIndex.value, cells.value.length - 1))
-  return cells.value[index] || null
+  const index = Math.max(0, Math.min(currentSlideIndex.value, cellsToUse.length - 1))
+  return cellsToUse[index] || null
 })
 
 // 调试：输出课堂控制按钮的显示条件
@@ -1581,14 +1694,16 @@ function goToPreviousSlide() {
 
 // 幻灯片模式：下一页
 function goToNextSlide() {
-  if (currentSlideIndex.value < cells.value.length - 1) {
+  const cellsToUse = isPreviewMode.value ? filteredCells.value : cells.value
+  if (currentSlideIndex.value < cellsToUse.length - 1) {
     currentSlideIndex.value++
   }
 }
 
 // 幻灯片模式：跳转到指定页
 function goToSlide(index: number) {
-  const maxIndex = cells.value.length - 1
+  const cellsToUse = isPreviewMode.value ? filteredCells.value : cells.value
+  const maxIndex = cellsToUse.length - 1
   currentSlideIndex.value = Math.max(0, Math.min(index, maxIndex))
 }
 

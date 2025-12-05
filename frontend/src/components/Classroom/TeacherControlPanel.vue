@@ -6,9 +6,6 @@
       <div class="top-control-row">
         <div class="top-control-left">
           <h2 class="panel-title">InspireEd 教师导播台</h2>
-          <div v-if="lesson" class="lesson-info">
-            <span class="lesson-title">{{ lesson.title }}</span>
-          </div>
           <!-- 学生人数显示 -->
           <div v-if="session" class="student-count-info">
             <span class="student-count-icon">👥</span>
@@ -18,22 +15,35 @@
               <span class="student-count-label">人已进入</span>
             </span>
           </div>
+          <!-- 模块数量显示 -->
+          <div v-if="lesson && lesson.content" class="module-count-info">
+            <span class="module-count-icon">📚</span>
+            <span class="module-count-text">
+              <span class="module-count-value">{{ lesson.content.length }}</span>
+              <span class="module-count-label">个模块</span>
+            </span>
+          </div>
+          <!-- 课程时长显示 -->
+          <div v-if="session && session.status !== 'pending'" class="duration-info" :class="{ 
+            'duration-warning': remainingTime < 600, 
+            'duration-danger': remainingTime < 300 
+          }">
+            <span class="duration-icon">⏱️</span>
+            <span class="duration-text">
+              <span class="duration-value" :class="{
+                'text-blue-600': remainingTime >= 600,
+                'text-orange-600': remainingTime < 600 && remainingTime >= 300,
+                'text-red-600': remainingTime < 300
+              }">
+                {{ formatDuration(displayDuration) }}
+              </span>
+              <span v-if="session.status === 'active'" class="duration-remaining">
+                剩余: {{ formatRemainingTime(remainingTime) }}
+              </span>
+            </span>
+          </div>
         </div>
         <div class="header-controls">
-          <!-- 导播台全屏按钮 -->
-          <button 
-            @click="togglePanelFullscreen"
-            class="btn btn-fullscreen"
-            :title="isPanelFullscreen ? '退出全屏' : '全屏显示导播台'"
-          >
-            <svg v-if="!isPanelFullscreen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-            <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            <span class="ml-1">{{ isPanelFullscreen ? '退出全屏' : '全屏' }}</span>
-          </button>
         <!-- 没有会话时，显示"创建课堂"按钮 -->
         <button 
           v-if="!session"
@@ -137,144 +147,13 @@
         </template>
         </div>
       </div>
-      
-      <!-- 第二行：关键指标（上课中时显示） - 首页风格卡片 -->
-      <div v-if="session && session.status !== 'pending'" class="top-control-metrics">
-        <!-- 课程时长卡片 -->
-        <div 
-          class="metric-card metric-card-time group"
-          :class="{ 
-            'metric-warning': remainingTime < 600, 
-            'metric-danger': remainingTime < 300 
-          }"
-        >
-          <span class="metric-accent-bar bg-gradient-to-r from-blue-500 to-cyan-500"></span>
-          <div class="metric-card-content">
-            <div class="metric-card-header">
-              <div class="metric-header-text">
-                <p class="metric-card-label">已用时</p>
-                <h3 class="metric-card-title">课程时长</h3>
-              </div>
-              <div class="metric-icon-wrapper bg-gradient-to-br from-blue-100 to-cyan-100">
-                <span class="metric-icon-text">⏱️</span>
-              </div>
-            </div>
-            <div class="metric-card-value-group">
-              <span class="metric-card-value" :class="{
-                'text-blue-600': remainingTime >= 600,
-                'text-orange-600': remainingTime < 600 && remainingTime >= 300,
-                'text-red-600 animate-pulse': remainingTime < 300
-              }">
-                {{ formatDuration(displayDuration) }}
-              </span>
-            </div>
-            <p class="metric-card-description" v-if="session.status === 'active'">
-              剩余: {{ formatRemainingTime(remainingTime) }}
-            </p>
-          </div>
-        </div>
-        
-        <!-- 在线学生数卡片 -->
-        <div class="metric-card metric-card-student group">
-          <span class="metric-accent-bar bg-gradient-to-r from-emerald-500 to-teal-500"></span>
-          <div class="metric-card-content">
-            <div class="metric-card-header">
-              <div class="metric-header-text">
-                <p class="metric-card-label">在线学生</p>
-                <h3 class="metric-card-title">学生状态</h3>
-              </div>
-              <div class="metric-icon-wrapper bg-gradient-to-br from-emerald-100 to-teal-100">
-                <span class="metric-icon-text">👥</span>
-              </div>
-            </div>
-            <div class="metric-card-value-group">
-              <span class="metric-card-value text-emerald-600">
-                {{ activeStudents.length }}/{{ totalStudents }}
-              </span>
-            </div>
-            <p class="metric-card-description">
-              在线率: {{ totalStudents > 0 ? Math.round((activeStudents.length / totalStudents) * 100) : 0 }}%
-            </p>
-          </div>
-        </div>
-        
-        <!-- 平均进度卡片 -->
-        <div class="metric-card metric-card-progress group">
-          <span class="metric-accent-bar bg-gradient-to-r from-purple-500 to-pink-500"></span>
-          <div class="metric-card-content">
-            <div class="metric-card-header">
-              <div class="metric-header-text">
-                <p class="metric-card-label">平均进度</p>
-                <h3 class="metric-card-title">学习进度</h3>
-              </div>
-              <div class="metric-icon-wrapper bg-gradient-to-br from-purple-100 to-pink-100">
-                <span class="metric-icon-text">📊</span>
-              </div>
-            </div>
-            <div class="metric-card-value-group">
-              <span class="metric-card-value text-purple-600">
-                {{ Math.round(sessionStatistics?.average_progress || 0) }}%
-              </span>
-            </div>
-            <p class="metric-card-description">
-              参与度: {{ participationRate }}%
-            </p>
-          </div>
-        </div>
-        
-        <!-- 当前模块卡片 -->
-        <div class="metric-card metric-card-module group">
-          <span class="metric-accent-bar bg-gradient-to-r from-amber-500 to-orange-500"></span>
-          <div class="metric-card-content">
-            <div class="metric-card-header">
-              <div class="metric-header-text">
-                <p class="metric-card-label">当前模块</p>
-                <h3 class="metric-card-title">教学内容</h3>
-              </div>
-              <div class="metric-icon-wrapper bg-gradient-to-br from-amber-100 to-orange-100">
-                <span class="metric-icon-text">🎯</span>
-              </div>
-            </div>
-            <div class="metric-card-value-group">
-              <span class="metric-card-value-small text-amber-600">
-                {{ currentCell?.title || getCellTypeLabel(currentCell?.type) || '未选择' }}
-              </span>
-            </div>
-            <p class="metric-card-description" v-if="lesson && lesson.content">
-              模块 {{ getCurrentModuleIndex() + 1 }}/{{ lesson.content.length }}
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
     
     <!-- 主布局：左侧模块列表，右侧预览和监控 -->
     <div class="main-layout" :class="{ 'module-fullscreen-mode': modulePanelFullscreen }">
       <!-- 左侧：教学模块 -->
-      <div class="panel teaching-modules" :class="{ 'module-panel-fullscreen': modulePanelFullscreen }">
-        <div class="module-panel-header">
-          <div class="module-header-left">
-            <h3 class="panel-title">教学模块</h3>
-            <div class="module-count" v-if="lesson && lesson.content">
-              共 {{ lesson.content.length }} 个模块
-            </div>
-          </div>
-          <div class="module-header-actions">
-            <button 
-              @click="toggleModulePanelFullscreen"
-              class="module-action-btn"
-              :title="modulePanelFullscreen ? '退出全屏' : '全屏显示模块'"
-            >
-              <svg v-if="modulePanelFullscreen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="module-list" v-if="lesson && lesson.content && lesson.content.length > 0">
+      <div class="panel teaching-modules teaching-modules-fullwidth" :class="{ 'module-panel-fullscreen': modulePanelFullscreen }">
+        <div class="module-list" ref="moduleListRef" v-if="lesson && lesson.content && lesson.content.length > 0">
           <!-- 隐藏所有内容选项 -->
           <div 
             class="module-item module-item-hidden"
@@ -294,6 +173,8 @@
           <div 
             v-for="(cell, index) in lesson.content" 
             :key="cell.id || index"
+            :ref="el => setModuleItemRef(el, index)"
+            :data-module-index="index"
             class="module-item"
             :class="{
               'module-item-active': isModuleActive(cell, index),
@@ -302,10 +183,11 @@
             }"
             :title="loading ? '切换中，请稍候...' : getModuleTooltip(cell, index)"
           >
-            <!-- 复选框 -->
+            <!-- 单选框 -->
             <div class="module-item-checkbox" @click.stop="!loading && handleModuleCheckboxClick(cell, index, $event)">
               <input 
-                type="checkbox" 
+                type="radio" 
+                name="module-display-radio"
                 :checked="isModuleActive(cell, index)"
                 :disabled="loading"
                 @change.stop="!loading && handleModuleCheckboxChange(cell, index, $event)"
@@ -338,283 +220,12 @@
           <p>暂无课程模块</p>
         </div>
       </div>
-
-      <!-- 右侧：学生视图预览 -->
-      <div v-if="session && session.status !== 'pending' && displayCellOrders.length > 0" class="panel student-preview-panel">
-        <h3 class="panel-title">👁️ 学生视图</h3>
-        <div class="preview-content-compact">
-          <div 
-            v-for="(order, index) in displayCellOrders.slice(0, 3)" 
-            :key="`preview-${order}-${index}`"
-            class="preview-item-compact"
-          >
-            <div class="preview-item-header-compact">
-              <span class="preview-item-number">#{{ order + 1 }}</span>
-              <span class="preview-item-type-compact">{{ getCellTypeLabel(getCellByOrder(order)?.type || '') }}</span>
-            </div>
-            <div class="preview-item-title-compact">
-              {{ getCellByOrder(order) ? (getCellByOrder(order)!.title || getCellTypeLabel(getCellByOrder(order)!.type)) : `模块 ${order + 1}` }}
-            </div>
-            <div class="preview-item-body-compact">
-              <!-- 文本模块预览 -->
-              <div v-if="getCellByOrder(order)?.type === 'text'" class="preview-text-compact">
-                <div class="preview-thumbnail-wrapper">
-                  <div class="preview-thumbnail preview-thumbnail-text">
-                    <div class="preview-thumbnail-content">
-                      <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-                <div class="preview-text-snippet" v-html="getTextPreview(getCellByOrder(order)!, 60)"></div>
-              </div>
-              
-              <!-- 视频模块预览 -->
-              <div v-else-if="getCellByOrder(order)?.type === 'video'" class="preview-video-compact">
-                <div class="preview-thumbnail-wrapper">
-                  <div class="preview-thumbnail preview-thumbnail-video">
-                    <img 
-                      v-if="(getCellByOrder(order) as any)?.content?.thumbnail || (getCellByOrder(order) as any)?.thumbnail"
-                      :src="(getCellByOrder(order) as any)?.content?.thumbnail || (getCellByOrder(order) as any)?.thumbnail"
-                      :alt="(getCellByOrder(order) as any)?.content?.title || '视频'"
-                      class="preview-thumbnail-image"
-                      @error="handleThumbnailError"
-                    />
-                    <div v-else class="preview-thumbnail-content">
-                      <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-                <span class="preview-icon-label">{{ (getCellByOrder(order) as any)?.content?.title || '视频' }}</span>
-              </div>
-              
-              <!-- 代码模块预览 -->
-              <div v-else-if="getCellByOrder(order)?.type === 'code'" class="preview-code-compact">
-                <div class="preview-thumbnail-wrapper">
-                  <div class="preview-thumbnail preview-thumbnail-code">
-                    <div class="preview-thumbnail-content">
-                      <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-                <span class="preview-icon-label">代码内容</span>
-              </div>
-              
-              <!-- 活动模块预览 -->
-              <div v-else-if="getCellByOrder(order)?.type === 'activity'" class="preview-activity-compact">
-                <div class="preview-thumbnail-wrapper">
-                  <div class="preview-thumbnail preview-thumbnail-activity">
-                    <div class="preview-thumbnail-content">
-                      <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-                <span class="preview-icon-label">{{ (getCellByOrder(order) as any)?.content?.title || '活动' }}</span>
-              </div>
-              
-              <!-- 默认预览 -->
-              <div v-else class="preview-default-compact">
-                <div class="preview-thumbnail-wrapper">
-                  <div class="preview-thumbnail preview-thumbnail-default">
-                    <div class="preview-thumbnail-content">
-                      <CellTypeIcon :type="getCellByOrder(order)?.type || 'text'" class="preview-thumbnail-icon" />
-                    </div>
-                  </div>
-                </div>
-                <span class="preview-icon-label">{{ getCellTypeLabel(getCellByOrder(order)?.type || '') }}</span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 如果超过3个模块，显示更多提示 -->
-          <div v-if="displayCellOrders.length > 3" class="preview-item-compact preview-more-compact">
-            <div class="preview-more-content-compact">
-              <span class="preview-more-icon">+{{ displayCellOrders.length - 3 }}</span>
-              <span class="preview-more-text-compact">更多模块</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 监控模块：合并课堂监控和实时数据 -->
-      <div class="panel monitoring-module">
-        <h3 class="panel-title">📊 课堂监控</h3>
-        <div class="monitoring-module-content">
-          <!-- 上半部分：学生监控 -->
-          <div class="monitoring-students-section">
-            <!-- 学生状态指示器网格 -->
-            <div class="student-indicators">
-              <div 
-                v-for="(student, index) in displayStudents" 
-                :key="student.id || index"
-                class="indicator-item"
-                :class="{ 'student-behind': (student.progressPercentage || student.progress_percentage || 0) < 50 }"
-              >
-                <div 
-                  class="indicator-circle"
-                  :class="getStudentStatusClass(student)"
-                  :title="getStudentTooltip(student)"
-                ></div>
-                <div class="indicator-student-info">
-                  <div class="indicator-student-name">{{ student.studentName || student.student_name || `学生 ${index + 1}` }}</div>
-                  <div class="indicator-student-account">{{ getStudentAccount(student) }}</div>
-                  <div class="indicator-student-progress">
-                    <div class="indicator-progress-bar">
-                      <div 
-                        class="indicator-progress-fill" 
-                        :style="{ width: `${Math.round(student.progressPercentage || student.progress_percentage || 0)}%` }"
-                        :class="getStudentStatusClass(student)"
-                      ></div>
-                    </div>
-                    <span class="indicator-progress-text">{{ Math.round(student.progressPercentage || student.progress_percentage || 0) }}%</span>
-                  </div>
-                </div>
-              </div>
-              <div 
-                v-for="n in Math.max(0, 8 - displayStudents.length)"
-                :key="`empty-${n}`"
-                class="indicator-item"
-              >
-                <div class="indicator-circle indicator-empty"></div>
-                <div class="indicator-student-info">
-                  <div class="indicator-student-name indicator-empty-text">--</div>
-                  <div class="indicator-student-account indicator-empty-text">--</div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- 进度落后学生区域（预警） -->
-            <div v-if="studentsBehindCount > 0" class="students-behind-section">
-              <div class="student-list-header">
-                <span class="student-list-title">⚠️ 进度落后学生 ({{ studentsBehindCount }})</span>
-              </div>
-              <div class="student-list-content">
-                <div 
-                  v-for="(student, index) in activeStudents.filter(s => {
-                    const progress = s.progressPercentage || s.progress_percentage || 0
-                    return progress < 50
-                  })" 
-                  :key="student.id || `behind-${index}`"
-                  class="student-list-item student-behind"
-                  :class="getStudentStatusClass(student)"
-                >
-                  <div class="student-list-indicator"></div>
-                  <div class="student-list-info">
-                    <div class="student-list-name">{{ student.studentName || student.student_name || `学生 ${index + 1}` }}</div>
-                    <div class="student-list-account">
-                      {{ getStudentAccount(student) }}
-                    </div>
-                  </div>
-                  <div class="student-progress-bar-container">
-                    <div class="student-progress-bar">
-                      <div 
-                        class="student-progress-fill" 
-                        :style="{ width: `${Math.round(student.progressPercentage || student.progress_percentage || 0)}%` }"
-                        :class="getStudentStatusClass(student)"
-                      ></div>
-                    </div>
-                    <div class="student-list-progress">
-                      {{ Math.round(student.progressPercentage || student.progress_percentage || 0) }}%
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- 如果学生超过8个，显示更多学生列表 -->
-            <div v-if="activeStudents.length > 8" class="student-list-extra">
-              <div class="student-list-header">
-                <span class="student-list-title">更多学生 ({{ activeStudents.length - 8 }})</span>
-              </div>
-              <div class="student-list-content">
-                <div 
-                  v-for="(student, index) in activeStudents.slice(8)" 
-                  :key="student.id || `extra-${index}`"
-                  class="student-list-item"
-                  :class="getStudentStatusClass(student)"
-                >
-                  <div class="student-list-indicator"></div>
-                  <div class="student-list-info">
-                    <div class="student-list-name">{{ student.studentName || student.student_name || `学生 ${index + 9}` }}</div>
-                    <div class="student-list-account">
-                      {{ getStudentAccount(student) }}
-                    </div>
-                  </div>
-                  <div class="student-progress-bar-container">
-                    <div class="student-progress-bar">
-                      <div 
-                        class="student-progress-fill" 
-                        :style="{ width: `${Math.round(student.progressPercentage || student.progress_percentage || 0)}%` }"
-                        :class="getStudentStatusClass(student)"
-                      ></div>
-                    </div>
-                    <div class="student-list-progress">
-                      {{ Math.round(student.progressPercentage || student.progress_percentage || 0) }}%
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-else-if="activeStudents.length === 0" class="student-list-empty">
-              <p>暂无学生在线</p>
-            </div>
-          </div>
-          
-          <!-- 活动统计部分（当当前模块是活动类型时显示） -->
-          <div v-if="currentCell && currentCell.type === 'activity' && currentActivityDbCell" class="activity-statistics-section">
-            <div class="activity-stats-header">
-              <span class="activity-stats-title">📝 活动统计</span>
-              <span class="activity-stats-submission">
-                {{ activityStatistics.submittedCount }} / {{ activityStatistics.totalStudents }}
-              </span>
-              </div>
-              
-            <!-- 选择题选项分布 -->
-            <div v-if="choiceItemsWithStats.length > 0" class="activity-choice-stats">
-              <div 
-                v-for="itemStat in choiceItemsWithStats" 
-                :key="itemStat.itemId"
-                class="activity-choice-item"
-              >
-                <div class="activity-choice-header">
-                  <span class="activity-choice-order">第 {{ itemStat.order + 1 }} 题</span>
-                  <span class="activity-choice-type">{{ getItemTypeLabel(itemStat.type) }}</span>
-                </div>
-                <div class="activity-choice-options">
-                  <div 
-                    v-for="option in itemStat.options" 
-                    :key="option.id"
-                    class="activity-option-item"
-                    :class="{ 'is-correct': option.isCorrect }"
-                  >
-                    <span class="activity-option-label">{{ option.label }}</span>
-                    <span class="activity-option-percentage">{{ option.percentage }}%</span>
-                </div>
-              </div>
-                </div>
-                </div>
-            <div v-else-if="loadingActivityStats" class="activity-stats-loading">
-              <p>加载中...</p>
-              </div>
-            <div v-else class="activity-stats-empty">
-              <p>暂无选择题数据</p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, h, provide, defineExpose } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, h, provide, defineExpose, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import type { Lesson } from '../../types/lesson'
 import type { Cell, ActivityCell } from '../../types/cell'
@@ -628,22 +239,22 @@ import logger from '@/utils/logger'
 // Cell类型图标组件
 const CellTypeIcon = (props: { type: string }) => {
   const icons: Record<string, any> = {
-    text: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+    text: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
       h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M4 6h16M4 12h16M4 18h16' })
     ]),
-    code: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+    code: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
       h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' })
     ]),
-    activity: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+    activity: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
       h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' })
     ]),
-    video: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+    video: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
       h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' })
     ]),
-    flowchart: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+    flowchart: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
       h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7' })
     ]),
-    qa: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
+    qa: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
       h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
     ]),
   }
@@ -667,6 +278,8 @@ const emit = defineEmits<{
 const route = useRoute()
 const session = ref<any>(null)
 const containerRef = ref<HTMLElement | null>(null) // 用于检查组件是否在 DOM 中
+const moduleListRef = ref<HTMLElement | null>(null) // 模块列表容器
+const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map()) // 模块项引用
 
 // 🔧 提供 sessionId 给子组件（通过 provide/inject）
 provide('classroomSessionId', computed(() => session.value?.id))
@@ -972,6 +585,34 @@ function isModuleActivityActive(cell: Cell, index: number): boolean {
   return false
 }
 
+// 设置模块项引用
+function setModuleItemRef(el: any, index: number) {
+  if (el) {
+    // 处理 Vue 组件实例
+    const element = (el as any).$el || el
+    if (element instanceof HTMLElement) {
+      moduleItemRefs.value.set(index, element)
+    }
+  } else {
+    moduleItemRefs.value.delete(index)
+  }
+}
+
+// 滚动到选中的模块
+function scrollToSelectedModule() {
+  if (selectedCellIndex.value < 0 || !moduleListRef.value) return
+  
+  const moduleElement = moduleItemRefs.value.get(selectedCellIndex.value)
+  if (moduleElement) {
+    // 使用平滑滚动，将模块滚动到视口中心
+    moduleElement.scrollIntoView({ 
+      behavior: 'smooth', 
+      block: 'center',
+      inline: 'nearest'
+    })
+  }
+}
+
 // 处理模块项点击
 function handleModuleItemClick(cell: Cell, index: number) {
   if (loading.value) return
@@ -986,12 +627,30 @@ function handleModuleItemClick(cell: Cell, index: number) {
   handleControlBoardNavigate(cellId, cellOrder, action, false)
 }
 
-// 处理复选框点击（防止事件冒泡）
+// 处理单选框点击（防止事件冒泡，并处理取消选中）
 function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
   event.stopPropagation()
+  
+  if (loading.value) {
+    return
+  }
+  
+  const isCurrentlyActive = isModuleActive(cell, index)
+  
+  // 如果点击已选中的单选框，取消选中（隐藏所有内容）
+  if (isCurrentlyActive) {
+    event.preventDefault()
+    const target = event.target as HTMLElement
+    const radioInput = target.closest('.module-item-checkbox')?.querySelector('input[type="radio"]') as HTMLInputElement
+    if (radioInput) {
+      radioInput.checked = false
+      // 隐藏所有内容
+      handleControlBoardNavigate(null, null, 'toggle', false)
+    }
+  }
 }
 
-// 处理复选框变化
+// 处理单选框变化（单选模式：一次只显示一个内容）
 function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
   if (loading.value) {
     return
@@ -999,28 +658,24 @@ function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
   
   const target = event.target as HTMLInputElement
   const isChecked = target.checked
-  const isCurrentlyActive = isModuleActive(cell, index)
   
-  // 如果状态没有变化，不需要操作
-  if (isChecked === isCurrentlyActive) {
+  // 只处理选中新项的情况（取消选中已在 handleModuleCheckboxClick 中处理）
+  if (!isChecked) {
     return
   }
-  
-  // 确定操作类型：如果勾选则添加，否则移除
-  const action: 'add' | 'remove' = isChecked ? 'add' : 'remove'
   
   const cellId = getCellId(cell)
   const cellOrder = cell.order !== undefined ? cell.order : index
   
-  // 发送导航事件（多选模式）
+  // 选中新项（单选模式，multiSelect = false，会自动清除其他选中项）
   if (cellId && typeof cellId === 'string' && isUUID(cellId)) {
-    handleControlBoardNavigate(null, cellOrder, action, true)
+    handleControlBoardNavigate(null, cellOrder, 'toggle', false)
   } else {
     const numericId = toNumericId(cellId)
     if (numericId) {
-      handleControlBoardNavigate(numericId, null, action, true)
+      handleControlBoardNavigate(numericId, null, 'toggle', false)
     } else {
-      handleControlBoardNavigate(null, cellOrder, action, true)
+      handleControlBoardNavigate(null, cellOrder, 'toggle', false)
     }
   }
 }
@@ -1853,6 +1508,13 @@ async function handleControlBoardNavigate(
         }
       }
     }
+    
+    // 🆕 滚动到选中的模块
+    // 使用 nextTick 确保 DOM 已更新
+    await nextTick()
+    setTimeout(() => {
+      scrollToSelectedModule()
+    }, 100)
   } catch (error: any) {
     console.error('Failed to navigate from control board:', error)
     const errorMessage = error.response?.data?.detail || error.message || '切换内容失败'
@@ -1968,6 +1630,18 @@ watch(() => session.value?.status, (status, oldStatus) => {
   }
 }, { immediate: true })
 
+// 监听 selectedCellIndex 变化，自动滚动到对应模块
+watch(selectedCellIndex, (newIndex, oldIndex) => {
+  if (newIndex >= 0 && newIndex !== oldIndex) {
+    // 延迟滚动，确保 DOM 已更新
+    nextTick(() => {
+      setTimeout(() => {
+        scrollToSelectedModule()
+      }, 150)
+    })
+  }
+})
+
 // 监听session变化，更新selectedCellIndex和displayCellIds
 watch(() => session.value, (newSession) => {
   if (!props.lesson?.content || !newSession) return
@@ -1979,7 +1653,12 @@ watch(() => session.value, (newSession) => {
     
     // 如果有选中的 orders，使用第一个的索引
     if (orders.length > 0) {
-      selectedCellIndex.value = orders[0]
+      // 🆕 通过 order 查找对应的数组索引
+      const index = props.lesson.content.findIndex((cell, idx) => {
+        const cellOrder = cell.order !== undefined ? cell.order : idx
+        return cellOrder === orders[0]
+      })
+      selectedCellIndex.value = index >= 0 ? index : orders[0]
       return
     }
   }
@@ -2202,6 +1881,15 @@ onUnmounted(() => {
 defineExpose({
   session,
   sessionId: computed(() => session.value?.id),
+  activeStudents,
+  totalStudents,
+  displayDuration,
+  remainingTime,
+  formatDuration,
+  formatRemainingTime,
+  handleToggleDisplayMode,
+  handlePause,
+  handleEnd,
   // 添加调试日志
   getSessionId: () => {
     const id = session.value?.id
@@ -2225,6 +1913,9 @@ defineExpose({
   min-height: auto;
   position: relative;
   width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 /* 导播台全屏模式 */
@@ -2257,17 +1948,11 @@ defineExpose({
 }
 
 .teacher-control-panel.panel-fullscreen .teaching-modules {
-  height: calc(100vh - 320px) !important;
-  min-height: 700px !important;
-  max-height: calc(100vh - 320px) !important;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
 }
 
-.teacher-control-panel.panel-fullscreen .monitoring-module {
-  height: calc(100vh - 320px);
-  min-height: 600px;
-  max-height: calc(100vh - 320px);
-  overflow-y: auto;
-}
 
 /* 🎯 优化后的顶部控制栏 */
 .top-control-bar {
@@ -2329,17 +2014,85 @@ defineExpose({
   margin-left: 2px;
 }
 
+.module-count-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  @apply bg-blue-50 border border-blue-200 rounded-lg;
+  margin-left: 16px;
+}
+
+.module-count-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.module-count-text {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  @apply text-sm font-medium;
+}
+
+.module-count-value {
+  @apply text-blue-700 font-bold text-base;
+}
+
+.module-count-label {
+  @apply text-blue-600;
+  margin-left: 2px;
+}
+
+.duration-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  @apply bg-blue-50 border border-blue-200 rounded-lg;
+  margin-left: 16px;
+}
+
+.duration-info.duration-warning {
+  @apply bg-orange-50 border-orange-200;
+}
+
+.duration-info.duration-danger {
+  @apply bg-red-50 border-red-200;
+}
+
+.duration-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.duration-text {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  @apply text-sm font-medium;
+  flex-wrap: wrap;
+}
+
+.duration-value {
+  @apply font-bold text-base;
+}
+
+.duration-remaining {
+  @apply text-gray-600 text-xs;
+}
+
 /* 关键指标行 - 首页风格卡片 */
 .top-control-metrics {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  padding: 20px 24px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 12px 16px;
   @apply bg-gray-50 border-t border-gray-200;
   overflow-x: auto;
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 1200px) {
   .top-control-metrics {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -2355,7 +2108,7 @@ defineExpose({
 .metric-card {
   position: relative;
   overflow: hidden;
-  @apply rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg;
+  @apply rounded-xl border border-gray-100 bg-white/80 backdrop-blur-sm p-4 shadow-md;
   transition: all 0.3s ease;
   transform: translateY(0);
 }
@@ -2370,21 +2123,21 @@ defineExpose({
   left: 0;
   right: 0;
   top: 0;
-  height: 4px;
+  height: 3px;
 }
 
 .metric-card-content {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .metric-card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .metric-header-text {
@@ -2394,27 +2147,27 @@ defineExpose({
 
 .metric-card-label {
   @apply text-xs font-semibold uppercase tracking-wide text-gray-500;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .metric-card-title {
-  @apply text-base font-bold text-gray-900;
-  line-height: 1.3;
+  @apply text-sm font-bold text-gray-900;
+  line-height: 1.2;
 }
 
 .metric-icon-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
 }
 
 .metric-icon-text {
-  font-size: 24px;
+  font-size: 18px;
   line-height: 1;
 }
 
@@ -2422,17 +2175,17 @@ defineExpose({
   display: flex;
   align-items: baseline;
   gap: 4px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .metric-card-value {
-  @apply text-3xl font-bold;
+  @apply text-2xl font-bold;
   line-height: 1;
 }
 
 .metric-card-value-small {
-  @apply text-xl font-bold;
-  line-height: 1.3;
+  @apply text-base font-bold;
+  line-height: 1.2;
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2440,9 +2193,9 @@ defineExpose({
 }
 
 .metric-card-description {
-  @apply text-sm text-gray-600;
-  margin-top: 4px;
-  line-height: 1.4;
+  @apply text-xs text-gray-600;
+  margin-top: 2px;
+  line-height: 1.3;
 }
 
 /* 警告和危险状态 */
@@ -2950,215 +2703,66 @@ defineExpose({
   gap: 12px;
 }
 
-/* 主布局 - 三栏：左侧模块列表，中间预览，右侧监控模块 */
+/* 主布局 - 单栏：仅显示教学模块 */
 .main-layout {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 2fr;
-  gap: 20px;
-  margin-bottom: 24px;
-  padding: 24px;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 16px;
   position: relative;
   align-items: start;
-  min-height: calc(100vh - 350px);
-}
-
-/* 学生预览面板 */
-.student-preview-panel {
-  height: calc(100vh - 320px);
-  min-height: 500px;
-  max-height: calc(100vh - 320px);
-  display: flex;
-  flex-direction: column;
+  min-height: auto;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
-.student-preview-panel .panel-title {
-  flex-shrink: 0;
-}
-
-.preview-content-compact {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-/* 监控模块：合并的课堂监控和实时数据 */
-.monitoring-module {
-  min-height: 400px;
-  max-height: calc(100vh - 320px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.monitoring-module .panel-title {
-  flex-shrink: 0;
-}
-
-.monitoring-module-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  overflow: hidden;
-  min-height: 0;
-}
-
-.monitoring-module-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.monitoring-module-content::-webkit-scrollbar-track {
-  @apply bg-gray-100;
-  border-radius: 3px;
-}
-
-.monitoring-module-content::-webkit-scrollbar-thumb {
-  @apply bg-gray-300;
-  border-radius: 3px;
-}
-
-.monitoring-module-content::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
-}
-
-.monitoring-students-section {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-  gap: 12px;
-}
-
-.monitoring-students-section::-webkit-scrollbar {
-  width: 6px;
-}
-
-.monitoring-students-section::-webkit-scrollbar-track {
-  @apply bg-gray-100;
-  border-radius: 3px;
-}
-
-.monitoring-students-section::-webkit-scrollbar-thumb {
-  @apply bg-gray-300;
-  border-radius: 3px;
-}
-
-.monitoring-students-section::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
-}
-
-.monitoring-divider {
-  height: 1px;
-  @apply bg-gray-200;
-  margin: 12px 0 8px 0;
-  flex-shrink: 0;
-}
-
-.monitoring-stats-section {
-  flex: 0 0 auto;
-  min-height: 180px;
-  padding-top: 12px;
-  background: white;
-}
-
-.stats-section-title {
-  @apply text-sm font-semibold text-gray-700 mb-3;
-}
-
-.stats-grid-compact {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-.stat-card-compact {
-  @apply bg-gray-50 border border-gray-200 rounded-lg p-3;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: all 0.2s ease;
-}
-
-.stat-card-compact:hover {
-  @apply bg-gray-100 border-gray-300 shadow-sm;
-}
-
-.stat-icon-compact {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  @apply bg-white border border-gray-200 rounded-lg;
-  flex-shrink: 0;
-  @apply text-gray-600;
-}
-
-.stat-icon-red {
-  @apply text-red-600;
-}
-
-.stat-icon-green {
-  @apply text-green-600;
-}
-
-.stat-icon-blue {
-  @apply text-blue-600;
-}
-
-.stat-content-compact {
-  flex: 1;
+/* 确保教学模块面板能够正常显示 */
+.main-layout .teaching-modules {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: visible;
+  box-sizing: border-box;
+  /* 确保面板占据全宽 */
+  flex: 1 1 100%;
+  /* 确保在 grid 中占据全宽 */
+  grid-column: 1 / -1;
   min-width: 0;
-}
-
-.stat-label-compact {
-  @apply text-xs text-gray-600 mb-1;
-}
-
-.stat-value-compact {
-  @apply text-base font-bold text-gray-900;
 }
 
 /* 模块面板全屏模式时的布局 */
 .main-layout.module-fullscreen-mode {
-  grid-template-columns: 1fr 0fr 0fr !important;
-}
-
-.main-layout.module-fullscreen-mode .student-preview-panel,
-.main-layout.module-fullscreen-mode .monitoring-module {
-  display: none;
-}
-
-/* 模块面板全屏模式 */
-/* 模块面板全屏模式 */
-.main-layout.module-fullscreen-mode {
-  grid-template-columns: 1fr 0fr 0fr !important;
+  grid-template-columns: 1fr !important;
   transition: grid-template-columns 0.3s ease;
 }
 
-/* 全屏模式下监控模块隐藏已在上面的规则中处理 */
-
 .main-layout.module-fullscreen-mode .teaching-modules {
-  height: calc(100vh - 280px) !important;
-  min-height: 700px !important;
-  max-height: calc(100vh - 280px) !important;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
 }
 
 /* 通用面板样式 */
 .panel {
-  @apply bg-white rounded-lg border border-gray-200 p-6;
+  @apply bg-white rounded-lg border border-gray-200 p-4;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow: visible;
+  /* 确保面板占据全宽 */
+  flex: 1 1 100%;
+  min-width: 0;
 }
 
 .panel h3.panel-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   @apply text-gray-900;
-  margin: 0 0 20px 0;
-  padding-bottom: 12px;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
   @apply border-b border-gray-200;
 }
 
@@ -3166,10 +2770,24 @@ defineExpose({
 .teaching-modules {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 320px);
-  min-height: 500px;
-  max-height: calc(100vh - 320px);
-  overflow: hidden;
+  height: auto;
+  min-height: auto;
+  max-height: none;
+  overflow: visible;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  /* 确保占据全宽 */
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+/* 教学模块全宽模式 - 减少 padding 以充分利用空间 */
+.teaching-modules-fullwidth {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
 }
 
 .module-panel-fullscreen {
@@ -3182,8 +2800,8 @@ defineExpose({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
   @apply border-b border-gray-200;
   flex-shrink: 0;
 }
@@ -3224,70 +2842,94 @@ defineExpose({
 
 .module-list {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding-right: 8px;
-  flex: 1;
+  padding-bottom: 8px;
+  flex: 0 0 auto;
   min-height: 0;
+  align-items: stretch;
+  height: fit-content;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  /* 确保滚动条在容器内 */
+  scrollbar-gutter: stable;
+  /* 确保子元素不会被压缩 */
+  min-width: 0;
+  /* 确保内容不会被压缩 */
+  align-content: flex-start;
+  /* 确保列表占据全宽 */
+  flex-grow: 1;
 }
 
 .module-list::-webkit-scrollbar {
-  width: 6px;
+  height: 8px;
 }
 
 .module-list::-webkit-scrollbar-track {
   @apply bg-gray-100;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 .module-list::-webkit-scrollbar-thumb {
-  @apply bg-gray-300;
-  border-radius: 3px;
+  @apply bg-gray-400;
+  border-radius: 4px;
 }
 
 .module-list::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
+  @apply bg-gray-500;
 }
 
 .module-item {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
-  padding-right: 60px; /* 为复选框预留空间 */
-  @apply bg-white border-2 border-gray-200 rounded-xl;
+  gap: 8px;
+  padding: 10px 12px;
+  padding-right: 50px; /* 为单选框预留空间 */
+  @apply bg-white border-2 border-gray-200 rounded-lg;
   cursor: pointer;
   transition: all 0.3s ease;
-  min-height: 80px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  min-height: 60px;
+  height: 60px;
+  min-width: 180px;
+  width: 180px;
+  flex: 0 0 180px;
   flex-shrink: 0;
+  flex-grow: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  /* 防止内容被压缩 */
+  box-sizing: border-box;
 }
 
 /* 全屏模式下模块项可以更大 */
 .module-panel-fullscreen .module-item {
-  min-height: 100px;
-  padding: 20px;
-  gap: 16px;
+  min-height: 70px;
+  height: 70px;
+  padding: 12px 14px;
+  gap: 10px;
 }
 
 .module-panel-fullscreen .module-item-icon {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
 }
 
 .module-panel-fullscreen .module-item-title {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .module-panel-fullscreen .module-item-subtitle {
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .module-item:hover:not(.module-item-disabled) {
   @apply border-gray-300 shadow-lg;
-  transform: translateX(4px);
+  transform: translateY(-2px);
 }
 
 .module-item-disabled {
@@ -3347,7 +2989,7 @@ defineExpose({
 /* 激活状态 */
 .module-item-active {
   @apply shadow-xl ring-4 ring-offset-2;
-  transform: translateX(4px) scale(1.02);
+  transform: translateY(-2px) scale(1.02);
   z-index: 10;
 }
 
@@ -3402,6 +3044,24 @@ defineExpose({
 
 .module-item-hidden {
   @apply bg-orange-50 border-orange-200;
+  /* 隐藏按钮使用更紧凑的宽度 */
+  min-width: 100px;
+  width: 100px;
+  flex: 0 0 100px;
+  padding: 10px 8px;
+  justify-content: center;
+  gap: 6px;
+}
+
+.module-item-hidden .module-item-icon {
+  flex-shrink: 0;
+}
+
+.module-item-hidden .module-item-label {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .module-item-hidden:hover:not(.module-item-disabled) {
@@ -3417,13 +3077,14 @@ defineExpose({
 }
 
 .module-item-number {
-  @apply absolute -top-3 -left-3 w-7 h-7 rounded-full;
+  @apply absolute -top-2 -left-2 w-6 h-6 rounded-full;
   @apply flex items-center justify-center text-xs font-bold;
   @apply bg-white border-2 border-gray-300 text-gray-700;
-  @apply shadow-md;
+  @apply shadow-sm;
   z-index: 2;
   transition: all 0.3s ease;
   flex-shrink: 0;
+  font-size: 11px;
 }
 
 .module-item-type-video .module-item-number {
@@ -3454,9 +3115,9 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  @apply bg-white border border-gray-200 rounded-lg;
+  width: 32px;
+  height: 32px;
+  @apply bg-white border border-gray-200 rounded-md;
   flex-shrink: 0;
   transition: all 0.3s ease;
 }
@@ -3502,25 +3163,27 @@ defineExpose({
 }
 
 .module-item-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   @apply text-gray-800;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: all 0.3s ease;
   max-width: 100%; /* 确保不超过容器 */
+  line-height: 1.3;
 }
 
 .module-item-subtitle {
-  font-size: 12px;
+  font-size: 11px;
   @apply text-gray-500;
   transition: all 0.3s ease;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%; /* 确保不超过容器 */
+  line-height: 1.2;
 }
 
 .module-item-active .module-item-title,
@@ -3531,27 +3194,27 @@ defineExpose({
 
 .module-item-activity-badge {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
-  padding: 4px 8px;
+  bottom: 6px;
+  right: 6px;
+  padding: 2px 6px;
   @apply bg-purple-500 text-white rounded-full;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   white-space: nowrap;
   animation: pulse-badge 2s infinite;
 }
 
-/* 复选框样式 */
+/* 单选框样式 */
 .module-item-checkbox {
-  @apply absolute bottom-3 right-3 z-10;
-  @apply bg-white rounded-lg shadow-md p-1.5;
+  @apply absolute bottom-2 right-2 z-10;
+  @apply bg-white rounded-md shadow-sm p-1;
   transition: all 0.3s ease;
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 28px;
+  min-height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 确保复选框不会遮挡内容 */
+  /* 确保单选框不会遮挡内容 */
   pointer-events: auto;
 }
 
@@ -3561,8 +3224,8 @@ defineExpose({
 }
 
 .checkbox-input {
-  @apply w-6 h-6 cursor-pointer;
-  @apply border-2 border-gray-400 rounded;
+  @apply w-5 h-5 cursor-pointer;
+  @apply border-2 border-gray-400 rounded-full;
   @apply focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
   transition: all 0.2s ease;
   flex-shrink: 0;
@@ -4112,13 +3775,13 @@ defineExpose({
   }
   
   .panel {
-    padding: 20px;
+    padding: 16px;
   }
   
   .teaching-modules {
     height: auto;
-    min-height: 400px;
-    max-height: 600px;
+    min-height: auto;
+    max-height: none;
   }
 }
 
@@ -4132,6 +3795,13 @@ defineExpose({
   .header-controls {
     width: 100%;
     flex-wrap: wrap;
+  }
+  
+  .module-item {
+    min-width: 180px;
+    width: 180px;
+    flex: 0 0 180px;
+    flex-shrink: 0;
   }
   
   .module-buttons {
@@ -4497,15 +4167,6 @@ defineExpose({
     gap: 16px;
   }
   
-  .student-preview-panel,
-  .monitoring-module {
-    height: auto;
-    max-height: 600px;
-  }
-  
-  .monitoring-module-content {
-    max-height: 500px;
-  }
 }
 
 @media (max-width: 768px) {
@@ -4520,6 +4181,13 @@ defineExpose({
   
   .stats-grid-compact {
     grid-template-columns: 1fr;
+  }
+  
+  .module-item {
+    min-width: 180px;
+    width: 180px;
+    flex: 0 0 180px;
+    flex-shrink: 0;
   }
 }
 

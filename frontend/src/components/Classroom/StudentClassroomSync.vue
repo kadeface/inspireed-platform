@@ -17,48 +17,12 @@
       </div>
     </div>
     
-    <!-- ACTIVE 状态：正在上课 -->
-    <div v-else-if="session.status === 'active'" class="classroom-banner">
-      <div class="banner-content">
-        <span class="live-indicator"></span>
-        <div class="banner-text">
-          <div class="banner-title">🎓 正在上课</div>
-          <div class="banner-subtitle">
-            {{ session.lessonTitle || '课程' }} · 
-            <span class="teacher-name">授课教师：{{ session.teacherName }}</span>
-          </div>
-        </div>
-        <button
-          @click="handleExitClassroom"
-          class="exit-button"
-          :disabled="isExiting"
-          title="退出上课"
-        >
-          <svg v-if="!isExiting" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-          <span v-else class="exit-loading">退出中...</span>
-        </button>
-      </div>
-      
-      <!-- 同步状态 -->
-      <div v-if="isSyncing" class="sync-status">
-        <span class="sync-icon">🔄</span>
-        <span>教师正在切换内容...</span>
-      </div>
+    <!-- ACTIVE 状态：同步状态提示 -->
+    <div v-else-if="session.status === 'active' && isSyncing" class="sync-status-banner">
+      <span class="sync-icon">🔄</span>
+      <span>教师正在切换内容...</span>
     </div>
 
-    <!-- 课堂信息 -->
-    <div v-if="session.status === 'active'" class="classroom-info">
-      <div class="info-item">
-        <span class="info-label">在线学生</span>
-        <span class="info-value">{{ session.activeStudents }} / {{ session.totalStudents }}</span>
-      </div>
-      <div v-if="sessionDuration" class="info-item">
-        <span class="info-label">已进行</span>
-        <span class="info-value">{{ formatDuration(sessionDuration) }}</span>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -266,6 +230,10 @@ onUnmounted(() => {
 
 .sync-status {
   @apply mt-4 pt-4 border-t border-emerald-300/50 flex items-center gap-2 text-sm text-emerald-50 font-medium;
+}
+
+.sync-status-banner {
+  @apply bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white rounded-xl p-4 shadow-lg shadow-emerald-500/30 flex items-center gap-2 text-sm font-medium;
 }
 
 .sync-icon {

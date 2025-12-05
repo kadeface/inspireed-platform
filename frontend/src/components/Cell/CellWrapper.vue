@@ -66,7 +66,7 @@
     <div :class="{ 'pointer-events-none opacity-30': isLocked }">
       <!-- Cell 头部信息栏 -->
       <div :class="[
-        'flex items-center justify-between mb-3 p-4 md:p-6 rounded-t-lg',
+        'flex items-center justify-between mb-3 px-4 py-2 md:px-6 md:py-3 rounded-t-lg',
         getStageBgClass(cellIndex),
         getStageBorderClass(cellIndex)
       ]">
@@ -90,7 +90,7 @@
         <!-- 掌握度状态 -->
         <div class="flex items-center gap-2">
           <!-- 掌握度百分比 -->
-          <div class="text-right mr-2">
+          <div class="text-right mr-2 flex items-center gap-1">
             <div class="text-xs text-gray-500">掌握度</div>
             <div 
               :class="[
