@@ -1,218 +1,294 @@
 <template>
-  <div class="subject-groups-page p-6">
-    <!-- 页面标题和操作栏 -->
-    <div class="flex justify-between items-center mb-6">
-      <div>
-        <h1 class="text-3xl font-bold text-gray-900">学科教研组</h1>
-        <p class="text-gray-600 mt-2">与同事协作，共享优质教学设计</p>
-      </div>
-      <button
-        @click="showCreateModal = true"
-        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-      >
-        <i class="fas fa-plus mr-2"></i>创建教研组
-      </button>
-    </div>
-
-    <!-- 统计卡片 -->
-    <div v-if="statistics" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-      <div class="bg-white rounded-lg shadow p-4">
-        <div class="text-gray-500 text-sm">全部教研组</div>
-        <div class="text-2xl font-bold text-gray-900 mt-1">
-          {{ statistics.total_groups }}
-        </div>
-      </div>
-      <div class="bg-white rounded-lg shadow p-4">
-        <div class="text-gray-500 text-sm">我的教研组</div>
-        <div class="text-2xl font-bold text-blue-600 mt-1">
-          {{ statistics.my_groups }}
-        </div>
-      </div>
-      <div class="bg-white rounded-lg shadow p-4">
-        <div class="text-gray-500 text-sm">总成员数</div>
-        <div class="text-2xl font-bold text-gray-900 mt-1">
-          {{ statistics.total_members }}
-        </div>
-      </div>
-      <div class="bg-white rounded-lg shadow p-4">
-        <div class="text-gray-500 text-sm">共享教学设计</div>
-        <div class="text-2xl font-bold text-gray-900 mt-1">
-          {{ statistics.total_shared_lessons }}
-        </div>
-      </div>
-      <div class="bg-white rounded-lg shadow p-4">
-        <div class="text-gray-500 text-sm">我的分享</div>
-        <div class="text-2xl font-bold text-green-600 mt-1">
-          {{ statistics.my_shared_lessons }}
-        </div>
-      </div>
-    </div>
-
-    <!-- 筛选器 -->
-    <div class="bg-white rounded-lg shadow p-4 mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">学科</label>
-          <select
-            v-model="filters.subject_id"
-            @change="loadGroups"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option :value="undefined">全部学科</option>
-            <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
-              {{ subject.name }}
-            </option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">年级</label>
-          <select
-            v-model="filters.grade_id"
-            @change="loadGroups"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option :value="undefined">全部年级</option>
-            <option v-for="grade in grades" :key="grade.id" :value="grade.id">
-              {{ grade.name }}
-            </option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">范围</label>
-          <select
-            v-model="filters.scope"
-            @change="loadGroups"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option :value="undefined">全部范围</option>
-            <option value="school">校级</option>
-            <option value="region">区域级</option>
-            <option value="national">全国级</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">类型</label>
-          <select
-            v-model="filters.is_public"
-            @change="loadGroups"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option :value="undefined">全部类型</option>
-            <option :value="true">公开</option>
-            <option :value="false">私密</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">我的教研组</label>
-          <div class="flex items-center h-10">
-            <input
-              type="checkbox"
-              v-model="filters.my_groups"
-              @change="loadGroups"
-              class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <span class="ml-2 text-gray-700">仅显示我加入的教研组</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 教研组列表 -->
-    <div v-if="loading" class="text-center py-12">
-      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      <p class="text-gray-600 mt-4">加载中...</p>
-    </div>
-
-    <div v-else-if="groups.length === 0" class="bg-white rounded-lg shadow p-12 text-center">
-      <i class="fas fa-users text-gray-400 text-6xl mb-4"></i>
-      <p class="text-gray-600 text-lg">暂无教研组</p>
-      <button
-        @click="showCreateModal = true"
-        class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-      >
-        创建第一个教研组
-      </button>
-    </div>
-
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div
-        v-for="group in groups"
-        :key="group.id"
-        @click="viewGroupDetail(group.id)"
-        class="bg-white rounded-lg shadow hover:shadow-lg transition cursor-pointer"
-      >
-        <div
-          v-if="group.cover_image_url"
-          class="h-40 bg-cover bg-center rounded-t-lg"
-          :style="{ backgroundImage: `url(${group.cover_image_url})` }"
-        ></div>
-        <div v-else class="h-40 bg-gradient-to-br from-blue-500 to-purple-600 rounded-t-lg"></div>
-        
-        <div class="p-4">
-          <div class="flex items-start justify-between mb-2">
-            <h3 class="text-xl font-bold text-gray-900 flex-1">{{ group.name }}</h3>
-            <span
-              v-if="group.user_role"
-              :class="getRoleBadgeClass(group.user_role)"
-              class="px-2 py-1 text-xs rounded-full ml-2"
+  <div class="subject-groups-page min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50">
+    <!-- 统一头部 -->
+    <DashboardHeader
+      title="学科教研组"
+      subtitle="与同事协作，共享优质教学设计"
+      :user-name="userName"
+      :region-name="regionName"
+      :school-name="schoolName"
+      :grade-name="gradeName"
+      @logout="handleLogout"
+    >
+        <template #default>
+          <div class="flex items-center gap-3 flex-wrap">
+            <button
+              @click="handleBackToDashboard"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl hover:bg-white hover:shadow-md transition-all"
+              title="返回教师工作台"
             >
-              {{ getRoleLabel(group.user_role) }}
-            </span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+              </svg>
+              返回工作台
+            </button>
+            <button
+              @click="showCreateModal = true"
+              class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl hover:from-emerald-600 hover:to-teal-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transform hover:scale-105"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              创建教研组
+            </button>
           </div>
-          
-          <p class="text-gray-600 text-sm mb-3 line-clamp-2">
-            {{ group.description || '暂无描述' }}
-          </p>
-          
-          <div class="flex items-center text-sm text-gray-500 space-x-4 mb-3">
-            <span><i class="fas fa-book mr-1"></i>{{ group.subject_name }}</span>
-            <span><i class="fas fa-globe mr-1"></i>{{ getScopeLabel(group.scope) }}</span>
+        </template>
+      </DashboardHeader>
+
+    <!-- 主内容区 -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- 统计卡片 -->
+      <div v-if="statistics" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
+        <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cyan-500 to-blue-600"></span>
+          <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-cyan-50/80 via-transparent to-transparent"></div>
+          <div class="relative">
+            <p class="text-xs uppercase tracking-wide text-cyan-600 font-semibold mb-1">全部教研组</p>
+            <p class="text-3xl font-bold text-gray-900 mb-2">
+              {{ statistics.total_groups }}
+            </p>
           </div>
-          
-          <div class="flex items-center justify-between text-sm text-gray-500 pt-3 border-t">
-            <div class="flex items-center space-x-4">
-              <span><i class="fas fa-users mr-1"></i>{{ group.member_count }} 成员</span>
-              <span><i class="fas fa-file-alt mr-1"></i>{{ group.lesson_count }} 教案</span>
-            </div>
-            <span v-if="group.is_public" class="text-green-600">
-              <i class="fas fa-lock-open mr-1"></i>公开
-            </span>
+        </div>
+        <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600"></span>
+          <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-emerald-50/80 via-transparent to-transparent"></div>
+          <div class="relative">
+            <p class="text-xs uppercase tracking-wide text-emerald-600 font-semibold mb-1">我的教研组</p>
+            <p class="text-3xl font-bold text-gray-900 mb-2">
+              {{ statistics.my_groups }}
+            </p>
+          </div>
+        </div>
+        <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-violet-500 to-purple-600"></span>
+          <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-violet-50/80 via-transparent to-transparent"></div>
+          <div class="relative">
+            <p class="text-xs uppercase tracking-wide text-violet-600 font-semibold mb-1">总成员数</p>
+            <p class="text-3xl font-bold text-gray-900 mb-2">
+              {{ statistics.total_members }}
+            </p>
+          </div>
+        </div>
+        <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-600"></span>
+          <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-amber-50/80 via-transparent to-transparent"></div>
+          <div class="relative">
+            <p class="text-xs uppercase tracking-wide text-amber-600 font-semibold mb-1">共享教学设计</p>
+            <p class="text-3xl font-bold text-gray-900 mb-2">
+              {{ statistics.total_shared_lessons }}
+            </p>
+          </div>
+        </div>
+        <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+          <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-green-500 to-emerald-600"></span>
+          <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-green-50/80 via-transparent to-transparent"></div>
+          <div class="relative">
+            <p class="text-xs uppercase tracking-wide text-green-600 font-semibold mb-1">我的分享</p>
+            <p class="text-3xl font-bold text-gray-900 mb-2">
+              {{ statistics.my_shared_lessons }}
+            </p>
           </div>
         </div>
       </div>
+
+      <!-- 筛选器 -->
+      <div class="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-lg p-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">学科</label>
+            <select
+              v-model="filters.subject_id"
+              @change="loadGroups"
+              class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+            >
+              <option :value="undefined">全部学科</option>
+              <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+                {{ subject.name }}
+              </option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">年级</label>
+            <select
+              v-model="filters.grade_id"
+              @change="loadGroups"
+              class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+            >
+              <option :value="undefined">全部年级</option>
+              <option v-for="grade in grades" :key="grade.id" :value="grade.id">
+                {{ grade.name }}
+              </option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">范围</label>
+            <select
+              v-model="filters.scope"
+              @change="loadGroups"
+              class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+            >
+              <option :value="undefined">全部范围</option>
+              <option value="school">校级</option>
+              <option value="region">区域级</option>
+              <option value="national">全国级</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">类型</label>
+            <select
+              v-model="filters.is_public"
+              @change="loadGroups"
+              class="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+            >
+              <option :value="undefined">全部类型</option>
+              <option :value="true">公开</option>
+              <option :value="false">私密</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">我的教研组</label>
+            <div class="flex items-center h-10">
+              <input
+                type="checkbox"
+                v-model="filters.my_groups"
+                @change="loadGroups"
+                class="w-4 h-4 text-emerald-600 rounded focus:ring-2 focus:ring-emerald-500"
+              />
+              <span class="ml-2 text-sm text-gray-700">仅显示我加入的教研组</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 教研组列表 -->
+      <div v-if="loading" class="flex items-center justify-center py-16 text-gray-500 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mr-3"></div>
+        <span class="text-sm font-medium">加载中...</span>
+      </div>
+
+      <div v-else-if="groups.length === 0" class="bg-white/80 backdrop-blur-sm border border-dashed border-gray-200 rounded-2xl shadow-lg p-12 text-center">
+        <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <p class="text-gray-600 text-lg font-medium mb-2">暂无教研组</p>
+        <p class="text-gray-400 text-sm mb-6">创建或加入教研组，与同事协作共享优质教学设计</p>
+        <button
+          @click="showCreateModal = true"
+          class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transform hover:scale-105 transition-all"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          创建第一个教研组
+        </button>
+      </div>
+
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div
+          v-for="group in groups"
+          :key="group.id"
+          @click="viewGroupDetail(group.id)"
+          class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
+        >
+          <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600"></span>
+          <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-emerald-50/80 via-transparent to-transparent"></div>
+          
+          <div
+            v-if="group.cover_image_url"
+            class="h-40 bg-cover bg-center"
+            :style="{ backgroundImage: `url(${group.cover_image_url})` }"
+          ></div>
+          <div v-else class="h-40 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500"></div>
+          
+          <div class="relative p-5">
+            <div class="flex items-start justify-between mb-2">
+              <h3 class="text-xl font-bold text-gray-900 flex-1">{{ group.name }}</h3>
+              <span
+                v-if="group.user_role"
+                :class="getRoleBadgeClass(group.user_role)"
+                class="px-3 py-1 text-xs font-semibold rounded-full ml-2 border"
+              >
+                {{ getRoleLabel(group.user_role) }}
+              </span>
+            </div>
+            
+            <p class="text-gray-600 text-sm mb-4 line-clamp-2">
+              {{ group.description || '暂无描述' }}
+            </p>
+            
+            <div class="flex items-center text-sm text-gray-500 space-x-4 mb-4">
+              <span class="inline-flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                {{ group.subject_name }}
+              </span>
+              <span class="inline-flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {{ getScopeLabel(group.scope) }}
+              </span>
+            </div>
+            
+            <div class="flex items-center justify-between text-sm text-gray-500 pt-4 border-t border-gray-200">
+              <div class="flex items-center space-x-4">
+                <span class="inline-flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  {{ group.member_count }} 成员
+                </span>
+                <span class="inline-flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {{ group.lesson_count }} 教案
+                </span>
+              </div>
+              <span v-if="group.is_public" class="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                </svg>
+                公开
+              </span>
+            </div>
+          </div>
+      </div>
     </div>
 
-    <!-- 分页 -->
-    <div v-if="totalPages > 1" class="mt-6 flex justify-center">
-      <nav class="flex space-x-2">
-        <button
-          @click="currentPage > 1 && changePage(currentPage - 1)"
-          :disabled="currentPage === 1"
-          class="px-3 py-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          上一页
-        </button>
-        <button
-          v-for="page in displayPages"
-          :key="page"
-          @click="changePage(page)"
-          :class="[
-            'px-3 py-2 rounded-lg border',
-            page === currentPage
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'border-gray-300 hover:bg-gray-50',
-          ]"
-        >
-          {{ page }}
-        </button>
-        <button
-          @click="currentPage < totalPages && changePage(currentPage + 1)"
-          :disabled="currentPage === totalPages"
-          class="px-3 py-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          下一页
-        </button>
-      </nav>
+      <!-- 分页 -->
+      <div v-if="totalPages > 1" class="mt-8 flex justify-center">
+        <nav class="flex items-center space-x-2">
+          <button
+            @click="currentPage > 1 && changePage(currentPage - 1)"
+            :disabled="currentPage === 1"
+            class="px-4 py-2 text-sm font-medium rounded-xl border border-gray-300 bg-white/80 backdrop-blur-sm text-gray-700 hover:bg-white hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            上一页
+          </button>
+          <button
+            v-for="page in displayPages"
+            :key="page"
+            @click="changePage(page)"
+            :class="[
+              'px-4 py-2 text-sm font-medium rounded-xl border transition-all',
+              page === currentPage
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/30'
+                : 'border-gray-300 bg-white/80 backdrop-blur-sm text-gray-700 hover:bg-white hover:shadow-md',
+            ]"
+          >
+            {{ page }}
+          </button>
+          <button
+            @click="currentPage < totalPages && changePage(currentPage + 1)"
+            :disabled="currentPage === totalPages"
+            class="px-4 py-2 text-sm font-medium rounded-xl border border-gray-300 bg-white/80 backdrop-blur-sm text-gray-700 hover:bg-white hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            下一页
+          </button>
+        </nav>
+      </div>
     </div>
 
     <!-- 创建教研组模态框 -->
@@ -229,11 +305,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/store/user'
+import { authService } from '@/services/auth'
 import {
   getSubjectGroups,
   getSubjectGroupStatistics,
 } from '@/services/subjectGroup'
 import { curriculumService } from '@/services/curriculum'
+import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import type {
   SubjectGroup,
   SubjectGroupStatistics,
@@ -244,6 +323,13 @@ import type { Subject } from '@/types/curriculum'
 import CreateGroupModal from '@/components/SubjectGroup/CreateGroupModal.vue'
 
 const router = useRouter()
+const userStore = useUserStore()
+
+// 用户信息
+const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '教师')
+const regionName = computed(() => userStore.user?.region_name || null)
+const schoolName = computed(() => userStore.user?.school_name || null)
+const gradeName = computed(() => userStore.user?.grade_name || null)
 
 // 数据
 const groups = ref<SubjectGroup[]>([])
@@ -359,15 +445,36 @@ function getRoleLabel(role: MemberRole): string {
 
 function getRoleBadgeClass(role: MemberRole): string {
   const classes: Record<MemberRole, string> = {
-    owner: 'bg-red-100 text-red-800',
-    admin: 'bg-blue-100 text-blue-800',
-    member: 'bg-gray-100 text-gray-800',
+    owner: 'bg-red-100 text-red-800 border-red-200',
+    admin: 'bg-blue-100 text-blue-800 border-blue-200',
+    member: 'bg-gray-100 text-gray-800 border-gray-200',
   }
-  return classes[role] || 'bg-gray-100 text-gray-800'
+  return classes[role] || 'bg-gray-100 text-gray-800 border-gray-200'
+}
+
+// 返回教师工作台
+function handleBackToDashboard() {
+  router.push('/teacher')
+}
+
+// 退出登录
+function handleLogout() {
+  userStore.logout()
+  router.push('/login')
 }
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
+  // 确保用户信息已加载
+  if (!userStore.user) {
+    try {
+      const currentUser = await authService.getCurrentUser()
+      userStore.setUser(currentUser)
+    } catch (error) {
+      console.error('Failed to load current user info:', error)
+    }
+  }
+
   loadGroups()
   loadStatistics()
   loadSubjects()

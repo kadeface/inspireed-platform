@@ -135,7 +135,7 @@ function startDurationTimer() {
   sessionDuration.value = calculateDuration()
   
   // 设置定时器，每秒更新时长
-  durationInterval.value = setInterval(() => {
+  durationInterval.value = window.setInterval(() => {
     if (props.session?.actualStart) {
       const duration = calculateDuration()
       // 如果计算出的时长有效（>= 0），更新显示
@@ -147,7 +147,7 @@ function startDurationTimer() {
         stopDurationTimer()
       }
     }
-  }, 1000)
+  }, 1000) as unknown as number
 }
 
 function stopDurationTimer() {

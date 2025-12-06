@@ -227,23 +227,69 @@
         <!-- 页面标题、筛选与操作栏 -->
         <div class="mb-6">
           <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <h2 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-gray-900 via-emerald-700 to-teal-700 bg-clip-text text-transparent">我的教案</h2>
-              <p class="mt-2 text-sm text-gray-600">
-                共 {{ lessonStore.totalLessons }} 个教案
-                <span v-if="selectedGrade" class="ml-2 text-emerald-600 font-medium">
-                  - 已筛选: {{ selectedGradeName }}
-                </span>
-                <span v-if="selectedChapterId && selectedChapterName" class="ml-2 text-teal-600 font-medium">
-                  - 章节: {{ selectedChapterName }}
-                  <button 
-                    @click="clearChapterFilter"
-                    class="ml-1 text-xs hover:underline hover:text-teal-700 transition-colors"
-                  >
-                    ✕ 清除
-                  </button>
-                </span>
-              </p>
+            <div class="flex-1">
+              <!-- 标签页切换 -->
+              <div class="inline-flex rounded-xl shadow-sm bg-white/80 backdrop-blur-sm border border-gray-200 mb-4" role="tablist">
+                <button
+                  @click="lessonTab = 'my'"
+                  :class="[
+                    'px-5 py-2.5 text-sm font-medium transition-all rounded-l-xl',
+                    lessonTab === 'my'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 z-10'
+                      : 'bg-transparent text-gray-700 hover:bg-gray-50'
+                  ]"
+                  role="tab"
+                  :aria-selected="lessonTab === 'my'"
+                >
+                  <svg class="w-4 h-4 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  我的教案
+                </button>
+                <button
+                  @click="lessonTab = 'shared'"
+                  :class="[
+                    'px-5 py-2.5 text-sm font-medium transition-all rounded-r-xl',
+                    lessonTab === 'shared'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 z-10'
+                      : 'bg-transparent text-gray-700 hover:bg-gray-50'
+                  ]"
+                  role="tab"
+                  :aria-selected="lessonTab === 'shared'"
+                >
+                  <svg class="w-4 h-4 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  共享教案
+                </button>
+              </div>
+              
+              <!-- 标题和统计 -->
+              <div>
+                <h2 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-gray-900 via-emerald-700 to-teal-700 bg-clip-text text-transparent">
+                  {{ lessonTab === 'my' ? '我的教案' : '共享教案' }}
+                </h2>
+                <p class="mt-2 text-sm text-gray-600">
+                  <span v-if="lessonTab === 'my'">
+                    共 {{ lessonStore.totalLessons }} 个教案
+                  </span>
+                  <span v-else>
+                    共 {{ sharedLessonsTotal }} 个共享教案
+                  </span>
+                  <span v-if="selectedGrade" class="ml-2 text-emerald-600 font-medium">
+                    - 已筛选: {{ selectedGradeName }}
+                  </span>
+                  <span v-if="selectedChapterId && selectedChapterName" class="ml-2 text-teal-600 font-medium">
+                    - 章节: {{ selectedChapterName }}
+                    <button 
+                      @click="clearChapterFilter"
+                      class="ml-1 text-xs hover:underline hover:text-teal-700 transition-colors"
+                    >
+                      ✕ 清除
+                    </button>
+                  </span>
+                </p>
+              </div>
             </div>
             <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
               <CurriculumWithResources
@@ -253,8 +299,8 @@
               />
 
               <div class="flex items-center gap-3">
-              <!-- 视图切换按钮 -->
-              <div class="inline-flex rounded-xl shadow-sm bg-white/80 backdrop-blur-sm border border-gray-200" role="group">
+              <!-- 视图切换按钮（仅在我的教案显示） -->
+              <div v-if="lessonTab === 'my'" class="inline-flex rounded-xl shadow-sm bg-white/80 backdrop-blur-sm border border-gray-200" role="group">
                 <button
                   @click="viewMode = 'list'"
                   :class="[
@@ -287,8 +333,9 @@
                 </button>
               </div>
  
-              <!-- 创建教案按钮 -->
+              <!-- 创建教案按钮（仅在我的教案显示） -->
               <button
+                v-if="lessonTab === 'my'"
                 @click="showCreateModal = true"
                 class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium rounded-xl hover:from-emerald-600 hover:to-teal-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transform hover:scale-105"
               >
@@ -373,7 +420,7 @@
           </div>
 
           <!-- 加载状态 -->
-          <div v-if="lessonStore.isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div v-if="(lessonTab === 'my' && lessonStore.isLoading) || (lessonTab === 'shared' && isLoadingSharedLessons)" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div
             v-for="i in 6"
             :key="i"
@@ -406,9 +453,16 @@
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <h3 class="mt-2 text-sm font-medium text-gray-900">暂无教案</h3>
+          <h3 class="mt-2 text-sm font-medium text-gray-900">
+            {{ lessonTab === 'my' ? '暂无教案' : '暂无共享教案' }}
+          </h3>
           <p class="mt-1 text-sm text-gray-500">
-            {{ searchQuery || currentStatus ? '未找到符合条件的教案' : '开始创建您的第一个教案吧' }}
+            <span v-if="lessonTab === 'my'">
+              {{ searchQuery || currentStatus ? '未找到符合条件的教案' : '开始创建您的第一个教案吧' }}
+            </span>
+            <span v-else>
+              {{ searchQuery ? '未找到符合条件的共享教案' : '暂无教师共享的教案，快去分享您的优秀教案吧' }}
+            </span>
           </p>
           <div class="mt-6">
             <button
@@ -429,23 +483,38 @@
             v-else
             class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
-            <LessonCard
-              v-for="lesson in lessonStore.lessons"
-              :key="lesson.id"
-              :lesson="lesson"
-              @edit="handleEdit"
-              @edit-published="handleEditPublished"
-              @duplicate="handleDuplicate"
+            <!-- 我的教案列表 -->
+            <template v-if="lessonTab === 'my'">
+              <LessonCard
+                v-for="lesson in lessonStore.lessons"
+                :key="lesson.id"
+                :lesson="lesson"
+                @edit="handleEdit"
+                @edit-published="handleEditPublished"
+                @duplicate="handleDuplicate"
               @delete="handleDeleteClick"
               @publish="handlePublish"
               @unpublish="handleUnpublish"
               @view="handleView"
             />
+            </template>
+            
+            <!-- 共享教案列表 -->
+            <template v-else>
+              <LessonCard
+                v-for="lesson in sharedLessons"
+                :key="lesson.id"
+                :lesson="lesson"
+                :readonly="true"
+                @view="handleView"
+                @duplicate="handleDuplicate"
+              />
+            </template>
           </div>
 
           <!-- 分页控件 -->
           <div
-            v-if="!lessonStore.isLoading && lessonStore.lessons.length > 0 && lessonStore.totalLessons > lessonStore.pageSize"
+            v-if="(lessonTab === 'my' && !lessonStore.isLoading && lessonStore.lessons.length > 0 && lessonStore.totalLessons > lessonStore.pageSize) || (lessonTab === 'shared' && !isLoadingSharedLessons && sharedLessons.length > 0 && sharedLessonsTotal > lessonStore.pageSize)"
             class="mt-6 flex items-center justify-between border-t border-gray-200 bg-white/80 backdrop-blur-sm px-4 py-3 sm:px-6 rounded-2xl shadow-lg"
           >
           <div class="flex flex-1 justify-between sm:hidden">
@@ -671,6 +740,11 @@ const availableChapters = ref<any[]>([])
 const viewMode = ref<'list' | 'tree'>('list') // 视图模式：列表视图或课程体系视图
 const pendingChapterId = ref<number | null>(null) // 从课程体系视图创建教案时的章节ID
 const pendingCourseId = ref<number | null>(null) // 从课程体系视图创建教案时的课程ID
+const lessonTab = ref<'my' | 'shared'>('my') // 教案标签页：我的教案 / 共享教案
+const sharedLessons = ref<any[]>([]) // 共享教案列表
+const sharedLessonsTotal = ref(0) // 共享教案总数
+const sharedLessonsPage = ref(1) // 共享教案当前页
+const isLoadingSharedLessons = ref(false) // 加载共享教案状态
 const showPublishModal = ref(false)
 const publishError = ref<string | null>(null)
 const publishTargetLessonId = ref<number | null>(null)
@@ -895,6 +969,39 @@ async function loadLessons() {
     showToast('error', error.message || '加载教案列表失败')
   }
 }
+
+// 加载共享教案列表
+async function loadSharedLessons() {
+  isLoadingSharedLessons.value = true
+  try {
+    // TODO: 调用实际的共享教案API
+    // 这里先使用模拟数据，后续需要根据实际API调整
+    const response = await lessonService.fetchLessons({
+      page: sharedLessonsPage.value,
+      page_size: lessonStore.pageSize,
+      search: searchQuery.value || undefined,
+      // 注意：LessonListParams 类型中暂不支持 shared 参数
+      // 如需支持共享教案筛选，需要在 types/api.ts 中扩展 LessonListParams 接口
+    })
+    sharedLessons.value = response.items
+    sharedLessonsTotal.value = response.total
+  } catch (error: any) {
+    showToast('error', error.message || '加载共享教案列表失败')
+    sharedLessons.value = []
+    sharedLessonsTotal.value = 0
+  } finally {
+    isLoadingSharedLessons.value = false
+  }
+}
+
+// 监听标签页切换
+watch(lessonTab, (newTab) => {
+  if (newTab === 'my') {
+    loadLessons()
+  } else {
+    loadSharedLessons()
+  }
+}, { immediate: false })
 
 // 加载问答统计
 async function loadQuestionStats() {

@@ -1,174 +1,214 @@
 <template>
-  <div class="teacher-assessment-page min-h-screen bg-gray-50">
-    <!-- 顶部抬头 -->
-    <div class="bg-white border-b">
-      <div
-        class="max-w-7xl mx-auto px-4 py-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
-      >
-        <div>
-          <p class="text-xs uppercase tracking-wide text-blue-600 font-semibold">Check</p>
-          <h1 class="text-2xl font-bold text-gray-900">过程性评估总览</h1>
-          <p class="text-sm text-gray-500 mt-1">
-            汇集课堂提交、流程表现与互动反馈，全景洞察学习进展
-          </p>
-        </div>
-        <div class="flex items-center gap-3">
-          <select
-            v-model="selectedLessonId"
-            class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option v-if="lessons.length === 0" value="">暂无课程</option>
-            <option
-              v-for="lesson in lessons"
-              :key="lesson.id"
-              :value="lesson.id"
+  <div class="teacher-assessment-page min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50">
+    <!-- 统一头部 -->
+    <DashboardHeader
+      title="过程性评估总览"
+      subtitle="汇集课堂提交、流程表现与互动反馈，全景洞察学习进展"
+      :user-name="userName"
+      :region-name="regionName"
+      :school-name="schoolName"
+      :grade-name="gradeName"
+      @logout="handleLogout"
+    >
+        <template #default>
+          <div class="flex items-center gap-3 flex-wrap">
+            <select
+              v-model="selectedLessonId"
+              class="px-4 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white/80 backdrop-blur-sm transition-all"
             >
-              {{ lesson.title }}
-            </option>
-          </select>
-          <button
-            @click="handleRefresh"
-            class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
-            :disabled="overviewLoading"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            刷新
-          </button>
-        </div>
-      </div>
-    </div>
+              <option v-if="lessons.length === 0" value="">暂无课程</option>
+              <option
+                v-for="lesson in lessons"
+                :key="lesson.id"
+                :value="lesson.id"
+              >
+                {{ lesson.title }}
+              </option>
+            </select>
+            <button
+              @click="handleRefresh"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl border border-gray-200 text-gray-700 bg-white/80 backdrop-blur-sm hover:bg-white hover:shadow-md transition-all"
+              :disabled="overviewLoading"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              刷新
+            </button>
+            <button
+              @click="handleBackToDashboard"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl hover:bg-white hover:shadow-md transition-all"
+              title="返回教师工作台"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+              </svg>
+              返回工作台
+            </button>
+          </div>
+        </template>
+      </DashboardHeader>
 
-    <div class="max-w-7xl mx-auto px-4 py-6 space-y-8">
+    <!-- 主内容区 -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- 返回按钮（内容区域顶部） -->
+      <div class="flex justify-start mb-6">
+        <button
+          @click="handleBackToDashboard"
+          class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl hover:bg-white hover:shadow-md transition-all"
+          title="返回教师工作台"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          返回工作台
+        </button>
+      </div>
+
       <!-- 课程加载状态 -->
       <div
         v-if="lessonLoading"
-        class="flex items-center justify-center py-16 text-gray-500"
+        class="flex items-center justify-center py-16 text-gray-500 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg"
       >
-        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mr-3"></div>
-        正在加载课程...
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mr-3"></div>
+        <span class="text-sm font-medium">正在加载课程...</span>
       </div>
 
       <template v-else>
         <div
           v-if="!selectedLessonId"
-          class="bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center text-gray-500"
+          class="bg-white/80 backdrop-blur-sm border border-dashed border-gray-200 rounded-2xl p-12 text-center text-gray-500 shadow-lg"
         >
           暂无可用课程，创建课程后即可查看过程性评估数据。
         </div>
 
         <div v-else>
           <!-- 概览卡片 -->
-          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div class="overview-card">
-              <div class="overview-label">参与学生</div>
-              <div class="overview-value">
-                {{ overviewMetrics.totalStudents }}
+          <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cyan-500 to-blue-600"></span>
+              <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-cyan-50/80 via-transparent to-transparent"></div>
+              <div class="relative">
+                <p class="text-xs uppercase tracking-wide text-cyan-600 font-semibold mb-1">参与学生</p>
+                <p class="text-3xl font-bold text-gray-900 mb-2">
+                  {{ overviewMetrics.totalStudents }}
+                </p>
+                <p class="text-xs text-gray-500">
+                  已纳入评估的学生总数
+                </p>
               </div>
-              <p class="overview-subtle">
-                已纳入评估的学生总数
-              </p>
             </div>
-            <div class="overview-card">
-              <div class="overview-label">提交率</div>
-              <div class="overview-value">
-                {{ formatPercentage(overviewMetrics.submissionRate) }}
+            <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600"></span>
+              <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-emerald-50/80 via-transparent to-transparent"></div>
+              <div class="relative">
+                <p class="text-xs uppercase tracking-wide text-emerald-600 font-semibold mb-1">提交率</p>
+                <p class="text-3xl font-bold text-gray-900 mb-2">
+                  {{ formatPercentage(overviewMetrics.submissionRate) }}
+                </p>
+                <p class="text-xs text-gray-500">
+                  提交或已评分：{{ overviewMetrics.submittedStudentCount }}/{{ overviewMetrics.totalStudents }}
+                </p>
               </div>
-              <p class="overview-subtle">
-                提交或已评分：{{ overviewMetrics.submittedStudentCount }}/{{ overviewMetrics.totalStudents }}
-              </p>
             </div>
-            <div class="overview-card">
-              <div class="overview-label">平均成绩</div>
-              <div class="overview-value">
-                {{ overviewMetrics.averageScore !== null ? `${overviewMetrics.averageScore.toFixed(1)} 分` : '—' }}
+            <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-violet-500 to-purple-600"></span>
+              <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-violet-50/80 via-transparent to-transparent"></div>
+              <div class="relative">
+                <p class="text-xs uppercase tracking-wide text-violet-600 font-semibold mb-1">平均成绩</p>
+                <p class="text-3xl font-bold text-gray-900 mb-2">
+                  {{ overviewMetrics.averageScore !== null ? `${overviewMetrics.averageScore.toFixed(1)} 分` : '—' }}
+                </p>
+                <p class="text-xs text-gray-500">
+                  基于所有活动的平均得分
+                </p>
               </div>
-              <p class="overview-subtle">
-                基于所有活动的平均得分
-              </p>
             </div>
-            <div class="overview-card">
-              <div class="overview-label">风险提醒</div>
-              <div class="overview-value">
-                {{ riskCounts.total }}
+            <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-600"></span>
+              <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-amber-50/80 via-transparent to-transparent"></div>
+              <div class="relative">
+                <p class="text-xs uppercase tracking-wide text-amber-600 font-semibold mb-1">风险提醒</p>
+                <p class="text-3xl font-bold text-gray-900 mb-2">
+                  {{ riskCounts.total }}
+                </p>
+                <p class="text-xs text-gray-500">
+                  高风险 {{ riskCounts.high }} · 中风险 {{ riskCounts.medium }}
+                </p>
               </div>
-              <p class="overview-subtle">
-                高风险 {{ riskCounts.high }} · 中风险 {{ riskCounts.medium }}
-              </p>
             </div>
           </div>
 
           <!-- 加载状态 -->
           <div
             v-if="overviewLoading"
-            class="flex items-center justify-center py-16 text-gray-500"
+            class="flex items-center justify-center py-16 text-gray-500 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg"
           >
-            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mr-3"></div>
-            正在获取评估数据...
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mr-3"></div>
+            <span class="text-sm font-medium">正在获取评估数据...</span>
           </div>
 
           <template v-else>
             <!-- 风险学生 -->
-            <section class="section-card">
-              <header class="section-header">
+            <section class="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-lg p-6 space-y-5">
+              <header class="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <h2 class="section-title">学习风险雷达</h2>
-                  <p class="section-subtitle">
+                  <h2 class="text-lg font-semibold text-gray-900">学习风险雷达</h2>
+                  <p class="text-sm text-gray-500 mt-1">
                     根据过程数据判定的高风险与关注学生，便于快速干预
                   </p>
                 </div>
               </header>
 
-              <div v-if="riskStudents.length === 0" class="empty-block">
+              <div v-if="riskStudents.length === 0" class="border border-dashed border-gray-200 rounded-xl p-8 text-center text-gray-500 bg-gray-50/50">
                 <div class="text-4xl mb-3">✅</div>
                 <p class="text-gray-600 font-medium">暂无风险提醒</p>
-                <p class="text-gray-400 text-sm">
+                <p class="text-gray-400 text-sm mt-1">
                   最新学习行为稳定，当出现异常波动时会即时提示。
                 </p>
               </div>
 
-              <div v-else class="overflow-x-auto">
+              <div v-else class="overflow-x-auto rounded-xl border border-gray-200 bg-white/50">
                 <table class="min-w-full text-left">
-                  <thead class="text-xs uppercase text-gray-400 border-b">
+                  <thead class="text-xs uppercase text-gray-500 bg-gray-50/80 border-b border-gray-200">
                     <tr>
-                      <th class="py-2 pr-6">学生</th>
-                      <th class="py-2 pr-6">风险等级</th>
-                      <th class="py-2 pr-6">平均成绩</th>
-                      <th class="py-2 pr-6">平均用时</th>
-                      <th class="py-2">建议</th>
+                      <th class="py-3 px-4 font-semibold">学生</th>
+                      <th class="py-3 px-4 font-semibold">风险等级</th>
+                      <th class="py-3 px-4 font-semibold">平均成绩</th>
+                      <th class="py-3 px-4 font-semibold">平均用时</th>
+                      <th class="py-3 px-4 font-semibold">建议</th>
                     </tr>
                   </thead>
-                  <tbody class="text-sm text-gray-700">
+                  <tbody class="text-sm text-gray-700 divide-y divide-gray-100">
                     <tr
                       v-for="record in riskStudents"
                       :key="record.studentId + (record.phase || '')"
-                      class="border-b last:border-transparent"
+                      class="hover:bg-gray-50/50 transition-colors"
                     >
-                      <td class="py-3 pr-6 font-medium text-gray-900">
+                      <td class="py-4 px-4 font-medium text-gray-900">
                         学生 #{{ record.studentId }}
                       </td>
-                      <td class="py-3 pr-6">
+                      <td class="py-4 px-4">
                         <span
                           :class="[
-                            'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold',
+                            'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold',
                             record.riskLevel === 'high'
-                              ? 'bg-red-100 text-red-700'
+                              ? 'bg-red-100 text-red-700 border border-red-200'
                               : record.riskLevel === 'medium'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-gray-100 text-gray-500'
+                                ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                                : 'bg-gray-100 text-gray-500 border border-gray-200'
                           ]"
                         >
                           {{ riskLevelLabel(record.riskLevel) }}
                         </span>
                       </td>
-                      <td class="py-3 pr-6">
+                      <td class="py-4 px-4">
                         {{ record.metrics?.average_score !== undefined ? `${record.metrics.average_score?.toFixed(1)} 分` : '—' }}
                       </td>
-                      <td class="py-3 pr-6">
+                      <td class="py-4 px-4">
                         {{ formatDuration(record.metrics?.average_time_spent) }}
                       </td>
-                      <td class="py-3">
+                      <td class="py-4 px-4">
                         <ul class="list-disc list-inside text-gray-500 space-y-1 text-xs">
                           <li v-for="tip in record.recommendations || []" :key="tip.type">
                             {{ tip.message }}
@@ -185,11 +225,11 @@
             </section>
 
             <!-- 活动表现 -->
-            <section class="section-card">
-              <header class="section-header">
+            <section class="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-lg p-6 space-y-5">
+              <header class="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <h2 class="section-title">课堂活动表现</h2>
-                  <p class="section-subtitle">
+                  <h2 class="text-lg font-semibold text-gray-900">课堂活动表现</h2>
+                  <p class="text-sm text-gray-500 mt-1">
                     对比各教学活动的提交率、表现水平与薄弱题目
                   </p>
                 </div>
@@ -197,11 +237,11 @@
 
               <div
                 v-if="activitySummaries.length === 0"
-                class="empty-block"
+                class="border border-dashed border-gray-200 rounded-xl p-8 text-center text-gray-500 bg-gray-50/50"
               >
                 <div class="text-4xl mb-3">📝</div>
                 <p class="text-gray-600 font-medium">尚未采集教学活动数据</p>
-                <p class="text-gray-400 text-sm">
+                <p class="text-gray-400 text-sm mt-1">
                   添加测验或作业等单元后，学生提交会自动汇总到这里。
                 </p>
               </div>
@@ -213,8 +253,11 @@
                 <div
                   v-for="summary in activitySummaries"
                   :key="summary.cellId"
-                  class="border border-gray-200 rounded-xl bg-white p-4 shadow-sm hover:shadow transition-shadow"
+                  class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-5 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
                 >
+                  <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600"></span>
+                  <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-emerald-50/80 via-transparent to-transparent"></div>
+                  <div class="relative">
                   <div class="flex items-start justify-between mb-3">
                     <div>
                       <p class="text-xs uppercase text-gray-400 font-semibold">活动单元</p>
@@ -265,62 +308,63 @@
                   <div v-else class="text-sm text-gray-400">
                     暂无学生提交
                   </div>
+                  </div>
                 </div>
               </div>
             </section>
 
             <!-- 流程图统计 -->
-            <section v-if="flowchartSummaries.length > 0" class="section-card">
-              <header class="section-header">
+            <section v-if="flowchartSummaries.length > 0" class="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-lg p-6 space-y-5">
+              <header class="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <h2 class="section-title">流程图表现</h2>
-                  <p class="section-subtitle">
+                  <h2 class="text-lg font-semibold text-gray-900">流程图表现</h2>
+                  <p class="text-sm text-gray-500 mt-1">
                     追踪学生流程构建的版本迭代、复杂度与活跃程度
                   </p>
                 </div>
               </header>
 
-              <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div class="mini-card">
-                  <p class="mini-card-label">累计快照</p>
-                  <p class="mini-card-value">{{ flowchartAggregate.snapshotCount }}</p>
-                  <p class="mini-card-subtle">涵盖所有流程图单元</p>
+              <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+                <div class="group relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50/80 backdrop-blur-sm p-4">
+                  <p class="text-xs uppercase text-gray-400 font-semibold mb-1">累计快照</p>
+                  <p class="text-xl font-bold text-gray-900 mt-1">{{ flowchartAggregate.snapshotCount }}</p>
+                  <p class="text-xs text-gray-500 mt-1">涵盖所有流程图单元</p>
                 </div>
-                <div class="mini-card">
-                  <p class="mini-card-label">最新更新时间</p>
-                  <p class="mini-card-value">
+                <div class="group relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50/80 backdrop-blur-sm p-4">
+                  <p class="text-xs uppercase text-gray-400 font-semibold mb-1">最新更新时间</p>
+                  <p class="text-xl font-bold text-gray-900 mt-1">
                     {{ flowchartAggregate.latestUpdated ? formatRelativeTime(flowchartAggregate.latestUpdated) : '—' }}
                   </p>
-                  <p class="mini-card-subtle">展示最近一次学生提交的时间</p>
+                  <p class="text-xs text-gray-500 mt-1">展示最近一次学生提交的时间</p>
                 </div>
-                <div class="mini-card">
-                  <p class="mini-card-label">最高版本号</p>
-                  <p class="mini-card-value">
+                <div class="group relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50/80 backdrop-blur-sm p-4">
+                  <p class="text-xs uppercase text-gray-400 font-semibold mb-1">最高版本号</p>
+                  <p class="text-xl font-bold text-gray-900 mt-1">
                     {{ flowchartAggregate.maxVersion ?? '—' }}
                   </p>
-                  <p class="mini-card-subtle">显示迭代次数</p>
+                  <p class="text-xs text-gray-500 mt-1">显示迭代次数</p>
                 </div>
-                <div class="mini-card">
-                  <p class="mini-card-label">平均节点数</p>
-                  <p class="mini-card-value">
+                <div class="group relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50/80 backdrop-blur-sm p-4">
+                  <p class="text-xs uppercase text-gray-400 font-semibold mb-1">平均节点数</p>
+                  <p class="text-xl font-bold text-gray-900 mt-1">
                     {{ flowchartAggregate.avgNodeCount ?? '—' }}
                   </p>
-                  <p class="mini-card-subtle">衡量流程图复杂度</p>
+                  <p class="text-xs text-gray-500 mt-1">衡量流程图复杂度</p>
                 </div>
               </div>
             </section>
 
             <!-- 问答概况 -->
-            <section class="section-card">
-              <header class="section-header">
+            <section class="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-lg p-6 space-y-5">
+              <header class="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <h2 class="section-title">学生问答概况</h2>
-                  <p class="section-subtitle">
+                  <h2 class="text-lg font-semibold text-gray-900">学生问答概况</h2>
+                  <p class="text-sm text-gray-500 mt-1">
                     汇总课堂提问与响应速度，保障互动闭环
                   </p>
                 </div>
                 <button
-                  class="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+                  class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-600 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-all"
                   @click="loadQuestions()"
                 >
                   刷新问答
@@ -330,21 +374,30 @@
                 </button>
               </header>
 
-              <div class="grid gap-4 md:grid-cols-3">
-                <div class="qa-card bg-yellow-50 text-yellow-700 border-yellow-200">
-                  <p class="qa-card-label">待答问题</p>
-                  <p class="qa-card-value">{{ stats?.pending ?? 0 }}</p>
-                  <p class="qa-card-subtle">及时响应，维护课堂节奏</p>
+              <div class="grid gap-6 md:grid-cols-3">
+                <div class="group relative overflow-hidden rounded-2xl border border-yellow-200 bg-yellow-50/80 backdrop-blur-sm p-5 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                  <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-yellow-500 to-amber-600"></span>
+                  <div class="relative">
+                    <p class="text-xs uppercase font-semibold text-yellow-700 mb-1">待答问题</p>
+                    <p class="text-2xl font-bold text-yellow-800 mb-2">{{ stats?.pending ?? 0 }}</p>
+                    <p class="text-xs text-yellow-600">及时响应，维护课堂节奏</p>
+                  </div>
                 </div>
-                <div class="qa-card bg-blue-50 text-blue-700 border-blue-200">
-                  <p class="qa-card-label">已答数量</p>
-                  <p class="qa-card-value">{{ stats?.answered ?? 0 }}</p>
-                  <p class="qa-card-subtle">教师或 AI 已给出答复</p>
+                <div class="group relative overflow-hidden rounded-2xl border border-blue-200 bg-blue-50/80 backdrop-blur-sm p-5 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                  <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-500 to-cyan-600"></span>
+                  <div class="relative">
+                    <p class="text-xs uppercase font-semibold text-blue-700 mb-1">已答数量</p>
+                    <p class="text-2xl font-bold text-blue-800 mb-2">{{ stats?.answered ?? 0 }}</p>
+                    <p class="text-xs text-blue-600">教师或 AI 已给出答复</p>
+                  </div>
                 </div>
-                <div class="qa-card bg-green-50 text-green-700 border-green-200">
-                  <p class="qa-card-label">学生已解决</p>
-                  <p class="qa-card-value">{{ stats?.resolved ?? 0 }}</p>
-                  <p class="qa-card-subtle">学生确认理解与掌握</p>
+                <div class="group relative overflow-hidden rounded-2xl border border-green-200 bg-green-50/80 backdrop-blur-sm p-5 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                  <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-green-500 to-emerald-600"></span>
+                  <div class="relative">
+                    <p class="text-xs uppercase font-semibold text-green-700 mb-1">学生已解决</p>
+                    <p class="text-2xl font-bold text-green-800 mb-2">{{ stats?.resolved ?? 0 }}</p>
+                    <p class="text-xs text-green-600">学生确认理解与掌握</p>
+                  </div>
                 </div>
               </div>
 
@@ -354,7 +407,7 @@
                   <div class="flex items-center gap-3">
                     <select
                       v-model="sortBy"
-                      class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      class="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
                     >
                       <option value="created_at">最新提问</option>
                       <option value="upvotes">最多点赞</option>
@@ -364,24 +417,24 @@
 
                 <!-- 问答列表 -->
                 <div v-if="loading" class="flex items-center justify-center py-8 text-gray-500">
-                  <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-3"></div>
-                  加载问答中...
+                  <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600 mr-3"></div>
+                  <span class="text-sm font-medium">加载问答中...</span>
                 </div>
 
                 <div
                   v-else-if="questions.length === 0"
-                  class="empty-block py-12"
+                  class="border border-dashed border-gray-200 rounded-xl p-12 text-center text-gray-500 bg-gray-50/50"
                 >
                   <div class="text-4xl mb-3">💭</div>
                   <p class="text-gray-600 font-medium">{{ emptyMessage }}</p>
-                  <p class="text-gray-400 text-sm">{{ emptyHint }}</p>
+                  <p class="text-gray-400 text-sm mt-1">{{ emptyHint }}</p>
                 </div>
 
                 <div v-else class="space-y-3">
                   <div
                     v-for="question in questions"
                     :key="question.id"
-                    class="bg-white border border-gray-200 rounded-lg px-4 py-3 hover:border-blue-200 hover:shadow-sm transition-colors"
+                    class="group relative overflow-hidden rounded-xl border border-gray-200 bg-white/80 backdrop-blur-sm px-5 py-4 shadow-sm hover:shadow-lg hover:border-emerald-200 transition-all duration-300"
                   >
                     <div class="flex items-start justify-between">
                       <div class="flex-1 pr-4">
@@ -408,14 +461,14 @@
                         <div class="flex items-center gap-2">
                           <button
                             @click="viewQuestion(question.id)"
-                            class="px-3 py-1 text-xs border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                            class="px-3 py-1.5 text-xs font-medium border border-gray-300 text-gray-700 bg-white/80 backdrop-blur-sm rounded-xl hover:bg-gray-50 hover:shadow-md transition-all"
                           >
                             查看
                           </button>
                           <button
                             v-if="!question.has_teacher_answer"
                             @click="answerQuestion(question.id)"
-                            class="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            class="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all transform hover:scale-105"
                           >
                             回答
                           </button>
@@ -424,11 +477,11 @@
                     </div>
                   </div>
 
-                  <div v-if="pagination.has_more" class="text-center pt-3">
+                  <div v-if="pagination.has_more" class="text-center pt-4">
                     <button
                       @click="loadMore"
                       :disabled="loading"
-                      class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                      class="px-5 py-2.5 text-sm font-medium border border-gray-300 rounded-xl text-gray-700 bg-white/80 backdrop-blur-sm hover:bg-white hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       加载更多
                     </button>
@@ -446,9 +499,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/store/user'
+import { authService } from '@/services/auth'
 import activityService from '@/services/activity'
 import { lessonService } from '@/services/lesson'
 import questionService from '@/services/question'
+import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import type { Lesson } from '@/types/lesson'
 import type {
   ActivityStatistics,
@@ -465,6 +521,13 @@ interface ActivitySummary {
 }
 
 const router = useRouter()
+const userStore = useUserStore()
+
+// 用户信息
+const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '教师')
+const regionName = computed(() => userStore.user?.region_name || null)
+const schoolName = computed(() => userStore.user?.school_name || null)
+const gradeName = computed(() => userStore.user?.grade_name || null)
 
 const lessons = ref<Lesson[]>([])
 const lessonLoading = ref(true)
@@ -630,6 +693,17 @@ const answerQuestion = (id: number) => {
   router.push(`/teacher/questions/${id}/answer`)
 }
 
+// 返回教师工作台
+function handleBackToDashboard() {
+  router.push('/teacher')
+}
+
+// 退出登录
+function handleLogout() {
+  userStore.logout()
+  router.push('/login')
+}
+
 const riskLevelLabel = (level?: string | null) => {
   if (level === 'high') return '高风险'
   if (level === 'medium') return '中风险'
@@ -680,7 +754,7 @@ const weakItems = (itemStats: Record<string, ActivityItemStatistic>) => {
   return Object.entries(itemStats)
     .map(([key, value]) => ({
       key,
-      accuracy: value.accuracy ?? value.correctCount / Math.max(value.attempts || 1, 1),
+      accuracy: value.correctCount / Math.max(value.attempts || 1, 1),
     }))
     .sort((a, b) => a.accuracy - b.accuracy)
     .slice(0, 3)
@@ -835,6 +909,27 @@ watch(sortBy, () => {
 })
 
 onMounted(async () => {
+  // 设置页面 head (meta description)
+  let metaDescription = document.querySelector('meta[name="description"]') as HTMLMetaElement | null
+  if (metaDescription) {
+    metaDescription.setAttribute('content', '汇集课堂提交、流程表现与互动反馈，全景洞察学习进展')
+  } else {
+    metaDescription = document.createElement('meta')
+    metaDescription.setAttribute('name', 'description')
+    metaDescription.setAttribute('content', '汇集课堂提交、流程表现与互动反馈，全景洞察学习进展')
+    document.head.appendChild(metaDescription)
+  }
+
+  // 确保用户信息已加载
+  if (!userStore.user) {
+    try {
+      const currentUser = await authService.getCurrentUser()
+      userStore.setUser(currentUser)
+    } catch (error) {
+      console.error('Failed to load current user info:', error)
+    }
+  }
+
   await loadLessons()
   if (selectedLessonId.value) {
     await loadOverview(selectedLessonId.value as number)
@@ -843,57 +938,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.overview-card {
-  @apply bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex flex-col gap-1;
-}
-.overview-label {
-  @apply text-xs uppercase font-semibold text-gray-400 tracking-wide;
-}
-.overview-value {
-  @apply text-3xl font-bold text-gray-900;
-}
-.overview-subtle {
-  @apply text-xs text-gray-500;
-}
-.section-card {
-  @apply bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-5;
-}
-.section-header {
-  @apply flex items-start justify-between gap-3 flex-wrap;
-}
-.section-title {
-  @apply text-lg font-semibold text-gray-900;
-}
-.section-subtitle {
-  @apply text-sm text-gray-500;
-}
-.empty-block {
-  @apply border border-dashed border-gray-200 rounded-xl p-8 text-center text-gray-500;
-}
-.mini-card {
-  @apply bg-gray-50 border border-gray-200 rounded-xl p-4;
-}
-.mini-card-label {
-  @apply text-xs uppercase text-gray-400 font-semibold;
-}
-.mini-card-value {
-  @apply text-xl font-bold text-gray-900 mt-1;
-}
-.mini-card-subtle {
-  @apply text-xs text-gray-500;
-}
-.qa-card {
-  @apply border rounded-xl p-4 shadow-sm;
-}
-.qa-card-label {
-  @apply text-xs uppercase font-semibold;
-}
-.qa-card-value {
-  @apply text-2xl font-bold;
-}
-.qa-card-subtle {
-  @apply text-xs;
-}
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;

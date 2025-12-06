@@ -5,7 +5,29 @@
       <!-- 第一行：标题和操作按钮 -->
       <div class="top-control-row">
         <div class="top-control-left">
-          <h2 class="panel-title">InspireEd 教师导播台</h2>
+          <div class="title-with-mode-toggle">
+            <h2 class="panel-title">InspireEd 教师导播台</h2>
+            <!-- 模式切换按钮 -->
+            <button
+              v-if="lesson && lesson.content && lesson.content.length > 0"
+              type="button"
+              @click="toggleSelectionMode"
+              :disabled="loading"
+              :class="[
+                'mode-toggle-btn-compact',
+                isMultiSelectMode ? 'mode-multi' : 'mode-single'
+              ]"
+              :title="isMultiSelectMode ? '当前：多选模式（点击切换为单选）' : '当前：单选模式（点击切换为多选）'"
+            >
+              <svg v-if="!isMultiSelectMode" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              <span class="ml-1 text-xs font-medium">{{ isMultiSelectMode ? '多选' : '单选' }}</span>
+            </button>
+          </div>
           <!-- 学生人数显示 -->
           <div v-if="session" class="student-count-info">
             <span class="student-count-icon">👥</span>
@@ -183,11 +205,11 @@
             }"
             :title="loading ? '切换中，请稍候...' : getModuleTooltip(cell, index)"
           >
-            <!-- 单选框 -->
+            <!-- 单选框/复选框 -->
             <div class="module-item-checkbox" @click.stop="!loading && handleModuleCheckboxClick(cell, index, $event)">
               <input 
-                type="radio" 
-                name="module-display-radio"
+                :type="isMultiSelectMode ? 'checkbox' : 'radio'"
+                :name="isMultiSelectMode ? `module-display-checkbox-${index}` : 'module-display-radio'"
                 :checked="isModuleActive(cell, index)"
                 :disabled="loading"
                 @change.stop="!loading && handleModuleCheckboxChange(cell, index, $event)"
@@ -225,7 +247,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, h, provide, defineExpose, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, h, provide, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import type { Lesson } from '../../types/lesson'
 import type { Cell, ActivityCell } from '../../types/cell'
@@ -298,6 +320,7 @@ watch(session, (newSession) => {
 const loading = ref(false)
 const activeStudents = ref<any[]>([])
 const loadingStudents = ref(false)
+const isMultiSelectMode = ref(false) // 多选模式：false=单选，true=多选
 const sessionStatistics = ref<any>(null)
 const selectedCellIndex = ref(-1)  // -1表示隐藏所有内容
 const sessionDuration = ref(0)
@@ -620,14 +643,21 @@ function handleModuleItemClick(cell: Cell, index: number) {
   const cellId = getCellId(cell)
   const cellOrder = cell.order !== undefined ? cell.order : index
   
-  // 🆕 对于活动模块，使用 'add' 而不是 'toggle'，确保不会误操作取消选中
-  const action = cell.type === 'activity' ? 'add' : 'toggle'
+  // 根据模式选择 action
+  let action: 'toggle' | 'add' | 'remove' = 'toggle'
+  if (isMultiSelectMode.value) {
+    // 多选模式：对于活动模块，使用 'add'；其他模块使用 'toggle'
+    action = cell.type === 'activity' ? 'add' : 'toggle'
+  } else {
+    // 单选模式：对于活动模块，使用 'add'；其他模块使用 'toggle'
+    action = cell.type === 'activity' ? 'add' : 'toggle'
+  }
   
   // 使用 handleControlBoardNavigate 处理导航
-  handleControlBoardNavigate(cellId, cellOrder, action, false)
+  handleControlBoardNavigate(cellId, cellOrder, action, isMultiSelectMode.value)
 }
 
-// 处理单选框点击（防止事件冒泡，并处理取消选中）
+// 处理单选框/复选框点击（防止事件冒泡，并处理取消选中）
 function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
   event.stopPropagation()
   
@@ -636,21 +666,35 @@ function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
   }
   
   const isCurrentlyActive = isModuleActive(cell, index)
+  const cellId = getCellId(cell)
+  const cellOrder = cell.order !== undefined ? cell.order : index
   
-  // 如果点击已选中的单选框，取消选中（隐藏所有内容）
-  if (isCurrentlyActive) {
-    event.preventDefault()
-    const target = event.target as HTMLElement
-    const radioInput = target.closest('.module-item-checkbox')?.querySelector('input[type="radio"]') as HTMLInputElement
-    if (radioInput) {
-      radioInput.checked = false
-      // 隐藏所有内容
-      handleControlBoardNavigate(null, null, 'toggle', false)
+  if (isMultiSelectMode.value) {
+    // 多选模式：复选框逻辑
+    if (isCurrentlyActive) {
+      // 取消选中：从选中列表中移除
+      handleControlBoardNavigate(cellId, cellOrder, 'remove', true)
+    } else {
+      // 选中：添加到选中列表
+      handleControlBoardNavigate(cellId, cellOrder, 'add', true)
+    }
+  } else {
+    // 单选模式：单选框逻辑
+    if (isCurrentlyActive) {
+      // 如果点击已选中的单选框，取消选中（隐藏所有内容）
+      event.preventDefault()
+      const target = event.target as HTMLElement
+      const radioInput = target.closest('.module-item-checkbox')?.querySelector('input[type="radio"]') as HTMLInputElement
+      if (radioInput) {
+        radioInput.checked = false
+        // 隐藏所有内容
+        handleControlBoardNavigate(null, null, 'toggle', false)
+      }
     }
   }
 }
 
-// 处理单选框变化（单选模式：一次只显示一个内容）
+// 处理单选框/复选框变化
 function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
   if (loading.value) {
     return
@@ -658,24 +702,33 @@ function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
   
   const target = event.target as HTMLInputElement
   const isChecked = target.checked
-  
-  // 只处理选中新项的情况（取消选中已在 handleModuleCheckboxClick 中处理）
-  if (!isChecked) {
-    return
-  }
-  
   const cellId = getCellId(cell)
   const cellOrder = cell.order !== undefined ? cell.order : index
   
-  // 选中新项（单选模式，multiSelect = false，会自动清除其他选中项）
-  if (cellId && typeof cellId === 'string' && isUUID(cellId)) {
-    handleControlBoardNavigate(null, cellOrder, 'toggle', false)
-  } else {
-    const numericId = toNumericId(cellId)
-    if (numericId) {
-      handleControlBoardNavigate(numericId, null, 'toggle', false)
+  if (isMultiSelectMode.value) {
+    // 多选模式：复选框逻辑（已在 handleModuleCheckboxClick 中处理，这里作为备用）
+    if (isChecked) {
+      handleControlBoardNavigate(cellId, cellOrder, 'add', true)
     } else {
+      handleControlBoardNavigate(cellId, cellOrder, 'remove', true)
+    }
+  } else {
+    // 单选模式：单选框逻辑
+    // 只处理选中新项的情况（取消选中已在 handleModuleCheckboxClick 中处理）
+    if (!isChecked) {
+      return
+    }
+    
+    // 选中新项（单选模式，multiSelect = false，会自动清除其他选中项）
+    if (cellId && typeof cellId === 'string' && isUUID(cellId)) {
       handleControlBoardNavigate(null, cellOrder, 'toggle', false)
+    } else {
+      const numericId = toNumericId(cellId)
+      if (numericId) {
+        handleControlBoardNavigate(numericId, null, 'toggle', false)
+      } else {
+        handleControlBoardNavigate(null, cellOrder, 'toggle', false)
+      }
     }
   }
 }
@@ -1309,6 +1362,30 @@ async function handleEnd() {
   }
 }
 
+// 切换选择模式（单选/多选）
+async function toggleSelectionMode() {
+  if (loading.value || !session.value) return
+  
+  const wasMultiSelect = isMultiSelectMode.value
+  isMultiSelectMode.value = !isMultiSelectMode.value
+  
+  // 如果从多选切换到单选，且当前有多个选中项，只保留第一个
+  if (!isMultiSelectMode.value && wasMultiSelect && displayCellOrders.value.length > 1) {
+    const firstOrder = displayCellOrders.value[0]
+    const cell = props.lesson?.content.find((cell, idx) => {
+      const cellOrder = cell.order !== undefined ? cell.order : idx
+      return cellOrder === firstOrder
+    })
+    if (cell) {
+      const id = getCellId(cell)
+      const order = cell.order !== undefined ? cell.order : props.lesson!.content.indexOf(cell)
+      // 切换到单选模式，只显示第一个选中的项
+      await handleControlBoardNavigate(id, order, 'toggle', false)
+    }
+  }
+  // 如果从单选切换到多选，且当前有选中项，保持选中状态（已经是多选模式，可以继续添加）
+}
+
 // 隐藏所有内容（通过导播台的"隐藏"节点调用）
 async function handleHideAll() {
   if (!session.value) return
@@ -1641,6 +1718,19 @@ watch(selectedCellIndex, (newIndex, oldIndex) => {
     })
   }
 })
+
+// 监听 displayCellOrders 变化，自动同步多选模式状态
+watch(displayCellOrders, (orders) => {
+  if (Array.isArray(orders) && orders.length > 1) {
+    // 如果有多个选中项，自动切换到多选模式
+    if (!isMultiSelectMode.value) {
+      isMultiSelectMode.value = true
+    }
+  } else if (Array.isArray(orders) && orders.length <= 1) {
+    // 如果只有一个或没有选中项，可以保持当前模式（不强制切换）
+    // 这样用户可以手动选择模式
+  }
+}, { immediate: true })
 
 // 监听session变化，更新selectedCellIndex和displayCellIds
 watch(() => session.value, (newSession) => {
@@ -2698,6 +2788,40 @@ defineExpose({
   margin: 0;
 }
 
+/* 标题与模式切换按钮容器 */
+.title-with-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 紧凑版模式切换按钮 */
+.mode-toggle-btn-compact {
+  @apply px-2.5 py-1 text-xs font-medium rounded-md transition-all;
+  @apply flex items-center justify-center;
+  @apply border cursor-pointer;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply shadow-sm;
+  min-width: 60px;
+  height: 28px;
+}
+
+.mode-toggle-btn-compact.mode-single {
+  @apply bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 hover:border-blue-400;
+}
+
+.mode-toggle-btn-compact.mode-multi {
+  @apply bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100 hover:border-purple-400;
+}
+
+.mode-toggle-btn-compact:hover:not(:disabled) {
+  @apply shadow-md transform scale-105;
+}
+
+.mode-toggle-btn-compact:active:not(:disabled) {
+  @apply transform scale-95;
+}
+
 .header-controls {
   display: flex;
   gap: 12px;
@@ -2947,11 +3071,21 @@ defineExpose({
 }
 
 .module-item-type-text {
-  @apply border-gray-200 bg-gray-50;
+  @apply border-amber-300 bg-amber-50;
+  border-width: 2px;
 }
 
 .module-item-type-text:hover:not(.module-item-disabled) {
-  @apply border-gray-300 bg-gray-100;
+  @apply border-amber-400 bg-amber-100;
+}
+
+.module-item-type-browser {
+  @apply border-cyan-300 bg-cyan-100;
+  border-width: 2px;
+}
+
+.module-item-type-browser:hover:not(.module-item-disabled) {
+  @apply border-cyan-400 bg-cyan-200;
 }
 
 .module-item-type-activity {
@@ -2998,7 +3132,11 @@ defineExpose({
 }
 
 .module-item-type-text.module-item-active {
-  @apply bg-gray-600 border-gray-700 ring-gray-300;
+  @apply bg-amber-500 border-amber-600 ring-amber-300;
+}
+
+.module-item-type-browser.module-item-active {
+  @apply bg-cyan-500 border-cyan-600 ring-cyan-300;
 }
 
 .module-item-type-activity.module-item-active {
@@ -3023,7 +3161,11 @@ defineExpose({
 }
 
 .module-item-type-text.module-item-active:hover:not(.module-item-disabled) {
-  @apply bg-gray-700 border-gray-800 ring-gray-400;
+  @apply bg-amber-600 border-amber-700 ring-amber-400;
+}
+
+.module-item-type-browser.module-item-active:hover:not(.module-item-disabled) {
+  @apply bg-cyan-600 border-cyan-700 ring-cyan-400;
 }
 
 .module-item-type-activity.module-item-active:hover:not(.module-item-disabled) {
@@ -3107,6 +3249,14 @@ defineExpose({
   @apply border-yellow-400 text-yellow-600;
 }
 
+.module-item-type-text .module-item-number {
+  @apply border-amber-500 text-amber-700;
+}
+
+.module-item-type-browser .module-item-number {
+  @apply border-cyan-500 text-cyan-700;
+}
+
 .module-item-active .module-item-number {
   @apply bg-white scale-110 shadow-lg;
 }
@@ -3128,7 +3278,11 @@ defineExpose({
 }
 
 .icon-text {
-  @apply text-gray-600;
+  @apply text-amber-700;
+}
+
+.icon-browser {
+  @apply text-cyan-600;
 }
 
 .icon-video {
@@ -3204,6 +3358,7 @@ defineExpose({
   animation: pulse-badge 2s infinite;
 }
 
+
 /* 单选框样式 */
 .module-item-checkbox {
   @apply absolute bottom-2 right-2 z-10;
@@ -3225,10 +3380,20 @@ defineExpose({
 
 .checkbox-input {
   @apply w-5 h-5 cursor-pointer;
-  @apply border-2 border-gray-400 rounded-full;
+  @apply border-2 border-gray-400;
   @apply focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
   transition: all 0.2s ease;
   flex-shrink: 0;
+}
+
+/* 单选框样式（圆形） */
+input[type="radio"].checkbox-input {
+  @apply rounded-full;
+}
+
+/* 复选框样式（方形） */
+input[type="checkbox"].checkbox-input {
+  @apply rounded;
 }
 
 .module-item-type-video .checkbox-input:checked {
@@ -3249,6 +3414,14 @@ defineExpose({
 
 .module-item-type-qa .checkbox-input:checked {
   accent-color: #eab308;
+}
+
+.module-item-type-text .checkbox-input:checked {
+  accent-color: #f59e0b;
+}
+
+.module-item-type-browser .checkbox-input:checked {
+  accent-color: #06b6d4;
 }
 
 .checkbox-input:disabled {
