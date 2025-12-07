@@ -115,6 +115,134 @@
               已从已发布状态切换为草稿
             </div>
 
+            <!-- 封面图片上传 -->
+            <button
+              v-if="!isPreviewMode"
+              type="button"
+              @click="triggerCoverImageUpload"
+              class="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="上传封面图片"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              封面
+            </button>
+            <input
+              ref="coverImageInput"
+              type="file"
+              accept="image/*"
+              @change="handleCoverImageSelect"
+              class="hidden"
+            />
+            
+            <!-- 封面图片预览和编辑模态框 -->
+            <div
+              v-if="showCoverImagePreview"
+              class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+              @click.self="cancelCoverImageEdit"
+            >
+              <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                  <h3 class="text-lg font-semibold text-gray-900">编辑封面图片</h3>
+                  <button
+                    @click="cancelCoverImageEdit"
+                    class="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                <div class="flex-1 overflow-auto p-6">
+                  <div class="space-y-4">
+                    <!-- 图片预览 -->
+                    <div class="relative bg-gray-100 rounded-lg overflow-hidden" style="aspect-ratio: 16/9;">
+                      <img
+                        ref="coverImagePreview"
+                        :src="coverImagePreviewUrl"
+                        alt="封面预览"
+                        class="w-full h-full object-contain"
+                        style="max-height: 500px;"
+                      />
+                    </div>
+                    
+                    <!-- 缩放控制 -->
+                    <div class="space-y-2">
+                      <label class="block text-sm font-medium text-gray-700">
+                        图片质量: {{ imageQuality }}%
+                      </label>
+                      <input
+                        v-model.number="imageQuality"
+                        type="range"
+                        min="50"
+                        max="100"
+                        step="5"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <div class="flex justify-between text-xs text-gray-500">
+                        <span>较小文件</span>
+                        <span>较高质量</span>
+                      </div>
+                    </div>
+                    
+                    <!-- 尺寸控制 -->
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                          最大宽度 (px)
+                        </label>
+                        <input
+                          v-model.number="maxImageWidth"
+                          type="number"
+                          min="200"
+                          max="4000"
+                          step="100"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                          最大高度 (px)
+                        </label>
+                        <input
+                          v-model.number="maxImageHeight"
+                          type="number"
+                          min="200"
+                          max="4000"
+                          step="100"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p class="text-sm text-blue-800">
+                        <strong>提示：</strong>调整图片质量可以减小文件大小，建议使用 70-90% 的质量以获得最佳效果。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+                  <button
+                    @click="cancelCoverImageEdit"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    @click="processAndUploadCoverImage"
+                    :disabled="isUploadingCoverImage"
+                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {{ isUploadingCoverImage ? '上传中...' : '确认上传' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- AI 助手 -->
             <button
               type="button"
@@ -727,6 +855,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLessonStore } from '../../store/lesson'
+import { lessonService } from '../../services/lesson'
 // 已删除自动保存功能，避免并发保存导致数据覆盖
 // import { useAutoSave } from '../../composables/useAutoSave'
 import { v4 as uuidv4 } from 'uuid'
@@ -746,6 +875,7 @@ import ClassroomSelectorModal from '../../components/Lesson/ClassroomSelectorMod
 import LessonAiAssistantDrawer from '@/components/Teacher/LessonAiAssistantDrawer.vue'
 import TeacherClassroomControlPanel from '@/components/Classroom/TeacherControlPanel.vue'
 import { useFullscreen } from '@/composables/useFullscreen'
+import api from '../../services/api'
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
@@ -783,6 +913,17 @@ const selectedClassroomIds = ref<number[]>([])
 const publishError = ref<string | null>(null)
 const showLessonAssistant = ref(false)
 const showClassroomPanel = ref(false)
+
+// 封面图片上传相关
+const coverImageInput = ref<HTMLInputElement | null>(null)
+const isUploadingCoverImage = ref(false)
+const showCoverImagePreview = ref(false)
+const coverImagePreviewUrl = ref<string>('')
+const coverImagePreviewFile = ref<File | null>(null)
+const coverImagePreview = ref<HTMLImageElement | null>(null)
+const imageQuality = ref(85) // 默认质量85%
+const maxImageWidth = ref(1920) // 默认最大宽度1920px
+const maxImageHeight = ref(1080) // 默认最大高度1080px
 
 // 课堂会话相关
 const teacherControlPanelRef = ref<InstanceType<typeof TeacherClassroomControlPanel> | null>(null)
@@ -1541,6 +1682,172 @@ async function handleManualSave() {
   } catch (error: any) {
     showToast('error', error.message || '保存失败')
   }
+}
+
+// 触发封面图片上传
+function triggerCoverImageUpload() {
+  coverImageInput.value?.click()
+}
+
+// 处理封面图片选择（显示预览）
+function handleCoverImageSelect(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) {
+    return
+  }
+
+  // 验证文件类型
+  if (!file.type.startsWith('image/')) {
+    showToast('error', '请选择图片文件')
+    return
+  }
+
+  // 验证文件大小（限制为10MB）
+  const maxSize = 10 * 1024 * 1024 // 10MB
+  if (file.size > maxSize) {
+    showToast('error', '图片文件大小不能超过10MB')
+    return
+  }
+
+  // 保存文件并显示预览
+  coverImagePreviewFile.value = file
+  coverImagePreviewUrl.value = URL.createObjectURL(file)
+  showCoverImagePreview.value = true
+}
+
+// 取消封面图片编辑
+function cancelCoverImageEdit() {
+  showCoverImagePreview.value = false
+  if (coverImagePreviewUrl.value) {
+    URL.revokeObjectURL(coverImagePreviewUrl.value)
+    coverImagePreviewUrl.value = ''
+  }
+  coverImagePreviewFile.value = null
+  // 重置设置
+  imageQuality.value = 85
+  maxImageWidth.value = 1920
+  maxImageHeight.value = 1080
+  // 清空input
+  if (coverImageInput.value) {
+    coverImageInput.value.value = ''
+  }
+}
+
+// 处理并上传封面图片（带缩放和压缩）
+async function processAndUploadCoverImage() {
+  if (!coverImagePreviewFile.value || !currentLesson.value) {
+    return
+  }
+
+  isUploadingCoverImage.value = true
+
+  try {
+    // 使用Canvas处理图片
+    const processedFile = await processImage(
+      coverImagePreviewFile.value,
+      maxImageWidth.value,
+      maxImageHeight.value,
+      imageQuality.value / 100
+    )
+
+    // 准备上传到服务器
+    const formData = new FormData()
+    formData.append('file', processedFile, coverImagePreviewFile.value.name)
+
+    // 上传文件
+    const response = await api.post<{
+      file_url: string
+      file_size: number
+      filename: string
+    }>('/upload/', formData, {
+      timeout: 30000, // 30秒超时
+    })
+
+    // 获取相对路径
+    const imageUrl = response.file_url
+
+    // 更新教案的封面图片URL
+    currentLesson.value.cover_image_url = imageUrl
+    
+    // 立即保存封面图片URL
+    await lessonService.updateLesson(currentLesson.value.id, {
+      cover_image_url: imageUrl,
+    })
+    
+    showToast('success', '封面图片上传成功')
+    
+    // 关闭预览
+    cancelCoverImageEdit()
+  } catch (error: any) {
+    console.error('上传封面图片失败:', error)
+    showToast('error', error.response?.data?.detail || '上传封面图片失败')
+  } finally {
+    isUploadingCoverImage.value = false
+  }
+}
+
+// 处理图片：缩放和压缩
+function processImage(
+  file: File,
+  maxWidth: number,
+  maxHeight: number,
+  quality: number
+): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      // 计算新尺寸
+      let width = img.width
+      let height = img.height
+
+      // 如果图片尺寸超过限制，按比例缩放
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height)
+        width = Math.round(width * ratio)
+        height = Math.round(height * ratio)
+      }
+
+      // 创建Canvas
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+
+      if (!ctx) {
+        reject(new Error('无法创建Canvas上下文'))
+        return
+      }
+
+      // 绘制图片
+      ctx.drawImage(img, 0, 0, width, height)
+
+      // 转换为Blob
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('图片处理失败'))
+            return
+          }
+          // 转换为File对象
+          const processedFile = new File([blob], file.name, {
+            type: file.type,
+            lastModified: Date.now(),
+          })
+          resolve(processedFile)
+        },
+        file.type,
+        quality
+      )
+    }
+
+    img.onerror = () => {
+      reject(new Error('图片加载失败'))
+    }
+
+    // 加载图片
+    img.src = URL.createObjectURL(file)
+  })
 }
 
 // 发布教案

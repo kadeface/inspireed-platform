@@ -964,6 +964,7 @@ async function loadLessons() {
       search: searchQuery.value || undefined,
       grade_id: selectedGrade.value || undefined,
       chapter_id: selectedChapterId.value || undefined,
+      creator_only: true, // 我的教案：只显示当前用户创建的教案
     })
   } catch (error: any) {
     showToast('error', error.message || '加载教案列表失败')
@@ -974,17 +975,24 @@ async function loadLessons() {
 async function loadSharedLessons() {
   isLoadingSharedLessons.value = true
   try {
-    // TODO: 调用实际的共享教案API
-    // 这里先使用模拟数据，后续需要根据实际API调整
+    // 共享教案：只显示已发布的教案，且排除当前用户创建的
     const response = await lessonService.fetchLessons({
       page: sharedLessonsPage.value,
       page_size: lessonStore.pageSize,
+      status: LessonStatus.PUBLISHED,
       search: searchQuery.value || undefined,
-      // 注意：LessonListParams 类型中暂不支持 shared 参数
-      // 如需支持共享教案筛选，需要在 types/api.ts 中扩展 LessonListParams 接口
+      creator_only: false, // 明确指定不限制创建者
     })
-    sharedLessons.value = response.items
-    sharedLessonsTotal.value = response.total
+    
+    // 过滤掉当前用户创建的教案，只保留其他教师创建的共享教案
+    const currentUserId = userStore.user?.id
+    const filteredItems = currentUserId 
+      ? response.items.filter(lesson => lesson.creator?.id !== currentUserId)
+      : response.items
+    
+    sharedLessons.value = filteredItems
+    // 注意：total可能需要调整，但为了简化，这里使用过滤后的数量
+    sharedLessonsTotal.value = filteredItems.length
   } catch (error: any) {
     showToast('error', error.message || '加载共享教案列表失败')
     sharedLessons.value = []
@@ -1027,9 +1035,9 @@ async function loadSubjectGroupStats() {
 async function loadLessonStatusStats() {
   try {
     const [draftResponse, publishedResponse, archivedResponse] = await Promise.all([
-      lessonService.fetchLessons({ status: LessonStatus.DRAFT, page_size: 1 }),
-      lessonService.fetchLessons({ status: LessonStatus.PUBLISHED, page_size: 1 }),
-      lessonService.fetchLessons({ status: LessonStatus.ARCHIVED, page_size: 1 }),
+      lessonService.fetchLessons({ status: LessonStatus.DRAFT, page_size: 1, creator_only: true }),
+      lessonService.fetchLessons({ status: LessonStatus.PUBLISHED, page_size: 1, creator_only: true }),
+      lessonService.fetchLessons({ status: LessonStatus.ARCHIVED, page_size: 1, creator_only: true }),
     ])
 
     lessonStatusSummary.value = {

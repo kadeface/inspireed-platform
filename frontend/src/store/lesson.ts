@@ -119,6 +119,7 @@ export const useLessonStore = defineStore('lesson', () => {
         chapter_id: params?.chapter_id,
         grade_id: params?.grade_id,
         course_id: params?.course_id,
+        creator_only: params?.creator_only,
       })
       
       lessons.value = response.items
@@ -216,6 +217,7 @@ export const useLessonStore = defineStore('lesson', () => {
           description: currentLesson.value.description,
           content: content,  // 确保始终是数组
           tags: currentLesson.value.tags || [],
+          cover_image_url: currentLesson.value.cover_image_url,
         }
         
         // 验证数据完整性

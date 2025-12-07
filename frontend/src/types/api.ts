@@ -34,6 +34,7 @@ export interface LessonListParams {
   chapter_id?: number
   subject_id?: number
   grade_id?: number
+  creator_only?: boolean
 }
 
 /**

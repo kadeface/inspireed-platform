@@ -40,8 +40,8 @@
           >
             <div class="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
               <div class="flex items-center gap-4 mb-4">
-                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                  <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                   </svg>
                 </div>
@@ -53,7 +53,7 @@
               <div class="flex gap-3">
                 <button
                   @click="toggleFullscreen('fullscreen')"
-                  class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  class="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-colors font-medium shadow-lg shadow-emerald-500/30"
                 >
                   进入全屏
                 </button>
@@ -242,14 +242,14 @@
           <div class="mt-8 mb-8 border-t border-gray-200 pt-8">
             <div class="flex items-center justify-between mb-6">
               <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
                 课程问答
               </h2>
               <button
                 @click="showQuestionForm = true"
-                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/30"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -270,22 +270,36 @@
         </div>
       </div>
 
+      <!-- 移动端遮罩层 -->
+      <Transition name="fade">
+        <div
+          v-if="sidebarVisible && isMobile"
+          @click="toggleSidebar"
+          class="fixed inset-0 bg-black/50 z-30 md:hidden"
+        ></div>
+      </Transition>
+
       <!-- 右侧：学习空间 -->
       <Transition name="slide-sidebar">
         <div 
           v-if="sidebarVisible" 
-          class="w-96 bg-white shadow-lg border-l border-gray-200 flex flex-col relative z-20 flex-shrink-0"
+          :class="[
+            'bg-white/80 backdrop-blur-sm shadow-lg flex flex-col relative z-40',
+            isMobile 
+              ? 'fixed inset-y-0 right-0 w-full max-w-sm' 
+              : 'w-96 border-l border-gray-200 flex-shrink-0'
+          ]"
         >
-        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <div class="px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
               学习空间
             </h2>
             <div class="flex items-center gap-2">
-              <span class="text-xs text-gray-500">当前进度 {{ progress }}%</span>
+              <span class="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">当前进度 {{ progress }}%</span>
               <!-- 关闭按钮 -->
               <button
                 @click="toggleSidebar"
@@ -305,8 +319,8 @@
               :class="[
                 'rounded-md px-3 py-1.5 text-sm font-medium transition',
                 activeSidebarTab === 'notes'
-                  ? 'bg-blue-600 text-white shadow'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
+                  : 'bg-white/80 backdrop-blur-sm text-gray-600 border border-gray-200 hover:bg-gray-50'
               ]"
             >
               学习笔记
@@ -317,8 +331,8 @@
               :class="[
                 'rounded-md px-3 py-1.5 text-sm font-medium transition flex items-center gap-2',
                 activeSidebarTab === 'assistant'
-                  ? 'bg-gradient-to-r from-[#4C6EF5] to-[#6C8DFF] text-white shadow'
-                  : 'bg-white text-[#4C6EF5] border border-[#4C6EF5] hover:bg-[#ECF0FF]'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
+                  : 'bg-white/80 backdrop-blur-sm text-emerald-600 border border-emerald-300 hover:bg-emerald-50'
               ]"
             >
               <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -341,12 +355,12 @@
                 placeholder="支持 Markdown 格式，使用工具栏快速插入格式..."
               />
             </div>
-            <div class="px-6 py-3 border-t border-gray-200 bg-gray-50">
-              <div class="flex items-center justify-between text-xs text-gray-500">
-                <span v-if="notesSaving">保存中...</span>
-                <span v-else-if="notesSaved" class="text-green-600">✓ 已保存</span>
-                <span v-else>未保存</span>
-                <span>{{ notes.length }} 字符</span>
+            <div class="px-6 py-3 border-t border-gray-200 bg-white/80 backdrop-blur-sm">
+              <div class="flex items-center justify-between text-xs text-gray-600">
+                <span v-if="notesSaving" class="text-emerald-600">保存中...</span>
+                <span v-else-if="notesSaved" class="text-emerald-600 font-medium">✓ 已保存</span>
+                <span v-else class="text-gray-500">未保存</span>
+                <span class="text-gray-500">{{ notes.length }} 字符</span>
               </div>
             </div>
           </div>
@@ -367,7 +381,12 @@
         <button
           v-if="!sidebarVisible"
           @click="toggleSidebar"
-          class="fixed right-4 bottom-4 z-30 p-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all hover:scale-110"
+          :class="[
+            'fixed z-30 p-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all hover:scale-110',
+            isMobile 
+              ? 'right-4 bottom-20' 
+              : 'right-4 bottom-4'
+          ]"
           title="显示学习空间"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -436,7 +455,24 @@ const notes = ref('')
 const notesSaving = ref(false)
 const notesSaved = ref(false)
 const activeSidebarTab = ref<'notes' | 'assistant'>('notes')
-const sidebarVisible = ref(true) // 侧边栏显示状态，默认显示
+
+// 检测是否为移动设备
+const isMobile = ref(false)
+const checkMobile = () => {
+  // 检测屏幕宽度和用户代理
+  const screenWidth = window.innerWidth
+  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  const wasMobile = isMobile.value
+  isMobile.value = screenWidth < 768 || isMobileDevice
+  
+  // 如果从桌面切换到移动端，或进入课堂模式，自动隐藏侧边栏
+  if (isMobile.value && (!wasMobile || isInClassroomMode.value)) {
+    sidebarVisible.value = false
+  }
+}
+
+// 侧边栏显示状态：手机端默认隐藏，桌面端默认显示
+const sidebarVisible = ref(false)
 
 // 问答相关状态
 const showQuestionForm = ref(false)
@@ -991,9 +1027,23 @@ const markAsCompleted = () => {
 // 切换侧边栏显示/隐藏
 const toggleSidebar = () => {
   sidebarVisible.value = !sidebarVisible.value
-  // 可选：将状态保存到 localStorage，下次访问时恢复
-  localStorage.setItem('student_sidebar_visible', String(sidebarVisible.value))
+  // 只在桌面端保存状态到 localStorage（手机端总是默认隐藏）
+  if (!isMobile.value) {
+    localStorage.setItem('student_sidebar_visible', String(sidebarVisible.value))
+  }
 }
+
+// 监听课堂模式和移动设备状态变化，在手机端自动隐藏侧边栏
+watch(
+  () => [isInClassroomMode.value, isMobile.value],
+  ([isInClassroom, mobile]) => {
+    if (isInClassroom && mobile) {
+      // 进入课堂模式时，手机端自动隐藏学习空间，优先显示授课内容
+      sidebarVisible.value = false
+    }
+  },
+  { immediate: true }
+)
 
 // 🆕 监听 display_cell_orders 变化，自动更新学生进度
 watch(
@@ -1212,10 +1262,21 @@ const handleQuestionSuccess = (_questionId: number) => {
 
 // 生命周期
 onMounted(async () => {
-  // 恢复侧边栏显示状态（从localStorage）
+  // 检测移动设备
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+  
+  // 恢复侧边栏显示状态（从localStorage，但手机端默认隐藏）
   const savedSidebarVisible = localStorage.getItem('student_sidebar_visible')
-  if (savedSidebarVisible !== null) {
+  if (isMobile.value) {
+    // 手机端默认隐藏，优先显示主要授课内容
+    sidebarVisible.value = false
+  } else if (savedSidebarVisible !== null) {
+    // 桌面端：恢复之前保存的状态
     sidebarVisible.value = savedSidebarVisible === 'true'
+  } else {
+    // 桌面端默认显示
+    sidebarVisible.value = true
   }
   
   loadLesson()
@@ -1247,6 +1308,9 @@ onUnmounted(() => {
     stopWatchDisplayCellIds = null
   }
   
+  // 移除窗口大小变化监听器
+  window.removeEventListener('resize', checkMobile)
+  
   // 移除全屏状态监听器
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
   document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
@@ -1276,6 +1340,15 @@ onUnmounted(() => {
 .slide-sidebar-leave-from {
   transform: translateX(0);
   opacity: 1;
+}
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+  /* 确保移动端侧边栏在最上层 */
+  .slide-sidebar-enter-active,
+  .slide-sidebar-leave-active {
+    z-index: 40;
+  }
 }
 
 /* 浮动按钮淡入淡出动画 */

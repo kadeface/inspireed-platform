@@ -4,12 +4,14 @@
     @click="handleView"
   >
     <!-- 封面图 -->
-    <div class="relative h-44 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500">
+    <div class="relative h-44 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 overflow-hidden">
       <img
-        v-if="lesson.cover_image_url"
-        :src="lesson.cover_image_url"
+        v-if="coverImageUrl && !imageLoadError"
+        :src="coverImageUrl"
         :alt="lesson.title"
         class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+        @error="imageLoadError = true"
+        @load="imageLoadError = false"
       />
       <div
         v-else
@@ -222,10 +224,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import type { Lesson } from '../../types/lesson'
 import { LessonStatus } from '../../types/lesson'
+import { getServerBaseUrl } from '../../utils/url'
 
 interface Props {
   lesson: Lesson
@@ -234,6 +237,36 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   showActions: true,
+})
+
+// 图片加载错误状态
+const imageLoadError = ref(false)
+
+// 构建完整的封面图片URL
+const coverImageUrl = computed(() => {
+  if (!props.lesson.cover_image_url) {
+    return null
+  }
+  
+  const url = props.lesson.cover_image_url
+  
+  // 如果已经是完整URL（http/https开头），直接返回
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  
+  // 如果是相对路径（以/开头），构建完整URL
+  if (url.startsWith('/')) {
+    return `${getServerBaseUrl()}${url}`
+  }
+  
+  // 其他情况直接返回
+  return url
+})
+
+// 监听封面图片URL变化，重置错误状态
+watch(() => props.lesson.cover_image_url, () => {
+  imageLoadError.value = false
 })
 
 const emit = defineEmits<{

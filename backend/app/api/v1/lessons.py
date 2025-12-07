@@ -186,6 +186,7 @@ async def list_lessons(
     chapter_id: Optional[int] = Query(None, description="按章节ID筛选"),
     subject_id: Optional[int] = Query(None, description="按学科ID筛选"),
     grade_id: Optional[int] = Query(None, description="按年级ID筛选"),
+    creator_only: bool = Query(False, description="是否只返回当前用户创建的教案"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
@@ -226,33 +227,40 @@ async def list_lessons(
             .distinct(Lesson.id)
         )
     else:
-        # 教师/管理员/教研员：可以看到自己创建的教案 + 所有已发布的教案（共享教案）
-        if status_enum:
-            # 如果指定了状态筛选
-            if status_enum == LessonStatus.PUBLISHED:
-                # 查看已发布教案时，显示自己的 + 所有已发布的
+        # 教师/管理员/教研员
+        if creator_only:
+            # 如果指定了creator_only=True，只返回当前用户创建的教案
+            base_query = base_query.where(Lesson.creator_id == current_user.id)
+            if status_enum:
+                base_query = base_query.where(Lesson.status == status_enum)
+        else:
+            # 默认行为：可以看到自己创建的教案 + 所有已发布的教案（共享教案）
+            if status_enum:
+                # 如果指定了状态筛选
+                if status_enum == LessonStatus.PUBLISHED:
+                    # 查看已发布教案时，显示自己的 + 所有已发布的
+                    base_query = base_query.where(
+                        or_(
+                            Lesson.creator_id == current_user.id,
+                            Lesson.status == LessonStatus.PUBLISHED
+                        )
+                    )
+                else:
+                    # 查看其他状态时，只显示自己创建的
+                    base_query = base_query.where(
+                        and_(
+                            Lesson.creator_id == current_user.id,
+                            Lesson.status == status_enum
+                        )
+                    )
+            else:
+                # 没有状态筛选时，显示自己创建的 + 所有已发布的
                 base_query = base_query.where(
                     or_(
                         Lesson.creator_id == current_user.id,
                         Lesson.status == LessonStatus.PUBLISHED
                     )
                 )
-            else:
-                # 查看其他状态时，只显示自己创建的
-                base_query = base_query.where(
-                    and_(
-                        Lesson.creator_id == current_user.id,
-                        Lesson.status == status_enum
-                    )
-                )
-        else:
-            # 没有状态筛选时，显示自己创建的 + 所有已发布的
-            base_query = base_query.where(
-                or_(
-                    Lesson.creator_id == current_user.id,
-                    Lesson.status == LessonStatus.PUBLISHED
-                )
-            )
 
     if search:
         base_query = base_query.where(Lesson.title.ilike(f"%{search}%"))

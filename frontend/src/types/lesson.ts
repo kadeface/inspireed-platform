@@ -77,6 +77,7 @@ export interface LessonUpdate {
   content?: Cell[]
   tags?: string[]
   status?: LessonStatus
+  cover_image_url?: string  // 封面图片URL
 }
 
 export interface LessonRelatedMaterial {

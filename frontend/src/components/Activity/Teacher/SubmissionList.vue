@@ -91,6 +91,7 @@
                 @change="toggleSelectAll"
               />
             </th>
+            <th class="table-header">排名</th>
             <th class="table-header">学生</th>
             <th class="table-header">状态</th>
             <th class="table-header">分数</th>
@@ -101,9 +102,10 @@
         </thead>
         <tbody>
           <tr
-            v-for="submission in submissions"
+            v-for="submission in submissionsWithRank"
             :key="submission.id"
             class="table-row"
+            :class="{ 'top-three': submission.rank !== null && submission.rank <= 3 }"
           >
             <td class="table-cell">
               <input
@@ -111,6 +113,23 @@
                 :value="submission.id"
                 v-model="selectedSubmissions"
               />
+            </td>
+            <td class="table-cell">
+              <div class="rank-display">
+                <span v-if="submission.rank === 1" class="rank-badge rank-first" title="🏆 冠军">
+                  🥇
+                </span>
+                <span v-else-if="submission.rank === 2" class="rank-badge rank-second" title="🥈 亚军">
+                  🥈
+                </span>
+                <span v-else-if="submission.rank === 3" class="rank-badge rank-third" title="🥉 季军">
+                  🥉
+                </span>
+                <span v-else-if="submission.rank !== null" class="rank-number">
+                  {{ submission.rank }}
+                </span>
+                <span v-else class="rank-unranked">-</span>
+              </div>
             </td>
             <td class="table-cell">
               <div class="student-info">
@@ -259,7 +278,7 @@ const statusFilter = ref('')
 const selectedSubmissions = ref<number[]>([])
 const gradingSubmission = ref<any | null>(null)
 
-// 全选状态
+// 全选状态（基于原始提交列表）
 const allSelected = computed(() => {
   return submissions.value.length > 0 && selectedSubmissions.value.length === submissions.value.length
 })
@@ -285,6 +304,65 @@ const statistics = computed(() => {
     draftPercent: totalStudents > 0 ? Math.round((draft / totalStudents) * 100) : 0,
     gradedPercent: totalStudents > 0 ? Math.round((graded / totalStudents) * 100) : 0,
   }
+})
+
+// 带排名的提交列表（按分数排序）
+const submissionsWithRank = computed(() => {
+  // 分离已评分和未评分的提交
+  // 已评分：有分数且不是未开始状态（通过id判断）
+  const gradedSubmissions = submissions.value.filter(s => 
+    s.score !== null && s.score !== undefined && s.id && s.id !== 0
+  )
+  const ungradedSubmissions = submissions.value.filter(s => 
+    !gradedSubmissions.includes(s)
+  )
+  
+  // 对已评分的提交按分数从高到低排序
+  const sortedGraded = [...gradedSubmissions].sort((a, b) => {
+    const scoreA = a.score ?? 0
+    const scoreB = b.score ?? 0
+    // 分数高的在前
+    if (scoreB !== scoreA) {
+      return scoreB - scoreA
+    }
+    // 分数相同，按提交时间排序（早提交的在前）
+    const timeA = new Date(a.submittedAt || a.createdAt || 0).getTime()
+    const timeB = new Date(b.submittedAt || b.createdAt || 0).getTime()
+    return timeA - timeB
+  })
+  
+  // 添加排名信息（正确处理并列情况）
+  let currentRank = 1
+  const rankedSubmissions: Array<ActivitySubmissionWithStudent & { rank: number | null }> = []
+  
+  for (let i = 0; i < sortedGraded.length; i++) {
+    const submission = sortedGraded[i]
+    
+    // 如果不是第一个，检查是否与前一个分数相同
+    if (i > 0) {
+      const prevScore = sortedGraded[i - 1].score ?? 0
+      const currentScore = submission.score ?? 0
+      
+      // 如果分数不同，更新排名
+      if (currentScore !== prevScore) {
+        currentRank = i + 1
+      }
+      // 如果分数相同，保持相同排名（并列）
+    }
+    
+    rankedSubmissions.push({
+      ...submission,
+      rank: currentRank,
+    })
+  }
+  
+  // 未评分的提交不显示排名，添加到末尾
+  const ungradedWithNullRank = ungradedSubmissions.map(s => ({
+    ...s,
+    rank: null,
+  }))
+  
+  return [...rankedSubmissions, ...ungradedWithNullRank]
 })
 
 // 获取选择题及其统计（从提交数据中计算）
@@ -1024,6 +1102,51 @@ onUnmounted(() => {
 
 .choice-option-item.is-correct .option-percentage {
   @apply text-green-600;
+}
+
+/* 排名样式 */
+.rank-display {
+  @apply flex items-center justify-center min-w-[60px];
+}
+
+.rank-badge {
+  @apply text-2xl flex-shrink-0;
+  animation: rankPulse 2s ease-in-out infinite;
+}
+
+.rank-first {
+  filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.4));
+}
+
+.rank-second {
+  filter: drop-shadow(0 2px 4px rgba(192, 192, 192, 0.4));
+}
+
+.rank-third {
+  filter: drop-shadow(0 2px 4px rgba(205, 127, 50, 0.4));
+}
+
+.rank-number {
+  @apply inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-sm;
+}
+
+.rank-unranked {
+  @apply text-gray-400 text-sm;
+}
+
+.table-row.top-three {
+  @apply bg-gradient-to-r from-yellow-50/30 to-transparent;
+}
+
+@keyframes rankPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.9;
+  }
 }
 </style>
 

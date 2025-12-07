@@ -41,6 +41,7 @@ class LessonService {
           chapter_id: params?.chapter_id,
           subject_id: params?.subject_id,
           grade_id: params?.grade_id,
+          creator_only: params?.creator_only,
         },
       })
       return response

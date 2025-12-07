@@ -7,46 +7,49 @@
       ></div>
 
       <aside
-        class="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col bg-white shadow-2xl"
+        class="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col bg-white/95 backdrop-blur-sm shadow-2xl"
       >
-        <header class="flex items-start justify-between gap-4 border-b border-[#E2E6F6] px-6 py-5">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-[#4C6EF5]">
-              教学共创
-            </p>
-            <h2 class="mt-1 text-xl font-semibold text-[#2B2F48]">
-              AI 教案助理
-            </h2>
-            <p class="mt-1 text-sm text-[#6E7590]">
-              根据当前教案结构，生成教学目标、活动设计与优化建议。
-            </p>
+        <header class="relative overflow-hidden border-b border-gray-200 bg-white/80 backdrop-blur-sm px-6 py-5">
+          <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-violet-500 to-purple-600"></span>
+          <div class="relative flex items-start justify-between gap-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-violet-600">
+                教学共创
+              </p>
+              <h2 class="mt-1 text-xl font-bold text-gray-900">
+                AI 教案助理
+              </h2>
+              <p class="mt-1 text-sm text-gray-600">
+                根据当前教案结构，生成教学目标、活动设计与优化建议。
+              </p>
+            </div>
+            <button
+              type="button"
+              class="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2"
+              @click="handleClose"
+            >
+              <span class="sr-only">关闭</span>
+              <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fill-rule="evenodd"
+                  d="M10 8.586l4.95-4.95a1 1 0 111.414 1.414L11.414 10l4.95 4.95a1 1 0 01-1.414 1.414L10 11.414l-4.95 4.95a1 1 0 01-1.414-1.414L8.586 10l-4.95-4.95A1 1 0 115.05 3.636L10 8.586z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </button>
           </div>
-          <button
-            type="button"
-            class="rounded-full p-2 text-[#6E7590] transition hover:bg-[#ECF0FF] hover:text-[#4C6EF5] focus:outline-none focus:ring-2 focus:ring-[#4C6EF5] focus:ring-offset-2"
-            @click="handleClose"
-          >
-            <span class="sr-only">关闭</span>
-            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fill-rule="evenodd"
-                d="M10 8.586l4.95-4.95a1 1 0 111.414 1.414L11.414 10l4.95 4.95a1 1 0 01-1.414 1.414L10 11.414l-4.95 4.95a1 1 0 01-1.414-1.414L8.586 10l-4.95-4.95A1 1 0 115.05 3.636L10 8.586z"
-                clip-rule="evenodd"
-              />
-            </svg>
-          </button>
         </header>
 
         <main class="flex-1 overflow-y-auto px-6 py-5">
           <!-- 标签页导航 -->
-          <div class="mb-4 flex gap-2 border-b border-[#E2E6F6]">
+          <div class="mb-4 inline-flex rounded-xl shadow-sm bg-white/80 backdrop-blur-sm border border-gray-200" role="tablist">
             <button
               type="button"
               :class="[
-                'px-4 py-2 text-sm font-medium transition-colors',
+                'px-5 py-2.5 text-sm font-medium transition-all rounded-l-xl',
                 activeTab === 'overview'
-                  ? 'border-b-2 border-[#4C6EF5] text-[#4C6EF5]'
-                  : 'text-[#6E7590] hover:text-[#4C6EF5]'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 z-10'
+                  : 'bg-transparent text-gray-700 hover:bg-gray-50'
               ]"
               @click="activeTab = 'overview'"
             >
@@ -55,10 +58,10 @@
             <button
               type="button"
               :class="[
-                'px-4 py-2 text-sm font-medium transition-colors',
+                'px-5 py-2.5 text-sm font-medium transition-all rounded-r-xl',
                 activeTab === 'resources'
-                  ? 'border-b-2 border-[#4C6EF5] text-[#4C6EF5]'
-                  : 'text-[#6E7590] hover:text-[#4C6EF5]'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 z-10'
+                  : 'bg-transparent text-gray-700 hover:bg-gray-50'
               ]"
               @click="activeTab = 'resources'"
             >
@@ -68,70 +71,92 @@
 
           <!-- 教案概览标签页 -->
           <div v-show="activeTab === 'overview'">
-            <section class="rounded-2xl border border-[#D9DFF5] bg-[#F7F8FC] p-4">
-              <h3 class="text-sm font-semibold text-[#2B2F48]">教案概览</h3>
-              <p class="mt-2 text-xs text-[#6E7590]">
+            <section class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-4 shadow-lg">
+              <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-violet-500 to-purple-600"></span>
+              <h3 class="relative text-sm font-semibold text-gray-900">教案概览</h3>
+              <p class="relative mt-2 text-xs text-gray-600">
                 标题：
-                <span class="font-medium text-[#4C6EF5]">
+                <span class="font-medium text-violet-600">
                   {{ lessonTitle || '未命名教案' }}
                 </span>
               </p>
-              <div v-if="lessonOutline" class="mt-3 space-y-2 text-xs text-[#4C568E]">
-                <p class="font-semibold text-[#6E7590]">结构要点</p>
+              <div v-if="lessonOutline" class="relative mt-3 space-y-2 text-xs text-gray-700">
+                <p class="font-semibold text-gray-600">结构要点</p>
                 <ul class="list-outside list-disc space-y-1 pl-5">
                   <li v-for="(item, index) in outlineItems" :key="index">
                     {{ item }}
                   </li>
                 </ul>
               </div>
-              <p v-else class="mt-3 text-xs text-[#8D93AA]">
+              <p v-else class="relative mt-3 text-xs text-gray-500">
                 尚未检测到详细结构，AI 将根据标题提供通用建议。
               </p>
             </section>
 
             <section class="mt-5 space-y-3">
             <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-[#2B2F48]">智能推荐提问</h3>
+              <h3 class="text-sm font-semibold text-gray-900">智能推荐提问</h3>
               <button
                 type="button"
-                class="rounded-full border border-[#4C6EF5] px-3 py-1 text-xs font-medium text-[#4C6EF5] transition hover:bg-[#4C6EF5] hover:text-white"
+                class="rounded-full border border-emerald-300 px-3 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-500 hover:text-white hover:border-emerald-500"
                 @click="rotatePrompts"
               >
                 换一批
               </button>
             </div>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="prompt in visiblePrompts"
-                :key="prompt"
-                type="button"
-                class="rounded-xl border border-transparent bg-[#EFF2FF] px-3 py-1.5 text-left text-xs text-[#4C6EF5] transition hover:border-[#4C6EF5]"
-                @click="applyPrompt(prompt)"
-              >
-                {{ prompt }}
-              </button>
+            <div class="space-y-3">
+              <!-- 基础推荐 -->
+              <div>
+                <p class="mb-2 text-xs font-medium text-gray-600">基础推荐</p>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="prompt in visibleBasePrompts"
+                    :key="prompt"
+                    type="button"
+                    class="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-1.5 text-left text-xs text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100/70"
+                    @click="applyPrompt(prompt)"
+                  >
+                    {{ prompt }}
+                  </button>
+                </div>
+              </div>
+              <!-- 学习科学推荐 -->
+              <div>
+                <p class="mb-2 text-xs font-medium text-gray-600">学习科学</p>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="prompt in visibleLearningSciencePrompts"
+                    :key="prompt"
+                    type="button"
+                    class="rounded-xl border border-teal-100 bg-teal-50/50 px-3 py-1.5 text-left text-xs text-teal-700 transition hover:border-teal-300 hover:bg-teal-100/70"
+                    @click="applyPrompt(prompt)"
+                  >
+                    {{ prompt }}
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
 
           <section class="mt-5 space-y-2">
-            <label class="text-sm font-semibold text-[#2B2F48]" for="lesson-assistant-question">
+            <label class="text-sm font-semibold text-gray-900" for="lesson-assistant-question">
               输入问题或描述需求
             </label>
             <textarea
               id="lesson-assistant-question"
               v-model="question"
               rows="4"
-              class="w-full resize-none rounded-xl border border-[#D9DFF5] px-4 py-3 text-sm text-[#2B2F48] shadow-sm focus:border-[#4C6EF5] focus:outline-none focus:ring-2 focus:ring-[#C8D4FF]"
+              class="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white/80 backdrop-blur-sm"
               placeholder="例如：帮我为《{{ lessonTitle || '本节课' }}》设计课堂导入活动。"
             ></textarea>
           </section>
 
-          <div class="mt-3 flex items-center justify-between gap-2 text-xs text-[#8D93AA]">
+          <div class="mt-3 flex items-center justify-between gap-2 text-xs text-gray-600">
             <p>AI 会结合标题与结构，生成大纲、活动或优化建议。</p>
             <button
               type="button"
               :disabled="isSubmitting || !canSubmit"
-              class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#4C6EF5] to-[#6C8DFF] px-4 py-2 text-sm font-semibold text-white shadow transition enabled:hover:shadow-lg enabled:focus:outline-none enabled:focus:ring-2 enabled:focus:ring-[#BFD0FF] disabled:cursor-not-allowed disabled:opacity-50"
+              class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition enabled:hover:shadow-xl enabled:hover:shadow-emerald-500/40 enabled:focus:outline-none enabled:focus:ring-2 enabled:focus:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-60"
               @click="handleSubmit"
             >
               <svg
@@ -160,44 +185,45 @@
 
           <p
             v-if="errorMessage"
-            class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600"
+            class="mt-3 rounded-xl border border-red-200 bg-red-50/80 backdrop-blur-sm px-3 py-2 text-xs text-red-700 shadow-sm"
           >
             {{ errorMessage }}
           </p>
 
             <section
               v-if="response"
-              class="mt-5 space-y-3 rounded-2xl border border-[#D9DFF5] bg-[#F7F8FC] p-4"
+              class="group relative overflow-hidden mt-5 space-y-3 rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-4 shadow-lg"
             >
-              <div class="flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-[#2B2F48]">助手回答</h3>
-                <div class="flex items-center gap-2 text-[11px] text-[#8D93AA]">
+              <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600"></span>
+              <div class="relative flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-gray-900">助手回答</h3>
+                <div class="flex items-center gap-2 text-[11px] text-gray-500">
                   <span v-if="response.model_used">模型 {{ response.model_used }}</span>
                   <span v-if="response.response_time_ms">
                     {{ Math.round(response.response_time_ms) }} ms
                   </span>
                 </div>
               </div>
-              <div class="rounded-xl bg-white p-4 text-sm text-[#2B2F48] shadow-inner">
+              <div class="relative rounded-xl bg-white/90 backdrop-blur-sm p-4 text-sm text-gray-900 shadow-inner border border-gray-100">
                 <MarkdownPreview :content="response.answer" />
               </div>
-              <div class="flex flex-wrap gap-2">
+              <div class="relative flex flex-wrap gap-2">
                 <button
                   type="button"
-                  class="rounded-full border border-[#4C6EF5] px-3 py-1 text-xs text-[#4C6EF5] transition hover:bg-[#4C6EF5] hover:text-white"
+                  class="rounded-full border border-emerald-300 px-3 py-1 text-xs text-emerald-700 transition hover:bg-emerald-500 hover:text-white hover:border-emerald-500"
                   @click="copyAnswer"
                 >
                   复制内容
                 </button>
                 <button
                   type="button"
-                  class="rounded-full border border-transparent bg-[#4FB5A3]/15 px-3 py-1 text-xs text-[#3A917F] transition hover:bg-[#4FB5A3]/25"
+                  class="rounded-full border border-transparent bg-teal-50 px-3 py-1 text-xs text-teal-700 transition hover:bg-teal-100"
                   @click="emitInsert"
                 >
                   插入到教案
                 </button>
               </div>
-              <p v-if="copyToast.show" class="text-xs text-[#4C6EF5]">
+              <p v-if="copyToast.show" class="relative text-xs text-emerald-600">
                 {{ copyToast.message }}
               </p>
             </section>
@@ -208,19 +234,20 @@
             <section
               v-for="category in aiResourceCategories"
               :key="category.name"
-              class="rounded-2xl border border-[#D9DFF5] bg-[#F7F8FC] p-4"
+              class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-4 shadow-lg"
             >
-              <h3 class="mb-3 text-sm font-semibold text-[#2B2F48]">
+              <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cyan-500 to-teal-600"></span>
+              <h3 class="relative mb-3 text-sm font-semibold text-gray-900">
                 {{ category.name }}
               </h3>
-              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div class="relative grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <a
                   v-for="resource in category.resources"
                   :key="resource.name"
                   :href="resource.url"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="group flex items-center gap-2 rounded-lg border border-transparent bg-white px-3 py-2 text-xs text-[#4C568E] transition hover:border-[#4C6EF5] hover:bg-[#EFF2FF] hover:text-[#4C6EF5]"
+                  class="group flex items-center gap-2 rounded-lg border border-gray-200 bg-white/90 backdrop-blur-sm px-3 py-2 text-xs text-gray-700 transition hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-700"
                 >
                   <div class="relative h-5 w-5 flex-shrink-0">
                     <img
@@ -232,7 +259,7 @@
                   </div>
                   <span class="truncate">{{ resource.name }}</span>
                   <svg
-                    class="ml-auto h-3 w-3 flex-shrink-0 text-[#8D93AA] group-hover:text-[#4C6EF5]"
+                    class="ml-auto h-3 w-3 flex-shrink-0 text-gray-400 group-hover:text-emerald-600"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -250,7 +277,7 @@
           </div>
         </main>
 
-        <footer class="border-t border-[#E2E6F6] bg-[#F7F8FC] px-6 py-4 text-xs text-[#8D93AA]">
+        <footer class="border-t border-gray-200 bg-gradient-to-r from-emerald-50/50 via-teal-50/30 to-cyan-50/30 px-6 py-4 text-xs text-gray-600">
           AI 建议仅供参考，请结合课堂实际进行调整。
         </footer>
       </aside>
@@ -303,7 +330,7 @@ const copyToast = ref({ show: false, message: '' })
 const activeTab = ref<'overview' | 'resources'>('overview')
 
 const basePrompts = computed(() => [
-  `请根据“${props.lessonTitle || '本节课'}”生成教学目标和达成指标。`,
+  `请根据"${props.lessonTitle || '本节课'}"生成教学目标和达成指标。`,
   '帮我设计一个课堂导入活动，强调学生参与感。',
   '为本课安排三个课堂活动，并给出时间分配建议。',
   '请提供学习评价/作业设计，突出形成性反馈。',
@@ -321,10 +348,25 @@ const outlinePrompts = computed(() => {
   ]
 })
 
-const allPrompts = computed(() => [...basePrompts.value, ...outlinePrompts.value])
+const learningSciencePrompts = computed(() => [
+  '基于布鲁姆分类法，为本课设计从记忆到创造的认知层次活动。',
+  '设计苏格拉底式提问序列，引导学生逐步深入思考。',
+  '结合费曼学习法，设计让学生用自己的话解释概念的活动。',
+  '分析不同学习风格学生的特点，提供差异化教学建议。',
+  '基于5E教学模型，优化本课的探索和解释环节。',
+  '设计促进学生主动输出的活动，培养元认知能力。',
+  '结合最近发展区理论，为本课设计脚手架支持。',
+  '基于建构主义理论，设计让学生主动建构知识的活动。',
+])
 
-const visiblePrompts = computed(() => {
-  const prompts = allPrompts.value
+const allPrompts = computed(() => [
+  ...basePrompts.value,
+  ...outlinePrompts.value,
+  ...learningSciencePrompts.value,
+])
+
+const visibleBasePrompts = computed(() => {
+  const prompts = [...basePrompts.value, ...outlinePrompts.value]
   if (prompts.length <= 3) {
     return prompts
   }
@@ -333,6 +375,20 @@ const visiblePrompts = computed(() => {
     prompts[start],
     prompts[(start + 1) % prompts.length],
     prompts[(start + 2) % prompts.length],
+  ]
+})
+
+const visibleLearningSciencePrompts = computed(() => {
+  const prompts = learningSciencePrompts.value
+  if (prompts.length <= 4) {
+    return prompts
+  }
+  const start = (promptIndex.value * 2) % prompts.length
+  return [
+    prompts[start],
+    prompts[(start + 1) % prompts.length],
+    prompts[(start + 2) % prompts.length],
+    prompts[(start + 3) % prompts.length],
   ]
 })
 
@@ -348,52 +404,58 @@ const aiResourceCategories: AiResourceCategory[] = [
   {
     name: 'AI工具大全',
     resources: [
-      { name: 'AI-Bot', url: 'https://ai-bot.cn', icon: 'https://www.google.com/s2/favicons?domain=ai-bot.cn&sz=32' },
+      { name: 'AI-Bot', url: 'https://ai-bot.cn' },
     ],
   },
   {
     name: '知识库',
     resources: [
-      { name: 'IMA', url: 'https://ima.qq.com/', icon: 'https://www.google.com/s2/favicons?domain=ima.qq.com&sz=32' },
-      { name: 'Notion AI', url: 'https://www.notion.so/product/ai', icon: 'https://www.google.com/s2/favicons?domain=notion.so&sz=32' },
-      { name: 'Obsidian', url: 'https://obsidian.md', icon: 'https://www.google.com/s2/favicons?domain=obsidian.md&sz=32' },
+      { name: 'IMA', url: 'https://ima.qq.com/' },
+      { name: 'Notion AI', url: 'https://www.notion.so/product/ai' },
+      { name: 'Obsidian', url: 'https://obsidian.md' },
     ],
   },
   {
     name: '大模型',
     resources: [
-      { name: 'DeepSeek', url: 'https://www.deepseek.com', icon: 'https://www.google.com/s2/favicons?domain=deepseek.com&sz=32' },
-      { name: '文心一言', url: 'https://yiyan.baidu.com', icon: 'https://www.google.com/s2/favicons?domain=baidu.com&sz=32' },
-      { name: 'Kimi', url: 'https://kimi.moonshot.cn', icon: 'https://www.google.com/s2/favicons?domain=moonshot.cn&sz=32' },
-      { name: 'ChatGPT', url: 'https://chat.openai.com', icon: 'https://www.google.com/s2/favicons?domain=openai.com&sz=32' },
-      { name: 'Claude', url: 'https://claude.ai', icon: 'https://www.google.com/s2/favicons?domain=claude.ai&sz=32' },
-      { name: '通义千问', url: 'https://tongyi.aliyun.com', icon: 'https://www.google.com/s2/favicons?domain=aliyun.com&sz=32' },
-      { name: '智谱清言', url: 'https://chatglm.cn', icon: 'https://www.google.com/s2/favicons?domain=chatglm.cn&sz=32' },
-      { name: '豆包', url: 'https://www.doubao.com', icon: 'https://www.google.com/s2/favicons?domain=doubao.com&sz=32' },
+      { name: 'DeepSeek', url: 'https://www.deepseek.com' },
+      { name: '文心一言', url: 'https://yiyan.baidu.com' },
+      { name: 'Kimi', url: 'https://kimi.moonshot.cn' },
+      { name: 'ChatGPT', url: 'https://chat.openai.com' },
+      { name: 'Claude', url: 'https://claude.ai' },
+      { name: '通义千问', url: 'https://tongyi.aliyun.com' },
+      { name: '智谱清言', url: 'https://chatglm.cn' },
+      { name: '豆包', url: 'https://www.doubao.com' },
     ],
   },
   {
     name: '文生图',
     resources: [
-      { name: '可灵', url: 'https://app.klingai.com/cn/', icon: 'https://www.google.com/s2/favicons?domain=klingai.com&sz=32' },
-      { name: 'Midjourney', url: 'https://www.midjourney.com', icon: 'https://www.google.com/s2/favicons?domain=midjourney.com&sz=32' },
-      { name: 'DALL·E', url: 'https://openai.com/dall-e-2', icon: 'https://www.google.com/s2/favicons?domain=openai.com&sz=32' },
-      { name: 'Stable Diffusion', url: 'https://stablediffusionweb.com', icon: 'https://www.google.com/s2/favicons?domain=stablediffusionweb.com&sz=32' },
-      { name: '文心一格', url: 'https://yige.baidu.com', icon: 'https://www.google.com/s2/favicons?domain=baidu.com&sz=32' },
-      { name: '通义万相', url: 'https://tongyi.aliyun.com/wanxiang', icon: 'https://www.google.com/s2/favicons?domain=aliyun.com&sz=32' },
-      { name: '6pen', url: 'https://6pen.art', icon: 'https://www.google.com/s2/favicons?domain=6pen.art&sz=32' },
+      { name: '可灵', url: 'https://app.klingai.com/cn/' },
+      { name: 'Midjourney', url: 'https://www.midjourney.com' },
+      { name: 'DALL·E', url: 'https://openai.com/dall-e-2' },
+      { name: 'Stable Diffusion', url: 'https://stablediffusionweb.com' },
+      { name: '文心一格', url: 'https://yige.baidu.com' },
+      { name: '通义万相', url: 'https://tongyi.aliyun.com/wanxiang' },
+      { name: '6pen', url: 'https://6pen.art' },
     ],
   },
   {
     name: '文生视频',
     resources: [
-      { name: '即梦', url: 'https://jimeng.jianying.com/ai-tool/home', icon: 'https://www.google.com/s2/favicons?domain=jianying.com&sz=32' },
-      { name: '蝉镜', url: 'https://www.chanjing.cc', icon: 'https://www.google.com/s2/favicons?domain=chanjing.cc&sz=32' },
-      { name: 'Runway', url: 'https://runwayml.com', icon: 'https://www.google.com/s2/favicons?domain=runwayml.com&sz=32' },
-      { name: 'Pika', url: 'https://pika.art', icon: 'https://www.google.com/s2/favicons?domain=pika.art&sz=32' },
-      { name: 'Sora', url: 'https://openai.com/sora', icon: 'https://www.google.com/s2/favicons?domain=openai.com&sz=32' },
-      { name: 'Stable Video', url: 'https://stability.ai/stable-video', icon: 'https://www.google.com/s2/favicons?domain=stability.ai&sz=32' },
-      { name: '快剪辑', url: 'https://www.kuaijianji.com', icon: 'https://www.google.com/s2/favicons?domain=kuaijianji.com&sz=32' },
+      { name: '即梦', url: 'https://jimeng.jianying.com/ai-tool/home' },
+      { name: '蝉镜', url: 'https://www.chanjing.cc' },
+      { name: 'Runway', url: 'https://runwayml.com' },
+      { name: 'Pika', url: 'https://pika.art' },
+      { name: 'Sora', url: 'https://openai.com/sora' },
+      { name: 'Stable Video', url: 'https://stability.ai/stable-video' },
+      { name: '快剪辑', url: 'https://www.kuaijianji.com' },
+    ],
+  },
+  {
+    name: '文生html',
+    resources: [
+      { name: '飞象老师', url: 'https://www.feixianglaoshi.com' },
     ],
   },
 ]
@@ -402,10 +464,10 @@ function getResourceIcon(resource: AiResource): string {
   if (resource.icon) {
     return resource.icon
   }
-  // 如果没有指定图标，从URL提取域名并使用favicon服务
+  // 如果没有指定图标，从URL提取域名并使用网站自己的favicon
   try {
-    const domain = new URL(resource.url).hostname
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+    const url = new URL(resource.url)
+    return `${url.protocol}//${url.hostname}/favicon.ico`
   } catch {
     return ''
   }
@@ -413,13 +475,17 @@ function getResourceIcon(resource: AiResource): string {
 
 function handleImageError(event: Event, resource: AiResource) {
   const img = event.target as HTMLImageElement
-  // 如果图标加载失败，尝试使用favicon服务
+  // 如果图标加载失败，尝试使用备用路径
   try {
-    const domain = new URL(resource.url).hostname
-    if (!img.src.includes('google.com/s2/favicons')) {
-      img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+    const url = new URL(resource.url)
+    const hostname = url.hostname
+    const protocol = url.protocol
+    
+    // 如果当前不是 /favicon.ico，尝试使用它
+    if (!img.src.includes('/favicon.ico')) {
+      img.src = `${protocol}//${hostname}/favicon.ico`
     } else {
-      // 如果favicon也加载失败，隐藏图片或使用默认图标
+      // 如果 favicon.ico 也加载失败，隐藏图片
       img.style.display = 'none'
     }
   } catch {

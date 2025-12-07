@@ -92,6 +92,7 @@ class LessonUpdate(BaseModel):
     content: Optional[List[dict]] = None
     tags: Optional[List[str]] = None
     status: Optional[LessonStatus] = None
+    cover_image_url: Optional[str] = Field(None, description="封面图片URL")
     
     @field_validator("content", mode="before")
     @classmethod

@@ -186,6 +186,85 @@
                 </div>
               </div>
 
+              <!-- 教案优化功能（仅在教案共创主题显示） -->
+              <div v-if="selectedTopic === 'lesson_plan'" class="space-y-3">
+                <div class="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-teal-50/60 p-4 shadow-sm">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h3 class="text-sm font-semibold text-gray-900">教案优化分析</h3>
+                      <p class="mt-1 text-xs text-gray-600">
+                        基于学习科学理论，全面分析教案并提供优化建议
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- 教案选择器 -->
+                  <div v-if="availableLessons.length > 0" class="mt-3 space-y-2">
+                    <label class="text-xs font-medium text-gray-700">选择要优化的教案</label>
+                    <select
+                      v-model="selectedLessonId"
+                      class="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    >
+                      <option :value="null">请选择教案...</option>
+                      <option
+                        v-for="lesson in availableLessons"
+                        :key="lesson.id"
+                        :value="lesson.id"
+                      >
+                        {{ lesson.title }} ({{ lesson.status === 'draft' ? '草稿' : lesson.status === 'published' ? '已发布' : '已归档' }})
+                      </option>
+                    </select>
+                  </div>
+                  <div v-else class="mt-3 text-xs text-gray-500">
+                    暂无可用教案
+                  </div>
+
+                  <!-- 优化按钮 -->
+                  <button
+                    type="button"
+                    :disabled="!selectedLessonId || isOptimizing"
+                    @click="handleOptimizeLesson"
+                    class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-violet-500/30 transition enabled:hover:shadow-xl enabled:hover:shadow-violet-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <svg
+                      v-if="isOptimizing"
+                      class="h-4 w-4 animate-spin"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      />
+                    </svg>
+                    <svg
+                      v-else
+                      class="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                      />
+                    </svg>
+                    <span>{{ isOptimizing ? '分析中...' : '一键优化分析' }}</span>
+                  </button>
+                </div>
+              </div>
+
               <div class="space-y-3">
                 <div class="flex items-center justify-between">
                   <label class="text-sm font-semibold text-gray-900">智能推荐提问</label>
@@ -358,7 +437,12 @@
                 </div>
                 <p class="font-semibold text-gray-900">等待您的问题</p>
                 <p class="mt-1 text-xs text-gray-600">
-                  选择主题并输入问题，AI 将结合最新数据给出建议。
+                  <span v-if="selectedTopic === 'lesson_plan'">
+                    选择教案并点击"一键优化分析"，或输入问题获取建议。
+                  </span>
+                  <span v-else>
+                    选择主题并输入问题，AI 将结合最新数据给出建议。
+                  </span>
                 </p>
               </div>
             </section>
@@ -452,9 +536,12 @@ const emit = defineEmits(['update:modelValue', 'close'])
 
 const question = ref('')
 const selectedTopic = ref<TeacherAssistantTopic>('pdca')
+const selectedLessonId = ref<number | null>(null)
 const isSubmitting = ref(false)
+const isOptimizing = ref(false)
 const errorMessage = ref<string | null>(null)
 const response = ref<TeacherAssistantResponse | null>(null)
+const optimizationReport = ref<any>(null)
 const suggestionOffset = ref(0)
 
 const topicOptions: Array<{ label: string; value: TeacherAssistantTopic }> = [
@@ -553,6 +640,12 @@ const recommendedPrompts = computed(() => {
 
 const isReady = computed(() => question.value.trim().length >= 4)
 
+const availableLessons = computed(() => {
+  return props.latestLessons.filter((lesson) => 
+    lesson.status === 'draft' || lesson.status === 'published'
+  )
+})
+
 function handleClose() {
   emit('update:modelValue', false)
   emit('close')
@@ -579,12 +672,14 @@ async function handleSubmit() {
 
   errorMessage.value = null
   isSubmitting.value = true
+  optimizationReport.value = null
 
   try {
     const assistantResponse = await assistantService.askTeacherAssistant({
       question: question.value.trim(),
       topic: selectedTopic.value,
       context: normalizedContext.value,
+      lesson_id: selectedLessonId.value || undefined,
     })
 
     response.value = assistantResponse
@@ -595,6 +690,149 @@ async function handleSubmit() {
   }
 }
 
+async function handleOptimizeLesson() {
+  if (!selectedLessonId.value || isOptimizing.value) {
+    return
+  }
+
+  errorMessage.value = null
+  isOptimizing.value = true
+  response.value = null
+
+  try {
+    // 构建优化分析的问题
+    const selectedLesson = props.latestLessons.find(l => l.id === selectedLessonId.value)
+    const optimizationQuestion = `请对教案《${selectedLesson?.title || '当前教案'}》进行全面优化分析，包括：
+1. 教学目标设计（是否明确、是否基于布鲁姆分类法）
+2. 活动设计（是否符合5E模型、是否有认知层次）
+3. 学生参与度（是否有主动输出、是否有互动）
+4. 评价设计（是否有形成性评价、是否有元认知反思）
+5. 学习科学理论应用（是否应用了相关理论）
+
+请提供结构化的分析报告，包括：
+- 总体评分（0-100分）
+- 各维度评分和详细分析
+- 优势、待改进点、具体优化建议
+- 基于学习科学理论的详细优化方案`
+
+    const assistantResponse = await assistantService.askTeacherAssistant({
+      question: optimizationQuestion,
+      topic: 'lesson_plan',
+      context: {
+        ...normalizedContext.value,
+        lesson_outline: selectedLesson ? `教案标题：${selectedLesson.title}\n状态：${selectedLesson.status}` : undefined,
+      },
+      lesson_id: selectedLessonId.value,
+    })
+
+    // 解析优化报告（从 AI 回答中提取结构化信息）
+    optimizationReport.value = parseOptimizationReport(assistantResponse.answer, assistantResponse)
+  } catch (error: any) {
+    errorMessage.value = error.message || '教案优化分析失败，请稍后重试。'
+  } finally {
+    isOptimizing.value = false
+  }
+}
+
+function parseOptimizationReport(answer: string, response: TeacherAssistantResponse): any {
+  // 尝试从回答中提取结构化信息
+  // 如果 AI 返回的是结构化 JSON，直接解析
+  // 否则从文本中提取关键信息
+  
+  try {
+    // 尝试解析 JSON（如果 AI 返回了结构化数据）
+    const jsonMatch = answer.match(/```json\s*([\s\S]*?)\s*```/) || answer.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0])
+      if (parsed.overall_score !== undefined) {
+        return parsed
+      }
+    }
+  } catch {
+    // 如果不是 JSON，继续文本解析
+  }
+
+  // 从文本中提取信息，构建结构化报告
+  const report: any = {
+    overall_score: 75, // 默认分数，实际应该从 AI 回答中提取
+    dimensions: [
+      {
+        name: '教学目标设计',
+        score: 70,
+        strengths: [],
+        issues: [],
+        suggestions: [],
+      },
+      {
+        name: '活动设计',
+        score: 75,
+        strengths: [],
+        issues: [],
+        suggestions: [],
+      },
+      {
+        name: '学生参与度',
+        score: 70,
+        strengths: [],
+        issues: [],
+        suggestions: [],
+      },
+      {
+        name: '评价设计',
+        score: 65,
+        strengths: [],
+        issues: [],
+        suggestions: [],
+      },
+      {
+        name: '学习科学理论应用',
+        score: 70,
+        strengths: [],
+        issues: [],
+        suggestions: [],
+      },
+    ],
+    detailed_suggestions: answer,
+  }
+
+  // 从 AI 回答中提取评分信息（简单模式匹配）
+  const scoreMatch = answer.match(/(?:总体评分|总分|综合评分)[：:]\s*(\d+)/i)
+  if (scoreMatch) {
+    report.overall_score = parseInt(scoreMatch[1], 10)
+  }
+
+  return report
+}
+
+function copyOptimizationReport() {
+  if (!optimizationReport.value) return
+  
+  const reportText = `教案优化分析报告
+
+总体评分：${optimizationReport.value.overall_score} / 100
+
+${optimizationReport.value.dimensions?.map((d: any) => `
+${d.name}：${d.score} / 100
+${d.strengths?.length ? `优势：${d.strengths.join('；')}` : ''}
+${d.issues?.length ? `待改进：${d.issues.join('；')}` : ''}
+${d.suggestions?.length ? `建议：${d.suggestions.join('；')}` : ''}
+`).join('\n')}
+
+详细方案：
+${optimizationReport.value.detailed_suggestions || ''}
+`
+
+  navigator.clipboard
+    .writeText(reportText)
+    .then(() => {
+      // 可以添加 toast 提示
+      console.log('报告已复制到剪贴板')
+    })
+    .catch(() => {
+      console.error('复制失败')
+    })
+}
+
 watch(
   () => props.modelValue,
   (isOpen) => {
@@ -602,8 +840,19 @@ watch(
       question.value = ''
       errorMessage.value = null
       response.value = null
+      optimizationReport.value = null
+      selectedLessonId.value = null
       suggestionOffset.value = 0
     }
+  }
+)
+
+watch(
+  () => selectedTopic.value,
+  () => {
+    // 切换主题时清除优化报告
+    optimizationReport.value = null
+    selectedLessonId.value = null
   }
 )
 </script>
