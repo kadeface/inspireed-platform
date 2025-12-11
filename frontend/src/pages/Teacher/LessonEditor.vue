@@ -8,12 +8,13 @@
           <div class="flex items-center gap-4 flex-1">
             <button
               @click="handleBack"
-              class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
-              title="返回"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl hover:bg-white hover:shadow-md transition-all"
+              title="返回教案列表"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
               </svg>
+              返回
             </button>
             
             <input
@@ -81,53 +82,84 @@
               </div>
             </template>
             
-            <!-- 保存状态指示器 -->
-            <div class="flex items-center gap-2 text-sm">
-              <span v-if="saveStatus === 'saving'" class="text-gray-500 flex items-center gap-1">
-                <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                保存中...
-              </span>
-              <span v-else-if="saveStatus === 'saved'" class="text-green-600 flex items-center gap-1">
+            <!-- 第一组：核心操作（最重要，最常用） -->
+            <div class="flex items-center gap-2 border-r border-gray-200 pr-3">
+              <!-- 保存状态指示器 -->
+              <div class="flex items-center gap-2 text-sm">
+                <span v-if="saveStatus === 'saving'" class="text-gray-500 flex items-center gap-1">
+                  <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  保存中...
+                </span>
+                <span v-else-if="saveStatus === 'saved'" class="text-green-600 flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  已保存
+                </span>
+                <span v-else-if="saveStatus === 'error'" class="text-red-600 flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  保存失败
+                </span>
+                <span v-else-if="lastSavedAt" class="text-gray-500">
+                  {{ formatSaveTime(lastSavedAt) }}
+                </span>
+              </div>
+
+              <!-- 手动保存按钮 -->
+              <button
+                @click="handleManualSave"
+                :disabled="saveStatus === 'saving'"
+                :class="[
+                  'px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-50',
+                  isPreviewMode
+                    ? 'text-amber-700 bg-amber-50 border border-amber-300 hover:bg-amber-100'
+                    : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                ]"
+                :title="isPreviewMode ? '授课模式下无法保存，点击将提示切换到编辑模式' : '保存教案'"
+              >
+                {{ isPreviewMode ? '保存（需切换模式）' : '保存' }}
+              </button>
+
+              <!-- 发布按钮 -->
+              <button
+                v-if="currentLesson?.status === 'draft'"
+                @click="handlePublish"
+                :disabled="isSaving"
+                class="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+              >
+                发布
+              </button>
+
+              <!-- 教案状态提示 -->
+              <div v-if="isRecentlyUnpublished" class="flex items-center gap-2 px-3 py-1.5 text-sm text-amber-600 bg-amber-50 rounded-md">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                已保存
-              </span>
-              <span v-else-if="saveStatus === 'error'" class="text-red-600 flex items-center gap-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                保存失败
-              </span>
-              <span v-else-if="lastSavedAt" class="text-gray-500">
-                {{ formatSaveTime(lastSavedAt) }}
-              </span>
+                已从已发布状态切换为草稿
+              </div>
             </div>
 
-            <!-- 教案状态提示 -->
-            <div v-if="isRecentlyUnpublished" class="flex items-center gap-2 px-3 py-1.5 text-sm text-amber-600 bg-amber-50 rounded-md">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              已从已发布状态切换为草稿
+            <!-- 第二组：辅助工具（编辑辅助功能） -->
+            <div class="flex items-center gap-2 border-r border-gray-200 pr-3">
+              <!-- AI 助手 -->
+              <button
+                type="button"
+                @click="showLessonAssistant = true"
+                class="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-[#4C6EF5] to-[#6C8DFF] px-3 py-1.5 text-sm font-medium text-white shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#BFD0FF]"
+              >
+                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 2a6 6 0 00-6 6v1.586l-.707.707A1 1 0 004 12h1v1a4 4 0 004 4v1h2v-1a4 4 0 004-4v-1h1a1 1 0 00.707-1.707L16 9.586V8a6 6 0 00-6-6z" />
+                </svg>
+                AI 助手
+              </button>
             </div>
-
-            <!-- 封面图片上传 -->
-            <button
-              v-if="!isPreviewMode"
-              type="button"
-              @click="triggerCoverImageUpload"
-              class="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              title="上传封面图片"
-            >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              封面
-            </button>
+            
+            <!-- 隐藏的文件输入（封面按钮在封面预览区域） -->
             <input
               ref="coverImageInput"
               type="file"
@@ -135,6 +167,79 @@
               @change="handleCoverImageSelect"
               class="hidden"
             />
+
+            <!-- 第三组：视图控制（查看和演示功能） -->
+            <div class="flex items-center gap-2 border-r border-gray-200 pr-3">
+              <!-- 紧凑模式切换 -->
+              <button
+                v-if="!isPreviewMode"
+                @click="compactMode = !compactMode"
+                :class="[
+                  'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                  compactMode
+                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
+                ]"
+                title="紧凑模式：限制长内容的高度，便于浏览教案结构"
+              >
+                <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                {{ compactMode ? '展开模式' : '紧凑模式' }}
+              </button>
+
+              <!-- 预览模式切换 -->
+              <button
+                @click="handleTogglePreviewMode"
+                :disabled="!canEnterPreviewMode && !isPreviewMode"
+                :class="[
+                  'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                  isPreviewMode
+                    ? 'bg-blue-600 text-white'
+                    : canEnterPreviewMode
+                      ? 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed',
+                ]"
+                :title="!canEnterPreviewMode && !isPreviewMode ? '需要先发布教案才能进入授课模式' : ''"
+              >
+                {{ isPreviewMode ? '编辑模式' : '授课模式' }}
+              </button>
+
+              <!-- 全屏预览按钮 -->
+              <button
+                @click="toggleFullscreenPreview"
+                class="px-3 py-1.5 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-2"
+                title="全屏预览"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                全屏预览
+              </button>
+            </div>
+
+            <!-- 第四组：导出操作（完成后的操作） -->
+            <div class="flex items-center gap-2">
+              <!-- 导出教案按钮 -->
+              <button
+                v-if="currentLesson"
+                type="button"
+                @click="handleExportLesson"
+                :disabled="exporting"
+                class="inline-flex items-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                title="导出教案为ZIP文件"
+              >
+                <svg v-if="exporting" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                {{ exporting ? '导出中...' : '导出教案' }}
+              </button>
+            </div>
             
             <!-- 封面图片预览和编辑模态框 -->
             <div
@@ -242,94 +347,6 @@
                 </div>
               </div>
             </div>
-
-            <!-- AI 助手 -->
-            <button
-              type="button"
-              @click="showLessonAssistant = true"
-              class="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-[#4C6EF5] to-[#6C8DFF] px-3 py-1.5 text-sm font-medium text-white shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#BFD0FF]"
-            >
-              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 2a6 6 0 00-6 6v1.586l-.707.707A1 1 0 004 12h1v1a4 4 0 004 4v1h2v-1a4 4 0 004-4v-1h1a1 1 0 00.707-1.707L16 9.586V8a6 6 0 00-6-6z" />
-              </svg>
-              AI 助手
-            </button>
-
-            <!-- 手动保存按钮 -->
-            <button
-              @click="handleManualSave"
-              :disabled="saveStatus === 'saving'"
-              :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-50',
-                isPreviewMode
-                  ? 'text-amber-700 bg-amber-50 border border-amber-300 hover:bg-amber-100'
-                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-              ]"
-              :title="isPreviewMode ? '授课模式下无法保存，点击将提示切换到编辑模式' : '保存教案'"
-            >
-              {{ isPreviewMode ? '保存（需切换模式）' : '保存' }}
-            </button>
-
-            <!-- 发布按钮 -->
-            <button
-              v-if="currentLesson?.status === 'draft'"
-              @click="handlePublish"
-              :disabled="isSaving"
-              class="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
-            >
-              发布
-            </button>
-
-            <!-- 课堂模式按钮 -->
-            <!-- 课堂控制按钮已隐藏，进入授课模式时自动显示课堂控制面板 -->
-
-            <!-- 紧凑模式切换 -->
-            <button
-              v-if="!isPreviewMode"
-              @click="compactMode = !compactMode"
-              :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-                compactMode
-                  ? 'bg-purple-600 text-white hover:bg-purple-700'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
-              ]"
-              title="紧凑模式：限制长内容的高度，便于浏览教案结构"
-            >
-              <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-              {{ compactMode ? '展开模式' : '紧凑模式' }}
-            </button>
-
-            <!-- 预览模式切换 -->
-            <button
-              @click="handleTogglePreviewMode"
-              :disabled="!canEnterPreviewMode && !isPreviewMode"
-              :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-                isPreviewMode
-                  ? 'bg-blue-600 text-white'
-                  : canEnterPreviewMode
-                    ? 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                    : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed',
-              ]"
-              :title="!canEnterPreviewMode && !isPreviewMode ? '需要先发布教案才能进入授课模式' : ''"
-            >
-              {{ isPreviewMode ? '编辑模式' : '授课模式' }}
-            </button>
-
-            <!-- 全屏预览按钮 -->
-            <button
-              @click="toggleFullscreenPreview"
-              class="px-3 py-1.5 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-2"
-              title="全屏预览"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-              全屏预览
-            </button>
           </div>
         </div>
       </div>
@@ -375,6 +392,56 @@
 
           <!-- Cell 列表 -->
           <div v-else-if="currentLesson" :class="isPreviewMode ? 'space-y-2' : 'space-y-4'">
+            <!-- 封面预览区域（仅在编辑模式下显示） -->
+            <div v-if="!isPreviewMode" class="mb-6">
+              <div class="relative h-64 rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 shadow-lg">
+                <!-- 封面图片 -->
+                <img
+                  v-if="coverImageUrl && !coverImageLoadError"
+                  :src="coverImageUrl"
+                  :alt="currentLesson.title"
+                  class="h-full w-full object-cover transition-transform duration-200 hover:scale-105"
+                  @error="coverImageLoadError = true"
+                  @load="coverImageLoadError = false"
+                />
+                <!-- 无封面时的占位符 -->
+                <div
+                  v-else
+                  class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/90"
+                >
+                  <div class="rounded-2xl bg-white/20 backdrop-blur-md p-4 ring-2 ring-inset ring-white/30 shadow-xl">
+                    <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="1.6"
+                        d="M4.75 5.75A2.75 2.75 0 0 1 7.5 3h9a2.75 2.75 0 0 1 2.75 2.75v14.5l-5.5-3.083L8.25 20.25V5.75"
+                      />
+                    </svg>
+                  </div>
+                  <span class="text-base font-semibold tracking-wide text-white/90 drop-shadow-sm">教案封面</span>
+                </div>
+
+                <!-- 渐变遮罩层 -->
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-slate-900/20 to-slate-900/0"></div>
+
+                <!-- 封面按钮（放在遮罩层上，右下角） -->
+                <div class="absolute bottom-4 right-4 z-10">
+                  <button
+                    type="button"
+                    @click="triggerCoverImageUpload"
+                    class="inline-flex items-center gap-2 rounded-md bg-white/90 backdrop-blur-sm border border-white/30 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50 transition-all shadow-md"
+                    title="上传封面图片"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    封面
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- 课堂控制面板（预览模式下） -->
             <TeacherClassroomControlPanel
               v-if="isPreviewMode && showClassroomPanel && currentLesson"
@@ -876,6 +943,9 @@ import LessonAiAssistantDrawer from '@/components/Teacher/LessonAiAssistantDrawe
 import TeacherClassroomControlPanel from '@/components/Classroom/TeacherControlPanel.vue'
 import { useFullscreen } from '@/composables/useFullscreen'
 import api from '../../services/api'
+import courseExportService from '../../services/courseExport'
+import { useToast } from '@/composables/useToast'
+import { getServerBaseUrl } from '@/utils/url'
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
@@ -924,6 +994,11 @@ const coverImagePreview = ref<HTMLImageElement | null>(null)
 const imageQuality = ref(85) // 默认质量85%
 const maxImageWidth = ref(1920) // 默认最大宽度1920px
 const maxImageHeight = ref(1080) // 默认最大高度1080px
+const coverImageLoadError = ref(false) // 封面图片加载错误状态
+
+// 导出教案相关
+const exporting = ref(false)
+const exportToast = useToast()
 
 // 课堂会话相关
 const teacherControlPanelRef = ref<InstanceType<typeof TeacherClassroomControlPanel> | null>(null)
@@ -1211,6 +1286,33 @@ const toast = ref({
 // 计算属性
 const currentLesson = computed(() => lessonStore.currentLesson)
 const cells = computed(() => lessonStore.cells)
+
+// 构建完整的封面图片URL（需要在 currentLesson 定义之后）
+const coverImageUrl = computed(() => {
+  if (!currentLesson.value?.cover_image_url) {
+    return null
+  }
+  
+  const url = currentLesson.value.cover_image_url
+  
+  // 如果已经是完整URL（http/https开头），直接返回
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  
+  // 如果是相对路径（以/开头），构建完整URL
+  if (url.startsWith('/')) {
+    return `${getServerBaseUrl()}${url}`
+  }
+  
+  // 其他情况直接返回
+  return url
+})
+
+// 监听封面图片URL变化，重置错误状态（需要在 currentLesson 定义之后）
+watch(() => currentLesson.value?.cover_image_url, () => {
+  coverImageLoadError.value = false
+})
 
 // 判断是否可以进入授课模式（只有已发布的教案才能进入授课模式）
 const canEnterPreviewMode = computed(() => {
@@ -1895,6 +1997,27 @@ function handlePublishCancel() {
 }
 
 // 返回
+// 导出教案
+async function handleExportLesson() {
+  if (!currentLesson.value) {
+    exportToast.error('教案不存在')
+    return
+  }
+  
+  exporting.value = true
+  try {
+    const blob = await courseExportService.exportLesson(currentLesson.value.id)
+    const filename = `${currentLesson.value.title}_导出.zip`
+    courseExportService.downloadFile(blob, filename)
+    exportToast.success('教案导出成功')
+  } catch (error: any) {
+    console.error('导出教案失败:', error)
+    exportToast.error(error.response?.data?.detail || error.message || '导出教案失败')
+  } finally {
+    exporting.value = false
+  }
+}
+
 async function handleBack() {
   // 在导航前保存未保存的更改（确保数据不丢失）
   if (currentLesson.value && !isPreviewMode.value) {

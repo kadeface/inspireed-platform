@@ -143,6 +143,13 @@ export const curriculumService = {
     return `${gradeName}${subjectName}`
   },
 
+  /**
+   * 生成课程代码（grade{level}-{subjectCode}）
+   */
+  generateCourseCode(subjectCode: string, gradeLevel: number): string {
+    return `grade${gradeLevel}-${subjectCode}`
+  },
+
   // ==================== Chapter APIs ====================
   
   /**

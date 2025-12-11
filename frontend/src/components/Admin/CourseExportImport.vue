@@ -111,6 +111,18 @@
           导入课程数据
         </h3>
 
+        <!-- 导入说明 -->
+        <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 class="text-sm font-semibold text-blue-900 mb-2">📋 导入说明</h4>
+          <ul class="text-sm text-blue-800 space-y-1">
+            <li>• 支持导入JSON或ZIP格式的课程数据文件</li>
+            <li>• 可以导入其他教师编写的教案（包含在课程导出文件中）</li>
+            <li>• 导入的教案会自动关联到对应的课程和章节</li>
+            <li>• 导入的教案状态将设置为"已发布"（共享状态）</li>
+            <li>• 如果文件包含资源文件（图片、PDF等），请使用ZIP格式</li>
+          </ul>
+        </div>
+
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">导入选项</label>
           <label class="flex items-center">
@@ -129,7 +141,7 @@
             <input
               ref="fileInput"
               type="file"
-              accept=".json"
+              accept=".json,.zip"
               @change="handleFileSelect"
               class="hidden"
             >
@@ -140,7 +152,7 @@
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
               </svg>
-              选择JSON文件
+              选择文件 (JSON/ZIP)
             </button>
             <span v-if="selectedFile" class="text-sm text-gray-600">
               已选择: {{ selectedFile.name }}
@@ -205,6 +217,49 @@
               <div class="text-center">
                 <div class="text-2xl font-bold text-red-600">{{ importResult.summary?.total_errors ?? 0 }}</div>
                 <div class="text-sm text-gray-600">错误数量</div>
+              </div>
+            </div>
+            
+            <!-- 详细统计 -->
+            <div v-if="importResult.result" class="mt-4 border-t pt-4">
+              <h5 class="text-sm font-medium text-gray-700 mb-2">详细统计:</h5>
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <span class="text-gray-600">课程:</span>
+                  <span class="ml-2 font-semibold text-blue-600">
+                    +{{ importResult.result.courses?.created ?? 0 }} 
+                    <span v-if="importResult.result.courses?.skipped > 0" class="text-yellow-600">
+                      (跳过{{ importResult.result.courses?.skipped }})
+                    </span>
+                  </span>
+                </div>
+                <div>
+                  <span class="text-gray-600">章节:</span>
+                  <span class="ml-2 font-semibold text-purple-600">
+                    +{{ importResult.result.chapters?.created ?? 0 }}
+                    <span v-if="importResult.result.chapters?.skipped > 0" class="text-yellow-600">
+                      (跳过{{ importResult.result.chapters?.skipped }})
+                    </span>
+                  </span>
+                </div>
+                <div>
+                  <span class="text-gray-600">教案:</span>
+                  <span class="ml-2 font-semibold text-orange-600">
+                    +{{ importResult.result.lessons?.created ?? 0 }}
+                    <span v-if="importResult.result.lessons?.skipped > 0" class="text-yellow-600">
+                      (跳过{{ importResult.result.lessons?.skipped }})
+                    </span>
+                  </span>
+                </div>
+                <div>
+                  <span class="text-gray-600">资源:</span>
+                  <span class="ml-2 font-semibold text-green-600">
+                    +{{ importResult.result.resources?.created ?? 0 }}
+                    <span v-if="importResult.result.resources?.skipped > 0" class="text-yellow-600">
+                      (跳过{{ importResult.result.resources?.skipped }})
+                    </span>
+                  </span>
+                </div>
               </div>
             </div>
             

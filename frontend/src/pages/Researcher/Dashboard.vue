@@ -36,14 +36,17 @@
       </div>
 
       <!-- 教研观摩 -->
-      <div class="quick-link-card bg-white rounded-lg shadow-lg p-6 opacity-60">
+      <router-link 
+        to="/researcher/curriculum"
+        class="quick-link-card bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow"
+      >
         <div class="flex items-center mb-4">
           <span class="text-4xl mr-3">👀</span>
-          <h2 class="text-xl font-semibold">教研观摩</h2>
+          <h2 class="text-xl font-semibold">导入教师教案</h2>
         </div>
-        <p class="text-gray-600">查看教师教案和使用统计</p>
-        <div class="mt-4 text-gray-400 font-medium">开发中...</div>
-      </div>
+        <p class="text-gray-600">导入其他教师编写的教案到系统中</p>
+        <div class="mt-4 text-blue-600 font-medium">进入导入 →</div>
+      </router-link>
 
       <!-- 数据分析 -->
       <div class="quick-link-card bg-white rounded-lg shadow-lg p-6 opacity-60">

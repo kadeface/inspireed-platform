@@ -14,7 +14,7 @@
             </label>
             <select
               v-model="formData.subject_id"
-              class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               :disabled="!!course"
               required
             >
@@ -35,7 +35,7 @@
             </label>
             <select
               v-model="formData.grade_id"
-              class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               :class="{ 'border-orange-300': course && originalGradeId && formData.grade_id !== originalGradeId }"
               required
             >
@@ -79,7 +79,7 @@
             <input
               v-model="formData.name"
               type="text"
-              class="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="flex-1 px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="例如：一年级数学"
               required
             />
@@ -118,12 +118,22 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">
                 课程代码
               </label>
-              <input
-                v-model="formData.code"
-                type="text"
-                class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="例如：grade1-math"
-              />
+              <div class="flex gap-2">
+                <input
+                  v-model="formData.code"
+                  type="text"
+                  class="flex-1 px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="例如：grade1-math"
+                />
+                <button
+                  v-if="!course && formData.subject_id && formData.grade_id"
+                  type="button"
+                  @click="autoGenerateCode"
+                  class="px-3 py-1.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg whitespace-nowrap"
+                >
+                  自动生成
+                </button>
+              </div>
             </div>
 
             <!-- Description -->
@@ -133,7 +143,7 @@
               </label>
               <textarea
                 v-model="formData.description"
-                class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows="2"
                 placeholder="课程简介..."
               ></textarea>
@@ -147,7 +157,7 @@
               <input
                 v-model.number="formData.display_order"
                 type="number"
-                class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 min="0"
               />
             </div>
@@ -283,6 +293,15 @@ function autoGenerateName() {
   
   if (subject && grade) {
     formData.value.name = curriculumService.generateCourseName(subject.name, grade.name)
+  }
+}
+
+function autoGenerateCode() {
+  const subject = props.subjects.find(s => s.id === formData.value.subject_id)
+  const grade = props.grades.find(g => g.id === formData.value.grade_id)
+  
+  if (subject && grade) {
+    formData.value.code = curriculumService.generateCourseCode(subject.code, grade.level)
   }
 }
 

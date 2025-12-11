@@ -144,6 +144,13 @@ export const researcherService = {
     return `${gradeName}${subjectName}`
   },
 
+  /**
+   * 生成课程代码（grade{level}-{subjectCode}）
+   */
+  generateCourseCode(subjectCode: string, gradeLevel: number): string {
+    return `grade${gradeLevel}-${subjectCode}`
+  },
+
   // ==================== Chapter APIs (复用通用章节接口) ====================
   
   /**

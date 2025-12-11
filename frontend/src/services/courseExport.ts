@@ -75,6 +75,14 @@ class CourseExportService {
   }
 
   /**
+   * 导出单个教案（教师、管理员或研究员）
+   */
+  async exportLesson(lessonId: number): Promise<Blob> {
+    const response = await api.downloadFile(`/course-export/lessons/${lessonId}/export`)
+    return response
+  }
+
+  /**
    * 导入课程数据
    */
   async importCourses(
@@ -120,16 +128,21 @@ class CourseExportService {
    * 验证导入文件格式
    */
   validateImportFile(file: File): { valid: boolean; error?: string } {
-    if (!file.name.endsWith('.json')) {
-      return { valid: false, error: '文件必须是JSON格式' }
+    const isJson = file.name.toLowerCase().endsWith('.json')
+    const isZip = file.name.toLowerCase().endsWith('.zip')
+    
+    if (!isJson && !isZip) {
+      return { valid: false, error: '文件必须是JSON或ZIP格式' }
     }
 
     if (file.size === 0) {
       return { valid: false, error: '文件不能为空' }
     }
 
-    if (file.size > 50 * 1024 * 1024) { // 50MB
-      return { valid: false, error: '文件大小不能超过50MB' }
+    // ZIP文件可能更大，因为包含资源文件
+    const maxSize = isZip ? 200 * 1024 * 1024 : 50 * 1024 * 1024 // ZIP: 200MB, JSON: 50MB
+    if (file.size > maxSize) {
+      return { valid: false, error: `文件大小不能超过${maxSize / 1024 / 1024}MB` }
     }
 
     return { valid: true }
@@ -137,9 +150,70 @@ class CourseExportService {
 
   /**
    * 预览导入文件内容
+   * 支持JSON和ZIP格式
    * 尝试多种编码格式
    */
   async previewImportFile(file: File): Promise<any> {
+    const isZip = file.name.toLowerCase().endsWith('.zip')
+    
+    // ZIP文件预览：提取并解析data.json
+    if (isZip) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = async (e) => {
+          try {
+            const arrayBuffer = e.target?.result as ArrayBuffer
+            if (!arrayBuffer) {
+              reject(new Error('文件读取失败'))
+              return
+            }
+            
+            // 使用JSZip库解析ZIP文件
+            // 注意：如果项目中没有JSZip，需要安装或使用其他方法
+            // 这里提供一个简化的实现，实际项目中可能需要引入JSZip
+            try {
+              // 动态导入JSZip（如果可用）
+              const JSZip = (window as any).JSZip
+              if (!JSZip) {
+                // 如果没有JSZip，返回提示信息
+                resolve({
+                  type: 'zip',
+                  message: 'ZIP文件预览需要解压，请直接导入查看结果',
+                  filename: file.name
+                })
+                return
+              }
+              
+              const zip = await JSZip.loadAsync(arrayBuffer)
+              const dataJson = zip.file('data.json')
+              
+              if (!dataJson) {
+                reject(new Error('ZIP文件中未找到data.json文件'))
+                return
+              }
+              
+              const jsonText = await dataJson.async('string')
+              const content = JSON.parse(jsonText)
+              resolve(content)
+            } catch (zipError: any) {
+              // 如果JSZip不可用，返回基本信息
+              resolve({
+                type: 'zip',
+                message: 'ZIP文件预览需要解压，请直接导入查看结果',
+                filename: file.name,
+                size: file.size
+              })
+            }
+          } catch (error: any) {
+            reject(new Error(`ZIP文件读取失败: ${error.message}`))
+          }
+        }
+        reader.onerror = () => reject(new Error('文件读取失败'))
+        reader.readAsArrayBuffer(file)
+      })
+    }
+    
+    // JSON文件预览：尝试多种编码格式
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       

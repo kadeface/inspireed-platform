@@ -2,7 +2,7 @@
 课程导出导入 API
 """
 
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional, Dict, Set, cast
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,6 @@ import zipfile
 import tempfile
 from pathlib import Path
 from datetime import datetime
-from typing import Set
 
 from app.core.database import get_db
 from app.models import Subject, Grade, Course, Chapter, Lesson, Resource, User, UserRole
@@ -33,11 +32,22 @@ def require_admin_or_researcher(current_user: User = Depends(get_current_user)) 
     return current_user
 
 
-def extract_file_urls_from_content(content: List[Dict]) -> Set[str]:
+def require_teacher_or_admin_or_researcher(current_user: User = Depends(get_current_user)) -> User:
+    """要求教师、管理员或研究员权限"""
+    if current_user.role not in [UserRole.TEACHER, UserRole.ADMIN, UserRole.RESEARCHER]:
+        raise HTTPException(status_code=403, detail="需要教师、管理员或研究员权限")
+    return current_user
+
+
+def extract_file_urls_from_content(content: Any) -> Set[str]:
     """从教案内容中提取所有文件URL"""
     file_urls = set()
     
     if not content:
+        return file_urls
+    
+    # 确保content是列表
+    if not isinstance(content, list):
         return file_urls
     
     for cell in content:
@@ -329,21 +339,29 @@ def collect_all_files(export_data: Dict, lesson_data_list: List[Dict], resource_
     
     # 从教案内容中提取文件
     for lesson_data in lesson_data_list:
-        content = lesson_data.get("content", [])
-        file_urls = extract_file_urls_from_content(content)
-        
-        # 封面图
-        cover_image_url = lesson_data.get("cover_image_url")
-        if cover_image_url:
-            file_urls.add(cover_image_url)
-        
-        # 转换URL为文件路径
-        for url in file_urls:
-            file_path = url_to_file_path(url)
-            if file_path and os.path.exists(file_path):
-                # 在ZIP中使用相对路径
-                zip_path = f"resources/{os.path.basename(file_path)}"
-                files_map[zip_path] = file_path
+        try:
+            content = lesson_data.get("content", [])
+            if content is None:
+                content = []
+            file_urls = extract_file_urls_from_content(content)
+            
+            # 封面图
+            cover_image_url = lesson_data.get("cover_image_url")
+            if cover_image_url:
+                file_urls.add(cover_image_url)
+            
+            # 转换URL为文件路径
+            for url in file_urls:
+                if url:
+                    file_path = url_to_file_path(url)
+                    if file_path and os.path.exists(file_path):
+                        # 在ZIP中使用相对路径
+                        zip_path = f"resources/{os.path.basename(file_path)}"
+                        files_map[zip_path] = file_path
+        except Exception as e:
+            # 如果处理某个教案时出错，记录错误但继续处理其他教案
+            print(f"警告: 处理教案文件时出错: {str(e)}")
+            continue
     
     # 从资源数据中提取文件
     for resource_data in resource_data_list:
@@ -1478,3 +1496,160 @@ async def import_courses(
         error_trace = traceback.format_exc()
         print(f"导入失败 - 详细错误信息:\n{error_trace}")
         raise HTTPException(400, f"导入失败: {str(e)}")
+
+
+@router.get("/lessons/{lesson_id}/export")
+async def export_lesson(
+    lesson_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_teacher_or_admin_or_researcher),
+):
+    """导出单个教案（教师、管理员或研究员）"""
+    try:
+        # 获取教案及其关联数据
+        lesson_result = await db.execute(
+            select(Lesson)
+            .options(
+                selectinload(Lesson.course).selectinload(Course.subject),
+                selectinload(Lesson.course).selectinload(Course.grade),
+                selectinload(Lesson.chapter),
+                selectinload(Lesson.creator),
+            )
+            .where(Lesson.id == lesson_id)
+        )
+        lesson = lesson_result.scalar_one_or_none()
+        
+        if not lesson:
+            raise HTTPException(404, "教案不存在")
+        
+        # 权限检查：教师只能导出自己创建的教案
+        role_value = cast(str, getattr(current_user.role, "value", current_user.role))
+        try:
+            user_role = UserRole(role_value)
+        except ValueError:
+            raise HTTPException(status_code=403, detail="当前用户角色无效")
+        
+        if user_role == UserRole.TEACHER and lesson.creator_id != current_user.id:
+            raise HTTPException(403, "只能导出自己创建的教案")
+        
+        # 获取课程信息
+        course = lesson.course
+        if not course:
+            raise HTTPException(404, "教案关联的课程不存在")
+        
+        # 构建导出数据
+        export_data = {
+            "version": "1.0",
+            "export_time": datetime.utcnow().isoformat(),
+            "exported_by": {
+                "id": current_user.id,
+                "username": current_user.username,
+                "email": current_user.email,
+            },
+            "data": {
+                "lessons": [],
+                "courses": [],
+                "chapters": [],
+            }
+        }
+        
+        # 添加课程信息
+        course_data = {
+            "code": course.code,
+            "name": course.name,
+            "description": course.description,
+            "subject_code": course.subject.code if course.subject else None,
+            "grade_level": course.grade.level if course.grade else None,
+        }
+        export_data["data"]["courses"].append(course_data)
+        
+        # 添加章节信息（如果教案关联了章节）
+        if lesson.chapter:
+            chapter_data = {
+                "code": lesson.chapter.code,
+                "name": lesson.chapter.name,
+                "description": lesson.chapter.description,
+                "course_code": course.code,
+                "order": lesson.chapter.order,
+            }
+            export_data["data"]["chapters"].append(chapter_data)
+        
+        # 添加教案数据
+        lesson_data = {
+            "course_code": course.code,
+            "chapter_code": lesson.chapter.code if lesson.chapter else None,
+            "title": lesson.title,
+            "description": lesson.description,
+            "status": lesson.status.value,
+            "content": lesson.content if lesson.content is not None else [],
+            "tags": lesson.tags or [],
+            "cover_image_url": lesson.cover_image_url,
+            "difficulty_level": lesson.difficulty_level.value if lesson.difficulty_level else None,
+            "estimated_duration": lesson.estimated_duration,
+            "reference_notes": lesson.reference_notes,
+        }
+        export_data["data"]["lessons"].append(lesson_data)
+        
+        # 收集所有需要导出的文件
+        lesson_data_list = export_data["data"].get("lessons", [])
+        try:
+            files_map = collect_all_files(export_data, lesson_data_list, [])
+        except Exception as e:
+            # 如果收集文件失败，记录错误但继续（使用空文件映射）
+            print(f"警告: 收集文件时出错: {str(e)}")
+            files_map = {}
+        
+        # 创建ZIP文件
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # 添加JSON数据
+            json_str = json.dumps(export_data, indent=2, ensure_ascii=False)
+            zip_file.writestr("data.json", json_str.encode("utf-8"))
+            
+            # 添加所有资源文件
+            for zip_path, file_path in files_map.items():
+                try:
+                    if os.path.exists(file_path):
+                        zip_file.write(file_path, zip_path)
+                    else:
+                        print(f"警告: 文件不存在 {file_path}")
+                except Exception as e:
+                    # 如果文件不存在或无法读取，记录错误但继续
+                    print(f"警告: 无法添加文件 {file_path}: {str(e)}")
+            
+            # 创建文件清单
+            manifest = {
+                "version": "1.0",
+                "export_time": datetime.utcnow().isoformat(),
+                "files": list(files_map.keys()),
+                "file_count": len(files_map)
+            }
+            zip_file.writestr("manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
+        
+        zip_buffer.seek(0)
+        
+        # 返回ZIP文件下载
+        import urllib.parse
+        filename = urllib.parse.quote(f"{lesson.title}_导出.zip")
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+        )
+    except HTTPException:
+        # 重新抛出 HTTPException，保持原始错误信息
+        raise
+    except Exception as e:
+        # 记录详细错误信息用于调试
+        import traceback
+        error_trace = traceback.format_exc()
+        error_msg = f"导出教案失败 - 详细错误信息:\n{error_trace}"
+        print(error_msg)
+        # 在开发环境中返回更详细的错误信息
+        import sys
+        if hasattr(sys, 'gettrace') and sys.gettrace() is not None:
+            # 调试模式：返回完整错误信息
+            raise HTTPException(500, f"导出教案失败: {str(e)}\n\n{error_trace}")
+        else:
+            # 生产模式：只返回简要错误信息
+            raise HTTPException(500, f"导出教案失败: {str(e)}")
