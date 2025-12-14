@@ -94,12 +94,14 @@ class LibraryAsset(Base):
     grade = relationship("Grade", foreign_keys=[grade_id])
     
     # 索引（性能优化）
+    # 注意：ix_library_assets_school_subject 和 ix_library_assets_school_grade 
+    # 在迁移文件中创建，避免重复定义
     __table_args__ = (
         Index("ix_library_assets_school_updated", "school_id", "updated_at"),
         Index("ix_library_assets_school_type", "school_id", "asset_type"),
         Index("ix_library_assets_school_visibility_status", "school_id", "visibility", "status"),
-        Index("ix_library_assets_school_subject", "school_id", "subject_id"),
-        Index("ix_library_assets_school_grade", "school_id", "grade_id"),
+        # ix_library_assets_school_subject 在迁移 018 中创建
+        # ix_library_assets_school_grade 在迁移 20251214_0826 中创建
         Index("ix_library_assets_sha256", "sha256"),
     )
     
