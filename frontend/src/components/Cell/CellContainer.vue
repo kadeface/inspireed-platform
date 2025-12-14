@@ -150,6 +150,7 @@ import ActivityCell from './ActivityCell.vue'
 import FlowchartCell from './FlowchartCell.vue'
 import FlowchartCellX6 from './FlowchartCellX6.vue'
 import BrowserCell from './BrowserCell.vue'
+import InteractiveCell from './InteractiveCell.vue'
 import ReferenceMaterialCell from '@/components/Cell/ReferenceMaterialCell.vue'
 import { useFeatureFlag } from '@/composables/useFeatureFlag'
 
@@ -305,6 +306,7 @@ const cellComponent = computed(() => {
     // 使用特性开关选择流程图编辑器
     [CellType.FLOWCHART]: useX6Editor ? FlowchartCellX6 : FlowchartCell,
     [CellType.BROWSER]: BrowserCell,
+    [CellType.INTERACTIVE]: InteractiveCell,
     [CellType.REFERENCE_MATERIAL]: ReferenceMaterialCell,
   }
   return componentMap[props.cell.type]
@@ -322,6 +324,7 @@ const cellTypeLabel = computed(() => {
     [CellType.ACTIVITY]: '活动',
     [CellType.FLOWCHART]: '流程图',
     [CellType.BROWSER]: '浏览器',
+    [CellType.INTERACTIVE]: '交互式课件',
     [CellType.REFERENCE_MATERIAL]: '参考素材',
   }
   return labelMap[props.cell.type]
@@ -358,6 +361,7 @@ const stageStyles = computed(() => {
     [CellType.ACTIVITY]: { bg: 'bg-orange-500', label: 'text-orange-100' },
     [CellType.FLOWCHART]: { bg: 'bg-indigo-500', label: 'text-indigo-100' },
     [CellType.BROWSER]: { bg: 'bg-cyan-500', label: 'text-cyan-100' },
+    [CellType.INTERACTIVE]: { bg: 'bg-purple-500', label: 'text-purple-100' },
     [CellType.REFERENCE_MATERIAL]: { bg: 'bg-slate-500', label: 'text-slate-100' },
   }
   return map[props.cell.type] || { bg: 'bg-blue-500', label: 'text-blue-100' }

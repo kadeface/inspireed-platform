@@ -1629,6 +1629,22 @@ function getDefaultCell(cellType: CellType, order: number): Cell {
         },
       } as Cell
 
+    case CellType.INTERACTIVE:
+      return {
+        ...baseCell,
+        type: CellType.INTERACTIVE,
+        content: {
+          url: '',
+          html_code: undefined,
+          title: '',
+          description: '',
+        },
+        config: {
+          allowFullscreen: true,
+          height: '800px',
+        },
+      } as Cell
+
     default:
       throw new Error(`Unknown cell type: ${cellType}`)
   }
@@ -2192,8 +2208,11 @@ function getCellTypeName(cellType: CellType): string {
     [CellType.VIDEO]: '视频单元',
     [CellType.ACTIVITY]: '活动单元',
     [CellType.FLOWCHART]: '流程图单元',
+    [CellType.BROWSER]: '浏览器单元',
+    [CellType.INTERACTIVE]: '交互式课件单元',
+    [CellType.REFERENCE_MATERIAL]: '参考素材单元',
   }
-  return nameMap[cellType]
+  return nameMap[cellType] || '未知单元'
 }
 
 // 初始化拖拽排序
@@ -2462,6 +2481,7 @@ function summarizeCell(cell: Cell, index: number): string | null {
     [CellType.VIDEO]: '视频',
     [CellType.ACTIVITY]: '活动',
     [CellType.FLOWCHART]: '流程图',
+    [CellType.INTERACTIVE]: '交互式课件',
     [CellType.REFERENCE_MATERIAL]: '参考素材',
   }
 

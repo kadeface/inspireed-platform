@@ -20,6 +20,7 @@ from app.api.v1 import (
     favorites,
     learning_paths,
     lessons,
+    library_assets,
     public_curriculum,
     questions,
     researcher_curriculum,
@@ -96,3 +97,6 @@ api_router.include_router(
 
 # 文件上传路由
 api_router.include_router(upload.router, prefix="/upload", tags=["文件上传"])
+
+# 资源库路由
+api_router.include_router(library_assets.router, prefix="/library/assets", tags=["资源库"])

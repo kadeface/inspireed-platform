@@ -1,6 +1,17 @@
 <template>
   <div class="curriculum-management p-6">
     <div class="header mb-6">
+      <div class="flex items-center gap-4 mb-2">
+        <router-link
+          to="/researcher"
+          class="flex items-center gap-2 px-6 py-2.5 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 font-medium transition-all"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span>返回</span>
+        </router-link>
+      </div>
       <h1 class="text-3xl font-bold text-gray-900">课程体系管理</h1>
       <p class="text-gray-600 mt-2">教研员专属 - 管理学科、年级、课程和官方资源</p>
     </div>
@@ -590,12 +601,10 @@ function toggleChapterLessons(chapterId: number) {
 
 async function loadSubjectsAndGrades() {
   try {
-    console.log('Loading subjects and grades...')
     const [subjects, grades] = await Promise.all([
       researcherService.getSubjects(true),
       researcherService.getGrades(true)
     ])
-    console.log('API Response - subjects:', subjects, 'grades:', grades)
     
     // Check if data is valid
     if (!Array.isArray(subjects) || !Array.isArray(grades)) {
@@ -605,7 +614,6 @@ async function loadSubjectsAndGrades() {
     allSubjects.value = subjects
     allGrades.value = grades
     dataLoaded.value = true
-    console.log(`Successfully loaded ${subjects.length} subjects and ${grades.length} grades`)
   } catch (error) {
     console.error('Failed to load subjects and grades:', error)
     dataLoaded.value = false

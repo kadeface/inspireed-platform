@@ -165,6 +165,12 @@ const cellTypes = [
     icon: '🌐',
     description: '嵌入网页内容',
   },
+  {
+    type: CellType.INTERACTIVE,
+    name: '交互式课件单元',
+    icon: '🎮',
+    description: 'HTML交互式课件',
+  },
 ]
 
 async function handleAddCell(cellType: CellType) {

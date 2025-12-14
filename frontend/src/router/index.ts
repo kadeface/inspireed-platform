@@ -74,6 +74,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/Teacher/SubjectGroupDetail.vue'),
     meta: { requiresAuth: true, role: 'teacher', title: '教研组详情 - InspireEd' },
   },
+  // 教师端 - 资源库
+  {
+    path: '/teacher/resource-library',
+    name: 'TeacherResourceLibrary',
+    component: () => import('../pages/Teacher/ResourceLibrary.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '资源库 - InspireEd' },
+  },
   {
     path: '/student',
     name: 'Student',

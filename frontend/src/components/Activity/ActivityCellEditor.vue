@@ -496,7 +496,11 @@ function deleteItem(index: number) {
 }
 
 .form-input {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900;
+}
+
+.form-input::placeholder {
+  @apply text-gray-400;
 }
 
 .form-hint {
@@ -512,7 +516,15 @@ function deleteItem(index: number) {
 }
 
 .inline-input {
-  @apply w-20 px-2 py-1 border border-gray-300 rounded text-sm;
+  @apply w-20 px-2 py-1 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+}
+
+.inline-input::placeholder {
+  @apply text-gray-400;
+}
+
+.inline-input:disabled {
+  @apply bg-gray-100 text-gray-500 cursor-not-allowed;
 }
 
 .template-grid {

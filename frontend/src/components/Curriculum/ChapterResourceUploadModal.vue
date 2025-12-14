@@ -24,7 +24,7 @@
               class="text-xl font-semibold text-gray-900"
               id="modal-title"
             >
-              上传资源到章节
+              添加资源到章节
             </h3>
             <button
               @click="handleClose"
@@ -37,7 +37,7 @@
           </div>
           
           <!-- 章节信息 -->
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
             <div class="flex items-center">
               <span class="text-blue-600 mr-2">📖</span>
               <div>
@@ -46,11 +46,38 @@
               </div>
             </div>
           </div>
+
+          <!-- Tab 切换 -->
+          <div class="flex border-b border-gray-200 mb-4">
+            <button
+              @click="activeTab = 'upload'"
+              :class="[
+                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                activeTab === 'upload'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              ]"
+            >
+              上传文件
+            </button>
+            <button
+              @click="activeTab = 'library'"
+              :class="[
+                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                activeTab === 'library'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              ]"
+            >
+              从资源库选择
+            </button>
+          </div>
         </div>
 
         <!-- 内容区 -->
         <div class="bg-white px-6 pb-6">
-          <form @submit.prevent="handleSubmit" class="space-y-4">
+          <!-- 上传文件 Tab -->
+          <form v-if="activeTab === 'upload'" @submit.prevent="handleSubmit" class="space-y-4">
             <!-- 资源标题 -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -169,6 +196,42 @@
               </select>
             </div>
           </form>
+
+          <!-- 从资源库选择 Tab -->
+          <div v-else-if="activeTab === 'library'" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                资源标题（可选，默认使用资产标题）
+              </label>
+              <input
+                v-model="libraryFormData.title"
+                type="text"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="留空则使用资产标题"
+                :disabled="loading"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                资源描述（可选）
+              </label>
+              <textarea
+                v-model="libraryFormData.description"
+                rows="2"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="留空则使用资产描述"
+                :disabled="loading"
+              ></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                选择资源 <span class="text-red-500">*</span>
+              </label>
+              <AssetPicker ref="assetPicker" @select="handleAssetSelect" />
+            </div>
+          </div>
         </div>
 
         <!-- 底部按钮 -->
@@ -181,6 +244,7 @@
             取消
           </button>
           <button
+            v-if="activeTab === 'upload'"
             @click="handleSubmit"
             :disabled="!canUpload || loading"
             class="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -194,6 +258,21 @@
             </span>
             <span v-else>上传资源</span>
           </button>
+          <button
+            v-else-if="activeTab === 'library'"
+            @click="handleLibrarySubmit"
+            :disabled="!canSubmitFromLibrary || loading"
+            class="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <span v-if="loading" class="inline-flex items-center">
+              <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              创建中...
+            </span>
+            <span v-else>引用资源</span>
+          </button>
         </div>
       </div>
     </div>
@@ -204,6 +283,8 @@
 import { ref, computed, watch } from 'vue'
 import resourceService from '@/services/resource'
 import type { Chapter } from '@/types/curriculum'
+import type { LibraryAssetSummary } from '@/types/library'
+import AssetPicker from '@/components/Library/AssetPicker.vue'
 
 interface Props {
   isOpen: boolean
@@ -226,6 +307,9 @@ const loading = ref(false)
 const isDragging = ref(false)
 const selectedFile = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement>()
+const activeTab = ref<'upload' | 'library'>('upload')
+const selectedAsset = ref<LibraryAssetSummary | null>(null)
+const assetPicker = ref<InstanceType<typeof AssetPicker>>()
 
 const formData = ref<ResourceFormData>({
   title: '',
@@ -233,8 +317,17 @@ const formData = ref<ResourceFormData>({
   resource_type: 'document'
 })
 
+const libraryFormData = ref({
+  title: '',
+  description: '',
+})
+
 const canUpload = computed(() => {
   return formData.value.title.trim() && selectedFile.value !== null
+})
+
+const canSubmitFromLibrary = computed(() => {
+  return selectedAsset.value !== null
 })
 
 // 监听章节变化，重置表单
@@ -250,11 +343,21 @@ function resetForm() {
     description: '',
     resource_type: 'document'
   }
+  libraryFormData.value = {
+    title: '',
+    description: '',
+  }
   selectedFile.value = null
+  selectedAsset.value = null
   isDragging.value = false
+  activeTab.value = 'upload'
   if (fileInput.value) {
     fileInput.value.value = ''
   }
+}
+
+function handleAssetSelect(asset: LibraryAssetSummary | null) {
+  selectedAsset.value = asset
 }
 
 function handleClose() {
@@ -361,6 +464,57 @@ async function handleSubmit() {
         errorMessage = error.response.data.message
       } else {
         errorMessage = JSON.stringify(error.response.data)
+      }
+    }
+    alert(errorMessage)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleLibrarySubmit() {
+  if (!canSubmitFromLibrary.value || !props.chapter || !selectedAsset.value) return
+  
+  loading.value = true
+  try {
+    console.log('开始引用资源库资产:', {
+      chapterId: props.chapter.id,
+      assetId: selectedAsset.value.id,
+      title: libraryFormData.value.title || selectedAsset.value.title,
+      description: libraryFormData.value.description,
+    })
+    
+    const resourceId = await resourceService.createResourceFromAsset(
+      props.chapter.id,
+      selectedAsset.value.id,
+      libraryFormData.value.title || selectedAsset.value.title,
+      libraryFormData.value.description
+    )
+    
+    console.log('引用成功，资源ID:', resourceId)
+    emit('success', resourceId)
+    handleClose()
+  } catch (error: any) {
+    console.error('引用失败，详细错误:', error)
+    
+    let errorMessage = '引用失败，请稍后重试'
+    if (error.response?.data) {
+      if (typeof error.response.data === 'string') {
+        errorMessage = error.response.data
+      } else if (error.response.data.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          const errors = error.response.data.detail.map((err: any) => {
+            if (err.loc && err.msg) {
+              return `${err.loc.join('.')}: ${err.msg}`
+            }
+            return err.msg || err
+          })
+          errorMessage = errors.join('\n')
+        } else {
+          errorMessage = error.response.data.detail
+        }
+      } else if (error.response.data.message) {
+        errorMessage = error.response.data.message
       }
     }
     alert(errorMessage)

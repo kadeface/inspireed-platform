@@ -145,9 +145,14 @@ class Resource(Base):
     # 基本信息
     title = Column(String(200), nullable=False)  # 集合的概念 - 教学设计
     description = Column(Text, nullable=True)
-    resource_type = Column(String(20), nullable=False)  # pdf, video, document, link
+    resource_type = Column(String(20), nullable=False)  # pdf, video, document, link, interactive
 
-    # 文件相关（主要用于PDF）
+    # 资源库引用（与 file_url 二选一）
+    asset_id = Column(
+        Integer, ForeignKey("library_assets.id"), nullable=True, comment="引用的资源库资产ID"
+    )
+
+    # 文件相关（主要用于PDF，当 asset_id 为空时使用）
     file_url = Column(String(500), nullable=True)  # 文件URL
     file_size = Column(Integer, nullable=True)  # 文件大小（字节）
     page_count = Column(Integer, nullable=True)  # PDF页数
@@ -175,6 +180,7 @@ class Resource(Base):
     # 关联关系
     chapter = relationship("Chapter", back_populates="resources")
     creator = relationship("User", foreign_keys=[created_by])
+    asset = relationship("LibraryAsset", foreign_keys=[asset_id])
 
     def __repr__(self) -> str:
         return (

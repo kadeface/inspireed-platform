@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
 from app.core.database import get_db
-from app.models import Resource, Chapter, Lesson, User, UserRole
+from app.models import Resource, Chapter, Lesson, User, UserRole, LibraryAsset
 from app.schemas.resource import (
     ResourceCreate,
     ResourceUpdate,
@@ -16,11 +16,60 @@ from app.schemas.resource import (
     ResourceDetail,
     ResourceListResponse,
 )
+from app.schemas.library_asset import LibraryAssetSummary
 from app.services.upload import upload_service
 from app.services.office_converter import office_converter_service
 from app.api.deps import get_current_user, get_current_admin
 
 router = APIRouter()
+
+
+async def _enrich_resource_response(
+    resource: Resource, db: AsyncSession
+) -> ResourceResponse:
+    """
+    为资源响应补充 asset 和 resolved_file_url 字段
+    """
+    resource_dict = {
+        "id": resource.id,
+        "chapter_id": resource.chapter_id,
+        "title": resource.title,
+        "description": resource.description,
+        "resource_type": resource.resource_type,
+        "is_official": resource.is_official,
+        "is_downloadable": resource.is_downloadable,
+        "display_order": resource.display_order,
+        "asset_id": resource.asset_id,
+        "file_url": resource.file_url,
+        "file_size": resource.file_size,
+        "page_count": resource.page_count,
+        "thumbnail_url": resource.thumbnail_url,
+        "is_active": resource.is_active,
+        "view_count": resource.view_count,
+        "download_count": resource.download_count,
+        "created_by": resource.created_by,
+        "created_at": resource.created_at,
+        "updated_at": resource.updated_at,
+    }
+    
+    # 如果有 asset_id，加载 asset 信息
+    asset_summary = None
+    if resource.asset_id:
+        asset = await db.get(LibraryAsset, resource.asset_id)
+        if asset:
+            asset_summary = LibraryAssetSummary.model_validate(asset)
+    
+    resource_dict["asset"] = asset_summary
+    
+    # 计算 resolved_file_url（优先使用 file_url，否则使用 asset.public_url）
+    resolved_file_url = resource.file_url
+    if not resolved_file_url and asset_summary:
+        resolved_file_url = asset_summary.public_url
+    
+    resource_dict["resolved_file_url"] = resolved_file_url
+    
+    return ResourceResponse(**resource_dict)
+
 
 
 @router.get("/", response_model=List[ResourceResponse])
@@ -50,7 +99,13 @@ async def list_resources(
     result = await db.execute(query)
     resources = result.scalars().all()
 
-    return resources
+    # 补充 asset 和 resolved_file_url
+    enriched_resources = []
+    for resource in resources:
+        enriched = await _enrich_resource_response(resource, db)
+        enriched_resources.append(enriched)
+    
+    return enriched_resources
 
 
 @router.get("/{resource_id}", response_model=ResourceDetail)
@@ -80,16 +135,17 @@ async def get_resource(
     lessons_count_result = await db.execute(lessons_count_query)
     lessons_count = lessons_count_result.scalar()
 
-    # 构建响应
-    resource_dict = {
-        **resource.__dict__,
-        "chapter": (
-            {"id": chapter.id, "name": chapter.name, "course_id": chapter.course_id}
-            if chapter
-            else None
-        ),
-        "lessons_count": lessons_count,
-    }
+    # 先获取基础响应（包含 asset 和 resolved_file_url）
+    base_response = await _enrich_resource_response(resource, db)
+    
+    # 构建详情响应
+    resource_dict = base_response.model_dump()
+    resource_dict["chapter"] = (
+        {"id": chapter.id, "name": chapter.name, "course_id": chapter.course_id}
+        if chapter
+        else None
+    )
+    resource_dict["lessons_count"] = lessons_count
 
     return ResourceDetail(**resource_dict)
 
@@ -102,6 +158,7 @@ async def create_resource(
     resource_type: str = Form("pdf"),
     is_official: bool = Form(False),
     is_downloadable: bool = Form(True),
+    asset_id: Optional[int] = Form(None, description="资源库资产ID（与file二选一）"),
     file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -115,6 +172,14 @@ async def create_resource(
     chapter = await db.get(Chapter, chapter_id)
     if not chapter:
         raise HTTPException(404, "Chapter not found")
+
+    # asset_id 和 file 不能同时为空（至少提供一个）
+    if not asset_id and not file:
+        raise HTTPException(400, "必须提供 asset_id 或上传文件")
+    
+    # asset_id 和 file 不能同时存在（二选一）
+    if asset_id and file:
+        raise HTTPException(400, "asset_id 和文件上传只能选择其一")
 
     # 创建资源记录
     role_value = cast(str, current_user.role)
@@ -131,8 +196,35 @@ async def create_resource(
         created_by=current_user.id,
     )
 
+    # 如果引用资源库资产
+    if asset_id:
+        # 验证资产是否存在
+        asset = await db.get(LibraryAsset, asset_id)
+        if not asset:
+            raise HTTPException(404, "资源库资产不存在")
+        
+        # 验证资产状态
+        if cast(str, asset.status) != "active":
+            raise HTTPException(400, "资源库资产状态无效")
+        
+        # 验证资产归属学校（确保同校）
+        if current_user.school_id and asset.school_id != current_user.school_id:
+            raise HTTPException(403, "无权引用其他学校的资源库资产")
+        
+        # 验证可见性（教师只能引用自己上传的或全校可见的）
+        user_role = cast(UserRole, current_user.role)
+        if user_role == UserRole.TEACHER:
+            if cast(int, asset.owner_user_id) != current_user.id and cast(str, asset.visibility) != "school":
+                raise HTTPException(403, "无权引用此资源库资产")
+        
+        # 设置引用
+        resource.asset_id = asset_id
+        # 从资产继承资源类型（如果未指定）
+        if not resource_type or resource_type == "pdf":
+            resource.resource_type = cast(str, asset.asset_type)
+    
     # 如果有文件上传
-    if file:
+    elif file:
         if resource_type == "pdf":
             # 上传 PDF 并提取元数据
             upload_result = await upload_service.upload_pdf(file)
@@ -151,7 +243,8 @@ async def create_resource(
     await db.commit()
     await db.refresh(resource)
 
-    return resource
+    # 返回时补充 asset 和 resolved_file_url
+    return await _enrich_resource_response(resource, db)
 
 
 @router.put("/{resource_id}", response_model=ResourceResponse)

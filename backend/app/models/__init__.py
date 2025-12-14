@@ -8,6 +8,7 @@ from app.models.cell import Cell, CellType, CognitiveLevel
 from app.models.logs import ExecutionLog, QARecord, ExecutionStatus
 from app.models.curriculum import Subject, Grade, Course, Chapter, Resource
 from app.models.organization import Region, School, Classroom
+from app.models.library_asset import LibraryAsset
 from app.models.favorite import Favorite
 from app.models.review import Review
 from app.models.learning_path import LearningPath, LearningPathLesson
@@ -60,6 +61,7 @@ __all__ = [
     "Course",
     "Chapter",
     "Resource",
+    "LibraryAsset",
     "Region",
     "School",
     "Classroom",

@@ -32,6 +32,22 @@ export interface ChapterWithChildren extends Chapter {
   resources_count: number
 }
 
+// 资源库资产摘要类型
+export interface LibraryAssetSummary {
+  id: number
+  title: string
+  asset_type: string
+  mime_type?: string
+  size_bytes?: number
+  thumbnail_url?: string
+  public_url?: string
+  page_count?: number
+  duration_seconds?: number
+  visibility: string
+  status: string
+  updated_at: string
+}
+
 // 资源基础类型
 export interface Resource {
   id: number
@@ -40,11 +56,18 @@ export interface Resource {
   description?: string
   resource_type: ResourceType
   
-  // 文件相关
+  // 资源库引用
+  asset_id?: number
+  asset?: LibraryAssetSummary
+  
+  // 文件相关（当 asset_id 为空时使用）
   file_url?: string
   file_size?: number  // 字节
   page_count?: number  // PDF 页数
   thumbnail_url?: string
+  
+  // 解析后的文件URL（优先使用 file_url，否则使用 asset.public_url）
+  resolved_file_url?: string
   
   // 权限和状态
   is_official: boolean

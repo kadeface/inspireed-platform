@@ -2,9 +2,14 @@
 资源相关的 Schema
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
+
+# 延迟导入以避免循环依赖
+from app.schemas.library_asset import LibraryAssetSummary
 
 
 class ResourceBase(BaseModel):
@@ -42,10 +47,20 @@ class ResourceResponse(ResourceBase):
 
     id: int
     chapter_id: int
+    
+    # 资源库引用
+    asset_id: Optional[int] = None
+    asset: Optional["LibraryAssetSummary"] = None  # Forward reference
+    
+    # 直接上传的文件信息（当 asset_id 为空时使用）
     file_url: Optional[str] = None
     file_size: Optional[int] = None
     page_count: Optional[int] = None
     thumbnail_url: Optional[str] = None
+    
+    # 解析后的文件URL（优先使用 file_url，否则使用 asset.public_url）
+    resolved_file_url: Optional[str] = None
+    
     is_active: bool
     view_count: int
     download_count: int

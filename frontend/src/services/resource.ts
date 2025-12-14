@@ -142,6 +142,37 @@ export const resourceService = {
   },
 
   /**
+   * 从资源库引用创建资源
+   */
+  async createResourceFromAsset(
+    chapterId: number,
+    assetId: number,
+    title: string,
+    description?: string
+  ): Promise<number> {
+    const formData = new FormData()
+    
+    formData.append('chapter_id', chapterId.toString())
+    formData.append('asset_id', assetId.toString())
+    formData.append('title', title)
+    if (description) formData.append('description', description)
+    formData.append('resource_type', 'pdf') // 默认值，后端会从资产推断
+    formData.append('is_downloadable', 'true')
+    
+    console.log('从资源库引用创建资源:', {
+      chapter_id: chapterId,
+      asset_id: assetId,
+      title,
+      description
+    })
+    
+    const resource = await api.post<Resource>('/resources/', formData)
+    
+    console.log('引用创建成功:', resource)
+    return resource.id
+  },
+
+  /**
    * 更新资源（管理员）
    */
   async updateResource(

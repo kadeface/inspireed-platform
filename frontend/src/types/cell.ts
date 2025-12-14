@@ -13,6 +13,7 @@ export const CellType = {
   ACTIVITY: 'activity',  // 教学活动（测验、问卷、作业、评价）
   FLOWCHART: 'flowchart',  // 流程图
   BROWSER: 'browser',  // 浏览器单元
+  INTERACTIVE: 'interactive',  // 交互式课件单元
   REFERENCE_MATERIAL: 'reference_material',
 } as const
 
@@ -237,6 +238,26 @@ export interface BrowserCell extends CellBase {
   }
 }
 
+export interface InteractiveCellContent {
+  asset_id?: number                // 资源库资产ID（如果从资源库选择）
+  url?: string                     // 交互式课件URL（直接输入URL时使用）
+  html_code?: string               // HTML代码（粘贴HTML代码时使用）
+  title?: string                   // 课件标题
+  description?: string             // 课件描述
+  thumbnail?: string               // 缩略图URL
+}
+
+export interface InteractiveCell extends CellBase {
+  type: typeof CellType.INTERACTIVE
+  content: InteractiveCellContent
+  config?: {
+    allowFullscreen?: boolean      // 是否允许全屏（默认true）
+    width?: string                 // iframe 宽度（默认100%）
+    height?: string                // iframe 高度（默认800px）
+    sandbox?: string[]             // iframe sandbox 属性（安全控制）
+  }
+}
+
 export type Cell =
   | TextCell
   | CodeCell
@@ -248,4 +269,5 @@ export type Cell =
   | ActivityCell
   | FlowchartCell
   | BrowserCell
+  | InteractiveCell
   | ReferenceMaterialCell

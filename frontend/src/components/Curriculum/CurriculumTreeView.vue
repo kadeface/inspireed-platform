@@ -360,7 +360,7 @@ onMounted(() => {
   display: flex;
   gap: 2rem;
   padding: 1.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgba(18, 184, 152, 1) 0%, rgba(120, 226, 205, 1) 100%);
   color: white;
 }
 
@@ -573,7 +573,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgba(18, 184, 152, 1) 0%, rgba(120, 226, 205, 1) 100%);
   color: white;
 }
 

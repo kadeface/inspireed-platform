@@ -175,6 +175,8 @@ function getCellTypeLabel(type: string): string {
     [CellType.CHART]: '图表',
     [CellType.CONTEST]: '竞赛',
     [CellType.PARAM]: '参数',
+    [CellType.BROWSER]: '浏览器',
+    [CellType.INTERACTIVE]: '交互式课件',
     [CellType.REFERENCE_MATERIAL]: '参考',
   }
   return labels[type] || type
@@ -192,6 +194,8 @@ function getCellIcon(type: string): string {
     [CellType.CHART]: '📈',
     [CellType.CONTEST]: '🏆',
     [CellType.PARAM]: '⚙️',
+    [CellType.BROWSER]: '🌐',
+    [CellType.INTERACTIVE]: '🎮',
     [CellType.REFERENCE_MATERIAL]: '📚',
   }
   return icons[type] || '📄'

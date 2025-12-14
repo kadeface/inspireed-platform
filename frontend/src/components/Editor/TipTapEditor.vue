@@ -58,7 +58,45 @@
         &lt;/&gt;
       </button>
       <button @click="triggerImageUpload" class="menu-btn">🖼️ Image</button>
-      <button @click="triggerFileUpload" class="menu-btn">📎 File</button>
+      <div class="relative inline-block">
+        <button 
+          @click.stop="toggleFileMenu" 
+          class="menu-btn"
+          type="button"
+        >
+          📎 File
+        </button>
+        <!-- 文件菜单下拉 -->
+        <Transition name="dropdown">
+          <div
+            v-if="showFileMenu"
+            v-click-outside="closeFileMenu"
+            class="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-[100] min-w-[200px]"
+            @click.stop
+          >
+            <button
+              @click.stop="triggerFileUpload"
+              type="button"
+              class="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 text-sm"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              上传本地文件
+            </button>
+            <button
+              @click.stop="openLibraryPicker"
+              type="button"
+              class="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 text-sm"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              从资源库选择
+            </button>
+          </div>
+        </Transition>
+      </div>
       <input
         ref="imageInput"
         type="file"
@@ -77,6 +115,35 @@
     <div v-if="isUploadingImage || isUploadingFile" class="upload-status">
       <p class="text-sm text-gray-600">上传中... {{ uploadProgress }}%</p>
     </div>
+
+    <!-- 资源库选择器模态框 -->
+    <Teleport to="body">
+      <div
+        v-if="showLibraryPicker"
+        class="fixed inset-0 z-50 overflow-y-auto"
+        @click.self="showLibraryPicker = false"
+      >
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="showLibraryPicker = false"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+          <div class="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="px-6 pt-6 pb-4 border-b flex items-center justify-between">
+              <h3 class="text-xl font-semibold text-gray-900">从资源库选择资源</h3>
+              <button @click="showLibraryPicker = false" class="text-gray-400 hover:text-gray-500">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6">
+              <AssetPicker
+                ref="assetPicker"
+                @select="handleLibraryAssetSelect"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -88,6 +155,8 @@ import Link from '@tiptap/extension-link'
 import { watch, onBeforeUnmount, ref } from 'vue'
 import api from '../../services/api'
 import { getServerBaseUrl } from '@/utils/url'
+import AssetPicker from '@/components/Library/AssetPicker.vue'
+import type { LibraryAssetSummary } from '@/types/library'
 
 interface Props {
   content: string
@@ -245,13 +314,32 @@ const isUploadingImage = ref(false)
 const isUploadingFile = ref(false)
 const uploadProgress = ref(0)
 
+// 文件菜单和资源库选择器
+const showFileMenu = ref(false)
+const showLibraryPicker = ref(false)
+const assetPicker = ref<InstanceType<typeof AssetPicker>>()
+
 function triggerImageUpload() {
   // 直接触发文件选择，优先使用本地图片上传
   imageInput.value?.click()
 }
 
+function toggleFileMenu() {
+  showFileMenu.value = !showFileMenu.value
+}
+
+function closeFileMenu() {
+  showFileMenu.value = false
+}
+
 function triggerFileUpload() {
+  closeFileMenu()
   fileInput.value?.click()
+}
+
+function openLibraryPicker() {
+  closeFileMenu()
+  showLibraryPicker.value = true
 }
 
 // 添加通过URL插入图片的功能（可以通过右键菜单或其他方式调用）
@@ -508,6 +596,110 @@ function getFileIcon(filename: string): string {
   return iconMap[ext] || '📎'
 }
 
+// 处理从资源库选择的资源
+async function handleLibraryAssetSelect(asset: LibraryAssetSummary | null) {
+  if (!asset || !editor.value) {
+    showLibraryPicker.value = false
+    return
+  }
+
+  try {
+    const fileUrl = asset.public_url || ''
+    const filename = asset.title || '资源文件'
+    
+    // 根据资源类型处理
+    if (asset.asset_type === 'image') {
+      // 图片资源：直接插入图片
+      const imageUrl = fileUrl.startsWith('/uploads/') 
+        ? `${getServerBaseUrl()}${fileUrl}`
+        : fileUrl
+      editor.value.chain().focus().setImage({ src: imageUrl }).run()
+    } else if (asset.asset_type === 'video') {
+      // 视频资源：插入视频链接或嵌入代码
+      const videoUrl = fileUrl.startsWith('/uploads/') 
+        ? `${getServerBaseUrl()}${fileUrl}`
+        : fileUrl
+      const videoHtml = `
+        <div class="video-embed">
+          <video controls style="max-width: 100%; height: auto;">
+            <source src="${videoUrl}" type="video/mp4">
+            您的浏览器不支持视频播放
+          </video>
+        </div>
+      `
+      editor.value.chain().focus().insertContent(videoHtml).run()
+    } else if (asset.asset_type === 'pdf') {
+      // PDF资源：插入PDF查看/下载组件
+      const pdfUrl = fileUrl.startsWith('/uploads/') 
+        ? `${getServerBaseUrl()}${fileUrl}`
+        : fileUrl
+      const pdfHtml = `
+        <div class="file-attachment pdf-attachment" data-pdf-url="${fileUrl}" data-file-filename="${filename}">
+          <div class="file-preview-card">
+            <div class="file-icon">📄</div>
+            <div class="file-info">
+              <div class="file-filename">${filename}</div>
+              <div class="file-size">PDF文档</div>
+            </div>
+            <div class="file-actions">
+              <button class="file-view-btn" onclick="window.open('${pdfUrl}', '_blank')">查看</button>
+              <a href="${pdfUrl}" download="${filename}" class="file-download-btn">下载</a>
+            </div>
+          </div>
+        </div>
+      `
+      editor.value.chain().focus().insertContent(pdfHtml).run()
+    } else {
+      // 其他文件类型：插入文件下载组件
+      const downloadUrl = fileUrl.startsWith('/uploads/') 
+        ? `${getServerBaseUrl()}${fileUrl}`
+        : fileUrl
+      const fileIcon = getFileIcon(filename)
+      const fileHtml = `
+        <div class="file-attachment" data-file-url="${fileUrl}" data-file-filename="${filename}">
+          <div class="file-preview-card">
+            <div class="file-icon">${fileIcon}</div>
+            <div class="file-info">
+              <div class="file-filename">${filename}</div>
+              <div class="file-size">${asset.size_bytes ? formatFileSize(asset.size_bytes) : ''}</div>
+            </div>
+            <div class="file-actions">
+              <a href="${downloadUrl}" download="${filename}" class="file-download-btn">下载</a>
+            </div>
+          </div>
+        </div>
+      `
+      editor.value.chain().focus().insertContent(fileHtml).run()
+    }
+    
+    showLibraryPicker.value = false
+  } catch (error) {
+    console.error('插入资源库资源失败:', error)
+    alert('插入资源失败，请重试')
+  }
+}
+
+// 自定义指令：点击外部关闭菜单
+const vClickOutside = {
+  mounted(el: HTMLElement & { clickOutsideEvent?: (event: MouseEvent) => void }, binding: any) {
+    el.clickOutsideEvent = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (!(el === target || el.contains(target))) {
+        binding.value(event)
+      }
+    }
+    // 使用 nextTick 确保在下一个事件循环中添加监听器，避免立即触发
+    setTimeout(() => {
+      document.addEventListener('click', el.clickOutsideEvent!, true)
+    }, 0)
+  },
+  unmounted(el: HTMLElement & { clickOutsideEvent?: (event: MouseEvent) => void }) {
+    if (el.clickOutsideEvent) {
+      document.removeEventListener('click', el.clickOutsideEvent, true)
+    }
+  },
+}
+
 onBeforeUnmount(() => {
   editor.value?.destroy()
 })
@@ -612,6 +804,32 @@ onBeforeUnmount(() => {
 
 .upload-status {
   @apply px-4 py-2 bg-blue-50 border-t border-blue-200;
+}
+
+/* 文件菜单下拉样式 */
+.menu-btn {
+  position: relative;
+}
+
+/* 视频嵌入样式 */
+:deep(.ProseMirror .video-embed) {
+  @apply my-4;
+}
+
+:deep(.ProseMirror .video-embed video) {
+  @apply w-full rounded-lg;
+}
+
+/* 下拉菜单动画 */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>
 

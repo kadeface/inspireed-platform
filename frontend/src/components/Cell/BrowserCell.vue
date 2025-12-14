@@ -462,7 +462,17 @@ onBeforeUnmount(() => {
 
 .form-group input,
 .form-group textarea {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500;
+  @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  @apply text-gray-400;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  @apply border-blue-500 bg-white;
 }
 
 .url-input-wrapper {
@@ -470,7 +480,15 @@ onBeforeUnmount(() => {
 }
 
 .url-input {
-  @apply flex-1;
+  @apply flex-1 bg-white text-gray-900;
+}
+
+.url-input::placeholder {
+  @apply text-gray-400;
+}
+
+.url-input:focus {
+  @apply bg-white;
 }
 
 .url-input.error {

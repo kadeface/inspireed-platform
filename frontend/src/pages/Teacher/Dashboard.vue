@@ -63,15 +63,15 @@
             to="/teacher/subject-groups"
             class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
           >
-            <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600"></span>
-            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-emerald-50/80 via-transparent to-transparent"></div>
+            <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-600"></span>
+            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-amber-50/80 via-transparent to-transparent"></div>
 
             <div class="relative flex items-start justify-between">
               <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-emerald-600">学科教研组</p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-amber-600">学科教研组</p>
                 <h3 class="mt-1 text-lg font-bold text-gray-900">协作共研</h3>
               </div>
-              <div class="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg bg-gradient-to-br from-emerald-500 to-teal-600">
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg bg-gradient-to-br from-amber-500 to-orange-600">
                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
@@ -79,7 +79,7 @@
             </div>
 
             <div v-if="subjectGroupStats" class="relative mt-4 flex items-baseline gap-2">
-              <span class="text-3xl font-bold text-emerald-700">{{ subjectGroupStats.my_groups || 0 }}</span>
+              <span class="text-3xl font-bold text-amber-700">{{ subjectGroupStats.my_groups || 0 }}</span>
               <span class="text-sm text-gray-500">我的教研组</span>
             </div>
             <div v-else class="relative mt-4 text-sm text-gray-500">加载中...</div>
@@ -91,8 +91,45 @@
               全部 {{ subjectGroupStats.total_groups || 0 }} 个 · 共享教案 {{ subjectGroupStats.total_shared_lessons || 0 }} 篇
             </p>
 
-            <div class="relative mt-4 inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-xl transition-all">
+            <div class="relative mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-4 py-2 rounded-xl transition-all">
               进入教研组
+              <svg class="ml-1 h-4 w-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </router-link>
+
+          <!-- 资源库卡片 -->
+          <router-link
+            to="/teacher/resource-library"
+            class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
+          >
+            <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-teal-500 to-emerald-600"></span>
+            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-teal-50/80 via-transparent to-transparent"></div>
+
+            <div class="relative flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-teal-600">资源库</p>
+                <h3 class="mt-1 text-lg font-bold text-gray-900">教学资源</h3>
+              </div>
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg bg-gradient-to-br from-teal-500 to-emerald-600">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+            </div>
+
+            <div class="relative mt-4 flex items-baseline gap-2">
+              <span class="text-3xl font-bold text-teal-700">—</span>
+              <span class="text-sm text-gray-500">资源库</span>
+            </div>
+
+            <p class="relative mt-3 text-sm text-gray-600 leading-relaxed">
+              上传、管理和分享学校的教学资源，支持在课程中快速引用。
+            </p>
+
+            <div class="relative mt-4 inline-flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700 hover:bg-teal-50 px-4 py-2 rounded-xl transition-all">
+              进入资源库
               <svg class="ml-1 h-4 w-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>

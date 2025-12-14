@@ -425,6 +425,7 @@ import ContestCell from '@/components/Cell/ContestCell.vue'
 import VideoCell from '@/components/Cell/VideoCell.vue'
 import ActivityCell from '@/components/Cell/ActivityCell.vue'
 import BrowserCell from '@/components/Cell/BrowserCell.vue'
+import InteractiveCell from '@/components/Cell/InteractiveCell.vue'
 import ReviewSection from '@/components/Resource/ReviewSection.vue'
 import QuestionForm from '@/components/Question/QuestionForm.vue'
 import QuestionList from '@/components/Question/QuestionList.vue'
@@ -889,6 +890,7 @@ const getCellComponent = (type: CellType) => {
     activity: ActivityCell,
     flowchart: FlowchartStudentCell,
     browser: BrowserCell,
+    interactive: InteractiveCell,
   }
   return components[type] || TextCell
 }
@@ -1129,6 +1131,7 @@ const summarizeCell = (cell: any, index: number): string | null => {
     activity: '活动',
     flowchart: '流程图',
     browser: '浏览器',
+    interactive: '交互式课件',
     reference_material: '参考素材',
   }
   const typeLabel = typeMap[cell.type] || '单元'

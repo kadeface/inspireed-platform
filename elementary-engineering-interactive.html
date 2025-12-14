@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小学工程问题知识点讲解 - 互动学习</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+        }
+
+        .content-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .content-section h2 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .content-section h2::before {
+            content: '';
+            width: 4px;
+            height: 30px;
+            background: #667eea;
+            border-radius: 2px;
+        }
+
+        .step-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 15px 0;
+            border-left: 5px solid #667eea;
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+
+        .step-card:hover {
+            transform: translateX(10px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .step-card h3 {
+            color: #667eea;
+            font-size: 1.3em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .interactive-area {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 2px dashed #667eea;
+        }
+
+        .problem-box {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s;
+        }
+
+        .problem-box:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            margin: 10px 5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .choice-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            margin: 10px 0;
+            padding: 15px 20px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .choice-btn:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+            transform: translateX(5px);
+        }
+
+        .choice-btn.correct {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+
+        .choice-btn.wrong {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+
+        .result-box {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+
+        .result-box.show {
+            display: block;
+        }
+
+        .result-box.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+
+        .result-box.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+
+        .drag-drop-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .drag-item {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 2px solid #667eea;
+            cursor: grab;
+            transition: all 0.3s;
+            user-select: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .drag-item:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .drag-item.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .drop-zone {
+            min-height: 80px;
+            border: 3px dashed #ccc;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            background: #f8f9fa;
+            transition: all 0.3s;
+        }
+
+        .drop-zone.drag-over {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .drop-zone.filled {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .solution-step {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s;
+        }
+
+        .solution-step.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .emoji {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .example-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .example-card {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s;
+            cursor: pointer;
+        }
+
+        .example-card:hover {
+            transform: scale(1.05);
+        }
+
+        .example-card h4 {
+            color: #2d3436;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            .content-section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏗️ 小学工程问题知识点讲解</h1>
+            <p>一起来探索工程问题的奥秘吧！</p>
+        </div>
+
+        <!-- 什么是工程问题 -->
+        <div class="content-section">
+            <h2><span class="emoji">🔍</span>什么是工程问题？</h2>
+            <div class="problem-box">
+                <p style="font-size: 1.1em; line-height: 1.8;">
+                    工程问题就是我们在日常生活中遇到的需要通过<strong>设计</strong>、<strong>制作</strong>和<strong>改进</strong>来解决的实际问题。
+                    比如：如何建造一座坚固的桥梁？如何制作一个能飞的纸飞机？如何设计一个省力的工具？
+                </p>
+            </div>
+            
+            <div class="example-grid">
+                <div class="example-card" onclick="showExample(1)">
+                    <h4>🌉 建桥问题</h4>
+                    <p>如何用最少的材料建一座能承载重物的桥？</p>
+                </div>
+                <div class="example-card" onclick="showExample(2)">
+                    <h4>✈️ 飞行器设计</h4>
+                    <p>如何让纸飞机飞得更远更稳？</p>
+                </div>
+                <div class="example-card" onclick="showExample(3)">
+                    <h4>⚙️ 工具设计</h4>
+                    <p>如何制作一个能轻松提起重物的工具？</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 工程问题解决步骤 -->
+        <div class="content-section">
+            <h2><span class="emoji">📋</span>工程问题解决步骤</h2>
+            
+            <div class="step-card" onclick="highlightStep(1)">
+                <h3>
+                    <span class="step-number">1</span>
+                    发现问题
+                </h3>
+                <p>观察生活中遇到的问题，明确需要解决什么。</p>
+            </div>
+
+            <div class="step-card" onclick="highlightStep(2)">
+                <h3>
+                    <span class="step-number">2</span>
+                    提出方案
+                </h3>
+                <p>思考多种可能的解决方法，画出设计图。</p>
+            </div>
+
+            <div class="step-card" onclick="highlightStep(3)">
+                <h3>
+                    <span class="step-number">3</span>
+                    制作原型
+                </h3>
+                <p>根据设计方案，动手制作模型或实物。</p>
+            </div>
+
+            <div class="step-card" onclick="highlightStep(4)">
+                <h3>
+                    <span class="step-number">4</span>
+                    测试改进
+                </h3>
+                <p>测试作品是否达到要求，发现问题并改进。</p>
+            </div>
+
+            <div class="step-card" onclick="highlightStep(5)">
+                <h3>
+                    <span class="step-number">5</span>
+                    分享交流
+                </h3>
+                <p>向他人展示成果，听取意见，互相学习。</p>
+            </div>
+        </div>
+
+        <!-- 互动练习：排序 -->
+        <div class="content-section">
+            <h2><span class="emoji">🎮</span>互动练习：排列工程步骤</h2>
+            <p style="margin-bottom: 15px;">把下面的步骤按正确顺序拖到框中：</p>
+            
+            <div class="drag-drop-area" id="dragArea">
+                <div class="drag-item" draggable="true" data-step="1">发现问题</div>
+                <div class="drag-item" draggable="true" data-step="2">提出方案</div>
+                <div class="drag-item" draggable="true" data-step="3">制作原型</div>
+                <div class="drag-item" draggable="true" data-step="4">测试改进</div>
+                <div class="drag-item" draggable="true" data-step="5">分享交流</div>
+            </div>
+
+            <div class="drop-zone" id="dropZone">
+                <p style="color: #999; text-align: center;">拖拽步骤到这里，按正确顺序排列</p>
+            </div>
+
+            <button class="btn" onclick="checkOrder()">检查答案</button>
+            <button class="btn btn-secondary" onclick="resetOrder()">重新开始</button>
+
+            <div class="result-box" id="orderResult"></div>
+        </div>
+
+        <!-- 选择题练习 -->
+        <div class="content-section">
+            <h2><span class="emoji">💡</span>知识问答</h2>
+            
+            <div class="interactive-area">
+                <h3 style="margin-bottom: 15px;">问题1：建造一座纸桥时，什么形状最稳固？</h3>
+                <button class="choice-btn" onclick="checkAnswer(1, false, this)">A. 直线形</button>
+                <button class="choice-btn" onclick="checkAnswer(1, false, this)">B. 圆形</button>
+                <button class="choice-btn" onclick="checkAnswer(1, true, this)">C. 三角形</button>
+                <button class="choice-btn" onclick="checkAnswer(1, false, this)">D. 波浪形</button>
+            </div>
+
+            <div class="interactive-area" style="margin-top: 30px;">
+                <h3 style="margin-bottom: 15px;">问题2：测试原型时发现不够结实，应该怎么办？</h3>
+                <button class="choice-btn" onclick="checkAnswer(2, false, this)">A. 放弃这个方案</button>
+                <button class="choice-btn" onclick="checkAnswer(2, true, this)">B. 分析问题并改进设计</button>
+                <button class="choice-btn" onclick="checkAnswer(2, false, this)">C. 重新开始</button>
+                <button class="choice-btn" onclick="checkAnswer(2, false, this)">D. 忽略问题</button>
+            </div>
+
+            <div class="interactive-area" style="margin-top: 30px;">
+                <h3 style="margin-bottom: 15px;">问题3：工程设计最重要的特点是什么？</h3>
+                <button class="choice-btn" onclick="checkAnswer(3, false, this)">A. 美观</button>
+                <button class="choice-btn" onclick="checkAnswer(3, true, this)">B. 实用且解决问题</button>
+                <button class="choice-btn" onclick="checkAnswer(3, false, this)">C. 便宜</button>
+                <button class="choice-btn" onclick="checkAnswer(3, false, this)">D. 快速</button>
+            </div>
+
+            <div class="progress-bar" style="margin-top: 30px;">
+                <div class="progress-fill" id="progressFill">0%</div>
+            </div>
+        </div>
+
+        <!-- 实例分析 -->
+        <div class="content-section">
+            <h2><span class="emoji">🎯</span>实例分析：设计一个纸桥</h2>
+            
+            <div class="interactive-area">
+                <h3 style="margin-bottom: 15px;">任务：用3张A4纸设计一座能承载100g重物的桥</h3>
+                
+                <button class="btn btn-success" onclick="showSolution()">显示解决方案</button>
+                
+                <div id="solutionSteps">
+                    <!-- 解决方案步骤将通过JavaScript动态添加 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="content-section">
+            <h2><span class="emoji">✨</span>学习总结</h2>
+            <div class="problem-box">
+                <p style="font-size: 1.1em; line-height: 1.8;">
+                    通过今天的学习，我们了解了：
+                </p>
+                <ul style="margin-top: 15px; font-size: 1.1em; line-height: 2;">
+                    <li>✅ 工程问题就是需要通过设计和制作来解决的实际问题</li>
+                    <li>✅ 解决工程问题有5个基本步骤：发现问题 → 提出方案 → 制作原型 → 测试改进 → 分享交流</li>
+                    <li>✅ 工程设计是一个反复改进的过程，失败是成功的一部分</li>
+                    <li>✅ 团队合作和分享想法能让设计变得更好</li>
+                </ul>
+                <p style="margin-top: 20px; font-size: 1.1em; color: #667eea; font-weight: bold;">
+                    🎉 现在你已经掌握了工程问题的基本知识，快去生活中找找问题，开始你的工程设计之旅吧！
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let droppedSteps = [];
+        let correctAnswers = 0;
+        let totalQuestions = 3;
+
+        // 拖拽功能
+        const dragItems = document.querySelectorAll('.drag-item');
+        const dropZone = document.getElementById('dropZone');
+
+        dragItems.forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', e.target.dataset.step);
+                e.target.classList.add('dragging');
+            });
+
+            item.addEventListener('dragend', (e) => {
+                e.target.classList.remove('dragging');
+            });
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            const stepNum = e.dataTransfer.getData('text/plain');
+            const draggedItem = document.querySelector(`[data-step="${stepNum}"]`);
+            
+            if (draggedItem && !draggedItem.classList.contains('dropped')) {
+                draggedItem.classList.add('dropped');
+                draggedItem.style.display = 'none';
+                
+                droppedSteps.push({
+                    num: parseInt(stepNum),
+                    text: draggedItem.textContent
+                });
+                
+                updateDropZone();
+            }
+        });
+
+        function updateDropZone() {
+            if (droppedSteps.length === 0) {
+                dropZone.innerHTML = '<p style="color: #999; text-align: center;">拖拽步骤到这里，按正确顺序排列</p>';
+            } else {
+                dropZone.innerHTML = droppedSteps.map((step, index) => 
+                    `<div style="background: white; padding: 10px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #667eea;">
+                        ${index + 1}. ${step.text}
+                    </div>`
+                ).join('');
+            }
+        }
+
+        function checkOrder() {
+            const resultBox = document.getElementById('orderResult');
+            const isCorrect = droppedSteps.length === 5 && 
+                droppedSteps.every((step, index) => step.num === index + 1);
+            
+            if (isCorrect) {
+                resultBox.className = 'result-box show success';
+                resultBox.innerHTML = '<strong>🎉 太棒了！</strong> 你完全正确！工程问题的解决步骤就是这样的顺序。';
+                dropZone.classList.add('filled');
+            } else {
+                resultBox.className = 'result-box show error';
+                resultBox.innerHTML = '<strong>❌ 不太对哦</strong> 再想想工程问题的解决步骤应该是：发现问题 → 提出方案 → 制作原型 → 测试改进 → 分享交流';
+            }
+        }
+
+        function resetOrder() {
+            droppedSteps = [];
+            dragItems.forEach(item => {
+                item.classList.remove('dropped');
+                item.style.display = 'block';
+            });
+            updateDropZone();
+            document.getElementById('orderResult').className = 'result-box';
+            dropZone.classList.remove('filled');
+        }
+
+        function checkAnswer(questionNum, isCorrect, element) {
+            const buttons = element.parentElement.querySelectorAll('.choice-btn');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.onclick = null;
+            });
+
+            if (isCorrect) {
+                element.classList.add('correct');
+                correctAnswers++;
+                element.innerHTML += ' ✓';
+            } else {
+                element.classList.add('wrong');
+                // 找到正确答案并标记
+                buttons.forEach(btn => {
+                    if (btn.textContent.includes('C. 三角形') || 
+                        btn.textContent.includes('B. 分析问题并改进设计') ||
+                        btn.textContent.includes('B. 实用且解决问题')) {
+                        btn.classList.add('correct');
+                        btn.innerHTML += ' ✓';
+                    }
+                });
+            }
+
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const progress = (correctAnswers / totalQuestions) * 100;
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = progress + '%';
+            progressFill.textContent = Math.round(progress) + '%';
+        }
+
+        function showSolution() {
+            const solutionSteps = [
+                {
+                    title: '第一步：发现问题',
+                    content: '明确需求：桥梁要能承载100g重物，只能用3张A4纸，不能使用胶水以外的其他材料。'
+                },
+                {
+                    title: '第二步：提出方案',
+                    content: '设计思路：使用三角形结构增加稳定性，将纸折叠成U型或W型增加承重能力，利用桥梁的拱形结构分散压力。'
+                },
+                {
+                    title: '第三步：制作原型',
+                    content: '制作过程：①将纸折叠成条状 ②用三角形结构做桥墩 ③搭建桥梁主体 ④连接各部分'
+                },
+                {
+                    title: '第四步：测试改进',
+                    content: '测试发现：第一次测试可能承重不够。改进方案：增加桥梁厚度、优化结构设计、加固关键连接点。'
+                },
+                {
+                    title: '第五步：分享交流',
+                    content: '向同学展示设计，听取改进建议，分享设计心得。'
+                }
+            ];
+
+            const container = document.getElementById('solutionSteps');
+            container.innerHTML = '';
+
+            solutionSteps.forEach((step, index) => {
+                setTimeout(() => {
+                    const stepDiv = document.createElement('div');
+                    stepDiv.className = 'solution-step show';
+                    stepDiv.innerHTML = `
+                        <h4 style="color: #667eea; margin-bottom: 10px;">${step.title}</h4>
+                        <p>${step.content}</p>
+                    `;
+                    container.appendChild(stepDiv);
+                }, index * 300);
+            });
+        }
+
+        function showExample(num) {
+            const examples = {
+                1: {
+                    title: '🌉 建桥问题',
+                    content: '问题：如何用最少的材料建一座能承载重物的桥？\n\n解决方案：\n- 使用三角形结构增加稳定性\n- 采用拱形设计分散压力\n- 优化材料分布'
+                },
+                2: {
+                    title: '✈️ 飞行器设计',
+                    content: '问题：如何让纸飞机飞得更远更稳？\n\n解决方案：\n- 机翼要对称平衡\n- 机头适当加重\n- 调整机翼角度\n- 多次试飞改进'
+                },
+                3: {
+                    title: '⚙️ 工具设计',
+                    content: '问题：如何制作一个能轻松提起重物的工具？\n\n解决方案：\n- 使用杠杆原理\n- 增加力臂长度\n- 使用滑轮系统\n- 优化握把设计'
+                }
+            };
+
+            const example = examples[num];
+            alert(`${example.title}\n\n${example.content}`);
+        }
+
+        function highlightStep(stepNum) {
+            const stepCard = document.querySelectorAll('.step-card')[stepNum - 1];
+            stepCard.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            stepCard.style.color = 'white';
+            stepCard.querySelector('h3').style.color = 'white';
+            
+            setTimeout(() => {
+                stepCard.style.background = 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)';
+                stepCard.style.color = '#333';
+                stepCard.querySelector('h3').style.color = '#667eea';
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
