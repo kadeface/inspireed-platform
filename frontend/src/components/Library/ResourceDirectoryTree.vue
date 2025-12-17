@@ -97,12 +97,53 @@
                     ]"
                     @click="handleNodeClick(grandchild)"
                   >
-                    <span class="w-4 h-4"></span>
+                    <span v-if="grandchild.children && grandchild.children.length > 0" class="flex-shrink-0">
+                      <svg
+                        :class="[
+                          'w-4 h-4 transition-transform',
+                          expandedNodes.has(grandchild.id) ? 'rotate-90' : ''
+                        ]"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        @click.stop="toggleExpand(grandchild.id)"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
+                    <span v-else class="w-4 h-4"></span>
                     <span v-if="grandchild.icon" class="text-base">{{ grandchild.icon }}</span>
                     <span class="flex-1 text-sm truncate">{{ grandchild.label }}</span>
                     <span v-if="grandchild.count !== undefined" class="text-xs text-gray-500">
                       ({{ grandchild.count }})
                     </span>
+                  </div>
+
+                  <!-- 四级节点（知识点分类下的具体知识点） -->
+                  <div
+                    v-if="grandchild.children && expandedNodes.has(grandchild.id)"
+                    class="ml-4 mt-1"
+                  >
+                    <div
+                      v-for="greatGrandchild in grandchild.children"
+                      :key="greatGrandchild.id"
+                      class="tree-node"
+                    >
+                      <div
+                        :class="[
+                          'tree-item flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100',
+                          isSelected(greatGrandchild) ? 'bg-purple-50 text-purple-700' : 'text-gray-700'
+                        ]"
+                        @click="handleNodeClick(greatGrandchild)"
+                      >
+                        <span class="w-4 h-4"></span>
+                        <span v-if="greatGrandchild.icon" class="text-base">{{ greatGrandchild.icon }}</span>
+                        <span class="flex-1 text-sm truncate">{{ greatGrandchild.label }}</span>
+                        <span v-if="greatGrandchild.count !== undefined" class="text-xs text-gray-500">
+                          ({{ greatGrandchild.count }})
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -119,6 +160,7 @@ import { ref, computed, watch } from 'vue'
 import type { ResourceTreeNode, ResourceFilter } from '@/types/library'
 import type { Subject, Grade } from '@/types/curriculum'
 import { LibraryAssetType, getAssetTypeIcon, getAssetTypeName } from '@/types/library'
+import { MathOlympiadCategories, getAllCategories } from '@/config/knowledgePoints'
 
 interface Props {
   subjects: Subject[]
@@ -153,6 +195,8 @@ const treeNodes = computed<ResourceTreeNode[]>(() => {
     kind: 'category',
     icon: '📖',
     children: props.subjects.map(subject => {
+      const isMath = subject.name === '数学' || subject.name?.includes('数学')
+      
       // 每个学科下有：通用 + 各年级
       const gradeNodes: ResourceTreeNode[] = [
         {
@@ -163,23 +207,62 @@ const treeNodes = computed<ResourceTreeNode[]>(() => {
           grade_id: null,
           icon: '🌐',
         },
-        ...props.grades.map(grade => ({
-          id: `subject:${subject.id}:grade:${grade.id}`,
-          label: grade.name,
-          kind: 'grade',
-          subject_id: subject.id,
-          grade_id: grade.id,
-          icon: '📘',
-          children: Object.values(LibraryAssetType).map(type => ({
-            id: `subject:${subject.id}:grade:${grade.id}:type:${type}`,
-            label: getAssetTypeName(type),
-            kind: 'asset_type',
+        ...props.grades.map(grade => {
+          const gradeChildren: ResourceTreeNode[] = []
+          
+          // 如果是数学学科，添加知识点分类节点
+          if (isMath) {
+            const knowledgePointNode: ResourceTreeNode = {
+              id: `subject:${subject.id}:grade:${grade.id}:knowledge-points`,
+              label: '按知识点分类',
+              kind: 'knowledge_point_category',
+              subject_id: subject.id,
+              grade_id: grade.id,
+              icon: '📚',
+              children: getAllCategories().map(category => ({
+                id: `subject:${subject.id}:grade:${grade.id}:knowledge-points:${category.name}`,
+                label: category.name,
+                kind: 'knowledge_point_category',
+                subject_id: subject.id,
+                grade_id: grade.id,
+                icon: '📑',
+                children: category.subcategories.map(subcategory => ({
+                  id: `subject:${subject.id}:grade:${grade.id}:knowledge-points:${category.name}/${subcategory}`,
+                  label: subcategory,
+                  kind: 'knowledge_point',
+                  subject_id: subject.id,
+                  grade_id: grade.id,
+                  knowledge_point_category: `${category.name}/${subcategory}`,
+                  icon: '📝',
+                })) as ResourceTreeNode[],
+              })) as ResourceTreeNode[],
+            }
+            gradeChildren.push(knowledgePointNode)
+          }
+          
+          // 添加资源类型节点
+          gradeChildren.push(
+            ...Object.values(LibraryAssetType).map(type => ({
+              id: `subject:${subject.id}:grade:${grade.id}:type:${type}`,
+              label: getAssetTypeName(type),
+              kind: 'asset_type',
+              subject_id: subject.id,
+              grade_id: grade.id,
+              asset_type: type,
+              icon: getAssetTypeIcon(type),
+            })) as ResourceTreeNode[]
+          )
+          
+          return {
+            id: `subject:${subject.id}:grade:${grade.id}`,
+            label: grade.name,
+            kind: 'grade',
             subject_id: subject.id,
             grade_id: grade.id,
-            asset_type: type,
-            icon: getAssetTypeIcon(type),
-          })) as ResourceTreeNode[],
-        })),
+            icon: '📘',
+            children: gradeChildren,
+          }
+        }),
       ]
 
       return {
@@ -270,6 +353,10 @@ const handleNodeClick = (node: ResourceTreeNode) => {
     filter.asset_type = node.asset_type
   }
 
+  if (node.knowledge_point_category) {
+    filter.knowledge_point_category = node.knowledge_point_category
+  }
+
   emit('select', filter)
 }
 
@@ -292,7 +379,10 @@ watch(() => props.selectedFilter, (newFilter) => {
     nodeId = `subject:${newFilter.subject_id}`
     if (newFilter.grade_id !== undefined) {
       nodeId += `:grade:${newFilter.grade_id}`
-      if (newFilter.asset_type) {
+      if (newFilter.knowledge_point_category) {
+        // 知识点分类节点ID格式：subject:X:grade:Y:knowledge-points:Category/Subcategory
+        nodeId = `subject:${newFilter.subject_id}:grade:${newFilter.grade_id}:knowledge-points:${newFilter.knowledge_point_category}`
+      } else if (newFilter.asset_type) {
         nodeId += `:type:${newFilter.asset_type}`
       }
     }
@@ -308,7 +398,16 @@ watch(() => props.selectedFilter, (newFilter) => {
       expandedNodes.value.add('by-subject')
       expandedNodes.value.add(`subject:${parts[1]}`)
       if (parts[2] === 'grade') {
-        expandedNodes.value.add(nodeId.split(':type:')[0])
+        const gradeNodeId = `subject:${parts[1]}:grade:${parts[3]}`
+        expandedNodes.value.add(gradeNodeId)
+        if (parts[4] === 'knowledge-points') {
+          expandedNodes.value.add(`${gradeNodeId}:knowledge-points`)
+          // 展开知识点分类节点
+          if (parts[5]) {
+            const categoryName = parts.slice(5).join(':').split('/')[0]
+            expandedNodes.value.add(`${gradeNodeId}:knowledge-points:${categoryName}`)
+          }
+        }
       }
     } else if (parts[0] === 'type') {
       expandedNodes.value.add('by-type')

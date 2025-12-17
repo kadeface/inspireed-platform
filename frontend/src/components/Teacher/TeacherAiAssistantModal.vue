@@ -66,6 +66,18 @@
 
                     <div class="h-10 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent"></div>
 
+                    <!-- 返回工作台按钮 -->
+                    <button
+                      @click="handleBackToDashboard"
+                      class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl hover:bg-white hover:shadow-md transition-all"
+                      title="返回教师工作台"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      返回工作台
+                    </button>
+
                     <!-- 退出登录按钮 -->
                     <button
                       @click="handleLogout"
@@ -649,6 +661,12 @@ const availableLessons = computed(() => {
 function handleClose() {
   emit('update:modelValue', false)
   emit('close')
+}
+
+// 返回工作台
+function handleBackToDashboard() {
+  handleClose()
+  router.push('/teacher')
 }
 
 // 退出登录

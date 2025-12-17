@@ -38,11 +38,12 @@ def _check_library_access(current_user: User) -> None:
 
 @router.get("/", response_model=LibraryAssetListResponse)
 async def list_library_assets(
-    query: Optional[str] = Query(None, description="搜索关键词（标题/描述）"),
+    query: Optional[str] = Query(None, description="搜索关键词（标题/描述/知识点名称）"),
     asset_type: Optional[str] = Query(None, description="资源类型筛选"),
     visibility: Optional[str] = Query(None, description="可见性筛选"),
     subject_id: Optional[int] = Query(None, description="学科ID筛选"),
     grade_id: Optional[int] = Query(None, description="年级ID筛选"),
+    knowledge_point_category: Optional[str] = Query(None, description="知识点分类筛选"),
     status: Optional[str] = Query(None, description="状态筛选"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -75,6 +76,7 @@ async def list_library_assets(
             or_(
                 LibraryAsset.title.ilike(search_pattern),
                 LibraryAsset.description.ilike(search_pattern),
+                LibraryAsset.knowledge_point_name.ilike(search_pattern),
             )
         )
     
@@ -93,6 +95,10 @@ async def list_library_assets(
     # 年级筛选
     if grade_id is not None:
         base_query = base_query.where(LibraryAsset.grade_id == grade_id)
+    
+    # 知识点分类筛选
+    if knowledge_point_category:
+        base_query = base_query.where(LibraryAsset.knowledge_point_category == knowledge_point_category)
     
     # 状态筛选（默认只显示 active）
     if status:
@@ -162,6 +168,8 @@ async def upload_library_asset(
     visibility: str = Form("teacher_only", description="可见性：teacher_only/school"),
     subject_id: Optional[int] = Form(None, description="学科ID（可选）"),
     grade_id: Optional[int] = Form(None, description="年级ID（可选）"),
+    knowledge_point_category: Optional[str] = Form(None, description="知识点分类（如：计算类/速算技巧）"),
+    knowledge_point_name: Optional[str] = Form(None, description="具体知识点名称（如：乘法口诀可视化）"),
     file: UploadFile = File(..., description="上传的文件"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -235,6 +243,8 @@ async def upload_library_asset(
         status="active",
         subject_id=subject_id,
         grade_id=grade_id,
+        knowledge_point_category=knowledge_point_category,
+        knowledge_point_name=knowledge_point_name,
     )
     
     db.add(library_asset)
@@ -337,6 +347,42 @@ async def delete_library_asset(
     return {"message": "资源已删除", "asset_id": asset_id}
 
 
+@router.post("/{asset_id}/increment-view")
+async def increment_asset_view(
+    asset_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """增加资源库资产的点击次数"""
+    _check_library_access(current_user)
+    
+    asset = await db.get(LibraryAsset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="资源库资产不存在")
+    
+    # 校验归属学校
+    asset_school_id = cast(int, asset.school_id)
+    user_school_id = cast(int, current_user.school_id)
+    if asset_school_id != user_school_id:
+        raise HTTPException(status_code=403, detail="无权访问其他学校的资源")
+    
+    # 可见性校验：教师只能访问自己上传的或全校可见的
+    user_role = cast(UserRole, current_user.role)
+    user_id = cast(int, current_user.id)
+    asset_owner_id = cast(int, asset.owner_user_id)
+    asset_visibility = cast(str, asset.visibility)
+    
+    if user_role == UserRole.TEACHER:
+        if asset_owner_id != user_id and asset_visibility != "school":
+            raise HTTPException(status_code=403, detail="无权访问此资源")
+    
+    # 增加点击次数
+    asset.view_count = cast(int, asset.view_count) + 1
+    await db.commit()
+    
+    return {"message": "点击次数已更新", "view_count": asset.view_count}
+
+
 @router.get("/{asset_id}/usages", response_model=LibraryAssetUsageResponse)
 async def get_library_asset_usages(
     asset_id: int,
@@ -387,3 +433,88 @@ async def get_library_asset_usages(
         usages=usages,
         total_usages=len(usages),
     )
+
+
+@router.get("/{asset_id}/content")
+async def get_library_asset_content(
+    asset_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取资源库资产的文件内容（用于编辑HTML等文本文件）"""
+    _check_library_access(current_user)
+    
+    asset = await db.get(LibraryAsset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="资源库资产不存在")
+    
+    # 校验归属学校
+    asset_school_id = cast(int, asset.school_id)
+    user_school_id = cast(int, current_user.school_id)
+    if asset_school_id != user_school_id:
+        raise HTTPException(status_code=403, detail="无权访问其他学校的资源")
+    
+    # 权限校验：教师只能访问自己上传的；管理员/教研员可访问全部
+    user_role = cast(UserRole, current_user.role)
+    user_id = cast(int, current_user.id)
+    asset_owner_id = cast(int, asset.owner_user_id)
+    
+    if user_role == UserRole.TEACHER and asset_owner_id != user_id:
+        raise HTTPException(status_code=403, detail="只能访问自己上传的资源")
+    
+    # 只允许获取文本类型的文件内容（HTML、文本等）
+    asset_type = cast(str, asset.asset_type)
+    mime_type = cast(Optional[str], asset.mime_type)
+    
+    if asset_type not in ["interactive", "document"] and mime_type not in ["text/html", "text/plain"]:
+        raise HTTPException(status_code=400, detail="此资源类型不支持获取文件内容")
+    
+    # 获取文件路径
+    storage_key = cast(str, asset.storage_key)
+    if not storage_key:
+        raise HTTPException(status_code=404, detail="资源文件不存在")
+    
+    # 构建完整文件路径
+    import os
+    from app.core.config import settings
+    
+    # storage_key 通常是相对路径，如 /uploads/resources/xxx.html
+    # 根据upload_service的实现，文件实际存储在 storage/resources/ 目录下
+    # 但storage_key返回的是 /uploads/resources/xxx.html
+    # 需要转换为: storage/resources/xxx.html
+    if storage_key.startswith("/uploads/"):
+        # 去掉 /uploads/ 前缀，得到 resources/xxx.html
+        relative_path = storage_key.replace("/uploads/", "", 1)
+        # 构建完整路径: storage/resources/xxx.html
+        file_path = os.path.join(settings.UPLOAD_DIR, relative_path)
+    else:
+        # 如果storage_key是绝对路径或其他格式，直接使用
+        file_path = storage_key
+    
+    # 安全检查：确保文件路径在允许的目录内
+    upload_dir = os.path.abspath(settings.UPLOAD_DIR)
+    file_abspath = os.path.abspath(file_path)
+    
+    if not file_abspath.startswith(upload_dir):
+        raise HTTPException(status_code=403, detail="文件路径不安全")
+    
+    # 检查文件是否存在
+    if not os.path.exists(file_path) or not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="文件不存在")
+    
+    # 读取文件内容
+    try:
+        import aiofiles
+        async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+            content = await f.read()
+        return {"content": content}
+    except UnicodeDecodeError:
+        # 如果UTF-8解码失败，尝试其他编码
+        try:
+            async with aiofiles.open(file_path, "r", encoding="gbk") as f:
+                content = await f.read()
+            return {"content": content}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"读取文件失败: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取文件失败: {str(e)}")

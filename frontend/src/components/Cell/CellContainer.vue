@@ -54,8 +54,8 @@
             </span>
 
             <!-- 可编辑标题 -->
-            <div class="flex-1 min-w-0" v-if="editable">
-              <div class="cell-title-editor">
+            <div class="flex-1 min-w-0">
+              <div class="cell-title-editor" v-if="editable">
                 <input
                   v-if="isEditingTitle"
                   v-model="localTitle"
@@ -82,11 +82,12 @@
                   </svg>
                 </div>
               </div>
+              <!-- 非编辑模式：只显示标题 -->
+              <div v-else class="flex-1 font-medium text-gray-700 min-w-0 truncate">
+                <span v-if="cell.title">{{ cell.title }}</span>
+                <span v-else class="text-gray-400 italic">无标题</span>
+              </div>
             </div>
-            <div v-else-if="cell.title" class="flex-1 font-medium text-gray-700 cell-drag-area min-w-0 truncate" :class="{ 'cursor-move': draggable }">
-              {{ cell.title }}
-            </div>
-            <div v-else class="flex-1 cell-drag-area" :class="{ 'cursor-move': draggable }"></div>
           </div>
 
           <div class="flex gap-2 flex-shrink-0" v-if="editable">

@@ -23,6 +23,12 @@ class LibraryAssetBase(BaseModel):
     )
     subject_id: Optional[int] = Field(None, description="学科ID（可选）")
     grade_id: Optional[int] = Field(None, description="年级ID（可选，NULL表示跨年级通用）")
+    knowledge_point_category: Optional[str] = Field(
+        None, max_length=100, description="知识点分类（如：计算类/速算技巧、几何类/图形认知）"
+    )
+    knowledge_point_name: Optional[str] = Field(
+        None, max_length=200, description="具体知识点名称（如：乘法口诀可视化）"
+    )
 
 
 class LibraryAssetCreate(BaseModel):
@@ -41,6 +47,12 @@ class LibraryAssetCreate(BaseModel):
     )
     subject_id: Optional[int] = Field(None, description="学科ID（可选）")
     grade_id: Optional[int] = Field(None, description="年级ID（可选）")
+    knowledge_point_category: Optional[str] = Field(
+        None, max_length=100, description="知识点分类（如：计算类/速算技巧、几何类/图形认知）"
+    )
+    knowledge_point_name: Optional[str] = Field(
+        None, max_length=200, description="具体知识点名称（如：乘法口诀可视化）"
+    )
 
 
 class LibraryAssetUpdate(BaseModel):
@@ -52,6 +64,8 @@ class LibraryAssetUpdate(BaseModel):
     status: Optional[str] = None
     subject_id: Optional[int] = None
     grade_id: Optional[int] = None
+    knowledge_point_category: Optional[str] = None
+    knowledge_point_name: Optional[str] = None
 
 
 class LibraryAssetSummary(BaseModel):
@@ -70,6 +84,9 @@ class LibraryAssetSummary(BaseModel):
     status: str
     subject_id: Optional[int] = None
     grade_id: Optional[int] = None
+    knowledge_point_category: Optional[str] = None
+    knowledge_point_name: Optional[str] = None
+    view_count: int = 0
     updated_at: datetime
 
     class Config:
@@ -98,6 +115,9 @@ class LibraryAssetDetail(BaseModel):
     status: str
     subject_id: Optional[int] = None
     grade_id: Optional[int] = None
+    knowledge_point_category: Optional[str] = None
+    knowledge_point_name: Optional[str] = None
+    view_count: int = 0
     created_at: datetime
     updated_at: datetime
 

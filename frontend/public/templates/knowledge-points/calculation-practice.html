@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>速算练习</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+      text-align: center;
+      font-size: 2em;
+    }
+
+    .question {
+      text-align: center;
+      font-size: 48px;
+      font-weight: bold;
+      color: #333;
+      margin: 30px 0;
+      min-height: 60px;
+    }
+
+    .input-container {
+      display: flex;
+      gap: 10px;
+      margin: 30px 0;
+    }
+
+    .input {
+      flex: 1;
+      padding: 15px;
+      border: 3px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 24px;
+      text-align: center;
+      transition: border-color 0.3s ease;
+    }
+
+    .input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .input.correct {
+      border-color: #48bb78;
+      background: #f0fff4;
+    }
+
+    .input.wrong {
+      border-color: #f5576c;
+      background: #fff5f5;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 8px;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    .feedback {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: bold;
+      min-height: 30px;
+    }
+
+    .feedback.correct {
+      color: #48bb78;
+    }
+
+    .feedback.wrong {
+      color: #f5576c;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ 速算练习</h1>
+    <div class="question" id="question"></div>
+    <div class="input-container">
+      <input
+        type="number"
+        class="input"
+        id="answer"
+        placeholder="输入答案"
+        autocomplete="off"
+      />
+      <button class="btn" id="submitBtn" onclick="checkAnswer()">提交</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-value" id="correct">0</div>
+        <div class="stat-label">正确</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="wrong">0</div>
+        <div class="stat-label">错误</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="total">0</div>
+        <div class="stat-label">总计</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentQuestion = {};
+    let correctCount = 0;
+    let wrongCount = 0;
+    let totalCount = 0;
+
+    function generateQuestion() {
+      const num1 = Math.floor(Math.random() * 20) + 1;
+      const num2 = Math.floor(Math.random() * 20) + 1;
+      const operations = ['+', '-', '×'];
+      const op = operations[Math.floor(Math.random() * operations.length)];
+      
+      let answer;
+      if (op === '+') {
+        answer = num1 + num2;
+      } else if (op === '-') {
+        answer = Math.max(num1, num2) - Math.min(num1, num2);
+      } else {
+        answer = num1 * num2;
+      }
+
+      currentQuestion = {
+        num1: op === '-' ? Math.max(num1, num2) : num1,
+        num2: op === '-' ? Math.min(num1, num2) : num2,
+        op,
+        answer
+      };
+
+      document.getElementById('question').textContent = 
+        `${currentQuestion.num1} ${currentQuestion.op} ${currentQuestion.num2} = ?`;
+      
+      document.getElementById('answer').value = '';
+      document.getElementById('answer').className = 'input';
+      document.getElementById('feedback').textContent = '';
+      document.getElementById('answer').focus();
+    }
+
+    function checkAnswer() {
+      const userAnswer = parseInt(document.getElementById('answer').value);
+      const input = document.getElementById('answer');
+      const feedback = document.getElementById('feedback');
+
+      if (isNaN(userAnswer)) {
+        feedback.textContent = '请输入数字！';
+        feedback.className = 'feedback wrong';
+        return;
+      }
+
+      totalCount++;
+      document.getElementById('total').textContent = totalCount;
+
+      if (userAnswer === currentQuestion.answer) {
+        correctCount++;
+        document.getElementById('correct').textContent = correctCount;
+        input.className = 'input correct';
+        feedback.textContent = '✓ 答对了！';
+        feedback.className = 'feedback correct';
+      } else {
+        wrongCount++;
+        document.getElementById('wrong').textContent = wrongCount;
+        input.className = 'input wrong';
+        feedback.textContent = `✗ 答错了！正确答案是 ${currentQuestion.answer}`;
+        feedback.className = 'feedback wrong';
+      }
+
+      setTimeout(() => {
+        generateQuestion();
+      }, 1500);
+    }
+
+    // 回车键提交
+    document.getElementById('answer').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        checkAnswer();
+      }
+    });
+
+    // 初始化
+    generateQuestion();
+  </script>
+</body>
+</html>

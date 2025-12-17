@@ -7,12 +7,12 @@
           v-model="searchQuery"
           type="text"
           placeholder="搜索资源标题..."
-          class="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+          class="flex-1 px-3 py-2 border rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
           @input="debouncedSearch"
         />
         <select
           v-model="filterType"
-          class="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+          class="px-3 py-2 border rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
           @change="loadAssets"
         >
           <option value="">全部类型</option>

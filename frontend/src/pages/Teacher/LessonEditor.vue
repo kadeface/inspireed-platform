@@ -208,8 +208,9 @@
               <!-- 全屏预览按钮 -->
               <button
                 @click="toggleFullscreenPreview"
-                class="px-3 py-1.5 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-2"
-                title="全屏预览"
+                :disabled="false"
+                class="px-3 py-1.5 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                :title="isPreviewMode ? '全屏预览（授课模式下可用）' : '全屏预览'"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -2108,6 +2109,7 @@ function handleClassroomButtonClick() {
 
 // 切换全屏预览
 function toggleFullscreenPreview() {
+  // 确保在授课模式下也能正常工作
   isFullscreenPreview.value = !isFullscreenPreview.value
   
   // 进入全屏时，禁止body滚动

@@ -118,6 +118,18 @@ const cellTypes = [
     description: '视频教学内容',
   },
   {
+    type: CellType.INTERACTIVE,
+    name: '交互式课件单元',
+    icon: '🎮',
+    description: 'HTML交互式课件',
+  },
+  {
+    type: CellType.BROWSER,
+    name: '浏览器单元',
+    icon: '🌐',
+    description: '嵌入网页内容',
+  },
+  {
     type: CellType.CODE,
     name: '代码单元',
     icon: '💻',
@@ -158,18 +170,6 @@ const cellTypes = [
     name: '参数单元',
     icon: '⚙️',
     description: '参数配置表单',
-  },
-  {
-    type: CellType.BROWSER,
-    name: '浏览器单元',
-    icon: '🌐',
-    description: '嵌入网页内容',
-  },
-  {
-    type: CellType.INTERACTIVE,
-    name: '交互式课件单元',
-    icon: '🎮',
-    description: 'HTML交互式课件',
   },
 ]
 

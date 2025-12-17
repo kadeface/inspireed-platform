@@ -18,6 +18,7 @@ export interface LibraryAssetListParams {
   visibility?: string
   subject_id?: number
   grade_id?: number
+  knowledge_point_category?: string
   status?: string
   page?: number
   page_size?: number
@@ -37,6 +38,7 @@ class LibraryService {
       if (params?.visibility) queryParams.append('visibility', params.visibility)
       if (params?.subject_id) queryParams.append('subject_id', params.subject_id.toString())
       if (params?.grade_id !== undefined) queryParams.append('grade_id', params.grade_id.toString())
+      if (params?.knowledge_point_category) queryParams.append('knowledge_point_category', params.knowledge_point_category)
       if (params?.status) queryParams.append('status', params.status)
       if (params?.page) queryParams.append('page', params.page.toString())
       if (params?.page_size) queryParams.append('page_size', params.page_size.toString())
@@ -75,6 +77,8 @@ class LibraryService {
       visibility?: string
       subject_id?: number
       grade_id?: number
+      knowledge_point_category?: string
+      knowledge_point_name?: string
     }
   ): Promise<LibraryAssetUploadResponse> {
     try {
@@ -86,6 +90,8 @@ class LibraryService {
       if (metadata.visibility) formData.append('visibility', metadata.visibility)
       if (metadata.subject_id) formData.append('subject_id', metadata.subject_id.toString())
       if (metadata.grade_id) formData.append('grade_id', metadata.grade_id.toString())
+      if (metadata.knowledge_point_category) formData.append('knowledge_point_category', metadata.knowledge_point_category)
+      if (metadata.knowledge_point_name) formData.append('knowledge_point_name', metadata.knowledge_point_name)
 
       return await api.post<LibraryAssetUploadResponse>(this.basePath, formData)
     } catch (error) {
@@ -126,6 +132,33 @@ class LibraryService {
       return await api.get<LibraryAssetUsageResponse>(`${this.basePath}/${id}/usages`)
     } catch (error) {
       console.error(`Failed to get library asset usages ${id}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * 增加资源库资产的点击次数
+   */
+  async incrementViewCount(id: number): Promise<{ message: string; view_count: number }> {
+    try {
+      return await api.post<{ message: string; view_count: number }>(
+        `${this.basePath}/${id}/increment-view`,
+        {}
+      )
+    } catch (error) {
+      console.error(`Failed to increment view count for asset ${id}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * 获取资源库资产的文件内容（用于编辑HTML等文本文件）
+   */
+  async getAssetContent(id: number): Promise<{ content: string }> {
+    try {
+      return await api.get<{ content: string }>(`${this.basePath}/${id}/content`)
+    } catch (error) {
+      console.error(`Failed to get asset content ${id}:`, error)
       throw error
     }
   }

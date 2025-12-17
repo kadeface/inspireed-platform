@@ -50,6 +50,9 @@ export interface LibraryAssetSummary {
   status: AssetStatus
   subject_id?: number
   grade_id?: number
+  knowledge_point_category?: string
+  knowledge_point_name?: string
+  view_count: number
   updated_at: string
 }
 
@@ -74,6 +77,9 @@ export interface LibraryAssetDetail {
   status: AssetStatus
   subject_id?: number
   grade_id?: number
+  knowledge_point_category?: string
+  knowledge_point_name?: string
+  view_count: number
   created_at: string
   updated_at: string
 }
@@ -94,6 +100,8 @@ export interface LibraryAssetCreateRequest {
   visibility?: AssetVisibility
   subject_id?: number
   grade_id?: number
+  knowledge_point_category?: string
+  knowledge_point_name?: string
 }
 
 // 更新资源库资产请求
@@ -104,6 +112,8 @@ export interface LibraryAssetUpdateRequest {
   status?: AssetStatus
   subject_id?: number
   grade_id?: number
+  knowledge_point_category?: string
+  knowledge_point_name?: string
 }
 
 // 资源库资产上传响应
@@ -183,7 +193,7 @@ export function getVisibilityName(visibility: AssetVisibility): string {
 }
 
 // 资源目录树节点类型
-export type ResourceTreeNodeKind = 'root' | 'category' | 'subject' | 'grade' | 'asset_type' | 'visibility'
+export type ResourceTreeNodeKind = 'root' | 'category' | 'subject' | 'grade' | 'asset_type' | 'visibility' | 'knowledge_point_category' | 'knowledge_point'
 
 export interface ResourceTreeNode {
   id: string
@@ -192,6 +202,7 @@ export interface ResourceTreeNode {
   subject_id?: number
   grade_id?: number | null  // null 表示"通用/跨年级"
   asset_type?: string
+  knowledge_point_category?: string
   children?: ResourceTreeNode[]
   icon?: string
   count?: number  // 该节点下的资源数量（可选，后续优化）
@@ -203,4 +214,5 @@ export interface ResourceFilter {
   grade_id?: number | null  // null 表示只显示通用资源
   asset_type?: string
   visibility?: AssetVisibility
+  knowledge_point_category?: string
 }

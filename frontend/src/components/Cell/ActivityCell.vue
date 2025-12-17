@@ -43,10 +43,6 @@
         :lesson-id="lessonId"
         :cell-order="cell.order"
       />
-      <!-- 调试信息 -->
-      <div v-if="!sessionId" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-        ⚠️ 未提供 sessionId，将显示所有会话的提交（包括课后提交）。如果这是课堂模式，请确保传递 sessionId。
-      </div>
     </div>
 
     <!-- 学生查看/答题模式 -->

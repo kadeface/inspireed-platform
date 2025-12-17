@@ -175,22 +175,38 @@
     <div class="main-layout" :class="{ 'module-fullscreen-mode': modulePanelFullscreen }">
       <!-- 左侧：教学模块 -->
       <div class="panel teaching-modules teaching-modules-fullwidth" :class="{ 'module-panel-fullscreen': modulePanelFullscreen }">
-        <div class="module-list" ref="moduleListRef" v-if="lesson && lesson.content && lesson.content.length > 0">
-          <!-- 隐藏所有内容选项 -->
-          <div 
-            class="module-item module-item-hidden"
-            :class="{ 'module-item-active': !session?.current_cell_id || session.current_cell_id === 0 }"
-            @click="handleHideAll"
-            :title="'隐藏所有内容'"
+        <!-- 导航控制栏（固定在顶部，始终可见） -->
+        <div class="module-navigation-bar" v-if="lesson && lesson.content && lesson.content.length > 0">
+          <!-- 上一模块按钮 -->
+          <button
+            class="module-nav-btn module-nav-btn-prev"
+            :class="{ 'module-nav-btn-disabled': !canGoPrev }"
+            :disabled="!canGoPrev"
+            @click="handlePrevModule"
+            :title="canGoPrev ? '上一模块' : '已经是第一个模块'"
           >
-            <div class="module-item-icon">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-              </svg>
-            </div>
-            <div class="module-item-label">隐藏</div>
-          </div>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>上一模块</span>
+          </button>
           
+          <!-- 下一模块按钮 -->
+          <button
+            class="module-nav-btn module-nav-btn-next"
+            :class="{ 'module-nav-btn-disabled': !canGoNext }"
+            :disabled="!canGoNext"
+            @click="handleNextModule"
+            :title="canGoNext ? '下一模块' : '已经是最后一个模块'"
+          >
+            <span>下一模块</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+        
+        <div class="module-list" ref="moduleListRef" v-if="lesson && lesson.content && lesson.content.length > 0">
           <!-- 课程模块列表 -->
           <div 
             v-for="(cell, index) in lesson.content" 
@@ -258,26 +274,35 @@ import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID }
 import activityService from '../../services/activity'
 import logger from '@/utils/logger'
 
-// Cell类型图标组件
+// Cell类型图标组件 - 使用更明显的图标设计
 const CellTypeIcon = (props: { type: string }) => {
   const icons: Record<string, any> = {
-    text: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M4 6h16M4 12h16M4 18h16' })
+    text: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M4 6h16M4 12h16M4 18h16' })
     ]),
-    code: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' })
+    code: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' })
     ]),
-    activity: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' })
+    activity: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' })
     ]),
-    video: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' })
+    video: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' })
     ]),
-    flowchart: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7' })
+    flowchart: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7' })
     ]),
-    qa: () => h('svg', { class: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+    qa: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+    ]),
+    browser: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9' })
+    ]),
+    interactive: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' })
+    ]),
+    reference_material: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' })
     ]),
   }
   
@@ -509,6 +534,58 @@ const displayCellOrders = computed(() => {
   return []
 })
 
+// 获取当前选中模块的索引
+const currentModuleIndex = computed(() => {
+  if (!props.lesson?.content) return -1
+  
+  // 多选模式：使用 displayCellOrders 中的第一个
+  if (displayCellOrders.value !== undefined && Array.isArray(displayCellOrders.value) && displayCellOrders.value.length > 0) {
+    const firstOrder = displayCellOrders.value[0]
+    const index = props.lesson.content.findIndex((cell, idx) => {
+      const cellOrder = cell.order !== undefined ? cell.order : idx
+      return cellOrder === firstOrder
+    })
+    if (index >= 0) return index
+  }
+  
+  // 单选模式：直接使用 selectedCellIndex（它会在点击时立即更新）
+  if (selectedCellIndex.value >= 0 && selectedCellIndex.value < props.lesson.content.length) {
+    return selectedCellIndex.value
+  }
+  
+  // 如果 selectedCellIndex 无效，尝试从 session.current_cell_id 获取
+  if (session.value?.current_cell_id) {
+    const currentId = session.value.current_cell_id
+    if (currentId === 0) return -1
+    
+    const index = props.lesson.content.findIndex((cell, idx) => {
+      const cellId = getCellId(cell)
+      if (typeof cellId === 'number' && cellId === currentId) return true
+      if (typeof cellId === 'string') {
+        const numId = parseInt(cellId)
+        if (!isNaN(numId) && numId === currentId) return true
+      }
+      if (idx === currentId) return true
+      if (cell.order !== undefined && cell.order === currentId) return true
+      return false
+    })
+    if (index >= 0) return index
+  }
+  
+  return -1
+})
+
+// 判断是否可以上一模块
+const canGoPrev = computed(() => {
+  return currentModuleIndex.value > 0
+})
+
+// 判断是否可以下一模块
+const canGoNext = computed(() => {
+  if (!props.lesson?.content) return false
+  return currentModuleIndex.value >= 0 && currentModuleIndex.value < props.lesson.content.length - 1
+})
+
 const currentActivityDbCell = computed(() => {
   if (!currentCell.value || currentCell.value.type !== 'activity') {
     return null
@@ -640,6 +717,9 @@ function scrollToSelectedModule() {
 function handleModuleItemClick(cell: Cell, index: number) {
   if (loading.value) return
   
+  // 立即更新 selectedCellIndex，确保按钮状态及时更新
+  selectedCellIndex.value = index
+  
   const cellId = getCellId(cell)
   const cellOrder = cell.order !== undefined ? cell.order : index
   
@@ -655,6 +735,26 @@ function handleModuleItemClick(cell: Cell, index: number) {
   
   // 使用 handleControlBoardNavigate 处理导航
   handleControlBoardNavigate(cellId, cellOrder, action, isMultiSelectMode.value)
+}
+
+// 导航到上一模块
+function handlePrevModule() {
+  if (!canGoPrev.value || !props.lesson?.content) return
+  const prevIndex = currentModuleIndex.value - 1
+  const prevCell = props.lesson.content[prevIndex]
+  if (prevCell) {
+    handleModuleItemClick(prevCell, prevIndex)
+  }
+}
+
+// 导航到下一模块
+function handleNextModule() {
+  if (!canGoNext.value || !props.lesson?.content) return
+  const nextIndex = currentModuleIndex.value + 1
+  const nextCell = props.lesson.content[nextIndex]
+  if (nextCell) {
+    handleModuleItemClick(nextCell, nextIndex)
+  }
 }
 
 // 处理单选框/复选框点击（防止事件冒泡，并处理取消选中）
@@ -2965,43 +3065,33 @@ defineExpose({
 }
 
 .module-list {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  gap: 10px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-right: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
   padding-bottom: 8px;
-  flex: 0 0 auto;
-  min-height: 0;
-  align-items: stretch;
-  height: fit-content;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box;
-  /* 确保滚动条在容器内 */
-  scrollbar-gutter: stable;
-  /* 确保子元素不会被压缩 */
-  min-width: 0;
-  /* 确保内容不会被压缩 */
-  align-content: flex-start;
-  /* 确保列表占据全宽 */
-  flex-grow: 1;
+  /* 网格自动换行，无需横向滚动 */
+  align-items: stretch;
+  /* 限制只显示2行，超出部分可垂直滚动 */
+  max-height: calc(52px * 2 + 8px); /* 2行高度：每行52px + 1个gap 8px */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .module-list::-webkit-scrollbar {
-  height: 8px;
+  width: 6px;
 }
 
 .module-list::-webkit-scrollbar-track {
   @apply bg-gray-100;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 .module-list::-webkit-scrollbar-thumb {
   @apply bg-gray-400;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 .module-list::-webkit-scrollbar-thumb:hover {
@@ -3012,43 +3102,35 @@ defineExpose({
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  padding-right: 50px; /* 为单选框预留空间 */
+  gap: 6px;
+  padding: 8px 10px;
+  padding-right: 36px; /* 为单选框预留空间（已缩小） */
   @apply bg-white border-2 border-gray-200 rounded-lg;
   cursor: pointer;
   transition: all 0.3s ease;
-  min-height: 60px;
-  height: 60px;
-  min-width: 180px;
-  width: 180px;
-  flex: 0 0 180px;
-  flex-shrink: 0;
-  flex-grow: 0;
+  min-height: 52px;
+  height: auto;
+  width: 100%; /* 网格项自动填充列宽 */
+  min-width: 0; /* 允许在网格中收缩 */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  /* 防止内容被压缩 */
   box-sizing: border-box;
 }
 
 /* 全屏模式下模块项可以更大 */
 .module-panel-fullscreen .module-item {
-  min-height: 70px;
-  height: 70px;
-  padding: 12px 14px;
-  gap: 10px;
+  min-height: 60px;
+  height: auto;
+  padding: 10px 12px;
+  gap: 8px;
 }
 
 .module-panel-fullscreen .module-item-icon {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
 }
 
 .module-panel-fullscreen .module-item-title {
-  font-size: 14px;
-}
-
-.module-panel-fullscreen .module-item-subtitle {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .module-item:hover:not(.module-item-disabled) {
@@ -3186,11 +3268,10 @@ defineExpose({
 
 .module-item-hidden {
   @apply bg-orange-50 border-orange-200;
-  /* 隐藏按钮使用更紧凑的宽度 */
-  min-width: 100px;
-  width: 100px;
-  flex: 0 0 100px;
-  padding: 10px 8px;
+  /* 隐藏按钮在网格中自适应宽度 */
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
   justify-content: center;
   gap: 6px;
 }
@@ -3204,6 +3285,56 @@ defineExpose({
   white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
+}
+
+/* 导航控制栏（固定在模块列表上方） */
+.module-navigation-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+/* 导航按钮样式 */
+.module-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  @apply bg-blue-50 border border-blue-200 rounded-lg;
+  @apply text-blue-700 font-medium text-sm;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+  min-width: 0;
+}
+
+.module-nav-btn:hover:not(:disabled) {
+  @apply bg-blue-100 border-blue-300;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.module-nav-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.module-nav-btn:disabled,
+.module-nav-btn.module-nav-btn-disabled {
+  @apply bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-60;
+}
+
+.module-nav-btn:disabled:hover,
+.module-nav-btn.module-nav-btn-disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.module-nav-btn svg {
+  flex-shrink: 0;
 }
 
 .module-item-hidden:hover:not(.module-item-disabled) {
@@ -3267,9 +3398,48 @@ defineExpose({
   justify-content: center;
   width: 32px;
   height: 32px;
-  @apply bg-white border border-gray-200 rounded-md;
+  @apply bg-white border-2 rounded-md;
   flex-shrink: 0;
   transition: all 0.3s ease;
+  /* 增强图标可见性 */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 不同类型图标的边框颜色 */
+.module-item-icon.icon-text {
+  @apply border-amber-300;
+}
+
+.module-item-icon.icon-code {
+  @apply border-green-300;
+}
+
+.module-item-icon.icon-activity {
+  @apply border-purple-300;
+}
+
+.module-item-icon.icon-video {
+  @apply border-blue-300;
+}
+
+.module-item-icon.icon-flowchart {
+  @apply border-indigo-300;
+}
+
+.module-item-icon.icon-qa {
+  @apply border-yellow-300;
+}
+
+.module-item-icon.icon-browser {
+  @apply border-cyan-300;
+}
+
+.module-item-icon.icon-interactive {
+  @apply border-purple-400;
+}
+
+.module-item-icon.icon-reference_material {
+  @apply border-slate-300;
 }
 
 .module-item-active .module-item-icon {
@@ -3305,6 +3475,14 @@ defineExpose({
   @apply text-yellow-600;
 }
 
+.icon-interactive {
+  @apply text-purple-600;
+}
+
+.icon-reference_material {
+  @apply text-slate-600;
+}
+
 .module-item-active .module-item-icon {
   @apply text-white;
 }
@@ -3312,7 +3490,7 @@ defineExpose({
 .module-item-content {
   flex: 1;
   min-width: 0;
-  padding-right: 8px; /* 额外预留一点空间 */
+  padding-right: 4px; /* 紧凑模式下减少预留空间 */
   overflow: hidden; /* 确保文字不会溢出 */
 }
 
@@ -3330,13 +3508,15 @@ defineExpose({
 }
 
 .module-item-subtitle {
+  /* 紧凑模式下隐藏副标题以提升信息密度 */
+  display: none;
   font-size: 11px;
   @apply text-gray-500;
   transition: all 0.3s ease;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%; /* 确保不超过容器 */
+  max-width: 100%;
   line-height: 1.2;
 }
 
@@ -3361,11 +3541,11 @@ defineExpose({
 
 /* 单选框样式 */
 .module-item-checkbox {
-  @apply absolute bottom-2 right-2 z-10;
-  @apply bg-white rounded-md shadow-sm p-1;
+  @apply absolute bottom-1.5 right-1.5 z-10;
+  @apply bg-white rounded-md shadow-sm p-0.5;
   transition: all 0.3s ease;
-  min-width: 28px;
-  min-height: 28px;
+  min-width: 24px;
+  min-height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3379,7 +3559,7 @@ defineExpose({
 }
 
 .checkbox-input {
-  @apply w-5 h-5 cursor-pointer;
+  @apply w-4 h-4 cursor-pointer;
   @apply border-2 border-gray-400;
   @apply focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
   transition: all 0.2s ease;
@@ -3970,13 +4150,6 @@ input[type="checkbox"].checkbox-input {
     flex-wrap: wrap;
   }
   
-  .module-item {
-    min-width: 180px;
-    width: 180px;
-    flex: 0 0 180px;
-    flex-shrink: 0;
-  }
-  
   .module-buttons {
     gap: 12px;
   }
@@ -4356,11 +4529,46 @@ input[type="checkbox"].checkbox-input {
     grid-template-columns: 1fr;
   }
   
+  /* 移动端导航栏 */
+  .module-navigation-bar {
+    gap: 6px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+  }
+  
+  .module-nav-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    gap: 4px;
+  }
+  
+  .module-nav-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  /* 移动端网格自动调整为更少的列数 */
+  .module-list {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 6px;
+    /* 移动端也限制为2行 */
+    max-height: calc(48px * 2 + 6px); /* 2行高度：每行48px + 1个gap 6px */
+  }
+  
   .module-item {
-    min-width: 180px;
-    width: 180px;
-    flex: 0 0 180px;
-    flex-shrink: 0;
+    padding: 6px 8px;
+    padding-right: 32px;
+    min-height: 48px;
+    gap: 5px;
+  }
+  
+  .module-item-icon {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .module-item-title {
+    font-size: 12px;
   }
 }
 

@@ -321,6 +321,12 @@
                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder:text-gray-400 focus:border-blue-500"
                 />
               </div>
+              <!-- 知识点分类选择器 -->
+              <div class="mb-4">
+                <KnowledgePointSelector
+                  v-model="saveToLibraryForm.knowledgePoint"
+                />
+              </div>
               <div v-if="saveToLibraryError" class="mb-4 text-sm text-red-600">
                 {{ saveToLibraryError }}
               </div>
@@ -356,6 +362,7 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { libraryService } from '@/services/library'
 import { getServerBaseUrl } from '@/utils/url'
 import AssetPicker from '@/components/Library/AssetPicker.vue'
+import KnowledgePointSelector from '@/components/Library/KnowledgePointSelector.vue'
 
 interface Props {
   cell: InteractiveCell
@@ -400,7 +407,8 @@ const isSavingToLibrary = ref(false)
 const saveToLibraryError = ref<string | null>(null)
 const saveToLibraryForm = ref({
   title: '',
-  description: ''
+  description: '',
+  knowledgePoint: {} as { category?: string; name?: string }
 })
 
 // 解析 URL（处理相对路径）
@@ -669,7 +677,9 @@ ${finalHtml}
       title: saveToLibraryForm.value.title,
       description: saveToLibraryForm.value.description || undefined,
       asset_type: 'interactive',
-      visibility: 'teacher_only'
+      visibility: 'teacher_only',
+      knowledge_point_category: saveToLibraryForm.value.knowledgePoint.category,
+      knowledge_point_name: saveToLibraryForm.value.knowledgePoint.name
     })
 
     // 上传成功，可以选择是否使用刚上传的资源
@@ -693,7 +703,7 @@ ${finalHtml}
     }
 
     // 重置表单并关闭模态框
-    saveToLibraryForm.value = { title: '', description: '' }
+    saveToLibraryForm.value = { title: '', description: '', knowledgePoint: {} }
     showSaveToLibraryModal.value = false
   } catch (error: any) {
     console.error('保存到资源库失败:', error)
@@ -709,6 +719,7 @@ watch(showSaveToLibraryModal, (isOpen) => {
     // 使用当前标题或默认标题
     saveToLibraryForm.value.title = localContent.value.title || '交互式课件'
     saveToLibraryForm.value.description = localContent.value.description || ''
+    saveToLibraryForm.value.knowledgePoint = {}
     saveToLibraryError.value = null
   }
 })

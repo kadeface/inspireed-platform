@@ -39,6 +39,14 @@ class LibraryAsset(Base):
         Integer, ForeignKey("grades.id"), nullable=True, comment="年级ID（可选，NULL表示跨年级通用）"
     )
     
+    # 知识点分类（用于小学奥数等知识点资源）
+    knowledge_point_category = Column(
+        String(100), nullable=True, comment="知识点分类（如：计算类/速算技巧、几何类/图形认知）"
+    )
+    knowledge_point_name = Column(
+        String(200), nullable=True, comment="具体知识点名称（如：乘法口诀可视化）"
+    )
+    
     # 基本信息
     title = Column(String(200), nullable=False, comment="资源标题")
     description = Column(Text, nullable=True, comment="资源描述")
@@ -81,6 +89,14 @@ class LibraryAsset(Base):
         comment="状态：active/processing/disabled/deleted"
     )
     
+    # 统计数据
+    view_count = Column(
+        Integer,
+        default=0,
+        nullable=False,
+        comment="点击/查看次数"
+    )
+    
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
@@ -102,6 +118,7 @@ class LibraryAsset(Base):
         Index("ix_library_assets_school_visibility_status", "school_id", "visibility", "status"),
         # ix_library_assets_school_subject 在迁移 018 中创建
         # ix_library_assets_school_grade 在迁移 20251214_0826 中创建
+        # ix_library_assets_knowledge_point 在迁移中添加
         Index("ix_library_assets_sha256", "sha256"),
     )
     
