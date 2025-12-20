@@ -277,6 +277,7 @@ import { ref, watch, computed } from 'vue'
 import type { Resource } from '../../types/resource'
 import { formatFileSize } from '../../types/resource'
 import { resourceService } from '../../services/resource'
+import { getServerBaseUrl } from '@/utils/url'
 
 interface Props {
   modelValue: boolean
@@ -331,7 +332,7 @@ const previewUrl = computed(() => {
   if (!url) return null
   
   if (url.startsWith('/uploads/')) {
-    const baseURL = import.meta.env.VITE_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:8000'
+    const baseURL = getServerBaseUrl()
     url = `${baseURL}${url}`
   }
   
@@ -457,7 +458,7 @@ function openConvertedPDF() {
   
   let url = previewInfo.value.preview_url
   if (url.startsWith('/uploads/')) {
-    const baseURL = import.meta.env.VITE_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:8000'
+    const baseURL = getServerBaseUrl()
     url = `${baseURL}${url}`
   }
   

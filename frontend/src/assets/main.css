@@ -4,6 +4,8 @@
 
 /* 自定义样式 */
 :root {
+  /* Force light form-controls rendering (avoid dark OS theme inputs) */
+  color-scheme: light;
   --primary-color: #0ea5e9;
   --primary-dark: #0284c7;
   --text-color: #1f2937;

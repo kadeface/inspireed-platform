@@ -62,11 +62,15 @@
             <div class="text-base md:text-lg text-gray-700 font-medium">结构化学习单元</div>
           </div>
           <div class="group text-center bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50">
-            <div class="text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">200+</div>
+            <div class="text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
+              {{ htmlResourceCount !== null ? `${htmlResourceCount}+` : '...' }}
+            </div>
             <div class="text-base md:text-lg text-gray-700 font-medium">交互式仿真实验</div>
           </div>
           <div class="group text-center bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50">
-            <div class="text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">500+</div>
+            <div class="text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+              {{ lessonCount !== null ? `${lessonCount}+` : '...' }}
+            </div>
             <div class="text-base md:text-lg text-gray-700 font-medium">教学实践案例</div>
           </div>
         </div>
@@ -498,11 +502,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../store/user'
 import { authService } from '../services/auth'
 import { UserRole } from '../types/user'
+import { libraryService } from '../services/library'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -511,6 +516,9 @@ const showLoginForm = ref(false)
 const isLogin = ref(true)
 const loading = ref(false)
 const error = ref('')
+const htmlResourceCount = ref<number | null>(null)
+const lessonCount = ref<number | null>(null)
+const cellCount = ref<number | null>(null)
 
 const form = ref({
   email: '',
@@ -574,4 +582,22 @@ async function handleSubmit() {
     loading.value = false
   }
 }
+
+// 获取资源库统计信息
+async function loadResourceStatistics() {
+  try {
+    const stats = await libraryService.getPublicStatistics()
+    htmlResourceCount.value = stats.html_resource_count
+    lessonCount.value = stats.lesson_count
+  } catch (error) {
+    console.error('Failed to load resource statistics:', error)
+    // 如果获取失败，显示默认值
+    htmlResourceCount.value = 200
+    lessonCount.value = 500
+  }
+}
+
+onMounted(() => {
+  loadResourceStatistics()
+})
 </script>

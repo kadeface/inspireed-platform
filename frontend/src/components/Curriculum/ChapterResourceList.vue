@@ -94,6 +94,7 @@ import { ref, watch, onMounted } from 'vue'
 import { resourceService } from '@/services/resource'
 import { useToast } from '@/composables/useToast'
 import type { ResourceResponse } from '@/types/resource'
+import { getServerBaseUrl } from '@/utils/url'
 
 interface Props {
   chapterId: number
@@ -137,7 +138,7 @@ async function handleDownload(resource: ResourceResponse) {
     const fullFilename = result.filename || resource.title
     
     // 构建完整的下载URL（确保使用正确的后端地址）
-    const baseURL = import.meta.env.VITE_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:8000'
+    const baseURL = getServerBaseUrl()
     const fullDownloadUrl = `${baseURL}${result.download_url}`
     
     // 创建下载链接

@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>《开平长师附属小学抽象数学可视化探究》 - 七桥问题与欧拉路径</title>
+    <style>
+        :root {
+            --primary-background: #FFFFFF;
+            --text-color: #000000;
+            --border-color: #E0E0E0;
+            --main-color: #FF6600;
+            --main-color-light: #FF9933;
+            --accent-color: #4CAF50;
+            --error-color: #D32F2F;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--primary-background);
+            color: var(--text-color);
+            font-family: 'Microsoft YaHei', 'Arial', sans-serif;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 3px solid var(--main-color);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--main-color);
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: var(--text-color);
+            font-size: 22px;
+            font-weight: normal;
+        }
+
+        #visualization-area {
+            display: flex;
+            gap: 20px;
+            min-height: 500px;
+            margin-bottom: 30px;
+        }
+
+        .left-panel {
+            flex: 0 0 45%;
+            background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .right-panel {
+            flex: 0 0 55%;
+            background: #fafafa;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--main-color);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--main-color-light);
+        }
+
+        #bridge-canvas {
+            width: 100%;
+            height: 450px;
+            cursor: crosshair;
+            background-color: white;
+            border-radius: 8px;
+        }
+
+        #graph-canvas {
+            width: 100%;
+            height: 450px;
+            background-color: white;
+            border-radius: 8px;
+        }
+
+        #control-panel {
+            background: #f9f9f9;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .btn-primary {
+            background-color: var(--main-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--main-color-light);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(255, 102, 0, 0.3);
+        }
+
+        .btn-success {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-secondary {
+            background-color: #757575;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #616161;
+        }
+
+        #instructions {
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .instruction-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--main-color);
+            margin-bottom: 10px;
+        }
+
+        .instruction-content {
+            line-height: 1.8;
+            font-size: 15px;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .feedback.success {
+            background-color: rgba(76, 175, 80, 0.1);
+            border: 2px solid var(--accent-color);
+            color: var(--accent-color);
+            display: block;
+        }
+
+        .feedback.error {
+            background-color: rgba(211, 47, 47, 0.1);
+            border: 2px solid var(--error-color);
+            color: var(--error-color);
+            display: block;
+        }
+
+        .feedback.info {
+            background-color: rgba(255, 102, 0, 0.1);
+            border: 2px solid var(--main-color);
+            color: var(--main-color);
+            display: block;
+        }
+
+        .stats-panel {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(255, 102, 0, 0.05);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-item {
+            margin: 8px 0;
+            font-size: 15px;
+        }
+
+        .stat-label {
+            font-weight: bold;
+            color: var(--main-color);
+        }
+
+        .degree-display {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .degree-item {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .odd-degree {
+            color: var(--error-color);
+            font-weight: bold;
+        }
+
+        .even-degree {
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>《开平长师附属小学抽象数学可视化探究》</h1>
+        <h2>七桥问题与欧拉路径</h2>
+    </header>
+
+    <div id="visualization-area">
+        <div class="left-panel">
+            <div class="panel-title">🌉 情境交互区：乡村小桥地图</div>
+            <canvas id="bridge-canvas"></canvas>
+        </div>
+        <div class="right-panel">
+            <div class="panel-title">📊 逻辑原理区：图论抽象模型</div>
+            <canvas id="graph-canvas"></canvas>
+            <div class="degree-display" id="degree-info"></div>
+        </div>
+    </div>
+
+    <div id="control-panel">
+        <div style="margin-bottom: 15px; padding: 15px; background: #f0f0f0; border-radius: 8px;">
+            <label for="bridge-count" style="font-weight: bold; color: var(--main-color); margin-right: 10px;">选择桥的数量：</label>
+            <select id="bridge-count" style="padding: 8px 15px; font-size: 16px; border: 2px solid var(--main-color); border-radius: 6px; cursor: pointer; background: white;" onchange="generateNewGraph()">
+                <option value="3">3座桥</option>
+                <option value="4">4座桥</option>
+                <option value="5">5座桥</option>
+                <option value="6" selected>6座桥（经典七桥问题）</option>
+                <option value="7">7座桥</option>
+                <option value="8">8座桥</option>
+                <option value="9">9座桥</option>
+                <option value="10">10座桥</option>
+            </select>
+            <button class="btn-secondary" onclick="generateNewGraph()" style="margin-left: 10px; padding: 8px 15px;">🔄 重新生成</button>
+        </div>
+        <div class="button-group">
+            <button class="btn-primary" onclick="startDrawing()">🖊️ 开始绘制路径</button>
+            <button class="btn-success" onclick="validatePath()">✓ 验证路径</button>
+            <button class="btn-secondary" onclick="resetCanvas()">↻ 重置</button>
+            <button class="btn-primary" onclick="showHint()">💡 显示提示</button>
+            <button class="btn-success" onclick="showTheory()">📚 查看原理</button>
+        </div>
+        <div class="stats-panel">
+            <div class="stat-item"><span class="stat-label">当前状态：</span><span id="status">等待开始</span></div>
+            <div class="stat-item"><span class="stat-label">已走过的桥：</span><span id="bridges-crossed">0 / 6</span></div>
+            <div class="stat-item"><span class="stat-label">当前位置：</span><span id="current-location">未开始</span></div>
+        </div>
+    </div>
+
+    <div id="instructions">
+        <div class="instruction-title">📖 操作说明</div>
+        <div class="instruction-content">
+            <p><strong>挑战目标：</strong>你能一次不重复地走遍所有的6座小桥吗？（每座桥最多只能走一次，陆地上可以重复走）</p>
+            <br>
+            <p><strong>操作步骤：</strong></p>
+            <p>1️⃣ 点击"开始绘制路径"按钮</p>
+            <p>2️⃣ 在左侧地图上点击选择起点（厂村/丙村/乙村/甲村）</p>
+            <p>3️⃣ 依次点击你想要经过的桥梁（黄色桥梁），每座桥只能点击一次</p>
+            <p>4️⃣ 尝试走完所有6座桥，观察右侧的图论模型同步高亮</p>
+            <p>5️⃣ 点击"验证路径"查看你的路径是否有效</p>
+            <br>
+            <p><strong>学习重点：</strong>观察右侧"逻辑原理区"中每个村庄连接的桥梁数量（顶点度数），思考这与能否一笔画完有什么关系？</p>
+        </div>
+        <div class="feedback" id="feedback"></div>
+    </div>
+
+    <script>
+        // 画布初始化
+        const bridgeCanvas = document.getElementById('bridge-canvas');
+        const bridgeCtx = bridgeCanvas.getContext('2d');
+        const graphCanvas = document.getElementById('graph-canvas');
+        const graphCtx = graphCanvas.getContext('2d');
+
+        // 设置画布尺寸
+        function resizeCanvas() {
+            // 确保画布有足够的尺寸来显示所有内容
+            const bridgeContainer = bridgeCanvas.parentElement;
+            const graphContainer = graphCanvas.parentElement;
+            
+            // 设置实际像素尺寸（考虑设备像素比）
+            const dpr = window.devicePixelRatio || 1;
+            // 确保最小宽度，以容纳所有坐标（最大x坐标是450）
+            const bridgeWidth = Math.max(bridgeContainer.clientWidth || 500, 500);
+            const bridgeHeight = 450; // 固定高度
+            const graphWidth = Math.max(graphContainer.clientWidth || 500, 500);
+            const graphHeight = 450; // 固定高度
+            
+            bridgeCanvas.width = bridgeWidth * dpr;
+            bridgeCanvas.height = bridgeHeight * dpr;
+            graphCanvas.width = graphWidth * dpr;
+            graphCanvas.height = graphHeight * dpr;
+            
+            // 设置CSS尺寸
+            bridgeCanvas.style.width = bridgeWidth + 'px';
+            bridgeCanvas.style.height = bridgeHeight + 'px';
+            graphCanvas.style.width = graphWidth + 'px';
+            graphCanvas.style.height = graphHeight + 'px';
+            
+            // 重置变换矩阵并缩放上下文以适应设备像素比
+            bridgeCtx.setTransform(1, 0, 0, 1, 0, 0);
+            bridgeCtx.scale(dpr, dpr);
+            graphCtx.setTransform(1, 0, 0, 1, 0, 0);
+            graphCtx.scale(dpr, dpr);
+            
+            // 重新计算桥梁坐标（适应新的画布尺寸）
+            bridges.forEach(bridge => {
+                const coords = calculateBridgeCoords(bridge);
+                bridge.x1 = coords.x1;
+                bridge.y1 = coords.y1;
+                bridge.x2 = coords.x2;
+                bridge.y2 = coords.y2;
+                bridge.cx = coords.cx;
+                bridge.cy = coords.cy;
+            });
+            
+            drawBridgeMap();
+            drawGraphModel();
+        }
+        
+        // 等待DOM加载完成后再初始化
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', resizeCanvas);
+        } else {
+            // 使用setTimeout确保DOM完全渲染
+            setTimeout(resizeCanvas, 0);
+        }
+
+        // 数据结构：村庄（顶点）
+        const villages = {
+            'A': { name: '厂村', x: 100, y: 150, graphX: 150, graphY: 100 },
+            'B': { name: '丙村', x: 350, y: 100, graphX: 450, graphY: 100 },
+            'C': { name: '乙村', x: 450, y: 280, graphX: 450, graphY: 300 },
+            'D': { name: '甲村', x: 180, y: 350, graphX: 150, graphY: 300 }
+        };
+
+        // 计算桥梁坐标的函数
+        function calculateBridgeCoords(bridge) {
+            const fromVillage = villages[bridge.from];
+            const toVillage = villages[bridge.to];
+            
+            // 计算从村庄中心到另一个村庄中心的方向
+            const dx = toVillage.x - fromVillage.x;
+            const dy = toVillage.y - fromVillage.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // 村庄半径
+            const villageRadius = 12;
+            
+            // 计算起点和终点（从村庄边缘开始）
+            const startX = fromVillage.x + (dx / distance) * villageRadius;
+            const startY = fromVillage.y + (dy / distance) * villageRadius;
+            const endX = toVillage.x - (dx / distance) * villageRadius;
+            const endY = toVillage.y - (dy / distance) * villageRadius;
+            
+            // 计算控制点（使桥梁呈现弯曲效果）
+            const midX = (startX + endX) / 2;
+            const midY = (startY + endY) / 2;
+            
+            // 计算垂直方向（用于偏移）
+            const perpendicularX = -dy / distance;
+            const perpendicularY = dx / distance;
+            
+            // 找出连接相同两个顶点的所有边
+            const sameEdges = bridges.filter(b => 
+                (b.from === bridge.from && b.to === bridge.to) ||
+                (b.from === bridge.to && b.to === bridge.from)
+            );
+            sameEdges.sort((a, b) => a.id - b.id);
+            
+            // 计算这条边在同向边中的索引
+            const edgeIndex = sameEdges.findIndex(b => b.id === bridge.id);
+            const totalSameEdges = sameEdges.length;
+            
+            // 根据索引计算偏移量（使多条边分开显示）
+            // 如果只有一条边，使用较小的偏移；如果有多条边，使用较大的偏移
+            const baseOffset = totalSameEdges === 1 ? 20 : 30;
+            const offsetDistance = (edgeIndex - (totalSameEdges - 1) / 2) * baseOffset;
+            
+            // 根据桥的ID添加额外的变化，使每条桥都有独特的弯曲
+            const variation = (bridge.id % 3 - 1) * 5; // -5, 0, 5的循环
+            const finalOffset = offsetDistance + variation;
+            
+            const offsetX = perpendicularX * finalOffset;
+            const offsetY = perpendicularY * finalOffset;
+            
+            return {
+                x1: startX,
+                y1: startY,
+                x2: endX,
+                y2: endY,
+                cx: midX + offsetX,
+                cy: midY + offsetY
+            };
+        }
+
+        // 数据结构：桥梁（边）- 改为可变
+        let bridges = [];
+
+        // 根据桥的数量生成图结构
+        function generateGraph(bridgeCount) {
+            bridges = [];
+            let bridgeId = 1;
+            
+            // 预定义的边模板（确保连通性和多样性）
+            const edgeTemplates = [
+                // 基础连通边（必须包含，确保图连通）
+                { from: 'A', to: 'B' },  // 桥1：连接厂村和丙村
+                { from: 'A', to: 'D' },  // 桥2：连接厂村和甲村
+                { from: 'B', to: 'C' },  // 桥3：连接丙村和乙村
+                { from: 'D', to: 'C' },  // 桥4：连接甲村和乙村
+                
+                // 额外的边（用于增加桥的数量）
+                { from: 'A', to: 'B' },  // 桥5：重复边（A-B）
+                { from: 'D', to: 'C' },  // 桥6：重复边（D-C）
+                { from: 'A', to: 'C' },  // 桥7：对角线（A-C）
+                { from: 'B', to: 'D' },  // 桥8：对角线（B-D）
+                { from: 'A', to: 'B' },  // 桥9：重复边（A-B）
+                { from: 'D', to: 'C' },  // 桥10：重复边（D-C）
+            ];
+            
+            // 根据桥的数量选择边
+            // 确保至少包含前4条边以保证连通性
+            const minEdges = Math.min(4, bridgeCount);
+            for (let i = 0; i < minEdges; i++) {
+                const edge = edgeTemplates[i];
+                bridges.push({
+                    id: bridgeId++,
+                    from: edge.from,
+                    to: edge.to,
+                    label: `桥${bridgeId - 1}`
+                });
+            }
+            
+            // 如果需要的桥数量超过4，添加额外的边
+            if (bridgeCount > 4) {
+                for (let i = 4; i < bridgeCount && i < edgeTemplates.length; i++) {
+                    const edge = edgeTemplates[i];
+                    bridges.push({
+                        id: bridgeId++,
+                        from: edge.from,
+                        to: edge.to,
+                        label: `桥${bridgeId - 1}`
+                    });
+                }
+            }
+            
+            // 为每座桥计算坐标
+            bridges.forEach(bridge => {
+                const coords = calculateBridgeCoords(bridge);
+                bridge.x1 = coords.x1;
+                bridge.y1 = coords.y1;
+                bridge.x2 = coords.x2;
+                bridge.y2 = coords.y2;
+                bridge.cx = coords.cx;
+                bridge.cy = coords.cy;
+            });
+            
+            // 更新UI显示
+            updateBridgeCountDisplay();
+        }
+        
+        // 更新桥数量显示
+        function updateBridgeCountDisplay() {
+            const bridgeCount = bridges.length;
+            document.getElementById('bridges-crossed').textContent = `0 / ${bridgeCount}`;
+            
+            // 更新说明文字
+            const instructionContent = document.querySelector('.instruction-content');
+            if (instructionContent) {
+                const firstP = instructionContent.querySelector('p');
+                if (firstP) {
+                    firstP.innerHTML = `<strong>挑战目标：</strong>你能一次不重复地走遍所有的${bridgeCount}座小桥吗？（每座桥最多只能走一次，陆地上可以重复走）`;
+                }
+                // 更新第4步说明
+                const steps = instructionContent.querySelectorAll('p');
+                if (steps.length >= 4) {
+                    steps[3].innerHTML = `4️⃣ 尝试走完所有${bridgeCount}座桥，观察右侧的图论模型同步高亮`;
+                }
+            }
+        }
+        
+        // 生成新图的函数（供UI调用）
+        function generateNewGraph() {
+            const bridgeCount = parseInt(document.getElementById('bridge-count').value);
+            generateGraph(bridgeCount);
+            
+            // 重置游戏状态
+            gameState.isDrawing = false;
+            gameState.currentVillage = null;
+            gameState.visitedBridges.clear();
+            gameState.path = [];
+            gameState.pathVertices = [];
+            
+            document.getElementById('status').textContent = '等待开始';
+            document.getElementById('bridges-crossed').textContent = `0 / ${bridgeCount}`;
+            document.getElementById('current-location').textContent = '未开始';
+            document.getElementById('feedback').className = 'feedback';
+            document.getElementById('feedback').style.display = 'none';
+            
+            // 重新绘制
+            drawBridgeMap();
+            drawGraphModel();
+            updateDegreeDisplay();
+        }
+        
+        // 初始化：生成6座桥的图
+        generateGraph(6);
+
+        // 游戏状态
+        let gameState = {
+            isDrawing: false,
+            currentVillage: null,
+            visitedBridges: new Set(),
+            path: [],
+            pathVertices: []
+        };
+
+        // 绘制河流背景
+        function drawRiver(ctx) {
+            ctx.fillStyle = '#4A90E2';
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.moveTo(50, 100);
+            ctx.bezierCurveTo(200, 80, 350, 150, 500, 120);
+            ctx.bezierCurveTo(520, 200, 480, 280, 500, 380);
+            ctx.bezierCurveTo(400, 370, 300, 360, 200, 380);
+            ctx.bezierCurveTo(150, 300, 100, 250, 80, 180);
+            ctx.closePath();
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+
+        // 绘制桥梁地图
+        function drawBridgeMap() {
+            bridgeCtx.clearRect(0, 0, bridgeCanvas.width, bridgeCanvas.height);
+            
+            // 绘制河流
+            drawRiver(bridgeCtx);
+
+            // 绘制桥梁
+            bridges.forEach(bridge => {
+                const isVisited = gameState.visitedBridges.has(bridge.id);
+                
+                bridgeCtx.save();
+                bridgeCtx.strokeStyle = isVisited ? '#FF6600' : '#FFD700';
+                bridgeCtx.lineWidth = isVisited ? 12 : 10;
+                bridgeCtx.lineCap = 'round';
+                
+                bridgeCtx.beginPath();
+                bridgeCtx.moveTo(bridge.x1, bridge.y1);
+                bridgeCtx.quadraticCurveTo(bridge.cx, bridge.cy, bridge.x2, bridge.y2);
+                bridgeCtx.stroke();
+
+                // 绘制桥梁边框
+                bridgeCtx.strokeStyle = isVisited ? '#CC5200' : '#CC9900';
+                bridgeCtx.lineWidth = isVisited ? 14 : 12;
+                bridgeCtx.globalAlpha = 0.3;
+                bridgeCtx.stroke();
+                bridgeCtx.restore();
+
+                // 绘制桥梁标签
+                bridgeCtx.fillStyle = '#000';
+                bridgeCtx.font = 'bold 12px Arial';
+                bridgeCtx.fillText(bridge.label, bridge.cx - 15, bridge.cy - 10);
+            });
+
+            // 绘制村庄
+            Object.keys(villages).forEach(key => {
+                const v = villages[key];
+                const isCurrent = gameState.currentVillage === key;
+                
+                bridgeCtx.fillStyle = isCurrent ? '#FF6600' : '#8B4513';
+                bridgeCtx.beginPath();
+                bridgeCtx.arc(v.x, v.y, isCurrent ? 15 : 12, 0, Math.PI * 2);
+                bridgeCtx.fill();
+                
+                bridgeCtx.strokeStyle = isCurrent ? '#FF9933' : '#654321';
+                bridgeCtx.lineWidth = 3;
+                bridgeCtx.stroke();
+
+                bridgeCtx.fillStyle = '#000';
+                bridgeCtx.font = 'bold 14px Microsoft YaHei';
+                bridgeCtx.fillText(v.name, v.x - 20, v.y + 30);
+            });
+
+            // 绘制路径
+            if (gameState.path.length > 0) {
+                bridgeCtx.strokeStyle = '#FF6600';
+                bridgeCtx.lineWidth = 3;
+                bridgeCtx.setLineDash([5, 5]);
+                bridgeCtx.beginPath();
+                
+                gameState.path.forEach((bridgeId, index) => {
+                    const bridge = bridges.find(b => b.id === bridgeId);
+                    if (index === 0) {
+                        bridgeCtx.moveTo(bridge.x1, bridge.y1);
+                    }
+                    bridgeCtx.quadraticCurveTo(bridge.cx, bridge.cy, bridge.x2, bridge.y2);
+                });
+                bridgeCtx.stroke();
+                bridgeCtx.setLineDash([]);
+            }
+        }
+
+        // 绘制图论模型
+        function drawGraphModel() {
+            graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+
+            // 计算每条边在同向边中的索引（用于偏移）
+            function getEdgeIndex(bridge) {
+                const sameEdges = bridges.filter(b => 
+                    (b.from === bridge.from && b.to === bridge.to) ||
+                    (b.from === bridge.to && b.to === bridge.from)
+                );
+                // 按ID排序，确保顺序一致
+                sameEdges.sort((a, b) => a.id - b.id);
+                return sameEdges.findIndex(b => b.id === bridge.id);
+            }
+
+            // 绘制边（桥梁的抽象表示）
+            bridges.forEach(bridge => {
+                const isVisited = gameState.visitedBridges.has(bridge.id);
+                const from = villages[bridge.from];
+                const to = villages[bridge.to];
+
+                // 计算边的方向向量
+                const dx = to.graphX - from.graphX;
+                const dy = to.graphY - from.graphY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // 计算垂直方向（用于偏移）
+                const perpX = -dy / distance;
+                const perpY = dx / distance;
+                
+                // 获取这条边在同向边中的索引
+                const edgeIndex = getEdgeIndex(bridge);
+                const totalEdges = bridges.filter(b => 
+                    (b.from === bridge.from && b.to === bridge.to) ||
+                    (b.from === bridge.to && b.to === bridge.from)
+                ).length;
+                
+                // 计算偏移量（使多条边分开显示）
+                const offsetDistance = (edgeIndex - (totalEdges - 1) / 2) * 15;
+                const offsetX = perpX * offsetDistance;
+                const offsetY = perpY * offsetDistance;
+                
+                // 计算起点和终点（考虑顶点半径）
+                const vertexRadius = 20;
+                const startX = from.graphX + (dx / distance) * vertexRadius + offsetX;
+                const startY = from.graphY + (dy / distance) * vertexRadius + offsetY;
+                const endX = to.graphX - (dx / distance) * vertexRadius + offsetX;
+                const endY = to.graphY - (dy / distance) * vertexRadius + offsetY;
+                
+                // 计算控制点（使边呈现轻微弯曲，更易区分）
+                const midX = (startX + endX) / 2;
+                const midY = (startY + endY) / 2;
+                const curveOffset = offsetDistance * 0.3; // 轻微的弯曲
+                const controlX = midX + perpX * curveOffset;
+                const controlY = midY + perpY * curveOffset;
+
+                graphCtx.save();
+                graphCtx.strokeStyle = isVisited ? '#FF6600' : '#999';
+                graphCtx.lineWidth = isVisited ? 5 : 2;
+                
+                graphCtx.beginPath();
+                graphCtx.moveTo(startX, startY);
+                graphCtx.quadraticCurveTo(controlX, controlY, endX, endY);
+                graphCtx.stroke();
+                graphCtx.restore();
+
+                // 绘制边的标签（在控制点位置，带背景以提高可读性）
+                const labelX = controlX;
+                const labelY = controlY - 8;
+                
+                // 绘制标签背景
+                graphCtx.save();
+                graphCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                graphCtx.font = 'bold 11px Arial';
+                const textMetrics = graphCtx.measureText(bridge.label);
+                const textWidth = textMetrics.width;
+                const textHeight = 14;
+                graphCtx.fillRect(labelX - textWidth / 2 - 3, labelY - textHeight / 2, textWidth + 6, textHeight);
+                graphCtx.restore();
+                
+                // 绘制标签文字
+                graphCtx.fillStyle = isVisited ? '#FF6600' : '#666';
+                graphCtx.font = 'bold 11px Arial';
+                graphCtx.textAlign = 'center';
+                graphCtx.textBaseline = 'middle';
+                graphCtx.fillText(bridge.label, labelX, labelY);
+                graphCtx.textBaseline = 'alphabetic'; // 恢复默认
+            });
+
+            // 绘制顶点
+            Object.keys(villages).forEach(key => {
+                const v = villages[key];
+                const isCurrent = gameState.currentVillage === key;
+                
+                graphCtx.fillStyle = isCurrent ? '#FF6600' : '#4CAF50';
+                graphCtx.beginPath();
+                graphCtx.arc(v.graphX, v.graphY, isCurrent ? 25 : 20, 0, Math.PI * 2);
+                graphCtx.fill();
+                
+                graphCtx.strokeStyle = '#333';
+                graphCtx.lineWidth = 3;
+                graphCtx.stroke();
+
+                // 绘制村庄名称
+                graphCtx.fillStyle = '#FFF';
+                graphCtx.font = 'bold 12px Microsoft YaHei';
+                graphCtx.textAlign = 'center';
+                graphCtx.fillText(v.name, v.graphX, v.graphY + 5);
+            });
+
+            // 绘制理论说明（调整位置确保不被遮挡）
+            const startY = 340; // 从y=340开始绘制，确保在450px画布内
+            const lineHeight = 15; // 行间距，稍微紧凑一些
+            
+            graphCtx.fillStyle = '#000';
+            graphCtx.font = 'bold 13px Microsoft YaHei';
+            graphCtx.textAlign = 'left';
+            graphCtx.fillText('欧拉路径判定原理：', 20, startY);
+            
+            graphCtx.font = '10px Microsoft YaHei';
+            graphCtx.fillText('前提：图必须是连通的', 20, startY + lineHeight);
+            
+            graphCtx.font = '11px Microsoft YaHei';
+            graphCtx.fillText('一个连通图存在欧拉路径（一笔画）', 20, startY + lineHeight * 2);
+            graphCtx.fillText('⟺ 奇数度顶点个数为 0 或 2', 20, startY + lineHeight * 3);
+            
+            graphCtx.font = '10px Microsoft YaHei';
+            graphCtx.fillText('• 0个奇数度顶点：存在欧拉回路（起点=终点）', 20, startY + lineHeight * 4);
+            graphCtx.fillText('• 2个奇数度顶点：存在欧拉路径（起点≠终点）', 20, startY + lineHeight * 5);
+        }
+
+        // 计算每个顶点的度数
+        function calculateDegrees() {
+            const degrees = { 'A': 0, 'B': 0, 'C': 0, 'D': 0 };
+            bridges.forEach(bridge => {
+                degrees[bridge.from]++;
+                degrees[bridge.to]++;
+            });
+            return degrees;
+        }
+
+        // 显示度数信息
+        function updateDegreeDisplay() {
+            const degrees = calculateDegrees();
+            const oddCount = Object.values(degrees).filter(d => d % 2 === 1).length;
+            
+            let html = '<div style="font-weight: bold; margin-bottom: 10px; color: #FF6600;">顶点度数分析：</div>';
+            Object.keys(degrees).forEach(key => {
+                const village = villages[key];
+                const degree = degrees[key];
+                const isOdd = degree % 2 === 1;
+                const className = isOdd ? 'odd-degree' : 'even-degree';
+                html += `<div class="degree-item ${className}">${village.name}（${key}）: 度数 = ${degree} ${isOdd ? '（奇数）' : '（偶数）'}</div>`;
+            });
+            
+            html += `<div style="margin-top: 10px; font-weight: bold;">奇数度顶点个数：${oddCount}</div>`;
+            html += `<div style="margin-top: 5px; color: ${oddCount === 0 || oddCount === 2 ? '#4CAF50' : '#D32F2F'};">`;
+            if (oddCount === 0) {
+                html += '✓ 存在欧拉回路（可以一笔画回到起点）';
+            } else if (oddCount === 2) {
+                html += '✓ 存在欧拉路径（可以一笔画，但起终点不同）';
+            } else {
+                html += '✗ 不存在欧拉路径（无法一笔画完）';
+            }
+            html += '</div>';
+            
+            document.getElementById('degree-info').innerHTML = html;
+        }
+
+        // 开始绘制路径
+        function startDrawing() {
+            gameState.isDrawing = true;
+            gameState.currentVillage = null;
+            gameState.visitedBridges.clear();
+            gameState.path = [];
+            gameState.pathVertices = [];
+            
+            const bridgeCount = bridges.length;
+            document.getElementById('status').textContent = '请选择起点村庄';
+            document.getElementById('bridges-crossed').textContent = `0 / ${bridgeCount}`;
+            document.getElementById('current-location').textContent = '未选择';
+            document.getElementById('feedback').className = 'feedback';
+            document.getElementById('feedback').style.display = 'none';
+            
+            drawBridgeMap();
+            drawGraphModel();
+            updateDegreeDisplay();
+        }
+
+        // 重置画布
+        function resetCanvas() {
+            gameState.isDrawing = false;
+            gameState.currentVillage = null;
+            gameState.visitedBridges.clear();
+            gameState.path = [];
+            gameState.pathVertices = [];
+            
+            const bridgeCount = bridges.length;
+            document.getElementById('status').textContent = '等待开始';
+            document.getElementById('bridges-crossed').textContent = `0 / ${bridgeCount}`;
+            document.getElementById('current-location').textContent = '未开始';
+            document.getElementById('feedback').className = 'feedback';
+            document.getElementById('feedback').style.display = 'none';
+            
+            drawBridgeMap();
+            drawGraphModel();
+            updateDegreeDisplay();
+        }
+
+        // 处理画布点击事件
+        bridgeCanvas.addEventListener('click', function(event) {
+            if (!gameState.isDrawing) {
+                showFeedback('请先点击"开始绘制路径"按钮', 'info');
+                return;
+            }
+
+            const rect = bridgeCanvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            // 如果还没选择起点，检测点击的村庄
+            if (gameState.currentVillage === null) {
+                Object.keys(villages).forEach(key => {
+                    const v = villages[key];
+                    const distance = Math.sqrt((x - v.x) ** 2 + (y - v.y) ** 2);
+                    if (distance < 20) {
+                        gameState.currentVillage = key;
+                        gameState.pathVertices.push(key);
+                        document.getElementById('current-location').textContent = v.name;
+                        document.getElementById('status').textContent = '绘制中...请点击要走的桥梁';
+                        drawBridgeMap();
+                        drawGraphModel();
+                    }
+                });
+                return;
+            }
+
+            // 检测点击的桥梁
+            bridges.forEach(bridge => {
+                // 计算点到桥梁的距离
+                const distance = distanceToQuadraticCurve(x, y, bridge.x1, bridge.y1, bridge.cx, bridge.cy, bridge.x2, bridge.y2);
+                
+                if (distance < 20 && !gameState.visitedBridges.has(bridge.id)) {
+                    // 检查桥梁是否连接当前村庄
+                    if (bridge.from === gameState.currentVillage || bridge.to === gameState.currentVillage) {
+                        gameState.visitedBridges.add(bridge.id);
+                        gameState.path.push(bridge.id);
+                        
+                        // 更新当前位置
+                        gameState.currentVillage = (bridge.from === gameState.currentVillage) ? bridge.to : bridge.from;
+                        gameState.pathVertices.push(gameState.currentVillage);
+                        
+                        const bridgeCount = bridges.length;
+                        document.getElementById('current-location').textContent = villages[gameState.currentVillage].name;
+                        document.getElementById('bridges-crossed').textContent = `${gameState.visitedBridges.size} / ${bridgeCount}`;
+                        
+                        drawBridgeMap();
+                        drawGraphModel();
+
+                        if (gameState.visitedBridges.size === bridgeCount) {
+                            document.getElementById('status').textContent = '已走完所有桥梁！点击验证查看结果';
+                            showFeedback(`太棒了！你已经走完了所有${bridgeCount}座桥，点击"验证路径"查看结果！`, 'success');
+                        }
+                    } else {
+                        showFeedback(`这座桥不连接${villages[gameState.currentVillage].name}，请选择正确的桥梁`, 'error');
+                    }
+                }
+            });
+        });
+
+        // 计算点到二次贝塞尔曲线的距离（简化版）
+        function distanceToQuadraticCurve(px, py, x1, y1, cx, cy, x2, y2) {
+            let minDist = Infinity;
+            for (let t = 0; t <= 1; t += 0.05) {
+                const x = (1-t)*(1-t)*x1 + 2*(1-t)*t*cx + t*t*x2;
+                const y = (1-t)*(1-t)*y1 + 2*(1-t)*t*cy + t*t*y2;
+                const dist = Math.sqrt((px - x) ** 2 + (py - y) ** 2);
+                minDist = Math.min(minDist, dist);
+            }
+            return minDist;
+        }
+
+        // 验证路径
+        function validatePath() {
+            const feedback = document.getElementById('feedback');
+            const bridgeCount = bridges.length;
+            
+            if (gameState.visitedBridges.size === 0) {
+                showFeedback('你还没有开始绘制路径！请点击"开始绘制路径"按钮。', 'error');
+                return;
+            }
+
+            if (gameState.visitedBridges.size < bridgeCount) {
+                showFeedback(`你只走过了 ${gameState.visitedBridges.size} 座桥，还有 ${bridgeCount - gameState.visitedBridges.size} 座桥没有经过。继续尝试吧！`, 'error');
+                return;
+            }
+
+            // 理论上这是不可能完成的
+            const degrees = calculateDegrees();
+            const oddCount = Object.values(degrees).filter(d => d % 2 === 1).length;
+            
+            let message = `<strong>🎉 恭喜！你找到了一条路径！</strong><br><br>`;
+            message += `<strong>路径分析：</strong><br>`;
+            message += `起点：${villages[gameState.pathVertices[0]].name}<br>`;
+            message += `终点：${villages[gameState.pathVertices[gameState.pathVertices.length - 1]].name}<br>`;
+            message += `经过的桥梁：${gameState.path.map(id => `桥${id}`).join(' → ')}<br><br>`;
+            message += `<strong>📊 数学原理：</strong><br>`;
+            message += `奇数度顶点个数：${oddCount}<br>`;
+            
+            if (oddCount === 2) {
+                message += `<span style="color: #4CAF50;">✓ 符合欧拉路径条件（2个奇数度顶点）</span><br>`;
+                message += `这个问题有解！起点和终点必须是两个奇数度顶点。`;
+            } else if (oddCount === 0) {
+                message += `<span style="color: #4CAF50;">✓ 符合欧拉回路条件（0个奇数度顶点）</span><br>`;
+                message += `可以从任意点出发，回到起点！`;
+            }
+            
+            showFeedback(message, 'success');
+        }
+
+        // 显示提示
+        function showHint() {
+            const degrees = calculateDegrees();
+            const oddVertices = Object.keys(degrees).filter(k => degrees[k] % 2 === 1).map(k => villages[k].name);
+            const oddCount = oddVertices.length;
+            
+            let message = `<strong>💡 提示：</strong><br><br>`;
+            message += `<strong>关键观察：</strong><br>`;
+            message += `当前图中有 <strong>${oddCount}</strong> 个奇数度顶点：${oddVertices.join('、')}<br><br>`;
+            
+            if (oddCount === 0 || oddCount === 2) {
+                message += `<span style="color: #4CAF50;">✓ 这个问题有解！</span><br>`;
+                if (oddCount === 2) {
+                    message += `你需要从一个奇数度顶点出发，在另一个奇数度顶点结束。<br>`;
+                    message += `尝试从 <strong>${oddVertices[0]}</strong> 或 <strong>${oddVertices[1]}</strong> 开始！`;
+                } else {
+                    message += `你可以从任意村庄出发，并回到起点！`;
+                }
+            } else {
+                message += `<span style="color: #D32F2F;">✗ 根据欧拉定理，这个问题无解！</span><br>`;
+                message += `要存在一笔画路径，奇数度顶点的个数必须是 0 或 2。<br>`;
+                message += `当前有 ${oddCount} 个奇数度顶点，所以无法一次不重复地走遍所有桥梁。`;
+            }
+            
+            showFeedback(message, 'info');
+        }
+
+        // 显示原理
+        function showTheory() {
+            let message = `<strong>📚 欧拉路径原理：</strong><br><br>`;
+            message += `<strong>1. 基本概念：</strong><br>`;
+            message += `• <strong>欧拉路径</strong>：经过图中每条边恰好一次的路径<br>`;
+            message += `• <strong>欧拉回路</strong>：起点和终点相同的欧拉路径<br>`;
+            message += `• <strong>顶点的度数</strong>：与该顶点相连的边的数量<br><br>`;
+            
+            message += `<strong>2. 欧拉定理：</strong><br>`;
+            message += `一个连通图存在欧拉路径，当且仅当：<br>`;
+            message += `• 所有顶点的度数都是偶数（存在欧拉回路）<br>`;
+            message += `• 恰有两个顶点的度数是奇数（存在欧拉路径）<br><br>`;
+            
+            message += `<strong>3. 为什么？</strong><br>`;
+            message += `想象你每次经过一个村庄：<br>`;
+            message += `• 如果是<strong>中途经过</strong>，你需要"进入一座桥，离开一座桥"（消耗2个度数）<br>`;
+            message += `• 如果是<strong>起点或终点</strong>，只需要离开或进入（消耗1个度数）<br>`;
+            message += `• 所以，除了起点和终点，其他村庄的度数必须是偶数！<br><br>`;
+            
+            const degrees = calculateDegrees();
+            const oddCount = Object.values(degrees).filter(d => d % 2 === 1).length;
+            
+            message += `<strong>4. 当前问题分析：</strong><br>`;
+            message += `本题有 <strong>${oddCount}</strong> 个奇数度顶点<br>`;
+            if (oddCount > 2) {
+                message += `<span style="color: #D32F2F;">因此，这个七桥问题无解！</span><br>`;
+                message += `这就是历史上著名的<strong>哥尼斯堡七桥问题</strong>，欧拉在1736年证明了它无解，并由此开创了图论这门学科！`;
+            } else {
+                message += `<span style="color: #4CAF50;">因此，这个问题有解！</span>`;
+            }
+            
+            showFeedback(message, 'info');
+        }
+
+        // 显示反馈信息
+        function showFeedback(message, type) {
+            const feedback = document.getElementById('feedback');
+            feedback.innerHTML = message;
+            feedback.className = `feedback ${type}`;
+        }
+
+        // 初始化
+        updateDegreeDisplay();
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>

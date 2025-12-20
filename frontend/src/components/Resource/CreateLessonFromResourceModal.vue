@@ -492,13 +492,18 @@ function close() {
   border-radius: 0.5rem;
   font-size: 0.875rem;
   transition: all 0.2s;
+  background: #ffffff;
+  color: #111827;
+}
+
+.form-input::placeholder {
+  color: #9ca3af;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #3b82f6;
-  ring: 2px;
-  ring-color: rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
 .form-input.input-error {

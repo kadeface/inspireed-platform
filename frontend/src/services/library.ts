@@ -162,6 +162,18 @@ class LibraryService {
       throw error
     }
   }
+
+  /**
+   * 获取资源库统计信息（公开接口，无需登录）
+   */
+  async getPublicStatistics(): Promise<{ html_resource_count: number; lesson_count: number; cell_count: number }> {
+    try {
+      return await api.get<{ html_resource_count: number; lesson_count: number; cell_count: number }>('/public/curriculum/statistics/resources')
+    } catch (error) {
+      console.error('Failed to get public resource statistics:', error)
+      throw error
+    }
+  }
 }
 
 export const libraryService = new LibraryService()

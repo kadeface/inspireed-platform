@@ -341,7 +341,7 @@ async def delete_library_asset(
         )
     
     # 软删除
-    asset.status = "deleted"
+    setattr(asset, "status", "deleted")
     await db.commit()
     
     return {"message": "资源已删除", "asset_id": asset_id}
@@ -377,7 +377,7 @@ async def increment_asset_view(
             raise HTTPException(status_code=403, detail="无权访问此资源")
     
     # 增加点击次数
-    asset.view_count = cast(int, asset.view_count) + 1
+    setattr(asset, "view_count", cast(int, asset.view_count) + 1)
     await db.commit()
     
     return {"message": "点击次数已更新", "view_count": asset.view_count}
@@ -476,6 +476,7 @@ async def get_library_asset_content(
     
     # 构建完整文件路径
     import os
+    import aiofiles
     from app.core.config import settings
     
     # storage_key 通常是相对路径，如 /uploads/resources/xxx.html
@@ -504,7 +505,6 @@ async def get_library_asset_content(
     
     # 读取文件内容
     try:
-        import aiofiles
         async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
             content = await f.read()
         return {"content": content}

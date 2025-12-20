@@ -32,7 +32,7 @@
                     <select
                       v-model="selectedSubjectId"
                       @change="handleSubjectChange"
-                      class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     >
                       <option value="">请选择学科</option>
@@ -52,7 +52,7 @@
                       v-model="selectedGradeId"
                       @change="handleGradeChange"
                       :disabled="!selectedSubjectId"
-                      class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                       required
                     >
                       <option value="">请选择年级</option>
@@ -70,7 +70,7 @@
                   <div v-if="availableCourses.length > 0" class="mb-3">
                     <select
                       v-model="selectedCourseId"
-                      class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     >
                       <option value="">请选择课程</option>
@@ -111,7 +111,7 @@
                   <select
                     v-model="formData.chapter_id"
                     :disabled="loadingChapters"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                   >
                     <option :value="null">不关联章节（稍后可以补充）</option>
                     <optgroup 
@@ -147,7 +147,7 @@
                     type="text"
                     required
                     placeholder="例如：Python 基础入门"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     :class="{ 'border-red-500': errors.title }"
                   />
                   <p v-if="errors.title" class="mt-1 text-sm text-red-600">{{ errors.title }}</p>
@@ -163,7 +163,7 @@
                     v-model="formData.description"
                     rows="3"
                     placeholder="简要描述教案内容和目标..."
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   ></textarea>
                 </div>
 
@@ -177,7 +177,7 @@
                     v-model="tagsInput"
                     type="text"
                     placeholder="用逗号分隔，例如：Python, 编程, 初级"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
@@ -256,7 +256,7 @@
                         v-model="materialSearch"
                         type="search"
                         placeholder="搜索标题或标签"
-                        class="w-full rounded-md border border-gray-300 pl-9 pr-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm text-gray-900 shadow-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                         :disabled="!selectedCourse"
                       />
                     </div>
@@ -267,7 +267,7 @@
                     <select
                       id="material-type"
                       v-model="materialTypeFilter"
-                      class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                       :disabled="!selectedCourse"
                     >
                       <option value="all">全部类型</option>

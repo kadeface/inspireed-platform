@@ -478,6 +478,7 @@ import { curriculumService } from '@/services/curriculum'
 import type { LibraryAssetDetail, LibraryAssetUpdateRequest } from '@/types/library'
 import type { Subject, Grade } from '@/types/curriculum'
 import { getAssetTypeName, getVisibilityName, formatFileSize } from '@/types/library'
+import { getServerBaseUrl } from '@/utils/url'
 
 interface Props {
   isOpen: boolean
@@ -544,7 +545,7 @@ const previewUrl = computed(() => {
 
   // 将相对路径转换为完整 URL（与其他预览组件保持一致）
   if (url.startsWith('/uploads/')) {
-    const baseURL = import.meta.env.VITE_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:8000'
+    const baseURL = getServerBaseUrl()
     url = `${baseURL}${url}`
   }
 

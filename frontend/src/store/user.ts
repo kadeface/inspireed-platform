@@ -26,6 +26,7 @@ export const useUserStore = defineStore('user', () => {
     token.value = null
     localStorage.removeItem('access_token')
     localStorage.removeItem('user')
+    sessionStorage.removeItem('access_token')
     isAuthenticated.value = false
   }
 

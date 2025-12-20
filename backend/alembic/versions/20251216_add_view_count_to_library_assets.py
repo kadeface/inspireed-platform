@@ -22,7 +22,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Add view_count column to library_assets table"""
 
-    # Add view_count column
+    # Add view_count column with server_default
     op.add_column(
         "library_assets",
         sa.Column(
@@ -33,6 +33,11 @@ def upgrade() -> None:
             comment="点击/查看次数",
         ),
     )
+    
+    # Explicitly update any NULL values to 0 (safety measure)
+    # This ensures all existing records have a proper value, even if server_default
+    # doesn't immediately apply in some database configurations
+    op.execute("UPDATE library_assets SET view_count = 0 WHERE view_count IS NULL")
 
 
 def downgrade() -> None:

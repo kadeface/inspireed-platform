@@ -11,13 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import Chapter, Course, Lesson, Subject
+from app.models import Chapter, Course, Lesson, Subject, LibraryAsset, Cell
+from app.models.lesson import LessonStatus
 from app.schemas.curriculum import (
     ChapterTreeNode,
     CourseResponse,
     CourseWithChaptersResponse,
     SubjectResponse,
 )
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -162,5 +164,49 @@ async def public_get_course_with_chapters(
         chapters=chapter_tree,
         total_chapters=len(chapters),
         total_lessons=total_lessons,
+    )
+
+
+class ResourceStatisticsResponse(BaseModel):
+    """资源统计响应"""
+    html_resource_count: int
+    lesson_count: int
+    cell_count: int
+
+
+@router.get("/statistics/resources", response_model=ResourceStatisticsResponse)
+async def public_get_resource_statistics(
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """获取资源库统计信息（公开，无需登录）"""
+    
+    # 统计HTML资源数量（asset_type为interactive且mime_type包含html，或mime_type为text/html）
+    html_count_query = select(func.count()).select_from(LibraryAsset).where(
+        LibraryAsset.status == "active",
+        LibraryAsset.asset_type == "interactive"
+    )
+    
+    html_count_result = await db.execute(html_count_query)
+    html_count = html_count_result.scalar() or 0
+    
+    # 统计已发布的教案数量（教学实践案例）
+    lesson_count_query = select(func.count()).select_from(Lesson).where(
+        Lesson.status == LessonStatus.PUBLISHED
+    )
+    
+    lesson_count_result = await db.execute(lesson_count_query)
+    lesson_count = lesson_count_result.scalar() or 0
+    
+    # 统计所有课程中使用的结构化学习单元（Cell）总数
+    # Cell属于教案，统计所有教案中的所有Cell
+    cell_count_query = select(func.count()).select_from(Cell)
+    
+    cell_count_result = await db.execute(cell_count_query)
+    cell_count = cell_count_result.scalar() or 0
+    
+    return ResourceStatisticsResponse(
+        html_resource_count=html_count,
+        lesson_count=lesson_count,
+        cell_count=cell_count
     )
 

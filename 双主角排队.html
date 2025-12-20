@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排队问题 - 3D互动探索</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        .ui-panel {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+
+        .title-panel {
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            min-width: 350px;
+            max-width: 500px;
+        }
+
+        .title-panel h1 {
+            font-size: 32px;
+            color: #667eea;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .title-panel p {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .control-panel {
+            top: 140px;
+            left: 10px;
+            width: 280px;
+            max-height: calc(100vh - 160px);
+            overflow-y: auto;
+            transition: width 0.3s ease, opacity 0.3s ease;
+        }
+
+        .control-panel.collapsed {
+            width: 50px;
+            overflow: hidden;
+            padding: 10px;
+        }
+
+        .control-panel.collapsed .panel-content {
+            opacity: 0;
+            pointer-events: none;
+            height: 0;
+        }
+
+        .control-panel.collapsed .toggle-btn {
+            position: relative;
+            top: 0;
+            right: 0;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .panel-content {
+            transition: opacity 0.3s ease;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider {
+            flex: 1;
+            height: 8px;
+            border-radius: 5px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: 3px solid #667eea;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: 3px solid #667eea;
+        }
+
+        .value-display {
+            min-width: 60px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+            background: #f0f0f0;
+            padding: 5px 10px;
+            border-radius: 10px;
+        }
+
+        .info-panel {
+            bottom: 20px;
+            right: 10px;
+            width: 320px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            transition: width 0.3s ease, opacity 0.3s ease;
+        }
+
+        .info-panel.collapsed {
+            width: 50px;
+            overflow: hidden;
+            padding: 10px;
+        }
+
+        .info-panel.collapsed .panel-content {
+            opacity: 0;
+            pointer-events: none;
+            height: 0;
+        }
+
+        .info-panel.collapsed .toggle-btn {
+            position: relative;
+            top: 0;
+            right: 0;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .info-panel h3 {
+            font-size: 20px;
+            color: #667eea;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .calculation-step {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .calculation-step strong {
+            color: #764ba2;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .calculation-step p {
+            color: #555;
+            line-height: 1.6;
+            margin: 5px 0;
+        }
+
+        .answer-box {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 15px;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .hint {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 12px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .reset-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 10px;
+        }
+
+        .reset-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: white;
+            z-index: 1000;
+        }
+
+        .toggle-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s, background 0.2s;
+            z-index: 20;
+        }
+
+        .toggle-btn:hover {
+            transform: scale(1.1);
+            background: linear-gradient(135deg, #764ba2, #667eea);
+        }
+
+        .control-panel .toggle-btn {
+            right: 10px;
+        }
+
+        .info-panel .toggle-btn {
+            right: 10px;
+            top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div class="loading" id="loading">加载中...</div>
+
+    <div class="ui-panel title-panel">
+        <h1>🎯 排队问题 - 3D探索</h1>
+        <p>拖动下方滑块，观察队伍变化，探索数学规律！</p>
+    </div>
+
+    <div class="ui-panel control-panel" id="controlPanel">
+        <button class="toggle-btn" onclick="togglePanel('controlPanel')" title="折叠/展开">◀</button>
+        <div class="panel-content">
+            <div class="control-group">
+                <label>📍 艾迪从前数第几个：</label>
+                <div class="slider-container">
+                    <input type="range" class="slider" id="eddieSlider" min="1" max="20" value="8">
+                    <div class="value-display" id="eddieValue">8</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>📍 大宽从后数第几个：</label>
+                <div class="slider-container">
+                    <input type="range" class="slider" id="dakuanSlider" min="1" max="20" value="9">
+                    <div class="value-display" id="dakuanValue">9</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>👥 他们之间的人数：</label>
+                <div class="slider-container">
+                    <input type="range" class="slider" id="betweenSlider" min="0" max="15" value="6">
+                    <div class="value-display" id="betweenValue">6</div>
+                </div>
+            </div>
+
+            <button class="reset-btn" onclick="resetView()">🔄 重置视角</button>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff6b6b;"></div>
+                    <span>艾迪</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff8c00;"></div>
+                    <span>大宽</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #95e1d3;"></div>
+                    <span>其他同学</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-panel info-panel" id="infoPanel">
+        <button class="toggle-btn" onclick="togglePanel('infoPanel')" title="折叠/展开">▶</button>
+        <div class="panel-content">
+            <h3>💡 解题思路</h3>
+            <div id="solution-steps"></div>
+            <div class="answer-box" id="answer">总人数：23人</div>
+            <div class="hint">
+                💡 <strong>提示：</strong>拖动滑块改变参数，看看队伍和答案如何变化！你能发现计算规律吗？
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Three.js 场景设置
+        let scene, camera, renderer, controls;
+        let characters = [];
+        let animationId;
+        let raycaster;
+        let mouse = new THREE.Vector2();
+
+        // 参数
+        let eddiePosition = 8;
+        let dakuanFromEnd = 9;
+        let peopleBetween = 6;
+
+        // 初始化场景
+        function initScene() {
+            const container = document.getElementById('canvas-container');
+            
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb);
+            scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(
+                60,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            // 调整相机位置，确保队列在中心可见区域
+            camera.position.set(0, 8, 18);
+            camera.lookAt(0, 1, 0);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 添加灯光
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.camera.left = -20;
+            directionalLight.shadow.camera.right = 20;
+            directionalLight.shadow.camera.top = 20;
+            directionalLight.shadow.camera.bottom = -20;
+            scene.add(directionalLight);
+
+            // 添加地面
+            const groundGeometry = new THREE.PlaneGeometry(50, 50);
+            const groundMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x90ee90,
+                roughness: 0.8
+            });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // 添加网格辅助线
+            const gridHelper = new THREE.GridHelper(50, 50, 0x666666, 0x888888);
+            gridHelper.position.y = 0.01;
+            scene.add(gridHelper);
+
+            // 初始化射线检测器
+            raycaster = new THREE.Raycaster();
+
+            // 鼠标控制
+            setupMouseControls();
+
+            // 窗口大小调整
+            window.addEventListener('resize', onWindowResize);
+
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // 创建3D角色
+        function createCharacter(index, totalPeople) {
+            const group = new THREE.Group();
+
+            // 确定颜色
+            let color;
+            if (index === eddiePosition - 1) {
+                color = 0xff6b6b; // 艾迪 - 红色
+            } else if (index === totalPeople - dakuanFromEnd) {
+                color = 0xff8c00; // 大宽 - 橙色
+            } else {
+                color = 0x95e1d3; // 其他 - 浅绿色
+            }
+
+            // 身体
+            const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 16);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                color: color,
+                roughness: 0.7,
+                metalness: 0.3
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.6;
+            body.castShadow = true;
+            group.add(body);
+
+            // 头部
+            const headGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xffd6a5,
+                roughness: 0.6
+            });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.5;
+            head.castShadow = true;
+            group.add(head);
+
+            // 眼睛
+            const eyeGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+            const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.1, 1.55, 0.25);
+            group.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(0.1, 1.55, 0.25);
+            group.add(rightEye);
+
+            // 嘴巴
+            const mouthGeometry = new THREE.TorusGeometry(0.08, 0.02, 8, 16, Math.PI);
+            const mouthMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+            mouth.position.set(0, 1.35, 0.25);
+            mouth.rotation.x = Math.PI;
+            group.add(mouth);
+
+            // 手臂
+            const armGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.8, 8);
+            const armMaterial = new THREE.MeshStandardMaterial({ 
+                color: color,
+                roughness: 0.7
+            });
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(-0.4, 0.8, 0);
+            leftArm.rotation.z = Math.PI / 6;
+            leftArm.castShadow = true;
+            group.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(0.4, 0.8, 0);
+            rightArm.rotation.z = -Math.PI / 6;
+            rightArm.castShadow = true;
+            group.add(rightArm);
+
+            // 添加编号标签
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 128, 128);
+            ctx.fillStyle = 'black';
+            ctx.font = 'bold 60px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText((index + 1).toString(), 64, 64);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const labelGeometry = new THREE.PlaneGeometry(0.5, 0.5);
+            const labelMaterial = new THREE.MeshBasicMaterial({ 
+                map: texture, 
+                transparent: true 
+            });
+            const label = new THREE.Mesh(labelGeometry, labelMaterial);
+            label.position.y = 2.2;
+            group.add(label);
+
+            // 添加简单动画
+            group.userData.baseY = 0;
+            group.userData.time = Math.random() * Math.PI * 2;
+            group.userData.index = index;
+            group.userData.label = label;
+            group.userData.labelScale = 1;
+            group.userData.jumpHeight = 0;
+            group.userData.isJumping = false;
+            group.userData.originalLabelSize = 0.5;
+            group.userData.enterAnimation = {
+                startTime: null,
+                duration: 800, // 进场动画持续时间（毫秒）
+                startY: -3, // 起始Y位置（从下方进入）
+                targetY: 0, // 目标Y位置
+                startScale: 0, // 起始缩放
+                targetScale: 1, // 目标缩放
+                isComplete: false
+            };
+
+            return group;
+        }
+
+        // 更新队伍
+        function updateQueue() {
+            // 清除现有角色
+            characters.forEach(char => scene.remove(char));
+            characters = [];
+
+            // 计算总人数
+            const totalPeople = calculateTotal();
+
+            // 计算大宽的实际位置（从前数）
+            const dakuanPosition = totalPeople - dakuanFromEnd;
+
+            // 创建新队伍
+            const spacing = 1.5; // 角色间距
+            const startX = -(totalPeople - 1) * spacing / 2;
+
+            for (let i = 0; i < totalPeople; i++) {
+                const character = createCharacter(i, totalPeople);
+                character.position.x = startX + i * spacing;
+                character.position.z = 0;
+                scene.add(character);
+                characters.push(character);
+            }
+
+            // 更新解题步骤
+            updateSolution(totalPeople, dakuanPosition);
+        }
+
+        // 计算总人数
+        function calculateTotal() {
+            return eddiePosition + peopleBetween + dakuanFromEnd;
+        }
+
+        // 更新解题步骤显示
+        function updateSolution(total, dakuanPos) {
+            const solutionDiv = document.getElementById('solution-steps');
+            const answerDiv = document.getElementById('answer');
+
+            solutionDiv.innerHTML = `
+                <div class="calculation-step">
+                    <strong>第1步：理解题意</strong>
+                    <p>• 艾迪从前数是第 <span style="color: #ff6b6b; font-weight: bold;">${eddiePosition}</span> 个</p>
+                    <p>• 大宽从后数是第 <span style="color: #ff8c00; font-weight: bold;">${dakuanFromEnd}</span> 个</p>
+                    <p>• 他们之间有 <span style="color: #764ba2; font-weight: bold;">${peopleBetween}</span> 人</p>
+                    <p>• 艾迪在大宽的前面</p>
+                </div>
+
+                <div class="calculation-step">
+                    <strong>第2步：找出大宽的位置</strong>
+                    <p>大宽从前数是第几个？</p>
+                    <p>从后数第 ${dakuanFromEnd} = 从前数第 <span style="color: #ff8c00; font-weight: bold;">${dakuanPos + 1}</span> 个</p>
+                </div>
+
+                <div class="calculation-step">
+                    <strong>第3步：计算总人数</strong>
+                    <p>方法1（按位置相加）：</p>
+                    <p>总人数 = 艾迪位置 + 中间人数 + 大宽从后位置</p>
+                    <p>总人数 = ${eddiePosition} + ${peopleBetween} + ${dakuanFromEnd}</p>
+                    <p style="color: #667eea; font-weight: bold; font-size: 18px;">= ${total} 人</p>
+                </div>
+
+                <div class="calculation-step">
+                    <strong>验证：</strong>
+                    <p>• 艾迪前面有 ${eddiePosition - 1} 人</p>
+                    <p>• 中间有 ${peopleBetween} 人</p>
+                    <p>• 大宽后面有 ${dakuanFromEnd - 1} 人</p>
+                    <p>• 加上艾迪和大宽本人：${eddiePosition - 1} + ${peopleBetween} + ${dakuanFromEnd - 1} + 2 = ${total} ✓</p>
+                </div>
+            `;
+
+            answerDiv.innerHTML = `总人数：${total} 人`;
+        }
+
+        // 鼠标控制
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let cameraRotation = { x: 0, y: 0 };
+        let mouseDownPosition = { x: 0, y: 0 };
+        let clickThreshold = 5; // 像素阈值，小于此值认为是点击
+
+        function setupMouseControls() {
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                mouseDownPosition = { x: e.clientX, y: e.clientY };
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+                isDragging = false;
+            });
+
+            renderer.domElement.addEventListener('mousemove', (e) => {
+                if (mouseDownPosition.x !== 0 || mouseDownPosition.y !== 0) {
+                    const deltaX = Math.abs(e.clientX - mouseDownPosition.x);
+                    const deltaY = Math.abs(e.clientY - mouseDownPosition.y);
+                    
+                    if (deltaX > clickThreshold || deltaY > clickThreshold) {
+                        isDragging = true;
+                    }
+                }
+
+                if (isDragging) {
+                    const deltaX = e.clientX - previousMousePosition.x;
+                    const deltaY = e.clientY - previousMousePosition.y;
+
+                    cameraRotation.y += deltaX * 0.005;
+                    cameraRotation.x += deltaY * 0.005;
+
+                    cameraRotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, cameraRotation.x));
+
+                    updateCameraPosition();
+
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                }
+            });
+
+            renderer.domElement.addEventListener('mouseup', (e) => {
+                if (!isDragging) {
+                    // 检测点击
+                    handleClick(e);
+                }
+                isDragging = false;
+                mouseDownPosition = { x: 0, y: 0 };
+            });
+
+            renderer.domElement.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const zoomSpeed = 0.1;
+                const distance = camera.position.length();
+                const newDistance = distance + (e.deltaY > 0 ? zoomSpeed : -zoomSpeed);
+                const clampedDistance = Math.max(5, Math.min(30, newDistance));
+                
+                camera.position.normalize().multiplyScalar(clampedDistance);
+            });
+        }
+
+        // 处理点击事件
+        function handleClick(event) {
+            // 计算鼠标在归一化设备坐标中的位置
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            // 更新射线检测器
+            raycaster.setFromCamera(mouse, camera);
+
+            // 收集所有可点击的对象（角色的所有子对象）
+            const clickableObjects = [];
+            characters.forEach(char => {
+                char.traverse(child => {
+                    if (child instanceof THREE.Mesh && child !== char.userData.label) {
+                        clickableObjects.push(child);
+                    }
+                });
+            });
+
+            // 检测与角色的交集
+            const intersects = raycaster.intersectObjects(clickableObjects, false);
+
+            if (intersects.length > 0) {
+                // 找到被点击的角色组
+                let clickedCharacter = null;
+                for (let intersect of intersects) {
+                    let obj = intersect.object;
+                    // 向上查找，找到角色组
+                    while (obj && obj.parent) {
+                        if (characters.includes(obj.parent)) {
+                            clickedCharacter = obj.parent;
+                            break;
+                        }
+                        obj = obj.parent;
+                    }
+                    if (clickedCharacter) break;
+                }
+
+                if (clickedCharacter && !clickedCharacter.userData.isJumping) {
+                    // 触发跳高和数字变大动画
+                    jumpCharacter(clickedCharacter);
+                }
+            }
+        }
+
+        // 角色跳高和数字变大动画
+        function jumpCharacter(character) {
+            character.userData.isJumping = true;
+            const jumpDuration = 600; // 动画持续时间（毫秒）
+            const maxJumpHeight = 1.5; // 最大跳高高度
+            const maxLabelScale = 6.0; // 最大标签缩放
+            const startTime = Date.now();
+
+            function animateJump() {
+                const elapsed = Date.now() - startTime;
+                const progress = elapsed / jumpDuration;
+
+                if (progress < 1) {
+                    // 使用缓动函数（ease-out）
+                    const easeOut = 1 - Math.pow(1 - progress, 3);
+                    
+                    // 跳高动画（抛物线）
+                    const jumpProgress = progress < 0.5 
+                        ? progress * 2 
+                        : 1 - (progress - 0.5) * 2;
+                    const jumpEase = 1 - Math.pow(1 - jumpProgress, 2);
+                    character.userData.jumpHeight = maxJumpHeight * jumpEase * (1 - Math.abs(progress - 0.5) * 2);
+
+                    // 标签变大动画
+                    if (progress < 0.5) {
+                        character.userData.labelScale = 1 + (maxLabelScale - 1) * easeOut;
+                    } else {
+                        character.userData.labelScale = maxLabelScale - (maxLabelScale - 1) * (progress - 0.5) * 2;
+                    }
+
+                    // 更新标签大小
+                    const label = character.userData.label;
+                    const originalSize = character.userData.originalLabelSize;
+                    label.scale.set(
+                        character.userData.labelScale,
+                        character.userData.labelScale,
+                        1
+                    );
+
+                    requestAnimationFrame(animateJump);
+                } else {
+                    // 动画结束
+                    character.userData.jumpHeight = 0;
+                    character.userData.labelScale = 1;
+                    character.userData.isJumping = false;
+                    const label = character.userData.label;
+                    label.scale.set(1, 1, 1);
+                }
+            }
+
+            animateJump();
+        }
+
+        function updateCameraPosition() {
+            const radius = 18;
+            camera.position.x = radius * Math.sin(cameraRotation.y) * Math.cos(cameraRotation.x);
+            camera.position.y = 8 + radius * Math.sin(cameraRotation.x);
+            camera.position.z = radius * Math.cos(cameraRotation.y) * Math.cos(cameraRotation.x);
+            camera.lookAt(0, 1, 0);
+        }
+
+        function resetView() {
+            cameraRotation = { x: 0, y: 0 };
+            camera.position.set(0, 8, 18);
+            camera.lookAt(0, 1, 0);
+        }
+
+        // 动画循环
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+
+            // 角色轻微浮动动画和跳高效果
+            characters.forEach(char => {
+                char.userData.time += 0.02;
+                const floatY = Math.sin(char.userData.time) * 0.05;
+                char.position.y = char.userData.baseY + floatY + char.userData.jumpHeight;
+                char.rotation.y = Math.sin(char.userData.time * 0.5) * 0.05;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // 窗口大小调整
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // 面板折叠/展开功能
+        function togglePanel(panelId) {
+            const panel = document.getElementById(panelId);
+            const btn = panel.querySelector('.toggle-btn');
+            
+            if (panel.classList.contains('collapsed')) {
+                panel.classList.remove('collapsed');
+                if (panelId === 'controlPanel') {
+                    btn.innerHTML = '◀';
+                } else {
+                    btn.innerHTML = '▶';
+                }
+            } else {
+                panel.classList.add('collapsed');
+                if (panelId === 'controlPanel') {
+                    btn.innerHTML = '▶';
+                } else {
+                    btn.innerHTML = '◀';
+                }
+            }
+        }
+
+        // 滑块事件监听
+        document.getElementById('eddieSlider').addEventListener('input', (e) => {
+            eddiePosition = parseInt(e.target.value);
+            document.getElementById('eddieValue').textContent = eddiePosition;
+            updateQueue();
+        });
+
+        document.getElementById('dakuanSlider').addEventListener('input', (e) => {
+            dakuanFromEnd = parseInt(e.target.value);
+            document.getElementById('dakuanValue').textContent = dakuanFromEnd;
+            updateQueue();
+        });
+
+        document.getElementById('betweenSlider').addEventListener('input', (e) => {
+            peopleBetween = parseInt(e.target.value);
+            document.getElementById('betweenValue').textContent = peopleBetween;
+            updateQueue();
+        });
+
+        // 初始化
+        initScene();
+        updateQueue();
+        animate();
+    </script>
+</body>
+</html>

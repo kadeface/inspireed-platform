@@ -505,6 +505,7 @@ import ChapterLessonList from '../../components/Curriculum/ChapterLessonList.vue
 import AssociateLessonModal from '../../components/Curriculum/AssociateLessonModal.vue'
 import CourseMergeModal from '../../components/Curriculum/CourseMergeModal.vue'
 import { useToast } from '@/composables/useToast'
+import { getServerBaseUrl } from '@/utils/url'
 
 const toast = useToast()
 const loading = ref(false)
@@ -791,7 +792,7 @@ function handleViewResource(resource: any) {
   }
   
   // 构建完整的查看URL
-  const baseURL = import.meta.env.VITE_API_BASE_URL?.replace('/api/v1', '') || 'http://localhost:8000'
+  const baseURL = getServerBaseUrl()
   const viewUrl = `${baseURL}${resource.file_url}`
   
   // 在新窗口中打开文件

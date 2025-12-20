@@ -1062,7 +1062,12 @@ function clearChapterFilter() {
 }
 
 const handleLogout = () => {
+  // 停止所有轮询
+  stopPendingSessionsPolling()
+  stopActiveSessionsPolling()
+  // 清除用户状态
   userStore.logout()
+  // 跳转到登录页
   router.push('/login')
 }
 

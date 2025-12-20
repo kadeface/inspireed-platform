@@ -401,13 +401,9 @@ const handleBack = () => {
 }
 
 // 退出登录
-const handleLogout = async () => {
-  try {
-    await authService.logout()
-    router.push('/login')
-  } catch (error) {
-    console.error('Logout failed:', error)
-  }
+const handleLogout = () => {
+  userStore.logout()
+  router.push('/login')
 }
 
 onMounted(() => {
