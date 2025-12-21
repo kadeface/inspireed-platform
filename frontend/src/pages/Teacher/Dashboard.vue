@@ -136,6 +136,43 @@
             </div>
           </router-link>
 
+          <!-- 班级教学助手卡片 -->
+          <router-link
+            to="/teacher/class-assistant"
+            class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
+          >
+            <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 to-blue-600"></span>
+            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-indigo-50/80 via-transparent to-transparent"></div>
+
+            <div class="relative flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">班级管理</p>
+                <h3 class="mt-1 text-lg font-bold text-gray-900">教学助手</h3>
+              </div>
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg bg-gradient-to-br from-indigo-500 to-blue-600">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              </div>
+            </div>
+
+            <div class="relative mt-4 flex items-baseline gap-2">
+              <span class="text-3xl font-bold text-indigo-700">—</span>
+              <span class="text-sm text-gray-500">班级助手</span>
+            </div>
+
+            <p class="relative mt-3 text-sm text-gray-600 leading-relaxed">
+              点名、考勤、纪律与值日管理，轻量化班级自治工具
+            </p>
+
+            <div class="relative mt-4 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-4 py-2 rounded-xl transition-all">
+              进入助手
+              <svg class="ml-1 h-4 w-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </router-link>
+
           <!-- AI 教学助理卡片 -->
           <button
             type="button"

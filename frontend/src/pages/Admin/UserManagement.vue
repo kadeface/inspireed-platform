@@ -369,7 +369,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useToast } from '@/composables/useToast'
 import adminService, {
   type User,
@@ -415,6 +415,10 @@ const userForm = ref<UserCreate>({
   grade_id: null,
   classroom_id: null
 })
+
+// 定时刷新相关
+const refreshInterval = ref<NodeJS.Timeout | null>(null)
+const REFRESH_INTERVAL_MS = 30000 // 30秒刷新一次
 
 // 计算属性
 const totalPages = computed(() => Math.ceil(totalUsers.value / pageSize.value))
@@ -489,6 +493,27 @@ function searchUsers() {
 function refreshUsers() {
   loadUsers()
   toast.success('用户列表已刷新')
+}
+
+function startAutoRefresh() {
+  // 如果已经有定时器，先清除
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value)
+  }
+  // 设置定时刷新
+  refreshInterval.value = setInterval(() => {
+    // 只在非加载状态时刷新，避免重复请求
+    if (!loading.value) {
+      loadUsers()
+    }
+  }, REFRESH_INTERVAL_MS)
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value)
+    refreshInterval.value = null
+  }
 }
 
 async function loadRegions() {
@@ -730,6 +755,13 @@ onMounted(() => {
   loadRegions()
   loadSchools()
   loadGrades()
+  // 启动自动刷新
+  startAutoRefresh()
+})
+
+onUnmounted(() => {
+  // 组件卸载时清除定时器
+  stopAutoRefresh()
 })
 
 watch(

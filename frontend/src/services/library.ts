@@ -174,6 +174,54 @@ class LibraryService {
       throw error
     }
   }
+
+  /**
+   * 创建资源库资产的新版本
+   */
+  async createAssetVersion(
+    assetId: number,
+    file: File,
+    changeNote?: string
+  ): Promise<LibraryAssetDetail> {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      if (changeNote) formData.append('change_note', changeNote)
+
+      return await api.post<LibraryAssetDetail>(`${this.basePath}/${assetId}/versions`, formData)
+    } catch (error) {
+      console.error(`Failed to create version for asset ${assetId}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * 获取资源库资产的所有版本
+   */
+  async getAssetVersions(assetId: number): Promise<{
+    asset_id: number
+    current_version: number
+    versions: Array<{
+      id: number
+      asset_id: number
+      version: number
+      storage_key: string
+      public_url?: string
+      size_bytes?: number
+      sha256?: string
+      created_by: number
+      change_note?: string
+      created_at: string
+    }>
+    total: number
+  }> {
+    try {
+      return await api.get(`${this.basePath}/${assetId}/versions`)
+    } catch (error) {
+      console.error(`Failed to get versions for asset ${assetId}:`, error)
+      throw error
+    }
+  }
 }
 
 export const libraryService = new LibraryService()

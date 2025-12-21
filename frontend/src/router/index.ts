@@ -81,6 +81,49 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/Teacher/ResourceLibrary.vue'),
     meta: { requiresAuth: true, role: 'teacher', title: '资源库 - InspireEd' },
   },
+  // 教师端 - 班级教学助手
+  {
+    path: '/teacher/class-assistant',
+    name: 'TeacherClassAssistant',
+    component: () => import('../pages/Teacher/ClassAssistantDashboard.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '班级教学助手 - InspireEd' },
+  },
+  {
+    path: '/teacher/class-assistant/:classroomId/attendance',
+    name: 'TeacherClassAssistantAttendance',
+    component: () => import('../pages/Teacher/ClassAssistantAttendance.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '点名考勤 - InspireEd' },
+  },
+  {
+    path: '/teacher/class-assistant/:classroomId/positive-behaviors',
+    name: 'TeacherClassAssistantPositiveBehaviors',
+    component: () => import('../pages/Teacher/ClassAssistantPositiveBehaviors.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '课堂表现 - InspireEd' },
+  },
+  {
+    path: '/teacher/class-assistant/:classroomId/discipline',
+    name: 'TeacherClassAssistantDiscipline',
+    component: () => import('../pages/Teacher/ClassAssistantDiscipline.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '纪律记录 - InspireEd' },
+  },
+  {
+    path: '/teacher/class-assistant/:classroomId/duty',
+    name: 'TeacherClassAssistantDuty',
+    component: () => import('../pages/Teacher/ClassAssistantDuty.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '值日管理 - InspireEd' },
+  },
+  {
+    path: '/teacher/class-assistant/:classroomId/stats',
+    name: 'TeacherClassAssistantStats',
+    component: () => import('../pages/Teacher/ClassAssistantStats.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '数据统计 - InspireEd' },
+  },
+  {
+    path: '/teacher/class-assistant/:classroomId/members',
+    name: 'TeacherClassAssistantMembers',
+    component: () => import('../pages/Teacher/ClassAssistantMembers.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '班级教学助手 - 成员管理 - InspireEd' },
+  },
   {
     path: '/student',
     name: 'Student',

@@ -88,17 +88,19 @@ class UploadService:
 
         return result
 
-    async def upload_file(self, file: UploadFile) -> dict:
+    async def upload_file(self, file: UploadFile, generate_thumbnail: bool = False) -> dict:
         """
         上传通用文件
 
         Args:
             file: 上传的文件对象
+            generate_thumbnail: 是否生成缩略图（仅对HTML文件有效）
 
         Returns:
             {
                 'file_url': str,
-                'file_size': int
+                'file_size': int,
+                'thumbnail_url': str (如果生成)
             }
         """
         # 生成唯一文件名
@@ -114,7 +116,21 @@ class UploadService:
         async with aiofiles.open(filepath, "wb") as f:
             await f.write(content)
 
-        return {"file_url": f"/uploads/resources/{filename}", "file_size": file_size}
+        result = {
+            "file_url": f"/uploads/resources/{filename}",
+            "file_size": file_size,
+        }
+
+        # 如果是HTML文件且需要生成缩略图
+        if generate_thumbnail and ext.lower() in ["html", "htm"]:
+            try:
+                thumbnail_url = await self._generate_html_thumbnail(filepath, filename)
+                if thumbnail_url:
+                    result["thumbnail_url"] = thumbnail_url
+            except Exception as e:
+                print(f"Failed to generate HTML thumbnail: {e}")
+
+        return result
 
     def _extract_pdf_metadata(self, file_stream: io.BytesIO) -> dict:
         """提取 PDF 元数据"""
@@ -174,6 +190,57 @@ class UploadService:
             return None
         except Exception as e:
             print(f"Error generating thumbnail: {e}")
+            return None
+
+    async def _generate_html_thumbnail(
+        self, html_path: str, original_filename: str
+    ) -> Optional[str]:
+        """
+        生成 HTML 文件的缩略图
+        
+        使用 Playwright 渲染 HTML 并截图
+        """
+        try:
+            # 尝试使用 Playwright
+            try:
+                from playwright.async_api import async_playwright
+            except ImportError:
+                print("Playwright not installed, skipping HTML thumbnail generation")
+                print("Install with: pip install playwright && playwright install chromium")
+                return None
+
+            # 生成缩略图文件名
+            thumb_filename = f"thumb_{os.path.splitext(original_filename)[0]}.png"
+            thumb_path = os.path.join(self.thumbnails_dir, thumb_filename)
+
+            # 构建文件URL（使用file://协议）
+            file_url = f"file://{os.path.abspath(html_path)}"
+
+            async with async_playwright() as p:
+                # 启动浏览器
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                
+                # 设置视口大小（缩略图尺寸）
+                await page.set_viewport_size({"width": 800, "height": 450})
+                
+                # 加载HTML文件
+                await page.goto(file_url, wait_until="networkidle", timeout=10000)
+                
+                # 等待页面渲染完成
+                await page.wait_for_timeout(1000)
+                
+                # 截图
+                await page.screenshot(path=thumb_path, full_page=False)
+                
+                await browser.close()
+
+            return f"/uploads/thumbnails/{thumb_filename}"
+        except ImportError:
+            print("Playwright not installed, skipping HTML thumbnail generation")
+            return None
+        except Exception as e:
+            print(f"Error generating HTML thumbnail: {e}")
             return None
 
     async def delete_file(self, file_url: str) -> bool:

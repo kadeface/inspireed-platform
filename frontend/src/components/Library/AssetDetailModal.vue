@@ -258,8 +258,19 @@
                 ></textarea>
               </div>
               <p class="mt-2 text-xs text-gray-500">
-                修改HTML代码后，点击保存将重新上传文件。
+                修改HTML代码后，点击保存将创建新版本，保留历史版本记录。
               </p>
+              <div class="mt-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  版本变更说明（可选）
+                </label>
+                <input
+                  v-model="changeNote"
+                  type="text"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm"
+                  placeholder="例如：修复了计算错误、添加了新功能等"
+                />
+              </div>
             </div>
 
             <!-- 操作按钮 -->
@@ -336,6 +347,63 @@
               <div>
                 <span class="text-gray-500">更新时间：</span>
                 <span class="text-gray-900">{{ formatDateTime(asset.updated_at) }}</span>
+              </div>
+              <div v-if="asset.version">
+                <span class="text-gray-500">当前版本：</span>
+                <span class="text-gray-900 font-medium">v{{ asset.version }}</span>
+              </div>
+            </div>
+
+            <!-- 版本管理按钮 -->
+            <div v-if="isHtmlAsset" class="pt-2 border-t">
+              <button
+                @click="handleShowVersions"
+                class="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                📋 查看版本历史
+              </button>
+            </div>
+
+            <!-- 版本历史列表 -->
+            <div v-if="showVersions" class="mt-4 pt-4 border-t">
+              <div class="flex items-center justify-between mb-3">
+                <h5 class="text-sm font-medium text-gray-900">版本历史</h5>
+                <button
+                  @click="showVersions = false"
+                  class="text-gray-400 hover:text-gray-500 text-sm"
+                >
+                  收起
+                </button>
+              </div>
+              <div v-if="loadingVersions" class="text-center py-4 text-sm text-gray-500">
+                加载中...
+              </div>
+              <div v-else-if="versions.length === 0" class="text-center py-4 text-sm text-gray-500">
+                暂无版本历史
+              </div>
+              <div v-else class="space-y-2 max-h-64 overflow-y-auto">
+                <div
+                  v-for="version in versions"
+                  :key="version.id"
+                  class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  :class="{ 'border-blue-500 bg-blue-50': version.version === asset.version }"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium text-gray-900">v{{ version.version }}</span>
+                      <span v-if="version.version === asset.version" class="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
+                        当前版本
+                      </span>
+                    </div>
+                    <span class="text-xs text-gray-500">{{ formatDateTime(version.created_at) }}</span>
+                  </div>
+                  <div v-if="version.change_note" class="mt-1 text-sm text-gray-600">
+                    {{ version.change_note }}
+                  </div>
+                  <div class="mt-1 text-xs text-gray-500">
+                    大小: {{ formatSize(version.size_bytes) }}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -503,6 +571,21 @@ const isEditingCode = ref(false)
 const htmlCode = ref('')
 const savingCode = ref(false)
 const loadingCode = ref(false)
+const changeNote = ref('')
+const showVersions = ref(false)
+const versions = ref<Array<{
+  id: number
+  asset_id: number
+  version: number
+  storage_key: string
+  public_url?: string
+  size_bytes?: number
+  sha256?: string
+  created_by: number
+  change_note?: string
+  created_at: string
+}>>([])
+const loadingVersions = ref(false)
 
 // 编辑表单数据
 const editForm = ref<{
@@ -613,6 +696,9 @@ watch(() => props.isOpen, (isOpen) => {
     showFullscreenPreview.value = false
     isEditingCode.value = false
     htmlCode.value = ''
+    changeNote.value = ''
+    showVersions.value = false
+    versions.value = []
   }
 }, { immediate: true })
 
@@ -741,13 +827,38 @@ const handleEditCode = async () => {
 const handleCancelCodeEdit = () => {
   isEditingCode.value = false
   htmlCode.value = ''
+  changeNote.value = ''
+}
+
+// 显示版本历史
+const handleShowVersions = async () => {
+  if (!asset.value) return
+  
+  if (showVersions.value) {
+    showVersions.value = false
+    return
+  }
+  
+  showVersions.value = true
+  loadingVersions.value = true
+  
+  try {
+    const result = await libraryService.getAssetVersions(asset.value.id)
+    versions.value = result.versions
+  } catch (error: any) {
+    console.error('Failed to load versions:', error)
+    alert(error.response?.data?.detail || error.message || '加载版本历史失败')
+  } finally {
+    loadingVersions.value = false
+  }
 }
 
 // 保存HTML代码
 const handleSaveCode = async () => {
   if (!asset.value || !htmlCode.value.trim()) return
   
-  if (!confirm('保存HTML代码将上传新文件。是否继续？')) {
+  const newVersion = (asset.value.version || 1) + 1
+  if (!confirm(`保存HTML代码将创建版本 ${newVersion}，保留历史版本记录。是否继续？`)) {
     return
   }
   
@@ -759,31 +870,22 @@ const handleSaveCode = async () => {
       type: 'text/html'
     })
     
-    // 上传新文件（创建新资源）
-    const uploadResult = await libraryService.uploadAsset(htmlFile, {
-      title: asset.value.title,
-      description: asset.value.description || undefined,
-      asset_type: 'interactive',
-      visibility: asset.value.visibility,
-      subject_id: asset.value.subject_id,
-      grade_id: asset.value.grade_id ?? undefined,
-      knowledge_point_category: asset.value.knowledge_point_category,
-      knowledge_point_name: asset.value.knowledge_point_name
-    })
+    // 创建新版本（保留历史版本）
+    const updatedAsset = await libraryService.createAssetVersion(
+      asset.value.id,
+      htmlFile,
+      changeNote.value || undefined
+    )
     
-    // 由于后端不支持直接更新文件，我们有两个选择：
-    // 1. 使用新资源（资源ID会改变）
-    // 2. 删除旧资源，但保持资源ID不变（需要后端支持）
-    
-    // 这里我们采用方案1：使用新资源
-    // 重新加载新资源信息
-    asset.value = await libraryService.getAsset(uploadResult.id)
+    // 更新资源信息
+    asset.value = updatedAsset
     
     isEditingCode.value = false
     htmlCode.value = ''
+    changeNote.value = ''
     emit('updated')
     
-    alert('HTML代码已保存！资源已更新为新文件。')
+    alert(`HTML代码已保存！已创建版本 ${newVersion}，历史版本已保留。`)
   } catch (error: any) {
     console.error('Save HTML code failed:', error)
     alert(error.response?.data?.detail || error.message || '保存失败')

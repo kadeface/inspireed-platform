@@ -9,7 +9,7 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models import LibraryAsset, User, UserRole, Resource, Chapter, Course
+from app.models import LibraryAsset, LibraryAssetVersion, User, UserRole, Resource, Chapter, Course
 from app.schemas.library_asset import (
     LibraryAssetSummary,
     LibraryAssetDetail,
@@ -18,6 +18,9 @@ from app.schemas.library_asset import (
     LibraryAssetUploadResponse,
     LibraryAssetUsage,
     LibraryAssetUsageResponse,
+    LibraryAssetVersionDetail,
+    LibraryAssetVersionListResponse,
+    LibraryAssetCreateVersionRequest,
 )
 from app.services.upload import upload_service
 from app.api.deps import get_current_user
@@ -208,6 +211,9 @@ async def upload_library_asset(
     # 上传文件
     if asset_type == "pdf":
         upload_result = await upload_service.upload_pdf(file)
+    elif asset_type == "interactive":
+        # 交互式课件（HTML）上传时生成缩略图
+        upload_result = await upload_service.upload_file(file, generate_thumbnail=True)
     else:
         upload_result = await upload_service.upload_file(file)
     
@@ -245,9 +251,25 @@ async def upload_library_asset(
         grade_id=grade_id,
         knowledge_point_category=knowledge_point_category,
         knowledge_point_name=knowledge_point_name,
+        version=1,  # 初始版本为1
     )
     
     db.add(library_asset)
+    await db.flush()  # 先flush获取ID
+    
+    # 创建初始版本记录
+    initial_version = LibraryAssetVersion(
+        asset_id=cast(int, library_asset.id),
+        version=1,
+        storage_key=upload_result["file_url"],
+        public_url=upload_result["file_url"],
+        size_bytes=upload_result.get("file_size"),
+        sha256=upload_result.get("sha256"),
+        created_by=user_id,
+        change_note="初始版本",
+    )
+    db.add(initial_version)
+    
     await db.commit()
     await db.refresh(library_asset)
     
@@ -518,3 +540,153 @@ async def get_library_asset_content(
             raise HTTPException(status_code=500, detail=f"读取文件失败: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"读取文件失败: {str(e)}")
+
+
+@router.post("/{asset_id}/versions", response_model=LibraryAssetDetail)
+async def create_asset_version(
+    asset_id: int,
+    change_note: Optional[str] = Form(None, description="版本变更说明"),
+    file: UploadFile = File(..., description="新版本的文件"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """创建资源库资产的新版本"""
+    _check_library_access(current_user)
+    
+    asset = await db.get(LibraryAsset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="资源库资产不存在")
+    
+    # 校验归属学校
+    asset_school_id = cast(int, asset.school_id)
+    user_school_id = cast(int, current_user.school_id)
+    if asset_school_id != user_school_id:
+        raise HTTPException(status_code=403, detail="无权修改其他学校的资源")
+    
+    # 权限校验：教师只能修改自己上传的；管理员/教研员可修改全部
+    user_role = cast(UserRole, current_user.role)
+    user_id = cast(int, current_user.id)
+    asset_owner_id = cast(int, asset.owner_user_id)
+    
+    if user_role == UserRole.TEACHER and asset_owner_id != user_id:
+        raise HTTPException(status_code=403, detail="只能修改自己上传的资源")
+    
+    # 上传新版本文件
+    file_ext = file.filename.split(".")[-1].lower() if file.filename and "." in file.filename else ""
+    
+    # 验证文件类型是否匹配
+    asset_type = cast(str, asset.asset_type)
+    if asset_type == "pdf" and file_ext != "pdf":
+        raise HTTPException(status_code=400, detail="PDF资源只能上传PDF文件")
+    elif asset_type == "interactive" and file_ext not in ["html", "htm"]:
+        raise HTTPException(status_code=400, detail="交互式课件只能上传HTML文件")
+    
+    # 上传文件
+    if asset_type == "pdf":
+        upload_result = await upload_service.upload_pdf(file)
+    elif asset_type == "interactive":
+        # 交互式课件（HTML）上传时生成缩略图
+        upload_result = await upload_service.upload_file(file, generate_thumbnail=True)
+    else:
+        upload_result = await upload_service.upload_file(file)
+    
+    # 获取当前版本号并递增
+    current_version = cast(int, asset.version)
+    new_version = current_version + 1
+    
+    # 保存当前版本到历史记录（如果还没有保存）
+    existing_version = await db.execute(
+        select(LibraryAssetVersion).where(
+            and_(
+                LibraryAssetVersion.asset_id == asset_id,
+                LibraryAssetVersion.version == current_version
+            )
+        )
+    )
+    if not existing_version.scalar_one_or_none():
+        # 当前版本还没有保存到历史，先保存
+        current_version_record = LibraryAssetVersion(
+            asset_id=asset_id,
+            version=current_version,
+            storage_key=cast(str, asset.storage_key),
+            public_url=cast(Optional[str], asset.public_url),
+            size_bytes=cast(Optional[int], asset.size_bytes),
+            sha256=cast(Optional[str], asset.sha256),
+            created_by=asset_owner_id,
+            change_note="自动保存的历史版本",
+        )
+        db.add(current_version_record)
+    
+    # 创建新版本记录
+    new_version_record = LibraryAssetVersion(
+        asset_id=asset_id,
+        version=new_version,
+        storage_key=upload_result["file_url"],
+        public_url=upload_result["file_url"],
+        size_bytes=upload_result.get("file_size"),
+        sha256=upload_result.get("sha256"),
+        created_by=user_id,
+        change_note=change_note,
+    )
+    db.add(new_version_record)
+    
+    # 更新资产为最新版本
+    asset.version = new_version
+    asset.storage_key = upload_result["file_url"]
+    asset.public_url = upload_result["file_url"]
+    asset.size_bytes = upload_result.get("file_size")
+    asset.sha256 = upload_result.get("sha256")
+    if upload_result.get("thumbnail_url"):
+        asset.thumbnail_url = upload_result.get("thumbnail_url")
+    if upload_result.get("page_count"):
+        asset.page_count = upload_result.get("page_count")
+    
+    await db.commit()
+    await db.refresh(asset)
+    
+    return LibraryAssetDetail.model_validate(asset)
+
+
+@router.get("/{asset_id}/versions", response_model=LibraryAssetVersionListResponse)
+async def get_asset_versions(
+    asset_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取资源库资产的所有版本"""
+    _check_library_access(current_user)
+    
+    asset = await db.get(LibraryAsset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="资源库资产不存在")
+    
+    # 校验归属学校
+    asset_school_id = cast(int, asset.school_id)
+    user_school_id = cast(int, current_user.school_id)
+    if asset_school_id != user_school_id:
+        raise HTTPException(status_code=403, detail="无权访问其他学校的资源")
+    
+    # 可见性校验：教师只能访问自己上传的或全校可见的
+    user_role = cast(UserRole, current_user.role)
+    user_id = cast(int, current_user.id)
+    asset_owner_id = cast(int, asset.owner_user_id)
+    asset_visibility = cast(str, asset.visibility)
+    
+    if user_role == UserRole.TEACHER:
+        if asset_owner_id != user_id and asset_visibility != "school":
+            raise HTTPException(status_code=403, detail="无权访问此资源")
+    
+    # 查询所有版本
+    versions_query = select(LibraryAssetVersion).where(
+        LibraryAssetVersion.asset_id == asset_id
+    ).order_by(LibraryAssetVersion.version.desc())
+    
+    result = await db.execute(versions_query)
+    versions = result.scalars().all()
+    
+    return LibraryAssetVersionListResponse(
+        asset_id=asset_id,
+        current_version=cast(int, asset.version),
+        versions=[LibraryAssetVersionDetail.model_validate(v) for v in versions],
+        total=len(versions),
+    )

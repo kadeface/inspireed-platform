@@ -87,6 +87,7 @@ class LibraryAssetSummary(BaseModel):
     knowledge_point_category: Optional[str] = None
     knowledge_point_name: Optional[str] = None
     view_count: int = 0
+    version: int = 1
     updated_at: datetime
 
     class Config:
@@ -118,6 +119,7 @@ class LibraryAssetDetail(BaseModel):
     knowledge_point_category: Optional[str] = None
     knowledge_point_name: Optional[str] = None
     view_count: int = 0
+    version: int = 1
     created_at: datetime
     updated_at: datetime
 
@@ -163,3 +165,36 @@ class LibraryAssetUsageResponse(BaseModel):
     asset_title: str
     usages: List[LibraryAssetUsage]
     total_usages: int
+
+
+class LibraryAssetVersionDetail(BaseModel):
+    """资源库资产版本详情 Schema"""
+
+    id: int
+    asset_id: int
+    version: int
+    storage_key: str
+    public_url: Optional[str] = None
+    size_bytes: Optional[int] = None
+    sha256: Optional[str] = None
+    created_by: int
+    change_note: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LibraryAssetVersionListResponse(BaseModel):
+    """资源库资产版本列表响应"""
+
+    asset_id: int
+    current_version: int
+    versions: List[LibraryAssetVersionDetail]
+    total: int
+
+
+class LibraryAssetCreateVersionRequest(BaseModel):
+    """创建新版本请求 Schema"""
+
+    change_note: Optional[str] = Field(None, description="版本变更说明")

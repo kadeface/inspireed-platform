@@ -52,8 +52,32 @@
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="text-center py-12">
+    <div v-if="loading && !dashboard" class="text-center py-12">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
       <div class="text-gray-500">加载中...</div>
+      <p class="text-sm text-gray-400 mt-2">如果加载时间过长，请检查网络连接或刷新页面</p>
+    </div>
+    
+    <!-- Error State -->
+    <div v-if="!loading && !dashboard" class="text-center py-12">
+      <div class="text-red-500 mb-4">
+        <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-medium text-gray-900 mb-2">数据加载失败</h3>
+      <p class="text-gray-500 mb-4">无法加载数据看板信息，请检查：</p>
+      <ul class="text-sm text-gray-500 text-left max-w-md mx-auto mb-4 space-y-1">
+        <li>• 后端服务是否正常运行</li>
+        <li>• 网络连接是否正常</li>
+        <li>• 是否有权限访问数据</li>
+      </ul>
+      <button
+        @click="loadDashboard"
+        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+      >
+        重试加载
+      </button>
     </div>
 
     <!-- Dashboard Content -->

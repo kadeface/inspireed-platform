@@ -38,6 +38,9 @@ class User(Base):
     username = Column(String(100), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(100), nullable=True)
+    
+    # 学籍号（唯一，跟随学生整个学习经历，不变）
+    student_id_number = Column(String(50), unique=True, nullable=True, index=True, comment="学籍号/身份证号等唯一标识")
 
     role = Column(
         SQLEnum(
@@ -71,6 +74,7 @@ class User(Base):
     updated_at = Column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
+    last_login = Column(DateTime, nullable=True, comment="最后登录时间")
 
     # 关联关系
     region = relationship("Region")

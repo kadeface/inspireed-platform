@@ -2,7 +2,7 @@
 认证API路由
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, cast
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -140,6 +140,10 @@ async def login(
             status_code=400,
             detail=f"用户未激活，请联系管理员。用户ID: {user.id}, 用户名: {user.username}, 角色: {user.role}",
         )
+
+    # 更新最后登录时间
+    user.last_login = datetime.utcnow()
+    await db.commit()
 
     # 创建访问令牌
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)

@@ -80,6 +80,7 @@ export interface LibraryAssetDetail {
   knowledge_point_category?: string
   knowledge_point_name?: string
   view_count: number
+  version: number
   created_at: string
   updated_at: string
 }

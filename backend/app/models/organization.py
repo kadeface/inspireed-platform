@@ -3,7 +3,7 @@
 包括区域、学校等组织单位
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -91,7 +91,15 @@ class Classroom(Base):
     )
     enrollment_year = Column(Integer, nullable=True, comment="入学年份/届别")
     head_teacher_id = Column(
-        Integer, ForeignKey("users.id"), nullable=True, comment="班主任ID"
+        Integer, ForeignKey("users.id"), nullable=True, comment="正班主任ID"
+    )
+    deputy_head_teacher_id = Column(
+        Integer, ForeignKey("users.id"), nullable=True, comment="副班主任ID"
+    )
+    settings = Column(
+        JSON,
+        nullable=True,
+        comment="班级设置（JSON格式，如可见性控制等）",
     )
     is_active = Column(Boolean, default=True, comment="是否激活")
     description = Column(Text, nullable=True, comment="班级描述")
@@ -108,6 +116,7 @@ class Classroom(Base):
     school = relationship("School", back_populates="classrooms")
     grade = relationship("Grade", back_populates="classrooms")
     head_teacher = relationship("User", foreign_keys=[head_teacher_id])
+    deputy_head_teacher = relationship("User", foreign_keys=[deputy_head_teacher_id])
     students = relationship(
         "User", back_populates="classroom", foreign_keys="User.classroom_id"
     )
