@@ -22,11 +22,13 @@ from app.api.v1 import (
     learning_paths,
     lessons,
     library_assets,
+    project_cells,
     public_curriculum,
     questions,
     researcher_curriculum,
     resources,
     reviews,
+    student_projects,
     subject_groups,
     student_ai_assistant,
     teacher_ai_assistant,
@@ -102,3 +104,11 @@ api_router.include_router(upload.router, prefix="/upload", tags=["文件上传"]
 
 # 资源库路由
 api_router.include_router(library_assets.router, prefix="/library/assets", tags=["资源库"])
+
+# 学生项目路由
+api_router.include_router(
+    student_projects.router, prefix="/student/projects", tags=["学生-项目"]
+)
+api_router.include_router(
+    project_cells.router, prefix="/project-cells", tags=["项目-单元"]
+)

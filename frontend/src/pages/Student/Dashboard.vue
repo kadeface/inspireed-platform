@@ -205,19 +205,90 @@
           <div class="text-sm font-semibold text-gray-900">学习路径</div>
         </button>
         <button
+          @click="router.push('/student/projects')"
+          class="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50 p-6 text-center"
+        >
+          <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">📝</div>
+          <div class="text-sm font-semibold text-gray-900">我的项目</div>
+        </button>
+        <button
           @click="router.push('/student/profile')"
           class="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50 p-6 text-center"
         >
           <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">📊</div>
           <div class="text-sm font-semibold text-gray-900">学习统计</div>
         </button>
-        <button
-          @click="showRecommended = !showRecommended"
-          class="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50 p-6 text-center"
-        >
-          <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">⭐</div>
-          <div class="text-sm font-semibold text-gray-900">推荐课程</div>
-        </button>
+      </div>
+
+      <!-- 我的项目快速入口 -->
+      <div v-if="recentProjects.length > 0" class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-bold text-gray-900">我的项目</h2>
+          <button
+            @click="router.push('/student/projects')"
+            class="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
+          >
+            查看全部
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div
+            v-for="project in recentProjects"
+            :key="project.id"
+            @click="router.push(`/student/projects/${project.id}`)"
+            class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 cursor-pointer border border-white/50 p-6 flex flex-col"
+          >
+            <!-- 项目标题 -->
+            <div class="flex items-start justify-between mb-3">
+              <h3 class="text-lg font-semibold text-gray-900 line-clamp-2 flex-1">
+                {{ project.title }}
+              </h3>
+              <span
+                class="ml-2 px-2 py-1 text-xs font-medium rounded-full"
+                :class="getProjectStatusClass(project.status)"
+              >
+                {{ getProjectStatusText(project.status) }}
+              </span>
+            </div>
+
+            <!-- 项目描述 -->
+            <p v-if="project.description" class="text-sm text-gray-600 mb-4 line-clamp-2 flex-grow">
+              {{ project.description }}
+            </p>
+            <div v-else class="flex-grow"></div>
+
+            <!-- 项目进度 -->
+            <div class="mb-4">
+              <div class="flex items-center justify-between text-xs text-gray-600 mb-2">
+                <span class="font-medium">完成度</span>
+                <span class="font-semibold text-emerald-600">{{ getProjectCompletion(project) }}%</span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div
+                  class="bg-gradient-to-r from-emerald-500 to-teal-500 h-2 rounded-full transition-all"
+                  :style="{ width: `${getProjectCompletion(project)}%` }"
+                ></div>
+              </div>
+            </div>
+
+            <!-- 项目信息 -->
+            <div class="flex items-center justify-between text-xs text-gray-500">
+              <span>{{ formatDate(project.updated_at) }}</span>
+              <button
+                @click.stop="router.push(`/student/projects/${project.id}`)"
+                class="text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
+              >
+                继续编辑
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 统计卡片 -->
@@ -327,35 +398,54 @@
               </button>
             </span>
           </h2>
-          <div class="inline-flex rounded-xl shadow-lg overflow-hidden" role="group">
+          <div class="flex items-center gap-4">
+            <!-- 查看全部按钮（仅在列表视图且有超过3个课程时显示） -->
             <button
-              @click="viewMode = 'list'"
-              :class="[
-                'px-4 py-2 text-sm font-medium border transition-all rounded-l-xl',
-                viewMode === 'list'
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 z-10 shadow-lg'
-                  : 'bg-white/80 backdrop-blur-sm text-gray-700 border-gray-300 hover:bg-white'
-              ]"
-              title="列表视图"
+              v-if="viewMode === 'list' && filteredLessons.length > 3"
+              @click="showAllLessons = !showAllLessons"
+              class="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              <span>{{ showAllLessons ? '收起' : '查看全部' }}</span>
+              <svg 
+                class="w-4 h-4 transition-transform"
+                :class="{ 'rotate-180': showAllLessons }"
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
-            <button
-              @click="viewMode = 'tree'"
-              :class="[
-                'px-4 py-2 text-sm font-medium border transition-all rounded-r-xl',
-                viewMode === 'tree'
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 z-10 shadow-lg'
-                  : 'bg-white/80 backdrop-blur-sm text-gray-700 border-gray-300 hover:bg-white'
-              ]"
-              title="课程体系视图"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-            </button>
+            <div class="inline-flex rounded-xl shadow-lg overflow-hidden" role="group">
+              <button
+                @click="viewMode = 'list'"
+                :class="[
+                  'px-4 py-2 text-sm font-medium border transition-all rounded-l-xl',
+                  viewMode === 'list'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 z-10 shadow-lg'
+                    : 'bg-white/80 backdrop-blur-sm text-gray-700 border-gray-300 hover:bg-white'
+                ]"
+                title="列表视图"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+              </button>
+              <button
+                @click="viewMode = 'tree'"
+                :class="[
+                  'px-4 py-2 text-sm font-medium border transition-all rounded-r-xl',
+                  viewMode === 'tree'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-500 z-10 shadow-lg'
+                    : 'bg-white/80 backdrop-blur-sm text-gray-700 border-gray-300 hover:bg-white'
+                ]"
+                title="课程体系视图"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -458,12 +548,13 @@
           <p class="mt-2 text-sm text-gray-500">请等待老师发布课程或调整筛选条件</p>
         </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div
-          v-for="lesson in filteredLessons"
-          :key="lesson.id"
-          class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 relative group border border-white/50"
-        >
+        <div v-else>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div
+              v-for="lesson in displayedLessons"
+              :key="lesson.id"
+              class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 relative group border border-white/50 flex flex-col"
+            >
           <!-- 收藏按钮 -->
           <button
             @click.stop="toggleFavorite(lesson.id)"
@@ -486,7 +577,7 @@
           </div>
 
           <!-- 课程信息 -->
-          <div class="p-6">
+          <div class="p-6 flex flex-col flex-1">
             <h3 class="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
               {{ lesson.title }}
             </h3>
@@ -513,7 +604,7 @@
             </div>
 
             <!-- 课程元信息 -->
-            <div class="space-y-2 mb-4">
+            <div class="space-y-2 mb-4 flex-grow">
               <!-- 教师信息 -->
               <div v-if="lesson.creator_name" class="flex items-center text-xs text-gray-600">
                 <svg class="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -557,12 +648,13 @@
 
             <!-- 操作按钮 -->
             <button
-              class="w-full px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 font-medium shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all transform hover:scale-[1.02]"
+              class="w-full px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 font-medium shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all transform hover:scale-[1.02] mt-auto"
               @click="viewLesson(lesson.id)"
             >
               {{ getLessonProgress(lesson.id) === 0 ? '开始学习' : '继续学习' }}
             </button>
-            </div>
+          </div>
+          </div>
           </div>
         </div>
       </div>
@@ -585,9 +677,11 @@ import { lessonService } from '@/services/lesson'
 import { curriculumService } from '@/services/curriculum'
 import { favoriteService } from '@/services/favorite'
 import classroomSessionService from '@/services/classroomSession'
+import { student_project_service } from '@/services/student_project'
 import type { Lesson } from '@/types/lesson'
 import type { Subject } from '@/types/curriculum'
 import type { StudentPendingSession } from '@/types/classroomSession'
+import type { StudentProject } from '@/types/student_project'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import CurriculumTreeViewStudent from '@/components/Student/CurriculumTreeViewStudent.vue'
 
@@ -612,6 +706,9 @@ const favoritedLessonIds = ref<Set<number>>(new Set())
 const viewMode = ref<'list' | 'tree'>('list') // 视图模式
 const selectedChapterId = ref<number | null>(null) // 选中的章节ID
 const selectedChapterName = ref<string>('') // 选中的章节名称
+const showAllLessons = ref(false) // 是否显示全部课程
+const recentProjects = ref<StudentProject[]>([]) // 最近的项目
+const loadingProjects = ref(false) // 加载项目状态
 
 // 学习进度数据（从localStorage获取）
 const progressData = ref<Record<number, number>>({})
@@ -692,6 +789,14 @@ const filteredLessons = computed(() => {
   return result
 })
 
+// 显示的课程列表（默认只显示3个）
+const displayedLessons = computed(() => {
+  if (showAllLessons.value) {
+    return filteredLessons.value
+  }
+  return filteredLessons.value.slice(0, 3)
+})
+
 const completedCount = computed(() => {
   return availableLessons.value.filter(lesson => getLessonProgress(lesson.id) === 100).length
 })
@@ -746,6 +851,9 @@ const fetchData = async () => {
     
     // 加载待开始课堂
     await loadPendingSessions()
+    
+    // 加载最近项目
+    await loadRecentProjects()
   } catch (e: any) {
     error.value = e.message || '加载数据失败'
     console.error('Failed to fetch data:', e)
@@ -763,6 +871,22 @@ const loadRecommendedLessons = async () => {
     console.error('Failed to load recommended lessons:', e)
   } finally {
     loadingRecommended.value = false
+  }
+}
+
+const loadRecentProjects = async () => {
+  loadingProjects.value = true
+  try {
+    const response = await student_project_service.fetch_projects({
+      page: 1,
+      page_size: 3, // 只显示最近3个项目
+    })
+    recentProjects.value = response.items
+  } catch (e) {
+    console.error('Failed to load recent projects:', e)
+    recentProjects.value = []
+  } finally {
+    loadingProjects.value = false
   }
 }
 
@@ -817,6 +941,7 @@ const resetFilters = () => {
   filterDifficulty.value = ''
   filterRating.value = ''
   sortBy.value = 'default'
+  showAllLessons.value = false
 }
 
 const viewLesson = (lessonId: number) => {
@@ -894,6 +1019,60 @@ const loadActiveSessions = async () => {
     }
   } finally {
     loadingActiveSessions.value = false
+  }
+}
+
+// 获取项目状态文本
+const getProjectStatusText = (status: string): string => {
+  const statusMap: Record<string, string> = {
+    draft: '草稿',
+    in_progress: '进行中',
+    completed: '已完成',
+    submitted: '已提交',
+  }
+  return statusMap[status] || status
+}
+
+// 获取项目状态样式
+const getProjectStatusClass = (status: string): string => {
+  const classMap: Record<string, string> = {
+    draft: 'bg-gray-100 text-gray-700',
+    in_progress: 'bg-emerald-100 text-emerald-700',
+    completed: 'bg-teal-100 text-teal-700',
+    submitted: 'bg-blue-100 text-blue-700',
+  }
+  return classMap[status] || 'bg-gray-100 text-gray-700'
+}
+
+// 计算项目完成度
+const getProjectCompletion = (project: StudentProject): number => {
+  if (!project.completion) return 0
+  const stages = ['engage', 'explore', 'explain', 'elaborate', 'evaluate']
+  const total = stages.reduce((sum, stage) => sum + (project.completion[stage as keyof typeof project.completion] || 0), 0)
+  return Math.round(total / stages.length)
+}
+
+// 格式化日期
+const formatDate = (dateString: string): string => {
+  if (!dateString) return '未知'
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return '未知'
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / 86400000)
+    
+    if (diffDays === 0) {
+      return '今天'
+    } else if (diffDays === 1) {
+      return '昨天'
+    } else if (diffDays < 7) {
+      return `${diffDays}天前`
+    } else {
+      return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+    }
+  } catch (e) {
+    return '未知'
   }
 }
 
@@ -1058,6 +1237,7 @@ async function handleViewChapterLessons(chapterId: number) {
 function clearChapterFilter() {
   selectedChapterId.value = null
   selectedChapterName.value = ''
+  showAllLessons.value = false
   fetchData()
 }
 

@@ -57,6 +57,12 @@ from app.models.subject_group import (
     GroupScope,
     MemberRole,
 )
+from app.models.student_project import (
+    StudentProject,
+    ProjectStatus,
+    ProjectStage,
+)
+from app.models.project_cell import ProjectCell
 
 __all__ = [
     "User",
@@ -120,4 +126,8 @@ __all__ = [
     "DisciplineRecord",
     "DutyRule",
     "DutyAssignment",
+    "StudentProject",
+    "ProjectStatus",
+    "ProjectStage",
+    "ProjectCell",
 ]

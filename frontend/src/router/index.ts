@@ -160,6 +160,19 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/Student/LearningPaths.vue'),
     meta: { requiresAuth: true, role: 'student', title: '学习路径 - InspireEd' },
   },
+  // 学生端 - 项目设计
+  {
+    path: '/student/projects',
+    name: 'StudentProjects',
+    component: () => import('../pages/Student/ProjectList.vue'),
+    meta: { requiresAuth: true, role: 'student', title: '我的项目 - InspireEd' },
+  },
+  {
+    path: '/student/projects/:id',
+    name: 'StudentProjectEditor',
+    component: () => import('../pages/Student/ProjectEditor.vue'),
+    meta: { requiresAuth: true, role: 'student', title: '编辑项目 - InspireEd' },
+  },
   // 学生端 - 问答系统
   {
     path: '/student/question/:id',
