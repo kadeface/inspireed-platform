@@ -25,6 +25,19 @@
     </DashboardHeader>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- 历史记录按钮 -->
+      <div class="mb-6 flex justify-end">
+        <button
+          @click="showHistory = true"
+          class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl hover:bg-white hover:shadow-md transition-all"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          查看历史记录
+        </button>
+      </div>
+
       <!-- 未开始点名 -->
       <div v-if="!currentSession" class="space-y-6">
         <div class="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-8 text-center">
@@ -143,11 +156,153 @@
         </div>
       </div>
     </main>
+
+    <!-- 历史记录模态框 -->
+    <div
+      v-if="showHistory"
+      class="fixed inset-0 z-50 overflow-y-auto"
+      @click.self="showHistory = false"
+    >
+      <div class="flex min-h-screen items-center justify-center p-4">
+        <div class="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl">
+          <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
+            <div class="flex items-center justify-between">
+              <h2 class="text-2xl font-bold text-gray-900">点名历史记录</h2>
+              <button
+                @click="showHistory = false"
+                class="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="p-6 max-h-[70vh] overflow-y-auto">
+            <div v-if="loadingHistory" class="text-center py-8 text-gray-500">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-2"></div>
+              加载中...
+            </div>
+            <div v-else-if="historySessions.length === 0" class="text-center py-8 text-gray-500">
+              暂无历史记录
+            </div>
+            <div v-else class="space-y-4">
+              <div
+                v-for="session in historySessions"
+                :key="session.id"
+                @click="viewHistorySession(session.id)"
+                class="p-4 border border-gray-200 rounded-xl hover:shadow-md transition-all cursor-pointer"
+              >
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="font-medium text-gray-900">
+                      {{ new Date(session.startedAt).toLocaleString('zh-CN') }}
+                    </p>
+                    <p v-if="session.endedAt" class="text-sm text-gray-500 mt-1">
+                      结束时间：{{ new Date(session.endedAt).toLocaleString('zh-CN') }}
+                    </p>
+                    <p v-else class="text-sm text-amber-600 mt-1">未完成</p>
+                  </div>
+                  <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 历史记录详情模态框 -->
+    <div
+      v-if="selectedHistorySession"
+      class="fixed inset-0 z-50 overflow-y-auto"
+      @click.self="selectedHistorySession = null"
+    >
+      <div class="flex min-h-screen items-center justify-center p-4">
+        <div class="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl">
+          <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
+            <div class="flex items-center justify-between">
+              <h2 class="text-2xl font-bold text-gray-900">点名详情</h2>
+              <button
+                @click="selectedHistorySession = null"
+                class="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="p-6 max-h-[70vh] overflow-y-auto">
+            <div v-if="loadingHistoryDetail" class="text-center py-8 text-gray-500">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-2"></div>
+              加载中...
+            </div>
+            <div v-else-if="historySessionDetail">
+              <div class="mb-6">
+                <p class="text-sm text-gray-500">开始时间</p>
+                <p class="text-lg font-medium text-gray-900">
+                  {{ new Date(historySessionDetail.startedAt).toLocaleString('zh-CN') }}
+                </p>
+                <p v-if="historySessionDetail.endedAt" class="text-sm text-gray-500 mt-2">结束时间</p>
+                <p v-if="historySessionDetail.endedAt" class="text-lg font-medium text-gray-900">
+                  {{ new Date(historySessionDetail.endedAt).toLocaleString('zh-CN') }}
+                </p>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div
+                  v-for="entry in historySessionDetail.entries"
+                  :key="entry.id"
+                  class="flex items-center justify-between p-4 border border-gray-200 rounded-xl"
+                  :class="{
+                    'bg-green-50 border-green-200': entry.status === 'present',
+                    'bg-yellow-50 border-yellow-200': entry.status === 'late',
+                    'bg-blue-50 border-blue-200': entry.status === 'leave',
+                    'bg-red-50 border-red-200': entry.status === 'absent',
+                  }"
+                >
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
+                      :class="{
+                        'bg-green-500': entry.status === 'present',
+                        'bg-yellow-500': entry.status === 'late',
+                        'bg-blue-500': entry.status === 'leave',
+                        'bg-red-500': entry.status === 'absent',
+                      }"
+                    >
+                      {{ getStudentName(entry.studentId)?.charAt(0) || '?' }}
+                    </div>
+                    <div>
+                      <p class="font-medium text-gray-900">{{ getStudentName(entry.studentId) }}</p>
+                      <p class="text-xs text-gray-500">座号：{{ getStudentSeatNo(entry.studentId) || '-' }}</p>
+                    </div>
+                  </div>
+                  <span
+                    class="px-3 py-1 text-xs font-medium rounded-full"
+                    :class="{
+                      'bg-green-100 text-green-800': entry.status === 'present',
+                      'bg-yellow-100 text-yellow-800': entry.status === 'late',
+                      'bg-blue-100 text-blue-800': entry.status === 'leave',
+                      'bg-red-100 text-red-800': entry.status === 'absent',
+                    }"
+                  >
+                    {{ entry.status === 'present' ? '出勤' : entry.status === 'late' ? '迟到' : entry.status === 'leave' ? '请假' : '缺勤' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
@@ -156,6 +311,7 @@ import type {
   ClassroomInfo,
   AttendanceSession,
   AttendanceEntry,
+  AttendanceSessionWithEntries,
   StudentInfo,
   AttendanceStatus,
 } from '@/types/classroomAssistant'
@@ -179,6 +335,12 @@ const selectedClassroom = ref<ClassroomInfo | null>(null)
 const students = ref<StudentInfo[]>([])
 const currentSession = ref<AttendanceSession | null>(null)
 const attendanceEntries = ref<AttendanceEntry[]>([])
+const showHistory = ref(false)
+const historySessions = ref<AttendanceSession[]>([])
+const loadingHistory = ref(false)
+const selectedHistorySession = ref<number | null>(null)
+const historySessionDetail = ref<AttendanceSessionWithEntries | null>(null)
+const loadingHistoryDetail = ref(false)
 
 const handleLogout = () => {
   userStore.logout()
@@ -220,6 +382,18 @@ const getStudentSeatNo = (studentId: number): number | null => {
   return student?.seat_no || null
 }
 
+const checkCurrentSession = async () => {
+  try {
+    const session = await classroomAssistantService.getCurrentAttendanceSession(classroomId.value)
+    if (session) {
+      currentSession.value = session
+      attendanceEntries.value = session.entries || []
+    }
+  } catch (error) {
+    console.error('检查当前会话失败:', error)
+  }
+}
+
 const startAttendance = async () => {
   try {
     starting.value = true
@@ -230,6 +404,16 @@ const startAttendance = async () => {
     await loadAttendanceSession(session.id)
   } catch (error: any) {
     console.error('开始点名失败:', error)
+    // 检查是否是未完成会话的错误
+    const errorDetail = error.response?.data?.detail || error.message || ''
+    if (errorDetail.includes('未完成的点名会话')) {
+      // 尝试加载未完成的会话
+      await checkCurrentSession()
+      if (currentSession.value) {
+        alert('检测到未完成的点名会话，已自动加载。您可以继续编辑或完成该会话。')
+        return
+      }
+    }
     // 提取详细的错误信息
     let errorMessage = '开始点名失败，请重试'
     if (error.response?.data?.detail) {
@@ -314,8 +498,41 @@ const completeAttendance = async () => {
   }
 }
 
+const loadHistory = async () => {
+  try {
+    loadingHistory.value = true
+    historySessions.value = await classroomAssistantService.listAttendanceSessions(classroomId.value, false, 50)
+  } catch (error) {
+    console.error('加载历史记录失败:', error)
+  } finally {
+    loadingHistory.value = false
+  }
+}
+
+const viewHistorySession = async (sessionId: number) => {
+  try {
+    loadingHistoryDetail.value = true
+    selectedHistorySession.value = sessionId
+    historySessionDetail.value = await classroomAssistantService.getAttendanceSession(sessionId)
+  } catch (error) {
+    console.error('加载历史记录详情失败:', error)
+    alert('加载失败，请重试')
+  } finally {
+    loadingHistoryDetail.value = false
+  }
+}
+
+// 监听历史记录模态框显示
+watch(showHistory, (newVal) => {
+  if (newVal) {
+    loadHistory()
+  }
+})
+
 onMounted(async () => {
   await loadClassroom()
   await loadStudents()
+  // 检查是否有未完成的考勤会话
+  await checkCurrentSession()
 })
 </script>

@@ -418,8 +418,10 @@ const loadClassroomData = async () => {
     )
     leaderboardTop3.value = leaderboard.slice(0, 3)
     
-    // TODO: 加载今日点名次数和本周纪律记录数
-    // 这些需要后端API支持或在前端计算
+    // 加载今日点名次数
+    todayAttendanceCount.value = await classroomAssistantService.getTodayAttendanceCount(selectedClassroomId.value)
+    
+    // TODO: 加载本周纪律记录数
   } catch (error) {
     console.error('加载班级数据失败:', error)
   } finally {

@@ -71,7 +71,11 @@
                 </tr>
                 <tr v-else v-for="member in members" :key="member.id" class="hover:bg-gray-50">
                   <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">{{ getUserName(member.userId) }}</div>
+                    <div class="text-sm font-medium text-gray-900">
+                      {{ member.userFullName || member.userName || member.userUsername || `用户${member.userId}` }}
+                    </div>
+                    <div v-if="member.userEmail" class="text-xs text-gray-500">{{ member.userEmail }}</div>
+                    <div class="text-xs text-gray-400">ID: {{ member.userId }}</div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full" :class="getRoleBadgeClass(member.roleInClass)">
@@ -115,7 +119,7 @@
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       @click.self="closeModal"
     >
-      <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+      <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-2xl font-bold text-gray-900">
             {{ showEditModal ? '编辑成员' : '添加成员' }}
@@ -131,19 +135,85 @@
         </div>
 
         <form @submit.prevent="saveMember" class="space-y-4">
-          <div>
+          <div v-if="!showEditModal">
             <label class="block text-sm font-medium text-gray-700 mb-2">
-              用户ID <span class="text-red-500">*</span>
+              选择用户 <span class="text-red-500">*</span>
+            </label>
+            <div class="space-y-2">
+              <div class="flex gap-2">
+                <input
+                  v-model="userSearchQuery"
+                  @input="searchUsersForMember"
+                  type="text"
+                  placeholder="搜索用户名、姓名或邮箱..."
+                  class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <select
+                  v-model="userRoleFilter"
+                  @change="onUserRoleFilterChange"
+                  class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">所有角色</option>
+                  <option value="teacher">教师</option>
+                  <option value="student">学生</option>
+                </select>
+              </div>
+              <div v-if="userSearchLoading" class="text-center text-gray-500 py-2 text-sm">
+                搜索中...
+              </div>
+              <div
+                v-else-if="searchedUsers.length > 0"
+                class="max-h-48 overflow-y-auto border border-gray-300 rounded-lg"
+              >
+                <div
+                  v-for="user in searchedUsers"
+                  :key="user.id"
+                  @click="selectUserForMember(user)"
+                  class="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                  :class="{ 'bg-blue-100': formData.userId === user.id }"
+                >
+                  <div class="font-medium text-gray-900">{{ user.full_name || user.username }}</div>
+                  <div class="text-xs text-gray-500">
+                    ID: {{ user.id }} | {{ user.username }} | {{ user.email }}
+                  </div>
+                </div>
+              </div>
+              <div v-else-if="userSearchQuery && !userSearchLoading" class="text-center text-gray-500 py-2 text-sm border border-gray-200 rounded-lg">
+                未找到用户，请尝试其他搜索关键词
+              </div>
+              <div v-if="selectedUserInfo" class="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <div class="text-sm font-medium text-blue-900">已选择：{{ selectedUserInfo.full_name || selectedUserInfo.username }}</div>
+                <div class="text-xs text-blue-700">ID: {{ selectedUserInfo.id }} | {{ selectedUserInfo.email }}</div>
+              </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              提示：搜索用户并点击选择，或直接在下方输入用户ID
+            </p>
+          </div>
+          <div v-if="!showEditModal">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              或直接输入用户ID <span class="text-red-500">*</span>
             </label>
             <input
               v-model.number="formData.userId"
               type="number"
               required
-              :disabled="showEditModal"
               placeholder="请输入用户ID"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              @input="onUserIdInput"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p class="text-xs text-gray-500 mt-1">提示：可以通过用户管理页面查找用户ID</p>
+          </div>
+          <div v-else>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              用户ID
+            </label>
+            <input
+              :value="formData.userId"
+              type="number"
+              disabled
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+            />
+            <p class="text-xs text-gray-500 mt-1">编辑模式下无法更改用户</p>
           </div>
 
           <div>
@@ -251,12 +321,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import { classroomAssistantService } from '@/services/classroomAssistant'
-import type {
-  ClassroomInfo,
-  ClassroomMembership,
-  ClassroomMembershipCreate,
-  ClassroomMembershipUpdate,
+import adminService, { type User } from '@/services/admin'
+import {
   RoleInClass,
+  type ClassroomInfo,
+  type ClassroomMembership,
+  type ClassroomMembershipCreate,
+  type ClassroomMembershipUpdate,
 } from '@/types/classroomAssistant'
 
 const route = useRoute()
@@ -273,13 +344,20 @@ const gradeName = computed(() => userStore.user?.grade_name || null)
 const loading = ref(false)
 const saving = ref(false)
 const members = ref<ClassroomMembership[]>([])
-const userMap = ref<Map<number, { username: string; fullName?: string }>>(new Map())
 const selectedClassroom = ref<ClassroomInfo | null>(null)
 
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const editingMember = ref<ClassroomMembership | null>(null)
 const error = ref('')
+
+// 用户搜索相关状态
+const userSearchQuery = ref('')
+const userRoleFilter = ref<string>('')
+const searchedUsers = ref<User[]>([])
+const userSearchLoading = ref(false)
+const selectedUserInfo = ref<User | null>(null)
+const canSearchUsers = ref(true) // 是否可以使用用户搜索功能
 
 const formData = ref<ClassroomMembershipCreate & { userId: number }>({
   classroomId: classroomId.value,
@@ -315,28 +393,12 @@ const loadMembers = async () => {
   try {
     loading.value = true
     members.value = await classroomAssistantService.getClassroomMembers(classroomId.value)
-    
-    // 尝试获取用户信息（这里需要用户信息，但暂时使用ID显示）
-    // 后续可以添加API来批量获取用户信息
-    members.value.forEach((member) => {
-      if (!userMap.value.has(member.userId)) {
-        userMap.value.set(member.userId, {
-          username: `用户${member.userId}`,
-          fullName: undefined,
-        })
-      }
-    })
   } catch (error: any) {
     console.error('加载成员列表失败:', error)
     error.value = error.response?.data?.detail || '加载成员列表失败'
   } finally {
     loading.value = false
   }
-}
-
-const getUserName = (userId: number): string => {
-  const user = userMap.value.get(userId)
-  return user?.fullName || user?.username || `用户${userId}`
 }
 
 const getRoleName = (role: RoleInClass): string => {
@@ -372,6 +434,10 @@ const resetForm = () => {
     isPrimaryClass: false,
   }
   error.value = ''
+  userSearchQuery.value = ''
+  userRoleFilter.value = ''
+  searchedUsers.value = []
+  selectedUserInfo.value = null
 }
 
 const closeModal = () => {
@@ -439,7 +505,8 @@ const saveMember = async () => {
 }
 
 const removeMember = async (member: ClassroomMembership) => {
-  if (!confirm(`确定要移除成员 ${getUserName(member.userId)} 吗？`)) {
+  const memberName = member.userFullName || member.userName || member.userUsername || `用户${member.userId}`
+  if (!confirm(`确定要移除成员 ${memberName} 吗？`)) {
     return
   }
   
@@ -449,6 +516,94 @@ const removeMember = async (member: ClassroomMembership) => {
   } catch (error: any) {
     console.error('移除成员失败:', error)
     alert(error.response?.data?.detail || error.message || '移除失败，请重试')
+  }
+}
+
+// 用户搜索功能
+async function searchUsersForMember() {
+  if (!userSearchQuery.value && !userRoleFilter.value) {
+    searchedUsers.value = []
+    return
+  }
+  
+  // 检查是否可以使用搜索功能
+  if (!canSearchUsers.value) {
+    return
+  }
+  
+  try {
+    userSearchLoading.value = true
+    const response = await adminService.getUsers({
+      page: 1,
+      size: 20,
+      role: userRoleFilter.value || undefined,
+      search: userSearchQuery.value || undefined,
+    })
+    searchedUsers.value = response.users
+  } catch (error: any) {
+    // 如果权限不足，禁用搜索功能
+    if (error.response?.status === 403 || error.response?.status === 401) {
+      canSearchUsers.value = false
+      console.warn('用户搜索功能不可用（权限不足），请使用用户ID手动输入')
+    } else {
+      console.error('搜索用户失败:', error)
+    }
+    searchedUsers.value = []
+  } finally {
+    userSearchLoading.value = false
+  }
+}
+
+function onUserRoleFilterChange() {
+  // 当用户选择角色筛选时，自动设置对应的角色
+  if (userRoleFilter.value === 'student') {
+    formData.value.roleInClass = RoleInClass.STUDENT
+  } else if (userRoleFilter.value === 'teacher') {
+    formData.value.roleInClass = RoleInClass.SUBJECT_TEACHER
+  }
+  // 执行搜索
+  searchUsersForMember()
+}
+
+function selectUserForMember(user: User) {
+  formData.value.userId = user.id
+  selectedUserInfo.value = user
+  // 根据用户的系统角色自动设置班级角色
+  autoSetRoleFromUser(user)
+}
+
+function autoSetRoleFromUser(user: User) {
+  // 根据用户的系统角色自动设置班级角色
+  if (user.role === 'student') {
+    formData.value.roleInClass = RoleInClass.STUDENT
+  } else if (user.role === 'teacher' || user.role === 'admin' || user.role === 'researcher') {
+    // 如果选择的是教师、管理员或研究员，默认设置为任课教师
+    // 教师可以根据需要后续手动调整为正班主任或副班主任
+    formData.value.roleInClass = RoleInClass.SUBJECT_TEACHER
+  }
+}
+
+async function onUserIdInput() {
+  const userId = formData.value.userId
+  
+  // 如果输入的用户ID与已选用户不同，清除已选用户信息
+  if (selectedUserInfo.value && selectedUserInfo.value.id !== userId) {
+    selectedUserInfo.value = null
+  }
+  
+  // 如果输入了有效的用户ID（大于0），尝试获取用户信息并自动设置角色
+  if (userId && userId > 0 && !selectedUserInfo.value && canSearchUsers.value) {
+    try {
+      const user = await adminService.getUser(userId)
+      selectedUserInfo.value = user
+      // 自动设置角色
+      autoSetRoleFromUser(user)
+    } catch (error: any) {
+      // 用户不存在或无法获取，忽略错误（用户可能还在输入）
+      if (error.response?.status !== 404) {
+        console.debug('获取用户信息失败:', error)
+      }
+    }
   }
 }
 

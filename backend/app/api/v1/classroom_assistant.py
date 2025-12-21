@@ -6,7 +6,7 @@
 from datetime import datetime, timedelta, date
 from typing import Any, List, Optional, Dict, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, and_, or_, desc, asc
+from sqlalchemy import select, func, and_, or_, desc, asc, case, join
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -616,6 +616,130 @@ async def update_classroom_settings(
 # ==================== 考勤 ====================
 
 
+@router.get("/classrooms/{classroom_id}/attendance/sessions/current", response_model=Optional[AttendanceSessionWithEntries])
+async def get_current_attendance_session(
+    classroom_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """获取当前未完成的考勤会话"""
+    # 检查权限：必须是班级成员
+    membership = await db.execute(
+        select(ClassroomMembership).where(
+            ClassroomMembership.user_id == current_user.id,
+            ClassroomMembership.classroom_id == classroom_id,
+            ClassroomMembership.is_active == True,
+        )
+    )
+    if not membership.scalar_one_or_none():
+        # 兼容：检查是否有 classroom_id
+        if not (current_user.classroom_id == classroom_id):
+            raise HTTPException(status_code=403, detail="无权访问该班级的考勤会话")
+    
+    # 查找未完成的会话
+    existing_session_result = await db.execute(
+        select(AttendanceSession)
+        .where(
+            AttendanceSession.classroom_id == classroom_id,
+            AttendanceSession.ended_at.is_(None),  # 未结束的会话
+        )
+        .order_by(desc(AttendanceSession.started_at))
+        .limit(1)
+    )
+    existing_session = existing_session_result.scalar_one_or_none()
+    
+    if not existing_session:
+        return None
+    
+    # 加载所有记录
+    entries_result = await db.execute(
+        select(AttendanceEntry)
+        .where(AttendanceEntry.session_id == existing_session.id)
+        .order_by(asc(AttendanceEntry.id))
+    )
+    entries = entries_result.scalars().all()
+    
+    return AttendanceSessionWithEntries(
+        **AttendanceSessionResponse.model_validate(existing_session).model_dump(),
+        entries=[AttendanceEntryResponse.model_validate(e) for e in entries],
+    )
+
+
+@router.get("/classrooms/{classroom_id}/attendance/sessions", response_model=List[AttendanceSessionResponse])
+async def list_attendance_sessions(
+    classroom_id: int,
+    include_unfinished: bool = Query(False, description="是否包含未完成的会话"),
+    limit: int = Query(50, ge=1, le=100, description="返回数量限制"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """获取考勤会话列表"""
+    # 检查权限：必须是班级成员
+    membership = await db.execute(
+        select(ClassroomMembership).where(
+            ClassroomMembership.user_id == current_user.id,
+            ClassroomMembership.classroom_id == classroom_id,
+            ClassroomMembership.is_active == True,
+        )
+    )
+    if not membership.scalar_one_or_none():
+        # 兼容：检查是否有 classroom_id
+        if not (current_user.classroom_id == classroom_id):
+            raise HTTPException(status_code=403, detail="无权访问该班级的考勤会话")
+    
+    # 构建查询
+    query = select(AttendanceSession).where(
+        AttendanceSession.classroom_id == classroom_id,
+    )
+    
+    # 如果不包含未完成的，只返回已完成的
+    if not include_unfinished:
+        query = query.where(AttendanceSession.ended_at.isnot(None))
+    
+    query = query.order_by(desc(AttendanceSession.started_at)).limit(limit)
+    
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+    
+    return [AttendanceSessionResponse.model_validate(s) for s in sessions]
+
+
+@router.get("/classrooms/{classroom_id}/attendance/sessions/today-count", response_model=int)
+async def get_today_attendance_count(
+    classroom_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """获取今日点名次数"""
+    # 检查权限：必须是班级成员
+    membership = await db.execute(
+        select(ClassroomMembership).where(
+            ClassroomMembership.user_id == current_user.id,
+            ClassroomMembership.classroom_id == classroom_id,
+            ClassroomMembership.is_active == True,
+        )
+    )
+    if not membership.scalar_one_or_none():
+        # 兼容：检查是否有 classroom_id
+        if not (current_user.classroom_id == classroom_id):
+            raise HTTPException(status_code=403, detail="无权访问该班级的考勤会话")
+    
+    # 获取今天的开始时间（UTC）
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # 统计今日已完成的会话数
+    count_result = await db.execute(
+        select(func.count(AttendanceSession.id)).where(
+            AttendanceSession.classroom_id == classroom_id,
+            AttendanceSession.started_at >= today_start,
+            AttendanceSession.ended_at.isnot(None),  # 只统计已完成的
+        )
+    )
+    count = count_result.scalar() or 0
+    
+    return count
+
+
 @router.post("/classrooms/{classroom_id}/attendance/sessions", response_model=AttendanceSessionResponse, status_code=201)
 async def create_attendance_session(
     classroom_id: int,
@@ -684,6 +808,56 @@ async def create_attendance_session(
     return AttendanceSessionResponse.model_validate(session)
 
 
+@router.get("/classrooms/{classroom_id}/attendance/entries", response_model=List[AttendanceEntryResponse])
+async def get_attendance_entries_by_status(
+    classroom_id: int,
+    status: Optional[AttendanceStatus] = Query(None, description="考勤状态筛选"),
+    from_date: Optional[datetime] = Query(None, description="开始日期"),
+    to_date: Optional[datetime] = Query(None, description="结束日期"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """获取考勤记录详情（按状态筛选）"""
+    # 检查权限：必须是班级成员
+    membership = await db.execute(
+        select(ClassroomMembership).where(
+            ClassroomMembership.user_id == current_user.id,
+            ClassroomMembership.classroom_id == classroom_id,
+            ClassroomMembership.is_active == True,
+        )
+    )
+    if not membership.scalar_one_or_none():
+        # 兼容：检查是否有 classroom_id
+        if not (current_user.classroom_id == classroom_id):
+            raise HTTPException(status_code=403, detail="无权访问该班级的考勤记录")
+    
+    # 默认时间范围：最近30天
+    if not to_date:
+        to_date = datetime.utcnow()
+    if not from_date:
+        from_date = to_date - timedelta(days=30)
+    
+    # 构建查询
+    query = select(AttendanceEntry).select_from(
+        join(AttendanceEntry, AttendanceSession, AttendanceEntry.session_id == AttendanceSession.id)
+    ).where(
+        AttendanceSession.classroom_id == classroom_id,
+        AttendanceSession.started_at >= from_date,
+        AttendanceSession.started_at <= to_date,
+    )
+    
+    # 如果指定了状态，添加状态筛选
+    if status:
+        query = query.where(AttendanceEntry.status == status)
+    
+    query = query.order_by(desc(AttendanceSession.started_at), asc(AttendanceEntry.id))
+    
+    result = await db.execute(query)
+    entries = result.scalars().all()
+    
+    return [AttendanceEntryResponse.model_validate(e) for e in entries]
+
+
 @router.get("/attendance/sessions/{session_id}", response_model=AttendanceSessionWithEntries)
 async def get_attendance_session(
     session_id: int,
@@ -732,15 +906,25 @@ async def update_attendance_entry(
     data: AttendanceEntryUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    membership: ClassroomMembership = Depends(require_classroom_management_permission),
 ) -> Any:
     """更新考勤记录（幂等）"""
+    # 先获取会话以获取 classroom_id
     session = await db.get(AttendanceSession, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="考勤会话不存在")
     
-    if session.classroom_id != membership.classroom_id:
-        raise HTTPException(status_code=400, detail="会话与班级不匹配")
+    # 检查权限：需要班级管理权限
+    membership = await check_classroom_permission(
+        db,
+        current_user,
+        session.classroom_id,
+        [
+            RoleInClass.HEAD_TEACHER_PRIMARY,
+            RoleInClass.HEAD_TEACHER_DEPUTY,
+            RoleInClass.SUBJECT_TEACHER,
+            RoleInClass.CADRE,
+        ],
+    )
     
     # 查找或创建记录
     entry_result = await db.execute(
@@ -775,15 +959,25 @@ async def mark_all_present(
     session_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    membership: ClassroomMembership = Depends(require_classroom_management_permission),
 ) -> Any:
     """一键全到"""
+    # 先获取会话以获取 classroom_id
     session = await db.get(AttendanceSession, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="考勤会话不存在")
     
-    if session.classroom_id != membership.classroom_id:
-        raise HTTPException(status_code=400, detail="会话与班级不匹配")
+    # 检查权限：需要班级管理权限
+    membership = await check_classroom_permission(
+        db,
+        current_user,
+        session.classroom_id,
+        [
+            RoleInClass.HEAD_TEACHER_PRIMARY,
+            RoleInClass.HEAD_TEACHER_DEPUTY,
+            RoleInClass.SUBJECT_TEACHER,
+            RoleInClass.CADRE,
+        ],
+    )
     
     # 批量更新所有记录为出勤
     entries_result = await db.execute(
@@ -803,15 +997,26 @@ async def mark_all_present(
 async def complete_attendance_session(
     session_id: int,
     db: AsyncSession = Depends(get_db),
-    membership: ClassroomMembership = Depends(require_classroom_management_permission),
+    current_user: User = Depends(get_current_user),
 ) -> Any:
     """完成考勤会话"""
+    # 先获取会话以获取 classroom_id
     session = await db.get(AttendanceSession, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="考勤会话不存在")
     
-    if session.classroom_id != membership.classroom_id:
-        raise HTTPException(status_code=400, detail="会话与班级不匹配")
+    # 检查权限：需要班级管理权限
+    membership = await check_classroom_permission(
+        db,
+        current_user,
+        session.classroom_id,
+        [
+            RoleInClass.HEAD_TEACHER_PRIMARY,
+            RoleInClass.HEAD_TEACHER_DEPUTY,
+            RoleInClass.SUBJECT_TEACHER,
+            RoleInClass.CADRE,
+        ],
+    )
     
     if session.ended_at:
         raise HTTPException(status_code=400, detail="考勤会话已完成")
@@ -1378,23 +1583,33 @@ async def get_classroom_stats(
     if not from_date:
         from_date = to_date - timedelta(days=30)
     
-    # 出勤统计
+    # 出勤统计 - 先统计会话数
+    session_count_query = select(
+        func.count(AttendanceSession.id).label("total_sessions")
+    ).where(
+        AttendanceSession.classroom_id == classroom_id,
+        AttendanceSession.started_at >= from_date,
+        AttendanceSession.started_at <= to_date,
+    )
+    session_count_result = await db.execute(session_count_query)
+    total_sessions = session_count_result.scalar() or 0
+    
+    # 统计各状态的条目数
     attendance_query = select(
-        func.count(AttendanceSession.id).label("total_sessions"),
         func.sum(
-            func.case((AttendanceEntry.status == AttendanceStatus.PRESENT, 1), else_=0)
+            case((AttendanceEntry.status == AttendanceStatus.PRESENT, 1), else_=0)
         ).label("present_count"),
         func.sum(
-            func.case((AttendanceEntry.status == AttendanceStatus.LATE, 1), else_=0)
+            case((AttendanceEntry.status == AttendanceStatus.LATE, 1), else_=0)
         ).label("late_count"),
         func.sum(
-            func.case((AttendanceEntry.status == AttendanceStatus.LEAVE, 1), else_=0)
+            case((AttendanceEntry.status == AttendanceStatus.LEAVE, 1), else_=0)
         ).label("leave_count"),
         func.sum(
-            func.case((AttendanceEntry.status == AttendanceStatus.ABSENT, 1), else_=0)
+            case((AttendanceEntry.status == AttendanceStatus.ABSENT, 1), else_=0)
         ).label("absent_count"),
     ).select_from(
-        AttendanceSession.join(AttendanceEntry, AttendanceSession.id == AttendanceEntry.session_id)
+        join(AttendanceSession, AttendanceEntry, AttendanceSession.id == AttendanceEntry.session_id)
     ).where(
         AttendanceSession.classroom_id == classroom_id,
         AttendanceSession.started_at >= from_date,
@@ -1405,22 +1620,21 @@ async def get_classroom_stats(
     attendance_row = attendance_result.first()
     
     attendance_stats = None
-    if attendance_row and attendance_row.total_sessions:
-        total_entries = (
-            (attendance_row.present_count or 0)
-            + (attendance_row.late_count or 0)
-            + (attendance_row.leave_count or 0)
-            + (attendance_row.absent_count or 0)
-        )
-        attendance_rate = (
-            (attendance_row.present_count or 0) / total_entries if total_entries > 0 else 0.0
-        )
+    if total_sessions > 0:
+        present_count = int(attendance_row.present_count or 0) if attendance_row else 0
+        late_count = int(attendance_row.late_count or 0) if attendance_row else 0
+        leave_count = int(attendance_row.leave_count or 0) if attendance_row else 0
+        absent_count = int(attendance_row.absent_count or 0) if attendance_row else 0
+        
+        total_entries = present_count + late_count + leave_count + absent_count
+        attendance_rate = present_count / total_entries if total_entries > 0 else 0.0
+        
         attendance_stats = AttendanceStats(
-            total_sessions=int(attendance_row.total_sessions),
-            present_count=int(attendance_row.present_count or 0),
-            late_count=int(attendance_row.late_count or 0),
-            leave_count=int(attendance_row.leave_count or 0),
-            absent_count=int(attendance_row.absent_count or 0),
+            total_sessions=int(total_sessions),
+            present_count=present_count,
+            late_count=late_count,
+            leave_count=leave_count,
+            absent_count=absent_count,
             attendance_rate=attendance_rate,
         )
     
@@ -1451,7 +1665,7 @@ async def get_classroom_stats(
         
         points_by_type_result = await db.execute(points_by_type_query)
         points_by_type = {
-            row.behavior_type: int(row.points) for row in points_by_type_result.all()
+            row.behavior_type: int(row.points or 0) for row in points_by_type_result.all()
         }
         positive_stats = PositiveBehaviorStats(
             total_points=int(positive_row.total_points or 0),
@@ -1485,7 +1699,7 @@ async def get_classroom_stats(
         
         records_by_type_result = await db.execute(records_by_type_query)
         records_by_type = {
-            row.event_type: int(row.count) for row in records_by_type_result.all()
+            row.event_type: int(row.count or 0) for row in records_by_type_result.all()
         }
         discipline_stats = DisciplineStats(
             total_records=int(discipline_row.total_records),
@@ -1496,7 +1710,7 @@ async def get_classroom_stats(
     duty_query = select(
         func.count(DutyAssignment.id).label("total_assignments"),
         func.sum(
-            func.case((DutyAssignment.status == DutyAssignmentStatus.COMPLETED, 1), else_=0)
+            case((DutyAssignment.status == DutyAssignmentStatus.COMPLETED, 1), else_=0)
         ).label("completed_count"),
     ).where(
         DutyAssignment.classroom_id == classroom_id,
@@ -1568,19 +1782,19 @@ async def get_my_stats(
     attendance_query = select(
         func.count(AttendanceSession.id).label("total_sessions"),
         func.sum(
-            func.case((AttendanceEntry.status == AttendanceStatus.PRESENT, 1), else_=0)
+            case((AttendanceEntry.status == AttendanceStatus.PRESENT, 1), else_=0)
         ).label("present_count"),
         func.sum(
-            func.case((AttendanceEntry.status == AttendanceStatus.LATE, 1), else_=0)
+            case((AttendanceEntry.status == AttendanceStatus.LATE, 1), else_=0)
         ).label("late_count"),
         func.sum(
-            func.case((AttendanceEntry.status == AttendanceStatus.LEAVE, 1), else_=0)
+            case((AttendanceEntry.status == AttendanceStatus.LEAVE, 1), else_=0)
         ).label("leave_count"),
         func.sum(
-            func.case((AttendanceEntry.status == AttendanceStatus.ABSENT, 1), else_=0)
+            case((AttendanceEntry.status == AttendanceStatus.ABSENT, 1), else_=0)
         ).label("absent_count"),
     ).select_from(
-        AttendanceSession.join(AttendanceEntry, AttendanceSession.id == AttendanceEntry.session_id)
+        join(AttendanceSession, AttendanceEntry, AttendanceSession.id == AttendanceEntry.session_id)
     ).where(
         AttendanceSession.classroom_id == classroom_id,
         AttendanceEntry.student_id == current_user.id,
@@ -1685,7 +1899,7 @@ async def get_my_stats(
     duty_query = select(
         func.count(DutyAssignment.id).label("total_assignments"),
         func.sum(
-            func.case((DutyAssignment.status == DutyAssignmentStatus.COMPLETED, 1), else_=0)
+            case((DutyAssignment.status == DutyAssignmentStatus.COMPLETED, 1), else_=0)
         ).label("completed_count"),
     ).where(
         DutyAssignment.assignee_user_id == current_user.id,

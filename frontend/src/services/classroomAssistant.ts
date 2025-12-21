@@ -152,6 +152,46 @@ export const classroomAssistantService = {
   },
 
   /**
+   * 获取当前未完成的考勤会话
+   */
+  async getCurrentAttendanceSession(classroomId: number): Promise<AttendanceSessionWithEntries | null> {
+    const data = await api.get<any>(
+      `/classroom-assistant/classrooms/${classroomId}/attendance/sessions/current`
+    )
+    if (!data) return null
+    return snakeToCamel<AttendanceSessionWithEntries>(data)
+  },
+
+  /**
+   * 获取考勤会话列表（历史记录）
+   */
+  async listAttendanceSessions(
+    classroomId: number,
+    includeUnfinished: boolean = false,
+    limit: number = 50
+  ): Promise<AttendanceSession[]> {
+    const params = {
+      include_unfinished: includeUnfinished,
+      limit,
+    }
+    const data = await api.get<any[]>(
+      `/classroom-assistant/classrooms/${classroomId}/attendance/sessions`,
+      { params }
+    )
+    return data.map((s) => snakeToCamel<AttendanceSession>(s))
+  },
+
+  /**
+   * 获取今日点名次数
+   */
+  async getTodayAttendanceCount(classroomId: number): Promise<number> {
+    const data = await api.get<number>(
+      `/classroom-assistant/classrooms/${classroomId}/attendance/sessions/today-count`
+    )
+    return data
+  },
+
+  /**
    * 获取考勤会话详情
    */
   async getAttendanceSession(sessionId: number): Promise<AttendanceSessionWithEntries> {
@@ -188,6 +228,27 @@ export const classroomAssistantService = {
    */
   async completeAttendanceSession(sessionId: number): Promise<void> {
     return api.post(`/classroom-assistant/attendance/sessions/${sessionId}/complete`)
+  },
+
+  /**
+   * 获取考勤记录详情（按状态筛选）
+   */
+  async getAttendanceEntriesByStatus(
+    classroomId: number,
+    status?: AttendanceStatus,
+    fromDate?: string,
+    toDate?: string
+  ): Promise<AttendanceEntry[]> {
+    const params: any = {}
+    if (status) params.status = status
+    if (fromDate) params.from_date = fromDate
+    if (toDate) params.to_date = toDate
+    
+    const data = await api.get<any[]>(
+      `/classroom-assistant/classrooms/${classroomId}/attendance/entries`,
+      { params }
+    )
+    return data.map((e) => snakeToCamel<AttendanceEntry>(e))
   },
 
   // ==================== 正面行为 ====================
