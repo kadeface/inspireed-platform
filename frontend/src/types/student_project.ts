@@ -23,7 +23,7 @@ export const ProjectStage = {
 export type ProjectStage = typeof ProjectStage[keyof typeof ProjectStage]
 
 export interface ProjectCell {
-  id?: number
+  id?: number | string  // 支持数字ID（后端）和字符串ID（前端UUID，避免重排/删除时的ID冲突）
   project_id?: number
   stage: ProjectStage
   cell_type: string

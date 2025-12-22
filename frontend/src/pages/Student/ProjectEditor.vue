@@ -226,7 +226,7 @@ const current_stage_cells = computed(() => {
 function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
   const cell_type_lower = project_cell.cell_type.toLowerCase()
   const base_cell: any = {
-    id: project_cell.id || `project-cell-${active_stage.value}-${index}`,
+    id: project_cell.id || uuidv4(),
     type: cell_type_lower as CellType,
     order: project_cell.order ?? index,
     title: project_cell.title,
@@ -756,6 +756,7 @@ function handle_add_cell(cell_type: string) {
   }
 
   const new_cell: ProjectCell = {
+    id: uuidv4(),
     stage: active_stage.value,
     cell_type: cell_type,
     title: '',
@@ -872,4 +873,3 @@ onMounted(() => {
   transform: translateX(-50%) translateY(-10px);
 }
 </style>
-

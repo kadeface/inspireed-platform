@@ -279,13 +279,17 @@ const editor = useEditor({
         else if (src.startsWith('http://') || src.startsWith('https://')) {
           try {
             const url = new URL(src)
+            const baseUrlObj = new URL(baseURL)
             // 检查是否是资源路径
             if (url.pathname.startsWith('/uploads/resources/')) {
-              // 检查是否是当前服务器地址（通过比较路径部分）
-              // 如果是，转换为相对路径
-              const relativePath = url.pathname + (url.search || '') + (url.hash || '')
-              const newSrcAttr = ` src=${quote}${relativePath}${quote}`
-              return match.replace(srcMatch[0], newSrcAttr)
+              // 验证主机名是否匹配当前服务器
+              if (url.hostname === baseUrlObj.hostname && url.port === baseUrlObj.port) {
+                // 如果是当前服务器，转换为相对路径
+                const relativePath = url.pathname + (url.search || '') + (url.hash || '')
+                const newSrcAttr = ` src=${quote}${relativePath}${quote}`
+                return match.replace(srcMatch[0], newSrcAttr)
+              }
+              // 如果不是当前服务器，保持原样（不转换）
             }
           } catch {
             // URL解析失败，保持原样
@@ -340,12 +344,26 @@ const editor = useEditor({
       return match
     })
     
-    // 替换文件下载链接中的href为相对路径
+    // 替换文件下载链接中的href为相对路径（仅当URL指向当前服务器时）
     html = html.replace(/href\s*=\s*(["'])([^"']+)\1[^>]*download/gi, (match, quote, url) => {
-      if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url) || url.startsWith('http')) {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
         try {
           const urlObj = new URL(url)
-          const relativePath = urlObj.pathname
+          const baseUrlObj = new URL(baseURL)
+          // 验证主机名是否匹配当前服务器
+          if (urlObj.hostname === baseUrlObj.hostname && urlObj.port === baseUrlObj.port) {
+            const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
+            return `href=${quote}${relativePath}${quote} download`
+          }
+          // 如果不是当前服务器，保持原样
+        } catch {
+          // URL解析失败，保持原样
+        }
+      } else if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url)) {
+        // 处理包含localhost或IP地址的URL（这些通常是本地开发环境）
+        try {
+          const urlObj = new URL(url)
+          const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
           return `href=${quote}${relativePath}${quote} download`
         } catch {
           const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
@@ -357,12 +375,26 @@ const editor = useEditor({
       return match
     })
     
-    // 替换data-file-download-url属性为相对路径
+    // 替换data-file-download-url属性为相对路径（仅当URL指向当前服务器时）
     html = html.replace(/data-file-download-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
-      if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url) || url.startsWith('http')) {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
         try {
           const urlObj = new URL(url)
-          const relativePath = urlObj.pathname
+          const baseUrlObj = new URL(baseURL)
+          // 验证主机名是否匹配当前服务器
+          if (urlObj.hostname === baseUrlObj.hostname && urlObj.port === baseUrlObj.port) {
+            const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
+            return `data-file-download-url=${quote}${relativePath}${quote}`
+          }
+          // 如果不是当前服务器，保持原样
+        } catch {
+          // URL解析失败，保持原样
+        }
+      } else if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url)) {
+        // 处理包含localhost或IP地址的URL（这些通常是本地开发环境）
+        try {
+          const urlObj = new URL(url)
+          const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
           return `data-file-download-url=${quote}${relativePath}${quote}`
         } catch {
           const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
@@ -918,4 +950,3 @@ onBeforeUnmount(() => {
   transform: translateY(-10px);
 }
 </style>
-
