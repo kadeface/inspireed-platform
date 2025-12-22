@@ -168,8 +168,63 @@ const emit = defineEmits<{
   update: [html: string]
 }>()
 
+// 标准化HTML内容中的图片URL（将IP地址替换为当前服务器地址）
+function normalizeImageUrls(html: string): string {
+  if (!html) return html
+  
+  const baseURL = getServerBaseUrl()
+  
+  // 处理图片URL：将IP地址或不同主机的URL替换为当前服务器地址
+  html = html.replace(/<img\s+([^>]*?)>/gi, (match, attrs) => {
+    const srcMatch = attrs.match(/\ssrc\s*=\s*(["'])([^"']+)\1/i) || attrs.match(/\ssrc\s*=\s*([^\s>]+)/i)
+    if (srcMatch) {
+      const quote = srcMatch[1] || '"'
+      let src = srcMatch[2] || srcMatch[1]
+      
+      // 如果是blob URL或data URL，不需要处理
+      if (src.startsWith('blob:') || src.startsWith('data:')) {
+        return match
+      }
+      
+      // 如果是相对路径，转换为完整URL以便在编辑器中显示
+      if (src.startsWith('/') && !src.startsWith('//')) {
+        const fullUrl = `${baseURL}${src}`
+        const newSrcAttr = ` src=${quote}${fullUrl}${quote}`
+        return match.replace(srcMatch[0], newSrcAttr)
+      }
+      
+      // 如果是完整URL，检查是否需要替换
+      if (src.startsWith('http://') || src.startsWith('https://')) {
+        try {
+          const url = new URL(src)
+          // 如果是资源路径（/uploads/resources/），检查主机名
+          if (url.pathname.startsWith('/uploads/resources/')) {
+            const isIPAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(url.hostname)
+            const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
+            const currentHost = window.location.hostname
+            const isDifferentHost = url.hostname !== currentHost && !isLocalhost
+            
+            // 如果是IP地址或不同的主机名，替换为当前服务器地址
+            if (isIPAddress || isDifferentHost) {
+              const path = url.pathname + (url.search || '') + (url.hash || '')
+              const newUrl = `${baseURL}${path}`
+              const newSrcAttr = ` src=${quote}${newUrl}${quote}`
+              return match.replace(srcMatch[0], newSrcAttr)
+            }
+          }
+        } catch {
+          // URL解析失败，保持原样
+        }
+      }
+    }
+    return match
+  })
+  
+  return html
+}
+
 const editor = useEditor({
-  content: props.content,
+  content: normalizeImageUrls(props.content),
   extensions: [
     StarterKit,
     Image.configure({
@@ -181,20 +236,33 @@ const editor = useEditor({
     }),
   ],
   onUpdate: ({ editor }) => {
-    // 在保存到数据库之前，将完整URL（包含localhost）转换为相对路径
+    // 在保存到数据库之前，将完整URL（包含localhost和IP地址）转换为相对路径
     let html = editor.getHTML()
+    const baseURL = getServerBaseUrl()
     
-    // 替换所有包含localhost或127.0.0.1的图片URL为相对路径
+    // 替换所有包含localhost、127.0.0.1或IP地址的图片URL为相对路径
     html = html.replace(/<img\s+([^>]*?)>/gi, (match, attrs) => {
       const srcMatch = attrs.match(/\ssrc\s*=\s*(["'])([^"']+)\1/i) || attrs.match(/\ssrc\s*=\s*([^\s>]+)/i)
       if (srcMatch) {
         const quote = srcMatch[1] || '"'
         let src = srcMatch[2] || srcMatch[1]
         
-        // 如果URL包含localhost或127.0.0.1，提取相对路径
-        if (src.includes('localhost') || src.includes('127.0.0.1')) {
+        // 如果是blob URL或data URL，不需要处理
+        if (src.startsWith('blob:') || src.startsWith('data:')) {
+          return match
+        }
+        
+        // 如果URL包含localhost、127.0.0.1或IP地址，提取相对路径
+        if (src.includes('localhost') || src.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(src)) {
           try {
             const url = new URL(src)
+            // 如果是资源路径（/uploads/resources/），提取相对路径
+            if (url.pathname.startsWith('/uploads/resources/')) {
+              const relativePath = url.pathname + (url.search || '') + (url.hash || '')
+              const newSrcAttr = ` src=${quote}${relativePath}${quote}`
+              return match.replace(srcMatch[0], newSrcAttr)
+            }
+            // 如果是其他路径，也提取相对路径
             const relativePath = url.pathname + (url.search || '') + (url.hash || '')
             const newSrcAttr = ` src=${quote}${relativePath}${quote}`
             return match.replace(srcMatch[0], newSrcAttr)
@@ -205,6 +273,22 @@ const editor = useEditor({
               const newSrcAttr = ` src=${quote}${pathMatch[0]}${quote}`
               return match.replace(srcMatch[0], newSrcAttr)
             }
+          }
+        }
+        // 如果URL是完整URL但指向当前服务器，也转换为相对路径
+        else if (src.startsWith('http://') || src.startsWith('https://')) {
+          try {
+            const url = new URL(src)
+            // 检查是否是资源路径
+            if (url.pathname.startsWith('/uploads/resources/')) {
+              // 检查是否是当前服务器地址（通过比较路径部分）
+              // 如果是，转换为相对路径
+              const relativePath = url.pathname + (url.search || '') + (url.hash || '')
+              const newSrcAttr = ` src=${quote}${relativePath}${quote}`
+              return match.replace(srcMatch[0], newSrcAttr)
+            }
+          } catch {
+            // URL解析失败，保持原样
           }
         }
       }
@@ -219,8 +303,8 @@ const editor = useEditor({
         const quote = urlMatch[2]
         let url = urlMatch[3]
         
-        // 如果URL包含完整地址，提取相对路径
-        if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('http')) {
+        // 如果URL包含完整地址（localhost、127.0.0.1或IP地址），提取相对路径
+        if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url) || url.startsWith('http')) {
           try {
             const urlObj = new URL(url)
             const relativePath = urlObj.pathname
@@ -241,7 +325,7 @@ const editor = useEditor({
     
     // 替换PDF查看按钮中的data-pdf-view-url属性为相对路径
     html = html.replace(/data-pdf-view-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
-      if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('http')) {
+      if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url) || url.startsWith('http')) {
         try {
           const urlObj = new URL(url)
           const relativePath = urlObj.pathname
@@ -258,7 +342,7 @@ const editor = useEditor({
     
     // 替换文件下载链接中的href为相对路径
     html = html.replace(/href\s*=\s*(["'])([^"']+)\1[^>]*download/gi, (match, quote, url) => {
-      if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('http')) {
+      if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url) || url.startsWith('http')) {
         try {
           const urlObj = new URL(url)
           const relativePath = urlObj.pathname
@@ -275,7 +359,7 @@ const editor = useEditor({
     
     // 替换data-file-download-url属性为相对路径
     html = html.replace(/data-file-download-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
-      if (url.includes('localhost') || url.includes('127.0.0.1') || url.startsWith('http')) {
+      if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url) || url.startsWith('http')) {
         try {
           const urlObj = new URL(url)
           const relativePath = urlObj.pathname
@@ -303,7 +387,9 @@ watch(
   () => props.content,
   (newContent) => {
     if (editor.value && editor.value.getHTML() !== newContent) {
-      editor.value.commands.setContent(newContent, false)
+      // 在设置内容之前，标准化图片URL
+      const normalizedContent = normalizeImageUrls(newContent)
+      editor.value.commands.setContent(normalizedContent, false)
     }
   }
 )

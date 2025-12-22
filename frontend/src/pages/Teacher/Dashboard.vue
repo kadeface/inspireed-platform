@@ -14,50 +14,9 @@
     <!-- 主内容区 -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="space-y-8">
-        <!-- 问答统计卡片 -->
+        <!-- 功能卡片 -->
         <section>
           <div class="overview-grid">
-            <!-- 问答总览卡片 -->
-          <router-link
-            to="/teacher/questions"
-            class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
-          >
-            <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cyan-500 to-blue-600"></span>
-            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-cyan-50/80 via-transparent to-transparent"></div>
-
-            <div class="relative flex items-start justify-between">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-cyan-600">学生问答</p>
-                <h3 class="mt-1 text-lg font-bold text-gray-900">互动反馈</h3>
-              </div>
-              <div class="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg bg-gradient-to-br from-cyan-500 to-blue-600">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </div>
-            </div>
-
-            <div v-if="questionStats" class="relative mt-4 flex items-baseline gap-2">
-              <span class="text-3xl font-bold text-cyan-700">{{ questionStats.pending || 0 }}</span>
-              <span class="text-sm text-gray-500">待回答</span>
-            </div>
-            <div v-else class="relative mt-4 text-sm text-gray-500">加载中...</div>
-
-            <p class="relative mt-3 text-sm text-gray-600 leading-relaxed">
-              {{ questionStats?.pending ? '有待处理互动，尽快回应学生的实时反馈。' : '课堂互动已及时闭环，随时查看评估总览。' }}
-            </p>
-            <p v-if="questionStats" class="relative mt-1 text-xs text-gray-500">
-              总问题 {{ questionStats.total || 0 }} · 已解决 {{ questionStats.resolved || 0 }}
-            </p>
-
-            <div class="relative mt-4 inline-flex items-center gap-1 text-sm font-medium text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 px-4 py-2 rounded-xl transition-all">
-              查看总览
-              <svg class="ml-1 h-4 w-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-          </router-link>
-
           <!-- 学科教研组卡片 -->
           <router-link
             to="/teacher/subject-groups"

@@ -625,6 +625,19 @@
       :resource-id="referenceResource?.id || null"
     />
 
+    <!-- 浮动教学助手按钮（仅在授课模式显示） -->
+    <TeachingAssistantFAB
+      :visible="isPreviewMode"
+      :classroom-id="currentClassroomId"
+      @open-drawer="handleOpenAssistantDrawer"
+    />
+
+    <!-- 教学助手抽屉 -->
+    <TeachingAssistantDrawer
+      v-model="showAssistantDrawer"
+      :classroom-id="currentClassroomId"
+    />
+
     <!-- 全屏预览模式 -->
     <Teleport to="body">
       <Transition name="fullscreen-fade">
@@ -942,6 +955,8 @@ import PDFViewerModal from '../../components/Resource/PDFViewerModal.vue'
 import ClassroomSelectorModal from '../../components/Lesson/ClassroomSelectorModal.vue'
 import LessonAiAssistantDrawer from '@/components/Teacher/LessonAiAssistantDrawer.vue'
 import TeacherClassroomControlPanel from '@/components/Classroom/TeacherControlPanel.vue'
+import TeachingAssistantFAB from '@/components/Teacher/TeachingAssistantFAB.vue'
+import TeachingAssistantDrawer from '@/components/Teacher/TeachingAssistantDrawer.vue'
 import { useFullscreen } from '@/composables/useFullscreen'
 import api from '../../services/api'
 import courseExportService from '../../services/courseExport'
@@ -984,6 +999,7 @@ const selectedClassroomIds = ref<number[]>([])
 const publishError = ref<string | null>(null)
 const showLessonAssistant = ref(false)
 const showClassroomPanel = ref(false)
+const showAssistantDrawer = ref(false)
 
 // 封面图片上传相关
 const coverImageInput = ref<HTMLInputElement | null>(null)
@@ -1319,6 +1335,22 @@ watch(() => currentLesson.value?.cover_image_url, () => {
 const canEnterPreviewMode = computed(() => {
   return currentLesson.value?.status === 'published'
 })
+
+// 获取当前班级ID（用于教学助手）
+const currentClassroomId = computed(() => {
+  // 优先从 lesson 的 classroom_ids 中获取第一个
+  if (currentLesson.value?.classroom_ids && currentLesson.value.classroom_ids.length > 0) {
+    return currentLesson.value.classroom_ids[0]
+  }
+  // 如果 session 中有 classroom_id，也可以使用
+  // 这里暂时返回 null，后续可以根据实际需求扩展
+  return null
+})
+
+// 处理打开教学助手抽屉
+function handleOpenAssistantDrawer(type: 'attendance' | 'behavior' | 'discipline' | 'duty') {
+  showAssistantDrawer.value = true
+}
 
 // 过滤Cells：在授课模式下只显示导播台选择的Cell
 const filteredCells = computed(() => {

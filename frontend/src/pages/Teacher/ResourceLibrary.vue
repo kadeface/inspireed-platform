@@ -97,21 +97,47 @@
             <div
               v-for="asset in assets"
               :key="asset.id"
-              class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
-              @click="viewAsset(asset)"
+              class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
             >
               <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500"></span>
               <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-emerald-50/80 via-transparent to-transparent"></div>
 
               <!-- 缩略图 -->
-              <div class="aspect-video bg-gray-100 flex items-center justify-center relative">
+              <div class="aspect-video bg-gray-100 flex items-center justify-center relative overflow-hidden">
+                <!-- 有缩略图时显示图片 -->
                 <img
                   v-if="asset.thumbnail_url"
                   :src="asset.thumbnail_url"
                   :alt="asset.title"
                   class="w-full h-full object-cover"
                 />
+                <!-- 交互式课件且没有缩略图时，使用iframe显示实际内容 -->
+                <iframe
+                  v-else-if="asset.asset_type === 'interactive' && asset.public_url"
+                  :src="getFullUrl(asset.public_url)"
+                  class="w-full h-full border-0"
+                  sandbox="allow-scripts allow-same-origin"
+                  loading="lazy"
+                ></iframe>
+                <!-- 其他类型没有缩略图时显示图标 -->
                 <span v-else class="text-6xl">{{ getAssetIcon(asset.asset_type) }}</span>
+                
+                <!-- 悬停覆盖层：预览和详情按钮 -->
+                <div class="card-overlay absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    v-if="asset.public_url || asset.thumbnail_url"
+                    @click.stop="previewAsset(asset)"
+                    class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-lg"
+                  >
+                    预览
+                  </button>
+                  <button
+                    @click.stop="viewAsset(asset)"
+                    class="px-6 py-2.5 bg-white hover:bg-gray-100 text-gray-900 font-medium rounded-lg border border-gray-300 transition-colors shadow-lg"
+                  >
+                    详情
+                  </button>
+                </div>
               </div>
 
               <!-- 信息 -->
@@ -210,6 +236,16 @@
       @updated="loadAssets"
       @deleted="handleAssetDeleted"
     />
+
+    <!-- 预览模态框（复用详情模态框，但只显示预览） -->
+    <AssetDetailModal
+      v-if="showPreviewModal"
+      :is-open="showPreviewModal"
+      :asset-id="previewAssetId"
+      @close="showPreviewModal = false"
+      @updated="loadAssets"
+      @deleted="handleAssetDeleted"
+    />
   </div>
 </template>
 
@@ -227,6 +263,7 @@ import UploadAssetModal from '@/components/Library/UploadAssetModal.vue'
 import AssetDetailModal from '@/components/Library/AssetDetailModal.vue'
 import ResourceDirectoryTree from '@/components/Library/ResourceDirectoryTree.vue'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
+import { getServerBaseUrl } from '@/utils/url'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -252,6 +289,8 @@ const currentFilter = ref<ResourceFilter>({})
 const showUploadModal = ref(false)
 const showDetailModal = ref(false)
 const selectedAssetId = ref<number | null>(null)
+const showPreviewModal = ref(false)
+const previewAssetId = ref<number | null>(null)
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
@@ -353,6 +392,25 @@ const viewAsset = async (asset: LibraryAssetSummary) => {
   }
 }
 
+// 预览资源
+const previewAsset = async (asset: LibraryAssetSummary) => {
+  previewAssetId.value = asset.id
+  showPreviewModal.value = true
+  
+  // 记录点击次数（异步执行，不阻塞界面）
+  try {
+    await libraryService.incrementViewCount(asset.id)
+    // 更新本地显示的点击次数
+    const assetInList = assets.value.find(a => a.id === asset.id)
+    if (assetInList) {
+      assetInList.view_count = (assetInList.view_count || 0) + 1
+    }
+  } catch (error) {
+    // 静默失败，不影响用户体验
+    console.error('Failed to increment view count:', error)
+  }
+}
+
 // 上传成功
 const handleUploadSuccess = () => {
   showUploadModal.value = false
@@ -375,6 +433,18 @@ const getAssetIcon = (type: string) => getAssetTypeIcon(type as any)
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
   return date.toLocaleDateString('zh-CN')
+}
+
+// 获取完整URL（将相对路径转换为绝对路径）
+const getFullUrl = (url?: string | null): string => {
+  if (!url) return ''
+  // 如果已经是完整URL，直接返回
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  // 如果是相对路径，添加服务器基础URL
+  const baseURL = getServerBaseUrl()
+  return `${baseURL}${url.startsWith('/') ? '' : '/'}${url}`
 }
 
 // 加载学科列表

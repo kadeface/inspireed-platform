@@ -22,14 +22,12 @@ from app.api.v1.auth import get_current_active_user
 router = APIRouter()
 
 
-def _calculate_completion(content: List[dict]) -> int:
+def _calculate_completion(content: list) -> int:
     """计算阶段完成度（基于非空cell数量）"""
     if not content:
         return 0
     # 简单计算：有内容就算有进度，可以根据实际需求调整
     non_empty_cells = [cell for cell in content if cell and isinstance(cell, dict) and cell.get("content")]
-    if not content:
-        return 0
     # 假设至少需要3个cell才算完成，可以根据需求调整
     completion = min(100, int((len(non_empty_cells) / max(3, len(content))) * 100))
     return completion
@@ -38,13 +36,13 @@ def _calculate_completion(content: List[dict]) -> int:
 def _update_completion(project: StudentProject) -> dict:
     """更新项目的完成度"""
     completion = {
-        "engage": _calculate_completion(project.engage_content or []),
-        "explore": _calculate_completion(project.explore_content or []),
-        "explain": _calculate_completion(project.explain_content or []),
-        "elaborate": _calculate_completion(project.elaborate_content or []),
-        "evaluate": _calculate_completion(project.evaluate_content or []),
+        "engage": _calculate_completion(cast(list, project.engage_content or [])),
+        "explore": _calculate_completion(cast(list, project.explore_content or [])),
+        "explain": _calculate_completion(cast(list, project.explain_content or [])),
+        "elaborate": _calculate_completion(cast(list, project.elaborate_content or [])),
+        "evaluate": _calculate_completion(cast(list, project.evaluate_content or [])),
     }
-    project.completion = completion
+    project.completion = completion  # type: ignore
     return completion
 
 
@@ -65,7 +63,7 @@ async def _get_project_or_404(
     # 权限检查：学生只能访问自己的项目
     user_role = cast(str, current_user.role)
     if user_role == UserRole.STUDENT.value:
-        if project.creator_id != current_user.id:
+        if project.creator_id != current_user.id:  # type: ignore
             raise HTTPException(status_code=403, detail="无权限访问此项目")
 
     return project
@@ -212,7 +210,7 @@ async def update_project(
     # 处理状态更新
     if "status" in update_data and update_data["status"]:
         try:
-            project.status = ProjectStatus(update_data["status"])
+            project.status = ProjectStatus(update_data["status"])  # type: ignore
         except ValueError:
             raise HTTPException(status_code=400, detail=f"无效的状态值: {update_data['status']}")
 
@@ -278,4 +276,3 @@ async def update_stage_content(
     await db.refresh(project, ["creator"])
 
     return _project_to_response(project)
-

@@ -224,16 +224,17 @@ const current_stage_cells = computed(() => {
 
 // 将 ProjectCell 转换为 Cell 格式
 function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
+  const cell_type_lower = project_cell.cell_type.toLowerCase()
   const base_cell: any = {
-    id: project_cell.id || `project-cell-${index}-${uuidv4()}`,
-    type: project_cell.cell_type.toLowerCase() as CellType,
+    id: project_cell.id || `project-cell-${active_stage.value}-${index}`,
+    type: cell_type_lower as CellType,
     order: project_cell.order ?? index,
     title: project_cell.title,
     editable: true,
   }
 
-  switch (project_cell.cell_type) {
-    case 'TEXT':
+  switch (cell_type_lower) {
+    case 'text':
       return {
         ...base_cell,
         type: CellType.TEXT,
@@ -245,7 +246,7 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         },
       } as Cell
 
-    case 'VIDEO':
+    case 'video':
       return {
         ...base_cell,
         type: CellType.VIDEO,
@@ -266,7 +267,7 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         },
       } as Cell
 
-    case 'CODE':
+    case 'code':
       return {
         ...base_cell,
         type: CellType.CODE,
@@ -282,7 +283,7 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         },
       } as Cell
 
-    case 'SIM':
+    case 'sim':
       return {
         ...base_cell,
         type: CellType.SIM,
@@ -303,7 +304,7 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         },
       } as Cell
 
-    case 'CHART':
+    case 'chart':
       return {
         ...base_cell,
         type: CellType.CHART,
@@ -314,7 +315,7 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         },
       } as Cell
 
-    case 'FLOWCHART':
+    case 'flowchart':
       return {
         ...base_cell,
         type: CellType.FLOWCHART,
@@ -329,7 +330,7 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         },
       } as Cell
 
-    case 'PARAM':
+    case 'param':
       return {
         ...base_cell,
         type: CellType.PARAM,
@@ -339,7 +340,7 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         },
       } as Cell
 
-    case 'CONTEST':
+    case 'contest':
       return {
         ...base_cell,
         type: CellType.CONTEST,
@@ -351,7 +352,7 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         },
       } as Cell
 
-    case 'ACTIVITY':
+    case 'activity':
       return {
         ...base_cell,
         type: CellType.ACTIVITY,
@@ -370,7 +371,7 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         },
       } as Cell
 
-    case 'BROWSER':
+    case 'browser':
       return {
         ...base_cell,
         type: CellType.BROWSER,
@@ -388,7 +389,7 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         },
       } as Cell
 
-    case 'INTERACTIVE':
+    case 'interactive':
       return {
         ...base_cell,
         type: CellType.INTERACTIVE,
@@ -425,7 +426,7 @@ function cell_to_project_cell(cell: Cell): ProjectCell {
     title: cell.title,
     order: cell.order,
     content: {} as any,
-    config: cell.config || {},
+    config: (cell as any).config || {},
   }
 
   switch (cell.type) {
@@ -685,6 +686,8 @@ function handle_add_cell(cell_type: string) {
     return
   }
 
+  const cell_type_lower = cell_type.toLowerCase()
+
   // 根据类型创建默认内容
   let default_content: any = {}
   const cell_type_name_map: Record<string, string> = {
@@ -701,36 +704,36 @@ function handle_add_cell(cell_type: string) {
     'INTERACTIVE': '交互式课件',
   }
 
-  switch (cell_type) {
-    case 'TEXT':
+  switch (cell_type_lower) {
+    case 'text':
       default_content = { html: '<p>在此输入文本内容...</p>', text: '' }
       break
-    case 'VIDEO':
+    case 'video':
       default_content = { videoUrl: '', title: '', description: '' }
       break
-    case 'CODE':
+    case 'code':
       default_content = { code: '# 在此编写代码\nprint("Hello, World!")', language: 'python' }
       break
-    case 'SIM':
+    case 'sim':
       default_content = {
         type: 'iframe',
         url: '',
         config: { width: 800, height: 600, autoplay: false, fullScreen: false }
       }
       break
-    case 'CHART':
+    case 'chart':
       default_content = { chartType: 'bar', data: {}, options: {} }
       break
-    case 'FLOWCHART':
+    case 'flowchart':
       default_content = { nodes: [], edges: [], style: { theme: 'light', layoutDirection: 'TB' } }
       break
-    case 'PARAM':
+    case 'param':
       default_content = { schema: {}, values: {} }
       break
-    case 'CONTEST':
+    case 'contest':
       default_content = { title: '竞赛任务', description: '在此输入竞赛说明...', rules: {} }
       break
-    case 'ACTIVITY':
+    case 'activity':
       default_content = {
         title: '新活动',
         description: '',
@@ -742,10 +745,10 @@ function handle_add_cell(cell_type: string) {
         display: { showProgress: true },
       }
       break
-    case 'BROWSER':
+    case 'browser':
       default_content = { url: '', title: '', description: '' }
       break
-    case 'INTERACTIVE':
+    case 'interactive':
       default_content = { url: '', html_code: undefined, title: '', description: '' }
       break
     default:
