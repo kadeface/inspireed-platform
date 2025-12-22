@@ -2,6 +2,7 @@
   "name": "inspireed-platform",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@10.26.1",
   "description": "InspireEd 教师教研系统 - Jupyter式教学评研一体化平台",
   "scripts": {
     "dev": "pnpm --filter frontend dev",
