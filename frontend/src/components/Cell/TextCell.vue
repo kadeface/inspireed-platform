@@ -341,62 +341,27 @@ const sanitizedHtml = computed(() => {
           return match
         }
         
-        // 如果URL包含localhost，需要替换为正确的服务器地址
-        if (src.includes('localhost') || src.includes('127.0.0.1')) {
-          // 提取路径部分（确保文件名不变）
-          try {
-            const url = new URL(src)
-            const path = url.pathname + (url.search || '') + (url.hash || '')
-            // 如果路径只是/，则不添加（避免baseURL后面出现多余的/）
-            // 否则确保路径以/开头
-            let normalizedPath = path
-            if (path === '/') {
-              normalizedPath = ''
-            } else if (!path.startsWith('/')) {
-              normalizedPath = '/' + path
-            }
-            newSrc = `${baseURL}${normalizedPath}`
-            // 验证文件名是否一致
-            const originalFilename = url.pathname.split('/').pop()
-            const newFilename = newSrc.split('/').pop()?.split('?')[0]
-            if (originalFilename && newFilename && originalFilename !== newFilename) {
-              // 文件名不一致，但继续处理
-            }
-          } catch (e) {
-            // 如果URL解析失败，尝试直接替换localhost部分
-            const originalFilename = src.split('/').pop()?.split('?')[0]
-            newSrc = src.replace(/https?:\/\/localhost(:\d+)?/, baseURL)
-              .replace(/https?:\/\/127\.0\.0\.1(:\d+)?/, baseURL)
-            const newFilename = newSrc.split('/').pop()?.split('?')[0]
-            if (originalFilename && newFilename && originalFilename !== newFilename) {
-              // 文件名不一致，但继续处理
-            }
+        // 如果是纯文件名（没有路径，只有文件名），假设是资源文件
+        // 例如：9ffa58aa-610a-4a2d-b640-65e0d5be2d41.png
+        if (!src.startsWith('/') && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('blob:')) {
+          // 检查是否看起来像一个文件名（包含扩展名）
+          if (/\.(png|jpe?g|gif|webp|svg|mp4|pdf|docx?|xlsx?|pptx?)$/i.test(src)) {
+            newSrc = `${baseURL}/uploads/resources/${src}`
+            const newSrcAttr = ` src=${quote}${newSrc}${quote}`
+            return match.replace(srcMatch[0], newSrcAttr)
           }
         }
+        
         // 如果是完整URL（http/https），检查是否需要替换为当前服务器地址
-        else if (src.startsWith('http://') || src.startsWith('https://')) {
+        if (src.startsWith('http://') || src.startsWith('https://')) {
           try {
             const url = new URL(src)
-            const currentHost = window.location.hostname
-            const urlHost = url.hostname
             
-            // 如果URL指向的是资源路径 (/uploads/resources/)，并且：
-            // 1. 主机名是IP地址（192.168.x.x, 10.x.x.x, 172.x.x.x等）
-            // 2. 或者是不同的主机名（排除当前主机）
-            // 则替换为当前服务器地址
-            if (url.pathname.startsWith('/uploads/resources/')) {
-              const isIPAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(urlHost)
-              const isLocalhost = urlHost === 'localhost' || urlHost === '127.0.0.1'
-              const isDifferentHost = urlHost !== currentHost && !isLocalhost
-              
-              // 如果是IP地址或者不同的主机名，替换为当前服务器地址
-              if (isIPAddress || isDifferentHost) {
-                const path = url.pathname + (url.search || '') + (url.hash || '')
-                newSrc = `${baseURL}${path}`
-              } else {
-                // 主机名相同，无需处理
-                return match
-              }
+            // 如果URL指向的是资源路径 (/uploads/)，统一替换为当前服务器地址
+            // 这样可以确保无论数据来自哪个环境（localhost、不同IP等），都能在当前环境正确显示
+            if (url.pathname.startsWith('/uploads/')) {
+              const path = url.pathname + (url.search || '') + (url.hash || '')
+              newSrc = `${baseURL}${path}`
             } else {
               // 不是资源路径，保持原样
               return match
@@ -649,61 +614,43 @@ const sanitizedHtml = computed(() => {
   
   let sanitized = DOMPurify.sanitize(html, config)
   
-  // 最终清理：替换sanitized HTML中任何剩余的localhost URL
-  // 这是一个安全网，确保所有localhost URL都被替换
-  // 只有当baseURL不包含localhost时才进行替换
-  const baseURLHasLocalhost = baseURL.includes('localhost') || baseURL.includes('127.0.0.1')
+  // 安全网：在DOMPurify之后，使用更精确的正则匹配HTML标签中的src属性
+  // 匹配所有指向 /uploads/ 路径的完整URL，无论主机名是什么，都替换为当前服务器地址
+  sanitized = sanitized.replace(/src\s*=\s*(["'])(https?:\/\/[^"']+\/uploads\/[^"']+)\1/gi, (match, quote, url) => {
+    try {
+      const urlObj = new URL(url)
+      if (urlObj.pathname.startsWith('/uploads/')) {
+        const path = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
+        return `src=${quote}${baseURL}${path}${quote}`
+      }
+    } catch (e) {
+      // URL解析失败，尝试直接提取路径
+      const pathMatch = url.match(/\/uploads\/[^"']+/)
+      if (pathMatch) {
+        return `src=${quote}${baseURL}${pathMatch[0]}${quote}`
+      }
+    }
+    return match
+  })
   
-  if (!baseURLHasLocalhost) {
-    // 只有当baseURL不是localhost时，才需要替换localhost URL
-    // 匹配完整的localhost URL（包含路径）
-    sanitized = sanitized.replace(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/[^\s"'>]*)?/gi, (match) => {
-      try {
-        const url = new URL(match)
-        const path = url.pathname + (url.search || '') + (url.hash || '')
-        // 如果路径只是/，则不添加（避免baseURL后面出现多余的/）
-        // 否则确保路径以/开头
-        let normalizedPath = path
-        if (path === '/') {
-          normalizedPath = ''
-        } else if (!path.startsWith('/')) {
-          normalizedPath = '/' + path
-        }
-        const newUrl = baseURL + normalizedPath
-        return newUrl
-      } catch (e) {
-        // 如果URL解析失败，直接替换localhost部分
-        const newUrl = match.replace(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, baseURL)
-        return newUrl
+  // 额外安全网：直接替换HTML字符串中所有指向 /uploads/ 的完整URL
+  // 这样可以确保无论原始URL的主机名是什么（localhost、不同IP等），都替换为当前服务器地址
+  sanitized = sanitized.replace(/https?:\/\/[^\s"'>]+\/uploads\/[^\s"'>]+/gi, (match) => {
+    try {
+      const urlObj = new URL(match)
+      if (urlObj.pathname.startsWith('/uploads/')) {
+        const path = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
+        return baseURL + path
       }
-    })
-    
-    // 处理硬编码的IP地址URL（如192.168.x.x:8000/uploads/resources/...）
-    // 匹配包含 /uploads/resources/ 的IP地址URL
-    sanitized = sanitized.replace(/https?:\/\/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?(\/uploads\/resources\/[^\s"'>]*)/gi, (match) => {
-      try {
-        const url = new URL(match)
-        const path = url.pathname + (url.search || '') + (url.hash || '')
-        // 如果是资源路径，替换为当前服务器地址
-        if (path.startsWith('/uploads/resources/')) {
-          let normalizedPath = path
-          if (path === '/') {
-            normalizedPath = ''
-          } else if (!path.startsWith('/')) {
-            normalizedPath = '/' + path
-          }
-          return baseURL + normalizedPath
-        }
-      } catch (e) {
-        // URL解析失败，尝试直接提取路径
-        const pathMatch = match.match(/\/uploads\/resources\/[^\s"'>]+/)
-        if (pathMatch) {
-          return baseURL + pathMatch[0]
-        }
+    } catch (e) {
+      // URL解析失败，尝试直接提取路径
+      const pathMatch = match.match(/\/uploads\/[^\s"'>]+/)
+      if (pathMatch) {
+        return baseURL + pathMatch[0]
       }
-      return match
-    })
-  }
+    }
+    return match
+  })
   
   // 修复双斜杠问题（如果baseURL以/结尾，路径也以/开头）
   // 转义baseURL中的特殊字符用于正则表达式
@@ -713,19 +660,8 @@ const sanitizedHtml = computed(() => {
   // 检查处理后的HTML（仅在开发环境或发现问题时输出日志）
   const originalHasImg = html.includes('<img')
   const sanitizedHasImg = sanitized.includes('<img')
-  if (originalHasImg) {
-    // 只有当baseURL不包含localhost时，才检查是否有localhost URL
-    // 如果baseURL本身就是localhost，那么包含localhost是正常的
-    if (!baseURLHasLocalhost) {
-      const hasLocalhost = /localhost|127\.0\.0\.1/.test(sanitized)
-      if (hasLocalhost) {
-        // 静默处理，不输出错误
-      }
-    }
-    
-    if (!sanitizedHasImg) {
-      // 图片标签被过滤，静默处理
-    }
+  if (originalHasImg && !sanitizedHasImg) {
+    // 图片标签被过滤，静默处理
   }
   
   return sanitized
@@ -754,6 +690,39 @@ function markdownToHtml(markdown: string): string {
 
   const renderInline = (text: string): string => {
     let result = escapeHtml(text)
+    // 处理图片语法 ![alt](url) - 必须在链接之前处理，因为图片和链接语法相似
+    result = result.replace(
+      /!\[([^\]]*)\]\((https?:\/\/[^\s)]+|\/[^\s)]+|[^\s)]+)\)/g,
+      (_match, alt, url) => {
+        // 规范化图片URL（在转换为HTML之前）
+        const baseURL = getServerBaseUrl()
+        let normalizedUrl = url
+        // 如果是完整URL且指向资源路径，统一替换为当前服务器地址
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          try {
+            const urlObj = new URL(url)
+            // 如果URL指向的是资源路径 (/uploads/)，统一替换为当前服务器地址
+            // 这样可以确保无论数据来自哪个环境，都能在当前环境正确显示
+            if (urlObj.pathname.startsWith('/uploads/')) {
+              const path = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
+              normalizedUrl = `${baseURL}${path}`
+            }
+          } catch {
+            // URL解析失败，使用原URL
+          }
+        } else if (url.startsWith('/')) {
+          // 相对路径，转换为完整URL
+          normalizedUrl = `${baseURL}${url}`
+        } else if (!url.startsWith('/') && !url.startsWith('http://') && !url.startsWith('https://')) {
+          // 纯文件名，假设是资源文件
+          if (/\.(png|jpe?g|gif|webp|svg|mp4|pdf|docx?|xlsx?|pptx?)$/i.test(url)) {
+            normalizedUrl = `${baseURL}/uploads/resources/${url}`
+          }
+        }
+        return `<img src="${normalizedUrl}" alt="${alt}" />`
+      }
+    )
+    // 处理链接语法 [text](url)
     result = result.replace(
       /\[([^\]]+)]\((https?:\/\/[^\s)]+)\)/g,
       (_match, label, url) =>
@@ -958,8 +927,32 @@ function htmlToMarkdown(html: string): string {
         const href = element.getAttribute('href') || ''
         return `[${content}](${href})`
       case 'img':
-        const src = element.getAttribute('src') || ''
+        let src = element.getAttribute('src') || ''
         const alt = element.getAttribute('alt') || ''
+        // 规范化图片URL，确保localhost和不同IP地址的URL都被替换为当前服务器地址
+        if (src && !src.startsWith('blob:') && !src.startsWith('data:')) {
+          const baseURL = getServerBaseUrl()
+          // 如果是完整URL且指向资源路径，统一替换为当前服务器地址
+          if (src.startsWith('http://') || src.startsWith('https://')) {
+            try {
+              const urlObj = new URL(src)
+              if (urlObj.pathname.startsWith('/uploads/')) {
+                const path = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
+                src = `${baseURL}${path}`
+              }
+            } catch {
+              // URL解析失败，使用原URL
+            }
+          } else if (src.startsWith('/')) {
+            // 相对路径，转换为完整URL
+            src = `${baseURL}${src}`
+          } else if (!src.startsWith('/') && !src.startsWith('http://') && !src.startsWith('https://')) {
+            // 纯文件名，假设是资源文件
+            if (/\.(png|jpe?g|gif|webp|svg|mp4|pdf|docx?|xlsx?|pptx?)$/i.test(src)) {
+              src = `${baseURL}/uploads/resources/${src}`
+            }
+          }
+        }
         return `![${alt}](${src})`
       default:
         return content

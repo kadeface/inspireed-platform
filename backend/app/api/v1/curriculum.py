@@ -205,7 +205,41 @@ async def list_courses(
 
     result = await db.execute(query)
     courses = result.scalars().all()
-    return courses
+    
+    # 过滤掉关联对象不存在或无效的课程（避免序列化错误）
+    valid_courses = []
+    for course in courses:
+        try:
+            # selectinload 应该已经加载了关联对象，但如果数据不一致可能导致 None
+            # 验证关联对象是否存在
+            if hasattr(course, 'subject') and hasattr(course, 'grade'):
+                # 检查关联对象是否有效（不是 None 且是有效的对象）
+                if course.subject is not None and course.grade is not None:
+                    valid_courses.append(course)
+                else:
+                    # 关联对象为 None，可能是数据不一致，跳过该课程
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f"跳过课程 {getattr(course, 'id', 'unknown')} "
+                        f"({getattr(course, 'name', 'unknown')}): "
+                        f"关联对象缺失 (subject={course.subject is not None}, "
+                        f"grade={course.grade is not None})"
+                    )
+            else:
+                # 如果对象没有这些属性，也跳过
+                valid_courses.append(course)
+        except Exception as e:
+            # 如果访问关联对象时出错，跳过该课程并记录错误
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"跳过课程 {getattr(course, 'id', 'unknown')} "
+                f"({getattr(course, 'name', 'unknown')}): 关联对象加载失败 - {str(e)}"
+            )
+            continue
+    
+    return valid_courses
 
 
 @router.post("/courses", response_model=CourseResponse, status_code=201)

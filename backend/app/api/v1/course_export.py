@@ -14,6 +14,7 @@ import os
 import re
 import zipfile
 import tempfile
+import hashlib
 from pathlib import Path
 from datetime import datetime
 
@@ -65,54 +66,233 @@ def extract_file_urls_from_content(content: Any) -> Set[str]:
                 img_pattern = r'<img[^>]+src\s*=\s*["\']([^"\']+)["\']'
                 for match in re.finditer(img_pattern, html, re.IGNORECASE):
                     url = match.group(1)
-                    if url and not url.startswith(("data:", "blob:", "http://", "https://")):
-                        file_urls.add(url)
+                    if url and not url.startswith(("data:", "blob:")):
+                        # 如果是完整URL（包含http://或https://），提取路径部分
+                        if url.startswith(("http://", "https://")):
+                            try:
+                                from urllib.parse import urlparse
+                                parsed = urlparse(url)
+                                if parsed.path:
+                                    url = parsed.path
+                                else:
+                                    continue  # 如果没有路径部分，跳过
+                            except:
+                                continue  # 解析失败，跳过
+                        # 只添加相对路径URL（以/uploads/开头的）
+                        if url.startswith("/uploads/"):
+                            file_urls.add(url)
                 
                 # 提取文件附件的URL
                 file_pattern = r'data-(?:pdf|file)-url\s*=\s*["\']([^"\']+)["\']'
                 for match in re.finditer(file_pattern, html, re.IGNORECASE):
                     url = match.group(1)
-                    if url and not url.startswith(("http://", "https://")):
-                        file_urls.add(url)
+                    if url:
+                        # 如果是完整URL（包含http://或https://），提取路径部分
+                        if url.startswith(("http://", "https://")):
+                            try:
+                                from urllib.parse import urlparse
+                                parsed = urlparse(url)
+                                if parsed.path:
+                                    url = parsed.path
+                                else:
+                                    continue  # 如果没有路径部分，跳过
+                            except:
+                                continue  # 解析失败，跳过
+                        # 只添加相对路径URL（以/uploads/开头的）
+                        if url.startswith("/uploads/"):
+                            file_urls.add(url)
         
         # VideoCell: 提取视频URL
         elif cell_type == "video" and isinstance(cell_content, dict):
             video_url = cell_content.get("videoUrl") or cell_content.get("video_url")
-            if video_url and not video_url.startswith(("http://", "https://", "blob:")):
-                file_urls.add(video_url)
+            if video_url:
+                # 提取相对路径部分（如果是完整URL，提取路径）
+                if video_url.startswith(("http://", "https://")):
+                    # 提取路径部分
+                    try:
+                        from urllib.parse import urlparse
+                        parsed = urlparse(video_url)
+                        if parsed.path:
+                            video_url = parsed.path
+                    except:
+                        pass
+                # 如果不是blob URL，添加
+                if video_url and not video_url.startswith("blob:"):
+                    file_urls.add(video_url)
         
         # ReferenceMaterialCell: 提取资源URL
         elif cell_type == "reference_material" and isinstance(cell_content, dict):
             preview_url = cell_content.get("preview_url")
             download_url = cell_content.get("download_url")
             for url in [preview_url, download_url]:
-                if url and not url.startswith(("http://", "https://")):
-                    file_urls.add(url)
+                if url:
+                    # 提取相对路径部分（如果是完整URL，提取路径）
+                    if url.startswith(("http://", "https://")):
+                        try:
+                            from urllib.parse import urlparse
+                            parsed = urlparse(url)
+                            if parsed.path:
+                                url = parsed.path
+                        except:
+                            pass
+                    # 添加相对路径URL
+                    if url and not url.startswith(("http://", "https://", "blob:")):
+                        file_urls.add(url)
+        
+        # InteractiveCell: 可能包含HTML文件或资源URL
+        elif cell_type == "interactive" and isinstance(cell_content, dict):
+            html_url = cell_content.get("html_url") or cell_content.get("htmlUrl")
+            if html_url:
+                # 如果是完整URL，提取路径部分
+                if html_url.startswith(("http://", "https://")):
+                    try:
+                        from urllib.parse import urlparse
+                        parsed = urlparse(html_url)
+                        if parsed.path and parsed.path.startswith("/uploads/"):
+                            html_url = parsed.path
+                        else:
+                            html_url = None  # 不是我们的资源URL
+                    except:
+                        html_url = None  # 解析失败
+                # 添加相对路径URL
+                if html_url and not html_url.startswith(("blob:", "data:")) and html_url.startswith("/uploads/"):
+                    file_urls.add(html_url)
+        
+        # 通用：检查content中是否有其他URL字段
+        if isinstance(cell_content, dict):
+            # 查找所有可能的URL字段
+            url_fields = ["url", "src", "href", "file_url", "fileUrl", "image_url", "imageUrl", 
+                         "thumbnail_url", "thumbnailUrl", "background_url", "backgroundUrl"]
+            for field in url_fields:
+                url_value = cell_content.get(field)
+                if url_value and isinstance(url_value, str):
+                    # 提取相对路径部分
+                    if url_value.startswith(("http://", "https://")):
+                        try:
+                            from urllib.parse import urlparse
+                            parsed = urlparse(url_value)
+                            if parsed.path:
+                                url_value = parsed.path
+                        except:
+                            pass
+                    if url_value and not url_value.startswith(("http://", "https://", "blob:", "data:")):
+                        file_urls.add(url_value)
     
     return file_urls
 
 
 def url_to_file_path(url: str) -> Optional[str]:
-    """将URL转换为实际文件路径"""
+    """
+    将URL转换为实际文件路径
+    
+    支持多种URL格式：
+    1. 相对路径: /uploads/resources/filename.jpg
+    2. 完整URL (域名): http://example.com/uploads/resources/filename.jpg
+    3. 完整URL (IP地址): http://192.168.1.100:8000/uploads/resources/filename.jpg
+    4. 完整URL (localhost): http://localhost:8000/uploads/resources/filename.jpg
+    5. 纯文件名: filename.jpg
+    
+    最佳实践：数据库中应存储相对路径，这样可以：
+    - 避免IP地址变更导致的问题
+    - 便于跨环境迁移
+    - 前端可以根据当前服务器地址动态构建完整URL
+    """
     if not url:
         return None
     
-    # 处理 /uploads/resources/xxx 格式的URL
-    if url.startswith("/uploads/resources/"):
-        filename = url.replace("/uploads/resources/", "")
-        file_path = os.path.join("storage", "resources", filename)
-        if os.path.exists(file_path):
+    # 使用配置中的上传目录
+    from app.core.config import settings
+    base_upload_dir = settings.UPLOAD_DIR  # 通常是 "storage"
+    resources_dir = os.path.join(base_upload_dir, "resources")
+    
+    # 提取文件名（无论URL格式如何）
+    filename = None
+    url_path = url.strip()
+    
+    # 方法1: 如果是完整URL（包含协议），提取路径部分
+    if "://" in url_path:
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url_path)
+            # 提取路径部分（如 /uploads/resources/file.jpg）
+            url_path = parsed.path if parsed.path else ""
+            # 也可以从完整URL中直接提取文件名
+            filename = os.path.basename(parsed.path)
+        except Exception as e:
+            print(f"警告: 解析URL失败 {url}: {str(e)}")
+            # 降级处理：手动提取
+            if "/" in url_path:
+                # 尝试提取路径部分
+                parts = url_path.split("://", 1)
+                if len(parts) > 1:
+                    # 去掉协议和域名/IP部分
+                    path_part = parts[1].split("/", 3)  # 分割：['', 'domain:port', 'uploads', 'resources/...']
+                    if len(path_part) >= 4:
+                        url_path = "/" + "/".join(path_part[2:])  # 保留 /uploads/resources/...
+                    elif len(path_part) >= 3:
+                        url_path = "/" + path_part[2]
+    
+    # 方法2: 如果路径以 /uploads/resources/ 开头，提取文件名
+    if not filename and url_path.startswith("/uploads/resources/"):
+        filename = url_path.replace("/uploads/resources/", "").strip()
+        # 移除可能的查询参数或锚点
+        if "?" in filename:
+            filename = filename.split("?")[0]
+        if "#" in filename:
+            filename = filename.split("#")[0]
+    
+    # 方法3: 如果路径包含 /resources/ 或 /uploads/，提取文件名
+    elif not filename and ("/resources/" in url_path or "/uploads/" in url_path):
+        filename = url_path.split("/")[-1].strip()
+        # 移除可能的查询参数或锚点
+        if "?" in filename:
+            filename = filename.split("?")[0]
+        if "#" in filename:
+            filename = filename.split("#")[0]
+    
+    # 方法4: 如果路径中没有斜杠，可能就是文件名
+    elif not filename and "/" not in url_path and "." in url_path:
+        filename = url_path
+        # 移除可能的查询参数或锚点
+        if "?" in filename:
+            filename = filename.split("?")[0]
+        if "#" in filename:
+            filename = filename.split("#")[0]
+    
+    # 如果仍然没有提取到文件名，尝试直接从URL末尾提取
+    if not filename:
+        # 尝试提取最后一个路径段作为文件名
+        parts = url_path.strip("/").split("/")
+        if parts:
+            potential_filename = parts[-1]
+            if "." in potential_filename:  # 包含扩展名，可能是文件名
+                filename = potential_filename
+                # 移除可能的查询参数或锚点
+                if "?" in filename:
+                    filename = filename.split("?")[0]
+                if "#" in filename:
+                    filename = filename.split("#")[0]
+    
+    if not filename:
+        print(f"警告: 无法从URL提取文件名: {url}")
+        return None
+    
+    # 尝试多个可能的存储路径
+    possible_paths = [
+        os.path.join(resources_dir, filename),
+        os.path.join("storage", "resources", filename),
+        os.path.join("backend", "storage", "resources", filename),
+        os.path.join(os.getcwd(), "storage", "resources", filename),
+        os.path.join(os.getcwd(), "backend", "storage", "resources", filename),
+        os.path.abspath(os.path.join(resources_dir, filename)),
+    ]
+    
+    for file_path in possible_paths:
+        if os.path.exists(file_path) and os.path.isfile(file_path):
             return file_path
     
-    # 处理相对路径
-    elif url.startswith("/") and not url.startswith("//"):
-        # 尝试作为资源文件
-        if "/resources/" in url or "/uploads/" in url:
-            filename = url.split("/")[-1]
-            file_path = os.path.join("storage", "resources", filename)
-            if os.path.exists(file_path):
-                return file_path
-    
+    # 如果都没找到，记录调试信息
+    print(f"调试: 无法找到文件 - 原始URL: {url}, 提取的文件名: {filename}, 尝试的路径: {possible_paths}")
     return None
 
 
@@ -242,17 +422,25 @@ async def _process_zip_import(zip_content: bytes, current_user: User) -> tuple[D
                             print(f"警告: 文件 {original_filename} 上传失败或返回格式不正确")
                             continue
                         
-                        # 记录URL映射
+                            # 记录URL映射 - 记录多种可能的URL格式
                         old_url = f"/uploads/resources/{original_filename}"
                         new_url = upload_result["file_url"]
+                        
+                        # 映射各种可能的URL格式（包括完整路径和文件名）
                         url_mapping[old_url] = new_url
+                        url_mapping[original_filename] = new_url
+                        url_mapping[f"resources/{original_filename}"] = new_url
+                        url_mapping[f"/resources/{original_filename}"] = new_url
+                        # 处理可能包含服务器地址的完整URL
+                        # 提取URL路径部分进行匹配（忽略服务器地址）
+                        if "/" in new_url:
+                            new_url_path = "/" + "/".join(new_url.split("/")[3:])  # 移除协议和域名部分
+                            if new_url_path != old_url:
+                                url_mapping[new_url_path] = new_url
+                        
                     except Exception as e:
                         print(f"警告: 上传文件 {original_filename} 时出错: {str(e)}")
                         continue
-                    
-                    # 也映射文件名（不包含路径）
-                    url_mapping[original_filename] = new_url
-                    url_mapping[f"resources/{original_filename}"] = new_url
         
         # 确保 import_data 不为 None
         if import_data is None:
@@ -280,11 +468,40 @@ def _update_urls_in_data(data: Dict, url_mapping: Dict[str, str]) -> Dict:
             for key, value in content.items():
                 if key in ["file_url", "thumbnail_url", "cover_image_url", "videoUrl", "video_url", 
                           "preview_url", "download_url"] and isinstance(value, str):
-                    # 尝试匹配URL
+                    # 尝试匹配URL - 改进匹配逻辑
+                    updated = False
                     for old_url, new_url in url_mapping.items():
-                        if old_url in value or value.endswith(old_url.split("/")[-1]):
+                        # 提取文件名用于匹配
+                        old_filename = old_url.split("/")[-1] if "/" in old_url else old_url
+                        value_filename = value.split("/")[-1] if "/" in value else value
+                        
+                        # 完整URL匹配
+                        if old_url == value or value == old_url:
                             content[key] = new_url
+                            updated = True
                             break
+                        # 文件名匹配
+                        elif old_filename and value_filename and old_filename == value_filename:
+                            content[key] = new_url
+                            updated = True
+                            break
+                        # 部分匹配（旧URL包含在新URL中，或相反）
+                        elif old_url in value or value in old_url:
+                            # 提取完整路径部分进行更精确匹配
+                            if "/" in old_url and "/" in value:
+                                old_path = old_url.split("/")[-1]  # 只取文件名部分
+                                if old_path in value:
+                                    content[key] = new_url
+                                    updated = True
+                                    break
+                    # 如果还没有更新，尝试通过文件名匹配
+                    if not updated and value:
+                        value_filename = value.split("/")[-1] if "/" in value else value
+                        for old_url, new_url in url_mapping.items():
+                            old_filename = old_url.split("/")[-1] if "/" in old_url else old_url
+                            if old_filename == value_filename:
+                                content[key] = new_url
+                                break
                 elif key == "html" and isinstance(value, str):
                     # 更新HTML中的URL
                     html = value
@@ -357,10 +574,23 @@ def collect_all_files(export_data: Dict, lesson_data_list: List[Dict], resource_
                     if file_path and os.path.exists(file_path):
                         # 在ZIP中使用相对路径
                         zip_path = f"resources/{os.path.basename(file_path)}"
+                        # 如果已经有同名文件但路径不同，使用文件名+部分哈希避免冲突
+                        if zip_path in files_map and files_map[zip_path] != file_path:
+                            # 文件名冲突，添加路径信息
+                            filename_base = os.path.splitext(os.path.basename(file_path))[0]
+                            filename_ext = os.path.splitext(os.path.basename(file_path))[1]
+                            path_hash = hashlib.md5(file_path.encode()).hexdigest()[:8]
+                            zip_path = f"resources/{filename_base}_{path_hash}{filename_ext}"
                         files_map[zip_path] = file_path
+                        print(f"调试: 成功添加文件到导出列表 - URL: {url}, 路径: {file_path}, ZIP路径: {zip_path}")
+                    else:
+                        # 记录无法找到的文件（用于调试）
+                        print(f"警告: 无法找到文件对应的路径 - URL: {url}, 提取到的路径: {file_path}")
+            print(f"调试: 从教案 '{lesson_data.get('title', '未知')}' 中提取了 {len(file_urls)} 个文件URL")
         except Exception as e:
             # 如果处理某个教案时出错，记录错误但继续处理其他教案
-            print(f"警告: 处理教案文件时出错: {str(e)}")
+            import traceback
+            print(f"警告: 处理教案文件时出错: {str(e)}\n{traceback.format_exc()}")
             continue
     
     # 从资源数据中提取文件
@@ -373,8 +603,20 @@ def collect_all_files(export_data: Dict, lesson_data_list: List[Dict], resource_
                 file_path = url_to_file_path(url)
                 if file_path and os.path.exists(file_path):
                     zip_path = f"resources/{os.path.basename(file_path)}"
+                    # 如果已经有同名文件但路径不同，使用文件名+部分哈希避免冲突
+                    if zip_path in files_map and files_map[zip_path] != file_path:
+                        # 文件名冲突，添加路径信息
+                        filename_base = os.path.splitext(os.path.basename(file_path))[0]
+                        filename_ext = os.path.splitext(os.path.basename(file_path))[1]
+                        path_hash = hashlib.md5(file_path.encode()).hexdigest()[:8]
+                        zip_path = f"resources/{filename_base}_{path_hash}{filename_ext}"
                     files_map[zip_path] = file_path
+                    print(f"调试: 成功添加资源文件到导出列表 - URL: {url}, 路径: {file_path}, ZIP路径: {zip_path}")
+                else:
+                    # 记录无法找到的文件（用于调试）
+                    print(f"警告: 无法找到资源文件对应的路径 - URL: {url}, 提取到的路径: {file_path}")
     
+    print(f"调试: 总共收集到 {len(files_map)} 个文件需要导出")
     return files_map
 
 
@@ -1314,17 +1556,108 @@ async def import_courses(
                     f"导入章节失败 {chapter_data.get('name', '')}: {str(e)}"
                 )
 
+        # 辅助函数：获取或创建默认的"未分类"课程
+        default_course_id_cache = None
+        async def get_or_create_default_course(db: AsyncSession, current_user: User) -> int:
+            """获取或创建默认的未分类课程，用于归类没有课程归属的教案"""
+            nonlocal default_course_id_cache
+            if default_course_id_cache is not None:
+                return default_course_id_cache
+            
+            # 1. 获取或创建"未分类"学科
+            default_subject_code = "uncategorized"
+            subject_result = await db.execute(
+                select(Subject).where(Subject.code == default_subject_code)
+            )
+            default_subject = subject_result.scalar_one_or_none()
+            
+            if not default_subject:
+                default_subject = Subject(
+                    name="未分类",
+                    code=default_subject_code,
+                    description="用于归类没有课程归属的教学案例",
+                    is_active=True,
+                    display_order=9999,  # 放在最后
+                )
+                db.add(default_subject)
+                await db.commit()
+                await db.refresh(default_subject)
+            
+            # 2. 获取或创建"未分类"年级（level=99，超出正常范围1-12）
+            # 先尝试通过level查找
+            default_grade_level = 99
+            grade_result = await db.execute(
+                select(Grade).where(Grade.level == default_grade_level)
+            )
+            default_grade = grade_result.scalar_one_or_none()
+            
+            # 如果通过level找不到，尝试通过名称查找（可能之前创建过level=0的）
+            if not default_grade:
+                grade_result_by_name = await db.execute(
+                    select(Grade).where(Grade.name == "未分类")
+                )
+                default_grade = grade_result_by_name.scalar_one_or_none()
+                
+                # 如果找到了但level不是99，更新level为99
+                if default_grade:
+                    current_level = cast(int, default_grade.level)
+                    if current_level != default_grade_level:
+                        setattr(default_grade, 'level', default_grade_level)
+                        await db.commit()
+                        await db.refresh(default_grade)
+            
+            # 如果仍然不存在，创建新的
+            if not default_grade:
+                default_grade = Grade(
+                    name="未分类",
+                    level=default_grade_level,
+                    is_active=True,
+                )
+                db.add(default_grade)
+                await db.commit()
+                await db.refresh(default_grade)
+            
+            # 3. 获取或创建"未分类"课程
+            default_course_code = "uncategorized-course"
+            course_result = await db.execute(
+                select(Course).where(Course.code == default_course_code)
+            )
+            default_course = course_result.scalar_one_or_none()
+            
+            if not default_course:
+                default_course = Course(
+                    subject_id=default_subject.id,
+                    grade_id=default_grade.id,
+                    name="未分类课程",
+                    code=default_course_code,
+                    description="用于归类没有课程归属的教学案例",
+                    is_active=True,
+                    display_order=9999,
+                    created_by=current_user.id,
+                )
+                db.add(default_course)
+                await db.commit()
+                await db.refresh(default_course)
+            
+            default_course_id_cache = cast(int, default_course.id)
+            return cast(int, default_course.id)
+
         # 5. 导入教案
         lessons = data.get("lessons") or []
         for lesson_data in lessons:
             try:
                 # 获取课程ID
-                course_id = course_code_map.get(lesson_data["course_code"])
+                course_code = lesson_data.get("course_code")
+                course_id = course_code_map.get(course_code) if course_code else None
+                
+                # 如果找不到课程，使用默认的"未分类"课程
                 if not course_id:
+                    course_id = await get_or_create_default_course(db, current_user)
+                    # 记录提示信息（作为警告而不是错误）
+                    lesson_title = lesson_data.get('title', '未知')
                     import_result["errors"].append(
-                        f"教案 {lesson_data.get('title', '')} 的课程不存在"
+                        f"提示：教案 '{lesson_title}' 的课程代码 '{course_code}' 不存在，已自动归类到'未分类课程'"
                     )
-                    continue
 
                 # 获取章节ID
                 chapter_id = None
@@ -1529,8 +1862,11 @@ async def export_lesson(
         except ValueError:
             raise HTTPException(status_code=403, detail="当前用户角色无效")
         
-        if user_role == UserRole.TEACHER and lesson.creator_id != current_user.id:
-            raise HTTPException(403, "只能导出自己创建的教案")
+        if user_role == UserRole.TEACHER:
+            creator_id = getattr(lesson, 'creator_id', None)
+            current_user_id = getattr(current_user, 'id', None)
+            if creator_id is not None and current_user_id is not None and creator_id != current_user_id:
+                raise HTTPException(403, "只能导出自己创建的教案")
         
         # 获取课程信息
         course = lesson.course
@@ -1584,7 +1920,7 @@ async def export_lesson(
             "content": lesson.content if lesson.content is not None else [],
             "tags": lesson.tags or [],
             "cover_image_url": lesson.cover_image_url,
-            "difficulty_level": lesson.difficulty_level.value if lesson.difficulty_level else None,
+            "difficulty_level": lesson.difficulty_level.value if lesson.difficulty_level is not None else None,
             "estimated_duration": lesson.estimated_duration,
             "reference_notes": lesson.reference_notes,
         }

@@ -40,7 +40,7 @@ class GradeBase(BaseModel):
     """年级基础模型"""
 
     name: str = Field(..., max_length=50, description="年级名称")
-    level: int = Field(..., ge=1, le=12, description="年级级别 (1-12)")
+    level: int = Field(..., ge=0, le=99, description="年级级别 (正常范围1-12，0和99为特殊值)")
 
 
 class GradeResponse(GradeBase):

@@ -186,6 +186,17 @@ function normalizeImageUrls(html: string): string {
         return match
       }
       
+      // 如果是纯文件名（没有路径，只有文件名），假设是资源文件
+      // 例如：9ffa58aa-610a-4a2d-b640-65e0d5be2d41.png
+      if (!src.startsWith('/') && !src.startsWith('http://') && !src.startsWith('https://')) {
+        // 检查是否看起来像一个文件名（包含扩展名）
+        if (/\.(png|jpe?g|gif|webp|svg|mp4|pdf|docx?|xlsx?|pptx?)$/i.test(src)) {
+          const fullUrl = `${baseURL}/uploads/resources/${src}`
+          const newSrcAttr = ` src=${quote}${fullUrl}${quote}`
+          return match.replace(srcMatch[0], newSrcAttr)
+        }
+      }
+      
       // 如果是相对路径，转换为完整URL以便在编辑器中显示
       if (src.startsWith('/') && !src.startsWith('//')) {
         const fullUrl = `${baseURL}${src}`
@@ -197,24 +208,55 @@ function normalizeImageUrls(html: string): string {
       if (src.startsWith('http://') || src.startsWith('https://')) {
         try {
           const url = new URL(src)
-          // 如果是资源路径（/uploads/resources/），检查主机名
-          if (url.pathname.startsWith('/uploads/resources/')) {
-            const isIPAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(url.hostname)
-            const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
-            const currentHost = window.location.hostname
-            const isDifferentHost = url.hostname !== currentHost && !isLocalhost
-            
-            // 如果是IP地址或不同的主机名，替换为当前服务器地址
-            if (isIPAddress || isDifferentHost) {
-              const path = url.pathname + (url.search || '') + (url.hash || '')
-              const newUrl = `${baseURL}${path}`
-              const newSrcAttr = ` src=${quote}${newUrl}${quote}`
-              return match.replace(srcMatch[0], newSrcAttr)
-            }
+          // 如果URL指向的是资源路径 (/uploads/)，统一替换为当前服务器地址
+          // 这样可以确保无论数据来自哪个环境（localhost、不同IP等），都能在当前环境正确显示
+          if (url.pathname.startsWith('/uploads/')) {
+            const path = url.pathname + (url.search || '') + (url.hash || '')
+            const newUrl = `${baseURL}${path}`
+            // 使用更可靠的替换方式：直接替换整个src属性
+            const srcPattern = /src\s*=\s*(["']?)[^"'\s>]+\1/i
+            return match.replace(srcPattern, `src=${quote}${newUrl}${quote}`)
           }
         } catch {
           // URL解析失败，保持原样
         }
+      }
+    }
+    return match
+  })
+  
+  // 安全网：在HTML字符串级别直接替换所有指向 /uploads/ 的完整URL
+  // 这样可以确保无论原始URL的主机名是什么（localhost、不同IP等），都替换为当前服务器地址
+  html = html.replace(/src\s*=\s*(["'])(https?:\/\/[^"']+\/uploads\/[^"']+)\1/gi, (match, quote, url) => {
+    try {
+      const urlObj = new URL(url)
+      if (urlObj.pathname.startsWith('/uploads/')) {
+        const path = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
+        return `src=${quote}${baseURL}${path}${quote}`
+      }
+    } catch (e) {
+      // URL解析失败，尝试直接提取路径
+      const pathMatch = url.match(/\/uploads\/[^"']+/)
+      if (pathMatch) {
+        return `src=${quote}${baseURL}${pathMatch[0]}${quote}`
+      }
+    }
+    return match
+  })
+  
+  // 额外安全网：直接替换HTML字符串中所有指向 /uploads/ 的完整URL
+  html = html.replace(/https?:\/\/[^\s"'>]+\/uploads\/[^\s"'>]+/gi, (match) => {
+    try {
+      const urlObj = new URL(match)
+      if (urlObj.pathname.startsWith('/uploads/')) {
+        const path = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
+        return baseURL + path
+      }
+    } catch (e) {
+      // URL解析失败，尝试直接提取路径
+      const pathMatch = match.match(/\/uploads\/[^\s"'>]+/)
+      if (pathMatch) {
+        return baseURL + pathMatch[0]
       }
     }
     return match

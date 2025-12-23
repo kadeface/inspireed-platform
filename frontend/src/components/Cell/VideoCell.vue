@@ -295,6 +295,7 @@ import type { VideoCell } from '../../types/cell'
 import type { LibraryAssetSummary } from '../../types/library'
 import api from '../../services/api'
 import { getServerBaseUrl } from '@/utils/url'
+import { normalizeResourceUrl } from '@/utils/normalizeResourceUrl'
 import { useFullscreen } from '@/composables/useFullscreen'
 import AssetPicker from '@/components/Library/AssetPicker.vue'
 
@@ -328,11 +329,32 @@ const assetPicker = ref<InstanceType<typeof AssetPicker>>()
 
 // 在编辑模式下使用 localContent，确保上传后立即显示；非编辑模式下使用 props
 const displayVideoUrl = computed(() => {
-  return props.editable ? (localContent.value.videoUrl || props.cell.content?.videoUrl) : (props.cell.content?.videoUrl)
+  const url = props.editable ? (localContent.value.videoUrl || props.cell.content?.videoUrl) : (props.cell.content?.videoUrl)
+  // 规范化URL，确保localhost和不同IP地址的URL都被替换为当前服务器地址
+  if (url) {
+    // 如果是blob URL或data URL，不需要处理
+    if (url.startsWith('blob:') || url.startsWith('data:')) {
+      return url
+    }
+    // 使用normalizeResourceUrl函数规范化URL
+    return normalizeResourceUrl(url)
+  }
+  return url
 })
 
 const displayContent = computed(() => {
-  return props.editable ? localContent.value : (props.cell.content || {} as VideoCell['content'])
+  const content = props.editable ? localContent.value : (props.cell.content || {} as VideoCell['content'])
+  // 规范化thumbnail URL，确保localhost和不同IP地址的URL都被替换为当前服务器地址
+  if (content.thumbnail) {
+    // 如果是blob URL或data URL，不需要处理
+    if (!content.thumbnail.startsWith('blob:') && !content.thumbnail.startsWith('data:')) {
+      return {
+        ...content,
+        thumbnail: normalizeResourceUrl(content.thumbnail)
+      }
+    }
+  }
+  return content
 })
 
 const displayConfig = computed(() => {
