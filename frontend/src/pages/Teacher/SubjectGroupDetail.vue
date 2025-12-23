@@ -1,30 +1,34 @@
 <template>
-  <div class="subject-group-detail-page p-6">
-    <!-- 加载状态 -->
-    <div v-if="loading" class="text-center py-12">
-      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      <p class="text-gray-600 mt-4">加载中...</p>
-    </div>
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50">
+    <div class="subject-group-detail-page max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- 加载状态 -->
+      <div v-if="loading" class="text-center py-12">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+        <p class="text-gray-600 mt-4">加载中...</p>
+      </div>
 
-    <div v-else-if="group">
-      <!-- 返回按钮 -->
-      <button
-        @click="$router.back()"
-        class="mb-4 text-blue-600 hover:text-blue-700 transition"
-      >
-        <i class="fas fa-arrow-left mr-2"></i>返回
-      </button>
+      <div v-else-if="group">
+        <!-- 返回按钮 -->
+        <button
+          @click="$router.back()"
+          class="mb-6 text-amber-600 hover:text-amber-700 transition flex items-center group"
+        >
+          <i class="fas fa-arrow-left mr-2 transform group-hover:-translate-x-1 transition-transform"></i>返回
+        </button>
 
-      <!-- 教研组头部 -->
-      <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
-        <div
-          v-if="group.cover_image_url"
-          class="h-48 bg-cover bg-center"
-          :style="{ backgroundImage: `url(${group.cover_image_url})` }"
-        ></div>
-        <div v-else class="h-48 bg-gradient-to-br from-blue-500 to-purple-600"></div>
+        <!-- 教研组头部 -->
+        <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-300 mb-6">
+          <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-600"></span>
+          <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-gradient-to-br from-amber-50/80 via-transparent to-transparent"></div>
+          
+          <div
+            v-if="group.cover_image_url"
+            class="h-48 bg-cover bg-center relative"
+            :style="{ backgroundImage: `url(${group.cover_image_url})` }"
+          ></div>
+          <div v-else class="h-48 bg-gradient-to-br from-amber-500 to-orange-600 relative"></div>
         
-        <div class="p-6">
+          <div class="p-6 relative">
           <div class="flex justify-between items-start mb-4">
             <div class="flex-1">
               <div class="flex items-center space-x-3 mb-2">
@@ -45,51 +49,60 @@
             <div v-if="canManage" class="flex space-x-2">
               <button
                 @click="showEditModal = true"
-                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                class="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm hover:shadow-md"
               >
                 <i class="fas fa-edit mr-2"></i>编辑
               </button>
               <button
                 v-if="isOwner"
                 @click="handleDelete"
-                class="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition"
+                class="px-4 py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 transition-all shadow-sm hover:shadow-md"
               >
                 <i class="fas fa-trash mr-2"></i>删除
               </button>
             </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200">
             <div class="flex items-center text-gray-700">
-              <i class="fas fa-book text-blue-600 mr-2"></i>
-              <span>{{ group.subject_name }}</span>
+              <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-md mr-3">
+                <i class="fas fa-book text-white"></i>
+              </div>
+              <span class="font-medium">{{ group.subject_name }}</span>
             </div>
             <div class="flex items-center text-gray-700">
-              <i class="fas fa-globe text-blue-600 mr-2"></i>
-              <span>{{ getScopeLabel(group.scope) }}</span>
+              <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-md mr-3">
+                <i class="fas fa-globe text-white"></i>
+              </div>
+              <span class="font-medium">{{ getScopeLabel(group.scope) }}</span>
             </div>
             <div class="flex items-center text-gray-700">
-              <i class="fas fa-users text-blue-600 mr-2"></i>
-              <span>{{ group.member_count }} 成员</span>
+              <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-md mr-3">
+                <i class="fas fa-users text-white"></i>
+              </div>
+              <span class="font-medium">{{ group.member_count }} 成员</span>
             </div>
             <div class="flex items-center text-gray-700">
-              <i class="fas fa-file-alt text-blue-600 mr-2"></i>
-              <span>{{ group.lesson_count }} 共享教案</span>
+              <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-md mr-3">
+                <i class="fas fa-file-alt text-white"></i>
+              </div>
+              <span class="font-medium">{{ group.lesson_count }} 共享教案</span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- 标签页 -->
-      <div class="bg-white rounded-lg shadow mb-6">
-        <div class="border-b">
+      <div class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-300 mb-6">
+        <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-600"></span>
+        <div class="border-b border-gray-200">
           <nav class="flex space-x-8 px-6">
             <button
               @click="activeTab = 'lessons'"
               :class="[
-                'py-4 border-b-2 font-medium transition',
+                'py-4 border-b-2 font-medium transition-all',
                 activeTab === 'lessons'
-                  ? 'border-blue-600 text-blue-600'
+                  ? 'border-amber-600 text-amber-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700',
               ]"
             >
@@ -98,9 +111,9 @@
             <button
               @click="activeTab = 'members'"
               :class="[
-                'py-4 border-b-2 font-medium transition',
+                'py-4 border-b-2 font-medium transition-all',
                 activeTab === 'members'
-                  ? 'border-blue-600 text-blue-600'
+                  ? 'border-amber-600 text-amber-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700',
               ]"
             >
@@ -117,7 +130,7 @@
               <button
                 v-if="group.user_role"
                 @click="showShareLessonModal = true"
-                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                class="px-4 py-2 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-xl hover:shadow-lg transition-all shadow-md"
               >
                 <i class="fas fa-share mr-2"></i>分享教案
               </button>
@@ -136,7 +149,7 @@
               <button
                 v-if="canManage"
                 @click="showAddMemberModal = true"
-                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                class="px-4 py-2 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-xl hover:shadow-lg transition-all shadow-md"
               >
                 <i class="fas fa-user-plus mr-2"></i>添加成员
               </button>
@@ -152,6 +165,7 @@
         </div>
       </div>
     </div>
+  </div>
 
     <!-- 编辑模态框 -->
     <EditGroupModal

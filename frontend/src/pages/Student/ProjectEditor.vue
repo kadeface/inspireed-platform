@@ -225,8 +225,11 @@ const current_stage_cells = computed(() => {
 // 将 ProjectCell 转换为 Cell 格式
 function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
   const cell_type_lower = project_cell.cell_type.toLowerCase()
+  // 使用稳定的后备 ID（基于 stage 和 index），确保同一 cell 总是有相同的 ID
+  // 注意：这应该很少被使用，因为所有 cell 在加载时都应该有 id
+  const stableId = project_cell.id || `project-cell-${active_stage.value}-${index}`
   const base_cell: any = {
-    id: project_cell.id || uuidv4(),
+    id: stableId,
     type: cell_type_lower as CellType,
     order: project_cell.order ?? index,
     title: project_cell.title,
@@ -544,8 +547,9 @@ function cell_to_project_cell(cell: Cell): ProjectCell {
       break
   }
 
-  if (typeof cell.id === 'number') {
-    project_cell.id = cell.id
+  // 保留 cell 的 ID（支持数字和字符串类型，如 UUID）
+  if (cell.id !== undefined && cell.id !== null) {
+    project_cell.id = cell.id as string | number
   }
 
   return project_cell
@@ -590,6 +594,23 @@ const formatted_updated_at = computed(() => {
   return dayjs(project.value.updated_at).format('YYYY-MM-DD HH:mm')
 })
 
+// 确保所有 cells 都有稳定的 id（用于避免 ID 查找失败）
+function ensure_cell_ids(project_data: StudentProject): void {
+  const stages: ProjectStage[] = ['engage', 'explore', 'explain', 'elaborate', 'evaluate']
+  
+  stages.forEach((stage) => {
+    const stage_field = `${stage}_content` as keyof StudentProject
+    const cells = (project_data[stage_field] as ProjectCell[]) || []
+    
+    cells.forEach((cell, index) => {
+      // 如果 cell 没有 id，分配一个稳定的 UUID
+      if (!cell.id) {
+        cell.id = uuidv4()
+      }
+    })
+  })
+}
+
 // 加载项目
 async function load_project() {
   const project_id = parseInt(route.params.id as string)
@@ -602,6 +623,8 @@ async function load_project() {
   loading.value = true
   try {
     const data = await student_project_service.fetch_project_by_id(project_id)
+    // 确保所有 cells 都有稳定的 id
+    ensure_cell_ids(data)
     project.value = data
     project_title.value = data.title
     project_description.value = data.description || ''

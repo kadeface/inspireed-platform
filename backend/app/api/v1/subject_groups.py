@@ -77,8 +77,31 @@ async def create_subject_group(
             raise HTTPException(status_code=404, detail="区域不存在")
 
     # 创建教研组
+    # 确保 scope 使用枚举值（小写字符串）而不是枚举名称
+    # SQLAlchemy 的 Enum 列需要字符串值，不能直接使用枚举对象
+    group_data_dict = group_data.model_dump(exclude={'scope'})
+    
+    # 直接使用枚举的值（小写字符串），确保是小写
+    if isinstance(group_data.scope, GroupScope):
+        scope_value = group_data.scope.value
+    else:
+        # 如果是字符串，强制转换为小写
+        scope_value = str(group_data.scope).lower()
+    
+    # 确保值是小写的（防御性编程）
+    scope_value = scope_value.lower() if isinstance(scope_value, str) else str(scope_value).lower()
+    
+    # 验证 scope 值是否有效
+    valid_scopes = {'school', 'region', 'national'}
+    if scope_value not in valid_scopes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效的教研组范围: {scope_value}，必须是 {valid_scopes} 之一"
+        )
+    
     group = SubjectGroup(
-        **group_data.model_dump(),
+        **group_data_dict,
+        scope=scope_value,  # 明确传递小写字符串值
         creator_id=current_user.id,
         member_count=1,  # 创建者自动成为成员
     )
@@ -86,8 +109,11 @@ async def create_subject_group(
     await db.flush()
 
     # 创建创建者的成员关系（作为组长）
+    # 确保使用枚举值（小写字符串）而不是枚举对象
     membership = GroupMembership(
-        group_id=group.id, user_id=current_user.id, role=MemberRole.OWNER
+        group_id=group.id,
+        user_id=current_user.id,
+        role=MemberRole.OWNER.value,  # 使用枚举值而不是枚举对象
     )
     db.add(membership)
 
@@ -499,14 +525,26 @@ async def add_group_member(
         else:
             # 重新激活
             setattr(existing, "is_active", True)
-            setattr(existing, "role", member_data.role)
+            # 确保使用枚举值（小写字符串）而不是枚举对象
+            role_value = (
+                member_data.role.value
+                if isinstance(member_data.role, MemberRole)
+                else str(member_data.role).lower()
+            )
+            setattr(existing, "role", role_value)
             await db.commit()
             await db.refresh(existing)
             membership = existing
     else:
         # 创建新成员关系
+        # 确保使用枚举值（小写字符串）而不是枚举对象
+        role_value = (
+            member_data.role.value
+            if isinstance(member_data.role, MemberRole)
+            else str(member_data.role).lower()
+        )
         membership = GroupMembership(
-            group_id=group_id, user_id=member_data.user_id, role=member_data.role
+            group_id=group_id, user_id=member_data.user_id, role=role_value
         )
         db.add(membership)
 
@@ -579,6 +617,11 @@ async def update_group_member(
     # 更新数据
     update_data = member_data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
+        # 如果更新 role 字段，确保使用枚举值（小写字符串）而不是枚举对象
+        if key == "role" and isinstance(value, MemberRole):
+            value = value.value
+        elif key == "role" and isinstance(value, str):
+            value = value.lower()
         setattr(target_membership, key, value)
 
     await db.commit()
@@ -728,11 +771,34 @@ async def list_shared_lessons(
 
         lesson = lessons.get(shared_lesson.lesson_id)
         if lesson:
-            response.lesson_title = cast(str, lesson.title)
-            response.lesson_description = cast(str, lesson.description)
-            response.lesson_cover_image_url = cast(str, lesson.cover_image_url)
-            response.lesson_cell_count = cast(int, lesson.cell_count)
-            response.lesson_estimated_duration = cast(int, lesson.estimated_duration)
+            lesson_title = cast(Optional[str], lesson.title)
+            lesson_description = cast(Optional[str], lesson.description)
+            lesson_cover_image_url = cast(Optional[str], lesson.cover_image_url)
+            
+            response.lesson_title = lesson_title if lesson_title else None
+            response.lesson_description = lesson_description if lesson_description else None
+            response.lesson_cover_image_url = (
+                lesson_cover_image_url if lesson_cover_image_url else None
+            )
+            # 计算 cell_count：优先使用数据库字段，如果为 0 则从 content 动态计算
+            db_cell_count = cast(int, lesson.cell_count) if lesson.cell_count is not None else 0
+            if db_cell_count > 0:
+                response.lesson_cell_count = db_cell_count
+            else:
+                # 如果数据库中的 cell_count 为 0，从 content 字段动态计算
+                content_list = lesson.content if isinstance(lesson.content, list) else []
+                response.lesson_cell_count = len(content_list)
+            response.lesson_estimated_duration = (
+                cast(int, lesson.estimated_duration)
+                if lesson.estimated_duration is not None
+                else None
+            )
+        else:
+            # 如果教案不存在（可能被删除），设置默认值
+            response.lesson_title = None
+            response.lesson_description = None
+            response.lesson_cell_count = 0
+            response.lesson_estimated_duration = None
 
         sharer = sharers.get(shared_lesson.sharer_id)
         if sharer:

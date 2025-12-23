@@ -57,7 +57,16 @@ class SubjectGroup(Base):
     )
 
     # 范围关联
-    scope = Column(SQLEnum(GroupScope), nullable=False, comment="教研组范围")
+    scope = Column(
+        SQLEnum(
+            GroupScope,
+            name="groupscope",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        comment="教研组范围",
+    )
     school_id = Column(
         Integer, ForeignKey("schools.id"), nullable=True, comment="关联学校（校级）"
     )
@@ -125,7 +134,15 @@ class GroupMembership(Base):
 
     # 角色
     role = Column(
-        SQLEnum(MemberRole), default=MemberRole.MEMBER, nullable=False, comment="成员角色"
+        SQLEnum(
+            MemberRole,
+            name="memberrole",
+            native_enum=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        default=MemberRole.MEMBER.value,  # 使用枚举值而不是枚举对象
+        nullable=False,
+        comment="成员角色",
     )
 
     # 状态

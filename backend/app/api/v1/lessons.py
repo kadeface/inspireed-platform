@@ -157,6 +157,10 @@ async def create_lesson(
         if chapter.is_active is False:
             raise HTTPException(status_code=400, detail="该章节已被禁用")
 
+    # 计算 cell_count
+    content_list = lesson_in.content if isinstance(lesson_in.content, list) else []
+    cell_count = len(content_list)
+    
     lesson = Lesson(
         title=lesson_in.title,
         description=lesson_in.description,
@@ -166,6 +170,7 @@ async def create_lesson(
         content=lesson_in.content,
         tags=lesson_in.tags or [],
         national_resource_id=lesson_in.national_resource_id,
+        cell_count=cell_count,  # 设置 cell_count
     )
     db.add(lesson)
     await db.commit()
@@ -784,6 +789,13 @@ async def update_lesson(
                 f"长度={len(set_value) if isinstance(set_value, list) else 'N/A'}"
             )
 
+    # 如果更新了内容，自动更新 cell_count
+    if content_updated:
+        content_list = lesson.content if isinstance(lesson.content, list) else []
+        cell_count = len(content_list)
+        setattr(lesson, "cell_count", cell_count)
+        logger.info(f"教案 {lesson_id} 更新 cell_count: {cell_count}")
+    
     # 如果更新了已发布教案的内容，自动更新版本号
     # 这样学生端可以通过版本号判断是否有新内容
     if content_updated and cast(str, lesson.status) == LessonStatus.PUBLISHED:

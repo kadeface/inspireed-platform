@@ -13,7 +13,7 @@
       <div
         v-for="lesson in lessons"
         :key="lesson.id"
-        class="border rounded-lg p-4 hover:shadow-md transition"
+        class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white/80 backdrop-blur-sm p-4 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
       >
         <div class="flex items-start justify-between">
           <div class="flex-1">
@@ -36,33 +36,44 @@
             </div>
 
             <div class="flex items-center space-x-4 text-sm text-gray-500">
-              <span><i class="fas fa-cube mr-1"></i>{{ lesson.lesson_cell_count || 0 }} 单元</span>
+              <span v-if="lesson.lesson_title">
+                <i class="fas fa-cube mr-1"></i>{{ lesson.lesson_cell_count ?? 0 }} 单元
+              </span>
+              <span v-else class="text-amber-600">
+                <i class="fas fa-exclamation-triangle mr-1"></i>教案已删除
+              </span>
               <span v-if="lesson.lesson_estimated_duration">
                 <i class="fas fa-clock mr-1"></i>{{ lesson.lesson_estimated_duration }} 分钟
               </span>
-              <span><i class="fas fa-eye mr-1"></i>{{ lesson.view_count }} 查看</span>
-              <span><i class="fas fa-download mr-1"></i>{{ lesson.download_count }} 下载</span>
-              <span><i class="fas fa-heart mr-1"></i>{{ lesson.like_count }} 点赞</span>
+              <span><i class="fas fa-eye mr-1"></i>{{ lesson.view_count || 0 }} 查看</span>
+              <span><i class="fas fa-download mr-1"></i>{{ lesson.download_count || 0 }} 下载</span>
+              <span><i class="fas fa-heart mr-1"></i>{{ lesson.like_count || 0 }} 点赞</span>
             </div>
           </div>
 
           <div class="flex flex-col space-y-2 ml-4">
             <button
               @click="viewLesson(lesson.lesson_id)"
-              class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+              :disabled="!lesson.lesson_title"
+              :class="[
+                'px-3 py-1.5 text-sm rounded-xl transition-all shadow-sm',
+                lesson.lesson_title
+                  ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:shadow-lg'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed',
+              ]"
             >
               <i class="fas fa-eye mr-1"></i>查看
             </button>
             <button
               @click="copyLesson(lesson.lesson_id, groupId)"
-              class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 transition"
+              class="px-3 py-1.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 transition-all shadow-sm hover:shadow-md"
             >
               <i class="fas fa-copy mr-1"></i>复制
             </button>
             <button
               v-if="canRemove(lesson)"
               @click="handleUnshare(lesson)"
-              class="px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition"
+              class="px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-xl hover:bg-red-50 transition-all shadow-sm hover:shadow-md"
             >
               <i class="fas fa-trash mr-1"></i>移除
             </button>
@@ -174,9 +185,11 @@ function changePage(page: number) {
 async function viewLesson(lessonId: number) {
   try {
     await incrementLessonView(props.groupId, lessonId)
-    router.push(`/teacher/lessons/${lessonId}`)
+    // 使用正确的路由路径（单数形式）
+    router.push(`/teacher/lesson/${lessonId}`)
   } catch (error) {
     console.error('查看教案失败:', error)
+    alert('查看教案失败，请重试')
   }
 }
 
