@@ -12,6 +12,7 @@ from PIL import Image
 import io
 
 from app.core.config import settings
+from app.utils.resource_url import url_to_filename
 
 
 class UploadService:
@@ -76,15 +77,16 @@ class UploadService:
             except Exception as e:
                 print(f"Failed to generate thumbnail: {e}")
 
-        # 返回文件信息
+        # 返回文件信息（只返回文件名，不包含路径）
         result = {
-            "file_url": f"/uploads/resources/{filename}",
+            "file_url": filename,  # 只返回文件名，不包含路径前缀
             "file_size": file_size,
             "page_count": pdf_meta.get("page_count", 0),
         }
 
         if thumbnail_url:
-            result["thumbnail_url"] = thumbnail_url
+            # 缩略图也返回文件名
+            result["thumbnail_url"] = url_to_filename(thumbnail_url)
 
         return result
 
@@ -117,7 +119,7 @@ class UploadService:
             await f.write(content)
 
         result = {
-            "file_url": f"/uploads/resources/{filename}",
+            "file_url": filename,  # 只返回文件名，不包含路径前缀
             "file_size": file_size,
         }
 
@@ -126,7 +128,8 @@ class UploadService:
             try:
                 thumbnail_url = await self._generate_html_thumbnail(filepath, filename)
                 if thumbnail_url:
-                    result["thumbnail_url"] = thumbnail_url
+                    # 缩略图也返回文件名
+                    result["thumbnail_url"] = url_to_filename(thumbnail_url)
             except Exception as e:
                 print(f"Failed to generate HTML thumbnail: {e}")
 
@@ -244,16 +247,15 @@ class UploadService:
             return None
 
     async def delete_file(self, file_url: str) -> bool:
-        """删除文件"""
+        """删除文件（支持文件名或完整URL）"""
         try:
-            # 从 URL 提取文件路径
-            if file_url.startswith("/uploads/resources/"):
-                filename = file_url.replace("/uploads/resources/", "")
-                filepath = os.path.join(self.resources_dir, filename)
+            # 从 URL 提取文件名（向后兼容）
+            filename = url_to_filename(file_url)
+            filepath = os.path.join(self.resources_dir, filename)
 
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-                    return True
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                return True
 
             return False
         except Exception as e:

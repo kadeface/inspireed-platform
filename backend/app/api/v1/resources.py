@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
+from fastapi import Request
+
 from app.core.database import get_db
 from app.models import Resource, Chapter, Lesson, User, UserRole, LibraryAsset
 from app.schemas.resource import (
@@ -20,15 +22,17 @@ from app.schemas.library_asset import LibraryAssetSummary
 from app.services.upload import upload_service
 from app.services.office_converter import office_converter_service
 from app.api.deps import get_current_user, get_current_admin
+from app.utils.resource_url import filename_to_url, url_to_filename
 
 router = APIRouter()
 
 
 async def _enrich_resource_response(
-    resource: Resource, db: AsyncSession
+    resource: Resource, db: AsyncSession, request: Optional[Request] = None
 ) -> ResourceResponse:
     """
     为资源响应补充 asset 和 resolved_file_url 字段
+    并将文件名转换为完整URL
     """
     resource_dict = {
         "id": resource.id,
@@ -54,17 +58,35 @@ async def _enrich_resource_response(
     
     # 如果有 asset_id，加载 asset 信息
     asset_summary = None
-    if resource.asset_id:
-        asset = await db.get(LibraryAsset, resource.asset_id)
+    asset_id_value = cast(Optional[int], resource.asset_id)
+    if asset_id_value:
+        asset = await db.get(LibraryAsset, asset_id_value)
         if asset:
             asset_summary = LibraryAssetSummary.model_validate(asset)
+            # 转换asset中的URL
+            if asset_summary and asset_summary.public_url:
+                asset_summary.public_url = filename_to_url(asset_summary.public_url, request)
+            if asset_summary and asset_summary.thumbnail_url:
+                asset_summary.thumbnail_url = filename_to_url(asset_summary.thumbnail_url, request)
     
     resource_dict["asset"] = asset_summary
     
+    # 转换URL：将文件名转换为完整URL
+    file_url_value = cast(Optional[str], resource_dict["file_url"])
+    if file_url_value:
+        resource_dict["file_url"] = filename_to_url(file_url_value, request)
+    thumbnail_url_value = cast(Optional[str], resource_dict["thumbnail_url"])
+    if thumbnail_url_value:
+        resource_dict["thumbnail_url"] = filename_to_url(thumbnail_url_value, request)
+    
     # 计算 resolved_file_url（优先使用 file_url，否则使用 asset.public_url）
-    resolved_file_url = resource.file_url
+    resolved_file_url = cast(Optional[str], resource.file_url)
     if not resolved_file_url and asset_summary:
         resolved_file_url = asset_summary.public_url
+    
+    # 转换resolved_file_url
+    if resolved_file_url:
+        resolved_file_url = filename_to_url(resolved_file_url, request)
     
     resource_dict["resolved_file_url"] = resolved_file_url
     
@@ -74,6 +96,7 @@ async def _enrich_resource_response(
 
 @router.get("/", response_model=List[ResourceResponse])
 async def list_resources(
+    request: Request,
     chapter_id: Optional[int] = None,
     resource_type: Optional[str] = None,
     is_official: Optional[bool] = None,
@@ -102,7 +125,7 @@ async def list_resources(
     # 补充 asset 和 resolved_file_url
     enriched_resources = []
     for resource in resources:
-        enriched = await _enrich_resource_response(resource, db)
+        enriched = await _enrich_resource_response(resource, db, request)
         enriched_resources.append(enriched)
     
     return enriched_resources
@@ -111,6 +134,7 @@ async def list_resources(
 @router.get("/{resource_id}", response_model=ResourceDetail)
 async def get_resource(
     resource_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -136,7 +160,7 @@ async def get_resource(
     lessons_count = lessons_count_result.scalar()
 
     # 先获取基础响应（包含 asset 和 resolved_file_url）
-    base_response = await _enrich_resource_response(resource, db)
+    base_response = await _enrich_resource_response(resource, db, request)
     
     # 构建详情响应
     resource_dict = base_response.model_dump()
@@ -152,6 +176,7 @@ async def get_resource(
 
 @router.post("/", response_model=ResourceResponse)
 async def create_resource(
+    request: Request,
     chapter_id: int = Form(...),
     title: str = Form(...),
     description: Optional[str] = Form(None),
@@ -208,48 +233,60 @@ async def create_resource(
             raise HTTPException(400, "资源库资产状态无效")
         
         # 验证资产归属学校（确保同校）
-        if current_user.school_id and asset.school_id != current_user.school_id:
+        user_school_id = cast(Optional[int], current_user.school_id)
+        asset_school_id = cast(Optional[int], asset.school_id)
+        if user_school_id and asset_school_id and user_school_id != asset_school_id:
             raise HTTPException(403, "无权引用其他学校的资源库资产")
         
         # 验证可见性（教师只能引用自己上传的或全校可见的）
         user_role = cast(UserRole, current_user.role)
         if user_role == UserRole.TEACHER:
-            if cast(int, asset.owner_user_id) != current_user.id and cast(str, asset.visibility) != "school":
+            asset_owner_id = cast(int, asset.owner_user_id)
+            asset_visibility = cast(str, asset.visibility)
+            if asset_owner_id != current_user.id and asset_visibility != "school":
                 raise HTTPException(403, "无权引用此资源库资产")
         
         # 设置引用
-        resource.asset_id = asset_id
+        setattr(resource, "asset_id", asset_id)
         # 从资产继承资源类型（如果未指定）
         if not resource_type or resource_type == "pdf":
-            resource.resource_type = cast(str, asset.asset_type)
+            asset_type_value = cast(str, asset.asset_type)
+            setattr(resource, "resource_type", asset_type_value)
     
     # 如果有文件上传
     elif file:
         if resource_type == "pdf":
-            # 上传 PDF 并提取元数据
+            # 上传 PDF 并提取元数据（upload_service现在返回文件名）
             upload_result = await upload_service.upload_pdf(file)
-            resource.file_url = upload_result["file_url"]
-            resource.file_size = upload_result["file_size"]
-            resource.page_count = upload_result["page_count"]
+            # 确保保存的是文件名（而不是路径）
+            file_url_value = url_to_filename(upload_result["file_url"])
+            setattr(resource, "file_url", file_url_value)
+            setattr(resource, "file_size", upload_result["file_size"])
+            setattr(resource, "page_count", upload_result["page_count"])
             thumbnail_url = cast(Optional[str], upload_result.get("thumbnail_url"))
-            setattr(resource, "thumbnail_url", thumbnail_url)
+            if thumbnail_url:
+                # 确保保存的是文件名
+                setattr(resource, "thumbnail_url", url_to_filename(thumbnail_url))
         else:
-            # 上传其他类型文件
+            # 上传其他类型文件（upload_service现在返回文件名）
             upload_result = await upload_service.upload_file(file)
-            resource.file_url = upload_result["file_url"]
-            resource.file_size = upload_result["file_size"]
+            # 确保保存的是文件名（而不是路径）
+            file_url_value = url_to_filename(upload_result["file_url"])
+            setattr(resource, "file_url", file_url_value)
+            setattr(resource, "file_size", upload_result["file_size"])
 
     db.add(resource)
     await db.commit()
     await db.refresh(resource)
 
-    # 返回时补充 asset 和 resolved_file_url
-    return await _enrich_resource_response(resource, db)
+    # 返回时补充 asset 和 resolved_file_url（转换为完整URL）
+    return await _enrich_resource_response(resource, db, request)
 
 
 @router.put("/{resource_id}", response_model=ResourceResponse)
 async def update_resource(
     resource_id: int,
+    request: Request,
     data: ResourceUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin),
@@ -263,12 +300,16 @@ async def update_resource(
     # 更新字段
     update_data = data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
+        # 如果更新的是URL字段，确保保存的是文件名
+        if field in ("file_url", "thumbnail_url") and value:
+            value = url_to_filename(value)
         setattr(resource, field, value)
 
     await db.commit()
     await db.refresh(resource)
 
-    return resource
+    # 返回时转换为完整URL
+    return await _enrich_resource_response(resource, db, request)
 
 
 @router.delete("/{resource_id}")

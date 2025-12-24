@@ -295,7 +295,7 @@ import type { VideoCell } from '../../types/cell'
 import type { LibraryAssetSummary } from '../../types/library'
 import api from '../../services/api'
 import { getServerBaseUrl } from '@/utils/url'
-import { normalizeResourceUrl } from '@/utils/normalizeResourceUrl'
+// 不再需要 normalizeResourceUrl，后端现在返回完整URL
 import { useFullscreen } from '@/composables/useFullscreen'
 import AssetPicker from '@/components/Library/AssetPicker.vue'
 
@@ -328,29 +328,37 @@ const selectedVideoAsset = ref<LibraryAssetSummary | null>(null)
 const assetPicker = ref<InstanceType<typeof AssetPicker>>()
 
 // 在编辑模式下使用 localContent，确保上传后立即显示；非编辑模式下使用 props
+// 注意：后端现在返回完整URL，前端可以直接使用
 const displayVideoUrl = computed(() => {
   const url = props.editable ? (localContent.value.videoUrl || props.cell.content?.videoUrl) : (props.cell.content?.videoUrl)
-  // 规范化URL，确保localhost和不同IP地址的URL都被替换为当前服务器地址
-  if (url) {
-    // 如果是blob URL或data URL，不需要处理
-    if (url.startsWith('blob:') || url.startsWith('data:')) {
-      return url
-    }
-    // 使用normalizeResourceUrl函数规范化URL
-    return normalizeResourceUrl(url)
+  // 如果是blob URL或data URL，直接返回
+  if (url && (url.startsWith('blob:') || url.startsWith('data:'))) {
+    return url
   }
+  // 如果URL是文件名（不包含/），需要转换为完整URL（向后兼容旧数据）
+  if (url && !url.includes('/') && !url.startsWith('http://') && !url.startsWith('https://')) {
+    const baseURL = getServerBaseUrl()
+    return `${baseURL}/uploads/resources/${url}`
+  }
+  // 其他情况（完整URL或相对路径），直接返回
+  // 后端API应该已经返回完整URL，这里保留向后兼容
   return url
 })
 
 const displayContent = computed(() => {
   const content = props.editable ? localContent.value : (props.cell.content || {} as VideoCell['content'])
-  // 规范化thumbnail URL，确保localhost和不同IP地址的URL都被替换为当前服务器地址
+  // 处理thumbnail URL（后端应该返回完整URL，这里保留向后兼容）
   if (content.thumbnail) {
-    // 如果是blob URL或data URL，不需要处理
-    if (!content.thumbnail.startsWith('blob:') && !content.thumbnail.startsWith('data:')) {
+    // 如果是blob URL或data URL，直接返回
+    if (content.thumbnail.startsWith('blob:') || content.thumbnail.startsWith('data:')) {
+      return content
+    }
+    // 如果URL是文件名（不包含/），需要转换为完整URL（向后兼容旧数据）
+    if (!content.thumbnail.includes('/') && !content.thumbnail.startsWith('http://') && !content.thumbnail.startsWith('https://')) {
+      const baseURL = getServerBaseUrl()
       return {
         ...content,
-        thumbnail: normalizeResourceUrl(content.thumbnail)
+        thumbnail: `${baseURL}/uploads/resources/${content.thumbnail}`
       }
     }
   }
@@ -475,8 +483,9 @@ async function handleFileUpload(event: Event) {
       timeout: 300000, // 5分钟超时，适应大文件上传
     })
 
-    // 使用相对路径保存到数据库（后端返回的已经是相对路径）
+    // 后端返回完整URL，提取文件名保存到数据库
     const videoUrl = response.file_url
+    const filename = extractFilename(videoUrl)
 
     // 清理临时 blob URL
     if (blobUrl.value === tempBlobUrl) {
@@ -484,9 +493,9 @@ async function handleFileUpload(event: Event) {
       blobUrl.value = null
     }
 
-    // 保存相对路径到localContent（数据库存储相对路径）
+    // 保存文件名到localContent（数据库存储文件名）
     isUpdatingFromProps = true
-    localContent.value.videoUrl = videoUrl
+    localContent.value.videoUrl = filename
     isUpdatingFromProps = false
 
     uploadProgress.value = 100
@@ -533,29 +542,32 @@ async function handleFileUpload(event: Event) {
   }
 }
 
-// 将完整URL转换为相对路径（用于保存到数据库）
-function convertUrlToRelative(url: string): string {
+// 从URL中提取文件名（用于保存到数据库）
+function extractFilename(url: string): string {
   if (!url || url.startsWith('blob:') || url.startsWith('data:')) {
     return url
   }
   
-  // 如果是完整URL且指向 /uploads/ 路径，提取相对路径
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    try {
-      const urlObj = new URL(url)
-      if (urlObj.pathname.startsWith('/uploads/')) {
-        return urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
-      }
-    } catch {
-      // URL解析失败，尝试直接提取路径
-      const pathMatch = url.match(/\/uploads\/[^\s"']+/)
-      if (pathMatch) {
-        return pathMatch[0]
-      }
-    }
+  // 如果已经是纯文件名（不包含路径分隔符），直接返回
+  if (!url.includes('/') && !url.startsWith('http://') && !url.startsWith('https://')) {
+    return url
   }
   
-  // 如果已经是相对路径或无法解析，返回原值
+  try {
+    const urlObj = new URL(url)
+    // 从路径中提取文件名（最后一个路径段）
+    const filename = urlObj.pathname.split('/').pop() || ''
+    return filename || url
+  } catch {
+    // URL解析失败，尝试直接提取文件名
+    // 支持格式：/uploads/resources/xxx.png 或 http://host:port/uploads/resources/xxx.png
+    if (url.includes('/')) {
+      const parts = url.split('/')
+      const filename = parts[parts.length - 1]
+      // 移除查询参数和hash
+      return filename.split('?')[0].split('#')[0] || url
+    }
+  }
   return url
 }
 
@@ -564,12 +576,12 @@ function handleVideoAssetSelect(asset: LibraryAssetSummary | null) {
   if (asset && asset.asset_type === 'video') {
     selectedVideoAsset.value = asset
     isUpdatingFromProps = true
-    // 将完整URL转换为相对路径保存到数据库
-    localContent.value.videoUrl = convertUrlToRelative(asset.public_url || '')
+    // 从完整URL中提取文件名保存到数据库
+    localContent.value.videoUrl = extractFilename(asset.public_url || '')
     localContent.value.title = localContent.value.title || asset.title
     localContent.value.description = localContent.value.description || undefined
-    // thumbnail也需要转换为相对路径
-    localContent.value.thumbnail = asset.thumbnail_url ? convertUrlToRelative(asset.thumbnail_url) : undefined
+    // thumbnail也需要提取文件名
+    localContent.value.thumbnail = asset.thumbnail_url ? extractFilename(asset.thumbnail_url) : undefined
     if (asset.duration_seconds) {
       localContent.value.duration = asset.duration_seconds
     }
@@ -591,17 +603,17 @@ function clearVideoAsset() {
 }
 
 function updateCell() {
-  // 在保存到数据库前，确保所有URL都是相对路径
+  // 在保存到数据库前，确保所有URL都是文件名
   const contentToSave = { ...localContent.value }
   
-  // 转换videoUrl为相对路径
+  // 提取videoUrl的文件名
   if (contentToSave.videoUrl) {
-    contentToSave.videoUrl = convertUrlToRelative(contentToSave.videoUrl)
+    contentToSave.videoUrl = extractFilename(contentToSave.videoUrl)
   }
   
-  // 转换thumbnail为相对路径
+  // 提取thumbnail的文件名
   if (contentToSave.thumbnail) {
-    contentToSave.thumbnail = convertUrlToRelative(contentToSave.thumbnail)
+    contentToSave.thumbnail = extractFilename(contentToSave.thumbnail)
   }
   
   const updatedCell: VideoCell = {

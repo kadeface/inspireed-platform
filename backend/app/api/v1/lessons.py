@@ -36,6 +36,7 @@ from app.schemas.lesson import (
 from app.api.v1.auth import get_current_active_user
 from app.api.deps import get_current_user_optional
 from pydantic import BaseModel, Field
+from app.utils.resource_url import filename_to_url, url_to_filename
 
 router = APIRouter()
 
@@ -61,8 +62,79 @@ async def _get_lesson_with_relations(
     return result.scalar_one_or_none()
 
 
-def _lesson_to_response(lesson: Lesson) -> LessonResponse:
-    """将教案对象转换为响应字典"""
+def _convert_content_urls(content: Any, request: Optional[Request] = None) -> Any:
+    """
+    递归转换content中的URL（文件名 → 完整URL）
+    用于在API返回前转换lesson.content中的资源URL
+    
+    转换规则：
+    - 动态服务器地址（从 request.base_url 获取，如果没有设置 RESOURCE_BASE_URL）
+    - .env设定的目录（RESOURCE_BASE_PATH，默认 /uploads/resources）
+    - 文件名（数据库存储的格式）
+    
+    最终格式：{动态服务器地址}/{RESOURCE_BASE_PATH}/{文件名}
+    例如：http://192.168.2.53:8000/uploads/resources/7a7a6bc2-64fa-4ec7-ae0b-27127fae74ba.png
+    """
+    if isinstance(content, dict):
+        result = {}
+        for key, value in content.items():
+            # 转换常见的URL字段（视频、缩略图等）
+            if key in ("videoUrl", "video_url", "thumbnail", "thumbnail_url", "url", "src"):
+                if isinstance(value, str) and value:
+                    # blob URL和data URL不转换
+                    if value.startswith(("blob:", "data:")):
+                        result[key] = value
+                    # 如果已经是完整URL，不转换
+                    elif value.startswith(("http://", "https://")):
+                        result[key] = value
+                    # 如果是文件名或相对路径，转换为完整URL
+                    # 使用 filename_to_url：动态服务器地址 + .env目录 + 文件名
+                    else:
+                        result[key] = filename_to_url(value, request)
+                else:
+                    result[key] = value
+            elif key == "html" and isinstance(value, str):
+                # 处理文本模块HTML内容中的资源URL（图片、文件、PDF等）
+                import re
+                html = value
+                # 替换img标签中的src属性（文本模块中的图片）
+                html = re.sub(
+                    r'(<img[^>]*\s+src\s*=\s*["\'])([^"\']+)(["\'][^>]*>)',
+                    lambda m: (
+                        # 使用 filename_to_url：动态服务器地址 + .env目录 + 文件名
+                        f'{m.group(1)}{filename_to_url(m.group(2), request)}{m.group(3)}'
+                        if m.group(2) and not m.group(2).startswith(("blob:", "data:", "http://", "https://"))
+                        else m.group(0)
+                    ),
+                    html,
+                    flags=re.IGNORECASE
+                )
+                # 替换data-pdf-url、data-file-url等属性（文本模块中的文件附件）
+                for attr in ["data-pdf-url", "data-file-url", "data-file-download-url", "data-pdf-view-url", "href"]:
+                    pattern = f'({attr}\\s*=\\s*["\'])([^"\']+)(["\'])'
+                    html = re.sub(
+                        pattern,
+                        lambda m: (
+                            # 使用 filename_to_url：动态服务器地址 + .env目录 + 文件名
+                            f'{m.group(1)}{filename_to_url(m.group(2), request)}{m.group(3)}'
+                            if m.group(2) and not m.group(2).startswith(("blob:", "data:", "http://", "https://"))
+                            else m.group(0)
+                        ),
+                        html,
+                        flags=re.IGNORECASE
+                    )
+                result[key] = html
+            else:
+                result[key] = _convert_content_urls(value, request)
+        return result
+    elif isinstance(content, list):
+        return [_convert_content_urls(item, request) for item in content]
+    else:
+        return content
+
+
+def _lesson_to_response(lesson: Lesson, request: Optional[Request] = None) -> LessonResponse:
+    """将教案对象转换为响应字典，并转换URL为完整URL"""
     # 导入日志记录器
     import logging
     logger = logging.getLogger(__name__)
@@ -77,8 +149,18 @@ def _lesson_to_response(lesson: Lesson) -> LessonResponse:
     raw_content = lesson.content or []
     raw_content_length = len(raw_content) if isinstance(raw_content, list) else 0
     
-    lesson_data.setdefault("content", raw_content)
+    # 转换content中的URL（文件名 → 完整URL）
+    converted_content = _convert_content_urls(raw_content, request)
+    
+    # 确保转换后的content被设置到lesson_data中
+    lesson_data["content"] = converted_content
     lesson_data.setdefault("tags", lesson.tags or [])
+    
+    # 转换cover_image_url
+    cover_image_url = cast(Optional[str], lesson.cover_image_url)
+    if cover_image_url:
+        lesson_data["cover_image_url"] = filename_to_url(cover_image_url, request)
+    
     lesson_data.update(
         {
             "creator_name": lesson.creator.full_name if lesson.creator else None,
@@ -131,6 +213,7 @@ def _lesson_to_response(lesson: Lesson) -> LessonResponse:
 
 @router.post("/", response_model=LessonResponse, status_code=201)
 async def create_lesson(
+    request: Request,
     lesson_in: LessonCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -178,11 +261,12 @@ async def create_lesson(
     lesson = await _get_lesson_with_relations(db, lesson_id_value)
     if not lesson:
         raise HTTPException(status_code=500, detail="教案创建后加载失败")
-    return _lesson_to_response(lesson)
+    return _lesson_to_response(lesson, request)
 
 
 @router.get("/", response_model=LessonListResponse)
 async def list_lessons(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None, description="状态筛选: draft, published, archived"),
@@ -299,7 +383,7 @@ async def list_lessons(
     paginated_query = ordered_query.offset((page - 1) * page_size).limit(page_size)
 
     lessons = (await db.execute(paginated_query)).scalars().all()
-    serialized_lessons = [_lesson_to_response(lesson) for lesson in lessons]
+    serialized_lessons = [_lesson_to_response(lesson, request) for lesson in lessons]
 
     return LessonListResponse(
         items=serialized_lessons,
@@ -311,6 +395,7 @@ async def list_lessons(
 
 @router.get("/recommended", response_model=LessonListResponse)
 async def get_recommended_lessons(
+    request: Request,
     limit: int = Query(10, ge=1, le=50, description="推荐课程数量"),
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
@@ -343,7 +428,7 @@ async def get_recommended_lessons(
     result = await db.execute(query)
     lessons = result.scalars().all()
 
-    lesson_responses = [_lesson_to_response(lesson) for lesson in lessons]
+    lesson_responses = [_lesson_to_response(lesson, request) for lesson in lessons]
 
     if (
         current_user
@@ -517,6 +602,7 @@ async def get_available_classrooms(
 @router.get("/{lesson_id}", response_model=LessonResponse)
 async def get_lesson(
     lesson_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
@@ -548,12 +634,13 @@ async def get_lesson(
         if creator_id != current_user.id and lesson_status != LessonStatus.PUBLISHED:
             raise HTTPException(status_code=403, detail="无权访问该教案")
 
-    return _lesson_to_response(lesson)
+    return _lesson_to_response(lesson, request)
 
 
 @router.put("/{lesson_id}", response_model=LessonResponse)
 async def update_lesson(
     lesson_id: int,
+    request: Request,
     lesson_in: LessonUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -851,7 +938,7 @@ async def update_lesson(
     )
     
     # 调试日志：记录返回前的数据
-    response_lesson = _lesson_to_response(lesson)
+    response_lesson = _lesson_to_response(lesson, request)
     response_count = len(response_lesson.content) if response_lesson.content else 0
     logger.info(
         f"教案 {lesson_id} 返回数据: content长度={response_count}, "
@@ -919,6 +1006,7 @@ async def delete_lesson(
 @router.post("/{lesson_id}/publish", response_model=LessonResponse)
 async def publish_lesson(
     lesson_id: int,
+    request: Request,
     publish_in: LessonPublishRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -1002,12 +1090,13 @@ async def publish_lesson(
     if not lesson:
         raise HTTPException(status_code=500, detail="教案发布后加载失败")
 
-    return _lesson_to_response(lesson)
+    return _lesson_to_response(lesson, request)
 
 
 @router.post("/{lesson_id}/unpublish", response_model=LessonResponse)
 async def unpublish_lesson(
     lesson_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
@@ -1032,12 +1121,13 @@ async def unpublish_lesson(
     if not lesson:
         raise HTTPException(status_code=500, detail="教案取消发布后加载失败")
 
-    return _lesson_to_response(lesson)
+    return _lesson_to_response(lesson, request)
 
 
 @router.post("/{lesson_id}/duplicate", response_model=LessonResponse)
 async def duplicate_lesson(
     lesson_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
@@ -1067,7 +1157,7 @@ async def duplicate_lesson(
     if not lesson_copy:
         raise HTTPException(status_code=500, detail="教案复制后加载失败")
 
-    return _lesson_to_response(lesson_copy)
+    return _lesson_to_response(lesson_copy, request)
 
 
 # ========== MVP: 基于资源创建教案相关端点 ==========
@@ -1086,6 +1176,7 @@ class CreateFromResourceRequest(BaseModel):
 
 @router.post("/from-resource", response_model=LessonResponse, status_code=201)
 async def create_lesson_from_resource(
+    request: Request,
     data: CreateFromResourceRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -1132,7 +1223,7 @@ async def create_lesson_from_resource(
     if not lesson:
         raise HTTPException(status_code=500, detail="教案创建后加载失败")
 
-    return _lesson_to_response(lesson)
+    return _lesson_to_response(lesson, request)
 
 
 @router.get("/{lesson_id}/reference-resource")
@@ -1179,6 +1270,7 @@ class UpdateReferenceNotesRequest(BaseModel):
 @router.put("/{lesson_id}/reference-notes", response_model=LessonResponse)
 async def update_reference_notes(
     lesson_id: int,
+    request: Request,
     data: UpdateReferenceNotesRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -1201,12 +1293,13 @@ async def update_reference_notes(
     if not lesson:
         raise HTTPException(status_code=500, detail="更新参考笔记后加载失败")
 
-    return _lesson_to_response(lesson)
+    return _lesson_to_response(lesson, request)
 
 
 @router.get("/chapter/{chapter_id}", response_model=LessonListResponse)
 async def get_chapter_lessons(
     chapter_id: int,
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None, description="状态筛选: draft, published, archived"),
@@ -1267,7 +1360,7 @@ async def get_chapter_lessons(
     paginated_query = ordered_query.offset((page - 1) * page_size).limit(page_size)
 
     lessons = (await db.execute(paginated_query)).scalars().all()
-    serialized_lessons = [_lesson_to_response(lesson) for lesson in lessons]
+    serialized_lessons = [_lesson_to_response(lesson, request) for lesson in lessons]
 
     return LessonListResponse(
         items=serialized_lessons,

@@ -211,8 +211,8 @@ function normalizeImageUrls(html: string): string {
           // 如果URL指向的是资源路径 (/uploads/)，统一替换为当前服务器地址
           // 这样可以确保无论数据来自哪个环境（localhost、不同IP等），都能在当前环境正确显示
           if (url.pathname.startsWith('/uploads/')) {
-            const path = url.pathname + (url.search || '') + (url.hash || '')
-            const newUrl = `${baseURL}${path}`
+              const path = url.pathname + (url.search || '') + (url.hash || '')
+              const newUrl = `${baseURL}${path}`
             // 使用更可靠的替换方式：直接替换整个src属性
             const srcPattern = /src\s*=\s*(["']?)[^"'\s>]+\1/i
             return match.replace(srcPattern, `src=${quote}${newUrl}${quote}`)
@@ -278,12 +278,34 @@ const editor = useEditor({
     }),
   ],
   onUpdate: ({ editor }) => {
-    // 在保存到数据库之前，将完整URL（包含localhost和IP地址）转换为相对路径
+    // 在保存到数据库之前，将完整URL或相对路径转换为文件名
     let html = editor.getHTML()
-    const baseURL = getServerBaseUrl()
     
-    // 将所有指向 /uploads/ 路径的完整URL转换为相对路径（无论主机名是什么）
-    // 这样可以确保数据库存储的是相对路径，而不是包含服务器IP的完整URL
+    // 辅助函数：从URL中提取文件名
+    const extractFilename = (url: string): string => {
+      if (!url || url.startsWith('blob:') || url.startsWith('data:')) {
+        return url
+      }
+      // 如果已经是纯文件名，直接返回
+      if (!url.includes('/') && !url.startsWith('http://') && !url.startsWith('https://')) {
+        return url
+      }
+      try {
+        const urlObj = new URL(url)
+        const filename = urlObj.pathname.split('/').pop() || ''
+        return filename || url
+      } catch {
+        // URL解析失败，尝试直接提取文件名
+        if (url.includes('/')) {
+          const parts = url.split('/')
+          const filename = parts[parts.length - 1]
+          return filename.split('?')[0].split('#')[0] || url
+        }
+      }
+      return url
+    }
+    
+    // 将所有指向 /uploads/ 路径的URL转换为文件名（无论主机名是什么）
     html = html.replace(/<img\s+([^>]*?)>/gi, (match, attrs) => {
       const srcMatch = attrs.match(/\ssrc\s*=\s*(["'])([^"']+)\1/i) || attrs.match(/\ssrc\s*=\s*([^\s>]+)/i)
       if (srcMatch) {
@@ -295,113 +317,45 @@ const editor = useEditor({
           return match
         }
         
-        // 如果是完整URL且指向 /uploads/ 路径，提取相对路径
-        if (src.startsWith('http://') || src.startsWith('https://')) {
-          try {
-            const url = new URL(src)
-            // 对于所有指向 /uploads/ 的URL，无论主机名是什么，都提取相对路径
-            // 这样可以避免在数据库中存储服务器IP地址
-            if (url.pathname.startsWith('/uploads/')) {
-              const relativePath = url.pathname + (url.search || '') + (url.hash || '')
-              const newSrcAttr = ` src=${quote}${relativePath}${quote}`
-              return match.replace(srcMatch[0], newSrcAttr)
-            }
-          } catch {
-            // URL解析失败，尝试直接提取路径
-            const pathMatch = src.match(/\/uploads\/[^"'\s]+/)
-            if (pathMatch) {
-              const newSrcAttr = ` src=${quote}${pathMatch[0]}${quote}`
-              return match.replace(srcMatch[0], newSrcAttr)
-            }
-          }
+        // 如果URL指向 /uploads/ 路径，提取文件名
+        if (src.includes('/uploads/') || src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')) {
+          const filename = extractFilename(src)
+          const newSrcAttr = ` src=${quote}${filename}${quote}`
+          return match.replace(srcMatch[0], newSrcAttr)
         }
       }
       return match
     })
     
-    // 替换PDF和文件组件中的完整URL为相对路径
+    // 替换PDF和文件组件中的URL为文件名
     html = html.replace(/<div\s+class="(pdf|file)-attachment[^"]*"[^>]*>/gi, (match) => {
-      // 提取data-pdf-url或data-file-url属性
       const urlMatch = match.match(/data-(pdf|file)-url\s*=\s*(["'])([^"']+)\2/i)
       if (urlMatch) {
         const quote = urlMatch[2]
         let url = urlMatch[3]
-        
-        // 如果URL包含完整地址（localhost、127.0.0.1或IP地址），提取相对路径
-        if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url) || url.startsWith('http')) {
-          try {
-            const urlObj = new URL(url)
-            const relativePath = urlObj.pathname
-            const newUrlAttr = `data-${urlMatch[1]}-url=${quote}${relativePath}${quote}`
-            return match.replace(urlMatch[0], newUrlAttr)
-          } catch {
-            // URL解析失败，尝试直接提取路径
-            const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
-            if (pathMatch) {
-              const newUrlAttr = `data-${urlMatch[1]}-url=${quote}${pathMatch[0]}${quote}`
-              return match.replace(urlMatch[0], newUrlAttr)
-            }
-          }
-        }
+        const filename = extractFilename(url)
+        const newUrlAttr = `data-${urlMatch[1]}-url=${quote}${filename}${quote}`
+        return match.replace(urlMatch[0], newUrlAttr)
       }
       return match
     })
     
-    // 替换PDF查看按钮中的data-pdf-view-url属性为相对路径
+    // 替换PDF查看按钮中的data-pdf-view-url属性为文件名
     html = html.replace(/data-pdf-view-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        try {
-          const urlObj = new URL(url)
-          if (urlObj.pathname.startsWith('/uploads/')) {
-            const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
-            return `data-pdf-view-url=${quote}${relativePath}${quote}`
-          }
-        } catch {
-          const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
-          if (pathMatch) {
-            return `data-pdf-view-url=${quote}${pathMatch[0]}${quote}`
-          }
-        }
-      }
-      return match
+      const filename = extractFilename(url)
+      return `data-pdf-view-url=${quote}${filename}${quote}`
     })
     
-    // 替换文件下载链接中的href为相对路径（所有指向 /uploads/ 的URL）
+    // 替换文件下载链接中的href为文件名
     html = html.replace(/href\s*=\s*(["'])([^"']+)\1[^>]*download/gi, (match, quote, url) => {
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        try {
-          const urlObj = new URL(url)
-          if (urlObj.pathname.startsWith('/uploads/')) {
-            const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
-            return `href=${quote}${relativePath}${quote} download`
-          }
-        } catch {
-          const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
-          if (pathMatch) {
-            return `href=${quote}${pathMatch[0]}${quote} download`
-          }
-        }
-      }
-      return match
+      const filename = extractFilename(url)
+      return `href=${quote}${filename}${quote} download`
     })
     
-    // 替换data-file-download-url属性为相对路径（所有指向 /uploads/ 的URL）
+    // 替换data-file-download-url属性为文件名
     html = html.replace(/data-file-download-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        try {
-          const urlObj = new URL(url)
-          if (urlObj.pathname.startsWith('/uploads/')) {
-            const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
-            return `data-file-download-url=${quote}${relativePath}${quote}`
-          }
-        } catch {
-          const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
-          if (pathMatch) {
-            return `data-file-download-url=${quote}${pathMatch[0]}${quote}`
-          }
-        }
-      }
-      return match
+      const filename = extractFilename(url)
+      return `data-file-download-url=${quote}${filename}${quote}`
     })
     
     emit('update', html)
@@ -516,29 +470,53 @@ async function handleImageUpload(event: Event) {
       timeout: 300000, // 5分钟超时
     })
 
-    // 使用相对路径保存到数据库（这样学生端可以根据自己的服务器地址动态构建URL）
-    // 只保存相对路径，不保存完整的服务器URL
-    const imageUrl = response.file_url  // 已经是 /uploads/resources/xxx.png 格式
+    // 后端API现在返回完整URL（根据方案2），例如: http://192.168.1.102:8000/uploads/resources/xxx.png
+    // 提取文件名用于保存到数据库（根据方案2，数据库只存储文件名）
+    const imageUrl = response.file_url  // 完整URL格式
     
-    // 为了在编辑器中显示，需要构建完整的预览URL
-    const previewUrl = imageUrl.startsWith('/uploads/') 
-      ? `${getServerBaseUrl()}${imageUrl}`
-      : imageUrl
+    // 从完整URL中提取文件名
+    const extractFilename = (url: string): string => {
+      if (!url || url.startsWith('blob:') || url.startsWith('data:')) {
+        return url
+      }
+      if (!url.includes('/') && !url.startsWith('http://') && !url.startsWith('https://')) {
+        return url  // 已经是文件名
+      }
+      try {
+        const urlObj = new URL(url)
+        const filename = urlObj.pathname.split('/').pop() || ''
+        return filename || url
+      } catch {
+        if (url.includes('/')) {
+          const parts = url.split('/')
+          const filename = parts[parts.length - 1]
+          return filename.split('?')[0].split('#')[0] || url
+        }
+      }
+      return url
+    }
+    
+    const filename = extractFilename(imageUrl)
+    
+    // 为了在编辑器中预览，需要构建完整的预览URL
+    const previewUrl = imageUrl.startsWith('http://') || imageUrl.startsWith('https://')
+      ? imageUrl  // 已经是完整URL，直接使用
+      : `${getServerBaseUrl()}/uploads/resources/${filename}`
 
-    // 更新图片src为相对路径（保存到数据库时使用相对路径）
-    // 但在编辑器中显示时使用完整URL以便预览
+    // 更新图片src为文件名（数据库存储文件名，显示时转换为完整URL）
+    // 注意：虽然编辑器中使用文件名，但通过normalizeImageUrls在显示时会转换为完整URL
     if (editor.value) {
       const { state } = editor.value
       const { tr } = state
       let updated = false
       
-      // 遍历所有节点，找到使用tempUrl的图片节点并更新
+      // 遍历所有节点，找到使用tempUrl的图片节点并更新为文件名
       state.doc.descendants((node, pos) => {
         if (node.type.name === 'image' && node.attrs.src === tempUrl) {
-          // 保存相对路径到数据库，但使用完整URL在编辑器中预览
+          // 直接使用文件名（onUpdate中不需要再转换）
           tr.setNodeMarkup(pos, undefined, {
             ...node.attrs,
-            src: previewUrl,  // 编辑器中使用完整URL以便预览
+            src: filename,  // 直接使用文件名
           })
           updated = true
         }
@@ -546,14 +524,12 @@ async function handleImageUpload(event: Event) {
       
       if (updated) {
         editor.value.view.dispatch(tr)
-        // 在保存到数据库之前，将完整URL替换为相对路径
-        // 通过监听onUpdate事件来处理
       } else {
         // 如果通过节点更新失败，尝试通过HTML替换
         const html = editor.value.getHTML()
-        // 使用更全面的正则表达式替换所有可能的blob URL格式
+        // 替换blob URL为文件名
         const blobUrlPattern = new RegExp(tempUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
-        const updatedHtml = html.replace(blobUrlPattern, previewUrl)
+        const updatedHtml = html.replace(blobUrlPattern, filename)
         if (updatedHtml !== html) {
           editor.value.commands.setContent(updatedHtml)
         }
@@ -633,32 +609,57 @@ async function handleFileUpload(event: Event) {
       timeout: 300000, // 5分钟超时
     })
 
-    // 获取相对路径（与图片上传保持一致，api服务已经返回数据对象）
-    const fileUrl = response.file_url
-    const filename = response.filename || file.name
+    // 后端API现在返回完整URL（根据方案2）
+    // 提取文件名用于保存到数据库（根据方案2，数据库只存储文件名）
+    const fileUrl = response.file_url  // 完整URL格式，例如: http://192.168.1.102:8000/uploads/resources/xxx.pdf
+    const originalFilename = response.filename || file.name
     
-    // 构建下载URL
-    const downloadUrl = fileUrl.startsWith('/uploads/') 
-      ? `${getServerBaseUrl()}${fileUrl}`
-      : fileUrl
+    // 从完整URL中提取文件名
+    const extractFilename = (url: string): string => {
+      if (!url || url.startsWith('blob:') || url.startsWith('data:')) {
+        return url
+      }
+      if (!url.includes('/') && !url.startsWith('http://') && !url.startsWith('https://')) {
+        return url  // 已经是文件名
+      }
+      try {
+        const urlObj = new URL(url)
+        const filename = urlObj.pathname.split('/').pop() || ''
+        return filename || url
+      } catch {
+        if (url.includes('/')) {
+          const parts = url.split('/')
+          const filename = parts[parts.length - 1]
+          return filename.split('?')[0].split('#')[0] || url
+        }
+      }
+      return url
+    }
+    
+    const filenameForDb = extractFilename(fileUrl)  // 用于数据库存储的文件名
+    
+    // 为了在编辑器中下载/查看，需要构建完整的URL
+    const downloadUrl = fileUrl.startsWith('http://') || fileUrl.startsWith('https://')
+      ? fileUrl  // 已经是完整URL，直接使用
+      : `${getServerBaseUrl()}/uploads/resources/${filenameForDb}`
 
     // 获取文件图标和类型
-    const fileIcon = getFileIcon(filename)
-    const isPDF = filename.toLowerCase().endsWith('.pdf')
+    const fileIcon = getFileIcon(originalFilename)
+    const isPDF = originalFilename.toLowerCase().endsWith('.pdf')
     
     // 在编辑器中插入文件下载/查看组件
-    // 使用相对路径保存，在查看时动态构建完整URL
+    // data-file-url存储文件名（用于数据库），href使用完整URL（用于下载）
     const fileHtml = `
-      <div class="file-attachment" data-file-url="${fileUrl}" data-file-filename="${filename}">
+      <div class="file-attachment" data-file-url="${filenameForDb}" data-file-filename="${originalFilename}">
         <div class="file-preview-card">
           <div class="file-icon">${fileIcon}</div>
           <div class="file-info">
-            <div class="file-filename">${filename}</div>
+            <div class="file-filename">${originalFilename}</div>
             <div class="file-size">${formatFileSize(response.file_size)}</div>
           </div>
           <div class="file-actions">
             ${isPDF ? `<button class="file-view-btn" onclick="window.open('${downloadUrl}', '_blank')">查看</button>` : ''}
-            <a href="${downloadUrl}" download="${filename}" class="file-download-btn">下载</a>
+            <a href="${downloadUrl}" download="${originalFilename}" class="file-download-btn">下载</a>
           </div>
         </div>
       </div>
@@ -720,21 +721,43 @@ async function handleLibraryAssetSelect(asset: LibraryAssetSummary | null) {
   }
 
   try {
+    // asset.public_url 是完整URL（API返回时已转换）
+    // 需要提取文件名用于数据库存储
     const fileUrl = asset.public_url || ''
-    const filename = asset.title || '资源文件'
+    const originalFilename = asset.title || '资源文件'
+    
+    // 从完整URL中提取文件名
+    const extractFilename = (url: string): string => {
+      if (!url || url.startsWith('blob:') || url.startsWith('data:')) {
+        return url
+      }
+      if (!url.includes('/') && !url.startsWith('http://') && !url.startsWith('https://')) {
+        return url  // 已经是文件名
+      }
+      try {
+        const urlObj = new URL(url)
+        const filename = urlObj.pathname.split('/').pop() || ''
+        return filename || url
+      } catch {
+        if (url.includes('/')) {
+          const parts = url.split('/')
+          const filename = parts[parts.length - 1]
+          return filename.split('?')[0].split('#')[0] || url
+        }
+      }
+      return url
+    }
+    
+    const filenameForDb = extractFilename(fileUrl)  // 用于数据库存储的文件名
     
     // 根据资源类型处理
     if (asset.asset_type === 'image') {
-      // 图片资源：直接插入图片
-      const imageUrl = fileUrl.startsWith('/uploads/') 
-        ? `${getServerBaseUrl()}${fileUrl}`
-        : fileUrl
-      editor.value.chain().focus().setImage({ src: imageUrl }).run()
+      // 图片资源：直接插入图片，使用文件名（数据库存储文件名）
+      editor.value.chain().focus().setImage({ src: filenameForDb }).run()
     } else if (asset.asset_type === 'video') {
       // 视频资源：插入视频链接或嵌入代码
-      const videoUrl = fileUrl.startsWith('/uploads/') 
-        ? `${getServerBaseUrl()}${fileUrl}`
-        : fileUrl
+      // 使用完整URL用于显示（下载时通过normalizeImageUrls转换）
+      const videoUrl = fileUrl
       const videoHtml = `
         <div class="video-embed">
           <video controls style="max-width: 100%; height: auto;">
@@ -746,20 +769,19 @@ async function handleLibraryAssetSelect(asset: LibraryAssetSummary | null) {
       editor.value.chain().focus().insertContent(videoHtml).run()
     } else if (asset.asset_type === 'pdf') {
       // PDF资源：插入PDF查看/下载组件
-      const pdfUrl = fileUrl.startsWith('/uploads/') 
-        ? `${getServerBaseUrl()}${fileUrl}`
-        : fileUrl
+      // data-pdf-url存储文件名（用于数据库），href使用完整URL（用于查看/下载）
+      const pdfUrl = fileUrl
       const pdfHtml = `
-        <div class="file-attachment pdf-attachment" data-pdf-url="${fileUrl}" data-file-filename="${filename}">
+        <div class="file-attachment pdf-attachment" data-pdf-url="${filenameForDb}" data-file-filename="${originalFilename}">
           <div class="file-preview-card">
             <div class="file-icon">📄</div>
             <div class="file-info">
-              <div class="file-filename">${filename}</div>
+              <div class="file-filename">${originalFilename}</div>
               <div class="file-size">PDF文档</div>
             </div>
             <div class="file-actions">
               <button class="file-view-btn" onclick="window.open('${pdfUrl}', '_blank')">查看</button>
-              <a href="${pdfUrl}" download="${filename}" class="file-download-btn">下载</a>
+              <a href="${pdfUrl}" download="${originalFilename}" class="file-download-btn">下载</a>
             </div>
           </div>
         </div>
@@ -767,20 +789,19 @@ async function handleLibraryAssetSelect(asset: LibraryAssetSummary | null) {
       editor.value.chain().focus().insertContent(pdfHtml).run()
     } else {
       // 其他文件类型：插入文件下载组件
-      const downloadUrl = fileUrl.startsWith('/uploads/') 
-        ? `${getServerBaseUrl()}${fileUrl}`
-        : fileUrl
-      const fileIcon = getFileIcon(filename)
+      // data-file-url存储文件名（用于数据库），href使用完整URL（用于下载）
+      const downloadUrl = fileUrl
+      const fileIcon = getFileIcon(originalFilename)
       const fileHtml = `
-        <div class="file-attachment" data-file-url="${fileUrl}" data-file-filename="${filename}">
+        <div class="file-attachment" data-file-url="${filenameForDb}" data-file-filename="${originalFilename}">
           <div class="file-preview-card">
             <div class="file-icon">${fileIcon}</div>
             <div class="file-info">
-              <div class="file-filename">${filename}</div>
+              <div class="file-filename">${originalFilename}</div>
               <div class="file-size">${asset.size_bytes ? formatFileSize(asset.size_bytes) : ''}</div>
             </div>
             <div class="file-actions">
-              <a href="${downloadUrl}" download="${filename}" class="file-download-btn">下载</a>
+              <a href="${downloadUrl}" download="${originalFilename}" class="file-download-btn">下载</a>
             </div>
           </div>
         </div>

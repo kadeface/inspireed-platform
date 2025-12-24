@@ -136,5 +136,13 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "storage"  # 上传文件存储目录
     MAX_UPLOAD_SIZE: int = 100 * 1024 * 1024  # 100MB
 
+    # 资源URL配置
+    # 资源文件的相对路径前缀（数据库存储的是文件名，路径前缀在配置中）
+    RESOURCE_BASE_PATH: str = "/uploads/resources"
+    # 资源文件的完整基础URL（可选，不配置则从请求中自动获取）
+    # 例如：http://192.168.2.35:8000 或 http://localhost:8000
+    # 如果为空，则从 Request.base_url 自动获取
+    RESOURCE_BASE_URL: Optional[str] = None
+
 
 settings = Settings()

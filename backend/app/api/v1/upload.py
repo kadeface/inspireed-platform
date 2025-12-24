@@ -3,13 +3,14 @@
 用于上传视频、图片等文件到服务器
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from typing import Optional
 from pydantic import BaseModel
 
 from app.api.deps import get_current_active_user
 from app.models.user import User
 from app.services.upload import upload_service
+from app.utils.resource_url import filename_to_url
 
 router = APIRouter()
 
@@ -23,6 +24,7 @@ class UploadResponse(BaseModel):
 
 @router.post("/", response_model=UploadResponse)
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user),
 ) -> UploadResponse:
@@ -35,7 +37,7 @@ async def upload_file(
     - 文档：pdf, doc, docx, ppt, pptx
     - 其他：根据需求扩展
     
-    返回文件的相对 URL，前端需要根据 API base URL 构建完整 URL
+    返回文件的完整 URL，前端可直接使用
     """
     if not file.filename:
         raise HTTPException(400, "文件名不能为空")
@@ -64,11 +66,14 @@ async def upload_file(
     # 注意：这里只能检查 Content-Length，实际文件大小需要在上传时检查
     
     try:
-        # 使用 upload_service 上传文件
+        # 使用 upload_service 上传文件（返回文件名）
         upload_result = await upload_service.upload_file(file)
         
+        # 将文件名转换为完整URL返回给前端
+        file_url = filename_to_url(upload_result["file_url"], request)
+        
         return UploadResponse(
-            file_url=upload_result["file_url"],
+            file_url=file_url,  # 返回完整URL
             file_size=upload_result["file_size"],
             filename=file.filename or "unknown"
         )

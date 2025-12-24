@@ -341,43 +341,24 @@ const sanitizedHtml = computed(() => {
           return match
         }
         
-        // 如果是纯文件名（没有路径，只有文件名），假设是资源文件
+        // 如果是完整URL（http/https），直接使用（后端已经返回完整URL，根据方案2）
+        if (src.startsWith('http://') || src.startsWith('https://')) {
+          return match
+        }
+        
+        // 如果是相对路径（以/开头但不是//），转换为绝对URL
+        if (src.startsWith('/') && !src.startsWith('//')) {
+          newSrc = `${baseURL}${src}`
+        }
+        // 如果是纯文件名（没有路径，只有文件名），假设是资源文件（作为安全网处理旧数据）
         // 例如：9ffa58aa-610a-4a2d-b640-65e0d5be2d41.png
-        if (!src.startsWith('/') && !src.startsWith('http://') && !src.startsWith('https://') && !src.startsWith('blob:')) {
+        else if (!src.startsWith('//')) {
           // 检查是否看起来像一个文件名（包含扩展名）
           if (/\.(png|jpe?g|gif|webp|svg|mp4|pdf|docx?|xlsx?|pptx?)$/i.test(src)) {
             newSrc = `${baseURL}/uploads/resources/${src}`
-            const newSrcAttr = ` src=${quote}${newSrc}${quote}`
-            return match.replace(srcMatch[0], newSrcAttr)
+          } else {
+            newSrc = `${baseURL}/${src.startsWith('/') ? src.slice(1) : src}`
           }
-        }
-        
-        // 如果是完整URL（http/https），检查是否需要替换为当前服务器地址
-        if (src.startsWith('http://') || src.startsWith('https://')) {
-          try {
-            const url = new URL(src)
-            
-            // 如果URL指向的是资源路径 (/uploads/)，统一替换为当前服务器地址
-            // 这样可以确保无论数据来自哪个环境（localhost、不同IP等），都能在当前环境正确显示
-            if (url.pathname.startsWith('/uploads/')) {
-              const path = url.pathname + (url.search || '') + (url.hash || '')
-              newSrc = `${baseURL}${path}`
-            } else {
-              // 不是资源路径，保持原样
-              return match
-            }
-          } catch (e) {
-            // URL解析失败，保持原样
-            return match
-          }
-        }
-        // 如果是相对路径（以/开头但不是//），转换为绝对URL
-        else if (src.startsWith('/') && !src.startsWith('//')) {
-          newSrc = `${baseURL}${src}`
-        }
-        // 如果是其他相对路径，也转换为绝对URL
-        else if (!src.startsWith('//')) {
-          newSrc = `${baseURL}/${src.startsWith('/') ? src.slice(1) : src}`
         }
         
         // 如果URL被修改，替换原src值
@@ -617,13 +598,13 @@ const sanitizedHtml = computed(() => {
   // 安全网：在DOMPurify之后，使用更精确的正则匹配HTML标签中的src属性
   // 匹配所有指向 /uploads/ 路径的完整URL，无论主机名是什么，都替换为当前服务器地址
   sanitized = sanitized.replace(/src\s*=\s*(["'])(https?:\/\/[^"']+\/uploads\/[^"']+)\1/gi, (match, quote, url) => {
-    try {
+      try {
       const urlObj = new URL(url)
       if (urlObj.pathname.startsWith('/uploads/')) {
         const path = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
         return `src=${quote}${baseURL}${path}${quote}`
       }
-    } catch (e) {
+      } catch (e) {
       // URL解析失败，尝试直接提取路径
       const pathMatch = url.match(/\/uploads\/[^"']+/)
       if (pathMatch) {
@@ -631,26 +612,26 @@ const sanitizedHtml = computed(() => {
       }
     }
     return match
-  })
-  
+    })
+    
   // 额外安全网：直接替换HTML字符串中所有指向 /uploads/ 的完整URL
   // 这样可以确保无论原始URL的主机名是什么（localhost、不同IP等），都替换为当前服务器地址
   sanitized = sanitized.replace(/https?:\/\/[^\s"'>]+\/uploads\/[^\s"'>]+/gi, (match) => {
-    try {
+      try {
       const urlObj = new URL(match)
       if (urlObj.pathname.startsWith('/uploads/')) {
         const path = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
         return baseURL + path
-      }
-    } catch (e) {
-      // URL解析失败，尝试直接提取路径
+        }
+      } catch (e) {
+        // URL解析失败，尝试直接提取路径
       const pathMatch = match.match(/\/uploads\/[^\s"'>]+/)
-      if (pathMatch) {
-        return baseURL + pathMatch[0]
+        if (pathMatch) {
+          return baseURL + pathMatch[0]
+        }
       }
-    }
-    return match
-  })
+      return match
+    })
   
   // 修复双斜杠问题（如果baseURL以/结尾，路径也以/开头）
   // 转义baseURL中的特殊字符用于正则表达式
@@ -661,7 +642,7 @@ const sanitizedHtml = computed(() => {
   const originalHasImg = html.includes('<img')
   const sanitizedHasImg = sanitized.includes('<img')
   if (originalHasImg && !sanitizedHasImg) {
-    // 图片标签被过滤，静默处理
+      // 图片标签被过滤，静默处理
   }
   
   return sanitized
@@ -973,8 +954,93 @@ watch(editorMode, (newMode) => {
   }
 })
 
+// 从URL中提取文件名（用于保存到数据库，与TipTapEditor中的逻辑保持一致）
+function extractFilename(url: string): string {
+  if (!url || url.startsWith('blob:') || url.startsWith('data:')) {
+    return url
+  }
+  // 如果已经是纯文件名，直接返回
+  if (!url.includes('/') && !url.startsWith('http://') && !url.startsWith('https://')) {
+    return url
+  }
+  try {
+    const urlObj = new URL(url)
+    const filename = urlObj.pathname.split('/').pop() || ''
+    return filename || url
+  } catch {
+    // URL解析失败，尝试直接提取文件名
+    if (url.includes('/')) {
+      const parts = url.split('/')
+      const filename = parts[parts.length - 1]
+      return filename.split('?')[0].split('#')[0] || url
+    }
+  }
+  return url
+}
+
 function handleUpdate() {
-  emit('update', props.cell)
+  // 在保存前，确保HTML内容中的URL都是文件名格式（安全网）
+  // TipTapEditor的onUpdate已经处理了URL提取，但这里作为额外保障
+  const cellToSave = { ...props.cell }
+  
+  if (cellToSave.content?.html) {
+    let html = cellToSave.content.html
+    
+    // 提取img标签中的文件名
+    html = html.replace(/<img\s+([^>]*?)>/gi, (match, attrs) => {
+      const srcMatch = attrs.match(/\ssrc\s*=\s*(["'])([^"']+)\1/i) || attrs.match(/\ssrc\s*=\s*([^\s>]+)/i)
+      if (srcMatch) {
+        const quote = srcMatch[1] || '"'
+        let src = srcMatch[2] || srcMatch[1]
+        
+        // 如果是blob URL或data URL，不需要处理
+        if (src.startsWith('blob:') || src.startsWith('data:')) {
+          return match
+        }
+        
+        // 如果URL指向 /uploads/ 路径，提取文件名
+        if (src.includes('/uploads/') || src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')) {
+          const filename = extractFilename(src)
+          const newSrcAttr = ` src=${quote}${filename}${quote}`
+          return match.replace(srcMatch[0], newSrcAttr)
+        }
+      }
+      return match
+    })
+    
+    // 提取文件附件组件中的文件名
+    html = html.replace(/<div\s+class="(pdf|file)-attachment[^"]*"[^>]*>/gi, (match) => {
+      const urlMatch = match.match(/data-(pdf|file)-url\s*=\s*(["'])([^"']+)\2/i)
+      if (urlMatch) {
+        const quote = urlMatch[2]
+        let url = urlMatch[3]
+        const filename = extractFilename(url)
+        const newUrlAttr = `data-${urlMatch[1]}-url=${quote}${filename}${quote}`
+        return match.replace(urlMatch[0], newUrlAttr)
+      }
+      return match
+    })
+    
+    // 提取其他文件相关的URL属性
+    html = html.replace(/data-pdf-view-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
+      const filename = extractFilename(url)
+      return `data-pdf-view-url=${quote}${filename}${quote}`
+    })
+    
+    html = html.replace(/href\s*=\s*(["'])([^"']+)\1[^>]*download/gi, (match, quote, url) => {
+      const filename = extractFilename(url)
+      return `href=${quote}${filename}${quote} download`
+    })
+    
+    html = html.replace(/data-file-download-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
+      const filename = extractFilename(url)
+      return `data-file-download-url=${quote}${filename}${quote}`
+    })
+    
+    cellToSave.content.html = html
+  }
+  
+  emit('update', cellToSave)
 }
 
 // 监听图片加载错误
