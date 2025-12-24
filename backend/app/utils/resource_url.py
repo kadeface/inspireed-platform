@@ -14,11 +14,13 @@ def filename_to_url(filename: str, request: Optional[Request] = None) -> str:
     将文件名转换为完整URL
     
     Args:
-        filename: 文件名（如 "xxx.png"）或相对路径（如 "/uploads/resources/xxx.png"）
+        filename: 文件名（如 "xxx.png"）、相对路径（如 "/uploads/resources/xxx.png"）
+                  或完整URL（如 "http://host:port/uploads/resources/xxx.png"）
         request: FastAPI请求对象（可选，用于自动获取base_url）
     
     Returns:
         完整URL（如 "http://host:port/uploads/resources/xxx.png"）
+        如果输入是完整URL且指向资源路径，会提取文件名后使用动态服务器地址重新构建
     
     示例:
         >>> filename_to_url("abc123.png", request)
@@ -26,13 +28,23 @@ def filename_to_url(filename: str, request: Optional[Request] = None) -> str:
         
         >>> filename_to_url("/uploads/resources/abc123.png", request)
         "http://localhost:8000/uploads/resources/abc123.png"
+        
+        >>> filename_to_url("http://192.168.1.102:8000/uploads/resources/abc123.png", request)
+        "http://localhost:8000/uploads/resources/abc123.png"  # 使用当前请求的服务器地址
     """
     if not filename:
         return filename
     
-    # 如果已经是完整URL，直接返回
+    # 如果已经是完整URL，检查是否是资源URL，如果是则提取文件名后重新构建（使用动态服务器地址）
     if filename.startswith(('http://', 'https://')):
-        return filename
+        # 检查是否是资源URL（/uploads/resources/或/uploads/thumbnails/）
+        if "/uploads/resources/" in filename or "/uploads/thumbnails/" in filename:
+            # 提取文件名，然后使用动态服务器地址重新构建URL
+            # 直接调用同文件中的url_to_filename函数
+            filename = url_to_filename(filename)
+        else:
+            # 不是资源URL，保持原样（可能是外部链接）
+            return filename
     
     # 向后兼容：如果包含路径前缀，提取文件名
     # 支持格式：/uploads/resources/xxx.png 或 uploads/resources/xxx.png

@@ -222,7 +222,7 @@
         :autoplay="displayConfig?.autoplay"
         :loop="displayConfig?.loop"
         :muted="displayConfig?.muted"
-        :preload="editable ? 'none' : 'metadata'"
+        :preload="'metadata'"
         @loadedmetadata="handleVideoLoaded"
         @timeupdate="handleTimeUpdate"
         @ended="handleVideoEnded"
@@ -626,8 +626,107 @@ function updateCell() {
 
 function handleVideoLoaded() {
   if (videoPlayer.value) {
-    localContent.value.duration = videoPlayer.value.duration
-    updateCell()
+    const video = videoPlayer.value
+    
+    // 更新视频时长（仅在编辑模式下更新localContent）
+    if (props.editable) {
+      localContent.value.duration = video.duration
+    }
+    
+    // 如果没有thumbnail，从视频第一帧生成缩略图
+    const currentThumbnail = props.editable 
+      ? localContent.value.thumbnail 
+      : (props.cell.content?.thumbnail)
+    
+    if (!currentThumbnail && video.videoWidth > 0 && video.videoHeight > 0) {
+      generateVideoThumbnail()
+    }
+    
+    if (props.editable) {
+      updateCell()
+    }
+  }
+}
+
+// 从视频第一帧生成缩略图
+function generateVideoThumbnail() {
+  if (!videoPlayer.value) return
+  
+  const video = videoPlayer.value
+  
+  // 确保视频已加载元数据
+  if (video.readyState < 1) {
+    // 如果视频还没加载，等待加载完成
+    const onLoadedData = () => {
+      captureFirstFrame()
+      video.removeEventListener('loadeddata', onLoadedData)
+    }
+    video.addEventListener('loadeddata', onLoadedData, { once: true })
+    return
+  }
+  
+  captureFirstFrame()
+  
+  function captureFirstFrame() {
+    // 创建一个canvas来截取视频帧
+    const canvas = document.createElement('canvas')
+    const videoWidth = video.videoWidth || 640
+    const videoHeight = video.videoHeight || 360
+    
+    if (videoWidth === 0 || videoHeight === 0) {
+      // 视频尺寸还未确定，稍后再试
+      setTimeout(() => captureFirstFrame(), 100)
+      return
+    }
+    
+    canvas.width = videoWidth
+    canvas.height = videoHeight
+    
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    // 将视频的第一帧绘制到canvas上
+    try {
+      // 保存当前播放时间
+      const originalTime = video.currentTime
+      
+      // 设置当前时间为第一帧（0秒）
+      video.currentTime = 0
+      
+      // 等待视频seek到第一帧
+      const onSeeked = () => {
+        try {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+          
+          // 恢复原来的播放时间（如果需要）
+          // video.currentTime = originalTime
+          
+          // 将canvas转换为blob URL
+          canvas.toBlob((blob) => {
+            if (blob && videoPlayer.value) {
+              const thumbnailUrl = URL.createObjectURL(blob)
+              
+              // 直接更新video元素的poster属性（这样无论编辑模式还是非编辑模式都能显示）
+              videoPlayer.value.poster = thumbnailUrl
+              
+              // 仅在编辑模式下更新localContent（用于可能的保存操作）
+              if (props.editable) {
+                isUpdatingFromProps = true
+                localContent.value.thumbnail = thumbnailUrl
+                isUpdatingFromProps = false
+              }
+            }
+          }, 'image/png', 0.8)
+        } catch (error) {
+          console.warn('截取视频第一帧失败:', error)
+        }
+        video.removeEventListener('seeked', onSeeked)
+      }
+      
+      video.addEventListener('seeked', onSeeked, { once: true })
+    } catch (error) {
+      console.warn('生成视频缩略图失败:', error)
+    }
   }
 }
 

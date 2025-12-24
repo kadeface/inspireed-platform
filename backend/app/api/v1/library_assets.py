@@ -24,8 +24,21 @@ from app.schemas.library_asset import (
 )
 from app.services.upload import upload_service
 from app.api.deps import get_current_user
+from app.utils.resource_url import url_to_filename, filename_to_url
+from fastapi import Request
 
 router = APIRouter()
+
+
+def _convert_asset_urls(asset_dict: dict, request: Optional[Request] = None) -> dict:
+    """
+    转换资源库资产中的URL（文件名 → 完整URL）
+    """
+    if asset_dict.get("public_url"):
+        asset_dict["public_url"] = filename_to_url(asset_dict["public_url"], request)
+    if asset_dict.get("thumbnail_url"):
+        asset_dict["thumbnail_url"] = filename_to_url(asset_dict["thumbnail_url"], request)
+    return asset_dict
 
 
 def _check_library_access(current_user: User) -> None:
@@ -41,6 +54,7 @@ def _check_library_access(current_user: User) -> None:
 
 @router.get("/", response_model=LibraryAssetListResponse)
 async def list_library_assets(
+    request: Request,
     query: Optional[str] = Query(None, description="搜索关键词（标题/描述/知识点名称）"),
     asset_type: Optional[str] = Query(None, description="资源类型筛选"),
     visibility: Optional[str] = Query(None, description="可见性筛选"),
@@ -123,8 +137,14 @@ async def list_library_assets(
     result = await db.execute(query_with_pagination)
     assets = result.scalars().all()
     
+    # 转换URL为完整URL
+    converted_items = []
+    for asset in assets:
+        asset_dict = LibraryAssetSummary.model_validate(asset).model_dump()
+        converted_items.append(LibraryAssetSummary(**_convert_asset_urls(asset_dict, request)))
+    
     return LibraryAssetListResponse(
-        items=[LibraryAssetSummary.model_validate(asset) for asset in assets],
+        items=converted_items,
         total=total,
         page=page,
         page_size=page_size,
@@ -134,6 +154,7 @@ async def list_library_assets(
 @router.get("/{asset_id}", response_model=LibraryAssetDetail)
 async def get_library_asset(
     asset_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -160,11 +181,14 @@ async def get_library_asset(
         if asset_owner_id != user_id and asset_visibility != "school":
             raise HTTPException(status_code=403, detail="无权访问此资源")
     
-    return LibraryAssetDetail.model_validate(asset)
+    # 转换URL为完整URL
+    asset_dict = LibraryAssetDetail.model_validate(asset).model_dump()
+    return LibraryAssetDetail(**_convert_asset_urls(asset_dict, request))
 
 
 @router.post("/", response_model=LibraryAssetUploadResponse)
 async def upload_library_asset(
+    request: Request,
     title: str = Form(..., description="资源标题"),
     description: Optional[str] = Form(None, description="资源描述"),
     asset_type: Optional[str] = Form(None, description="资源类型（可选，自动推断）"),
@@ -232,6 +256,12 @@ async def upload_library_asset(
             raise HTTPException(status_code=400, detail="年级不存在")
     
     # 创建资源库资产记录
+    # 确保存储的是文件名（不包含路径）
+    file_url = url_to_filename(upload_result["file_url"])
+    thumbnail_url_value = upload_result.get("thumbnail_url")
+    if thumbnail_url_value:
+        thumbnail_url_value = url_to_filename(thumbnail_url_value)
+    
     library_asset = LibraryAsset(
         school_id=school_id,
         owner_user_id=user_id,
@@ -241,9 +271,9 @@ async def upload_library_asset(
         mime_type=file.content_type,
         size_bytes=upload_result.get("file_size"),
         storage_provider="local",
-        storage_key=upload_result["file_url"],  # 存储相对路径
-        public_url=upload_result["file_url"],
-        thumbnail_url=upload_result.get("thumbnail_url"),
+        storage_key=file_url,  # 存储文件名
+        public_url=file_url,  # 存储文件名
+        thumbnail_url=thumbnail_url_value,  # 存储文件名
         page_count=upload_result.get("page_count"),
         visibility=visibility,
         status="active",
@@ -258,11 +288,12 @@ async def upload_library_asset(
     await db.flush()  # 先flush获取ID
     
     # 创建初始版本记录
+    # 确保存储的是文件名（不包含路径）
     initial_version = LibraryAssetVersion(
         asset_id=cast(int, library_asset.id),
         version=1,
-        storage_key=upload_result["file_url"],
-        public_url=upload_result["file_url"],
+        storage_key=file_url,  # 存储文件名
+        public_url=file_url,  # 存储文件名
         size_bytes=upload_result.get("file_size"),
         sha256=upload_result.get("sha256"),
         created_by=user_id,
@@ -273,19 +304,24 @@ async def upload_library_asset(
     await db.commit()
     await db.refresh(library_asset)
     
+    # 转换URL为完整URL
+    public_url_value = filename_to_url(cast(str, library_asset.public_url), request) if library_asset.public_url else None
+    thumbnail_url_value = filename_to_url(cast(str, library_asset.thumbnail_url), request) if library_asset.thumbnail_url else None
+    
     return LibraryAssetUploadResponse(
         id=cast(int, library_asset.id),
         title=cast(str, library_asset.title),
         asset_type=cast(str, library_asset.asset_type),
-        public_url=cast(Optional[str], library_asset.public_url),
+        public_url=public_url_value,
         size_bytes=cast(Optional[int], library_asset.size_bytes),
-        thumbnail_url=cast(Optional[str], library_asset.thumbnail_url),
+        thumbnail_url=thumbnail_url_value,
     )
 
 
 @router.patch("/{asset_id}", response_model=LibraryAssetDetail)
 async def update_library_asset(
     asset_id: int,
+    request: Request,
     data: LibraryAssetUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -319,7 +355,9 @@ async def update_library_asset(
     await db.commit()
     await db.refresh(asset)
     
-    return LibraryAssetDetail.model_validate(asset)
+    # 转换URL为完整URL
+    asset_dict = LibraryAssetDetail.model_validate(asset).model_dump()
+    return LibraryAssetDetail(**_convert_asset_urls(asset_dict, request))
 
 
 @router.delete("/{asset_id}")
@@ -545,6 +583,7 @@ async def get_library_asset_content(
 @router.post("/{asset_id}/versions", response_model=LibraryAssetDetail)
 async def create_asset_version(
     asset_id: int,
+    request: Request,
     change_note: Optional[str] = Form(None, description="版本变更说明"),
     file: UploadFile = File(..., description="新版本的文件"),
     db: AsyncSession = Depends(get_db),
@@ -618,11 +657,13 @@ async def create_asset_version(
         db.add(current_version_record)
     
     # 创建新版本记录
+    # 确保存储的是文件名（不包含路径）
+    new_file_url = url_to_filename(upload_result["file_url"])
     new_version_record = LibraryAssetVersion(
         asset_id=asset_id,
         version=new_version,
-        storage_key=upload_result["file_url"],
-        public_url=upload_result["file_url"],
+        storage_key=new_file_url,  # 存储文件名
+        public_url=new_file_url,  # 存储文件名
         size_bytes=upload_result.get("file_size"),
         sha256=upload_result.get("sha256"),
         created_by=user_id,
@@ -632,19 +673,22 @@ async def create_asset_version(
     
     # 更新资产为最新版本
     asset.version = new_version
-    asset.storage_key = upload_result["file_url"]
-    asset.public_url = upload_result["file_url"]
+    asset.storage_key = new_file_url  # 存储文件名
+    asset.public_url = new_file_url  # 存储文件名
     asset.size_bytes = upload_result.get("file_size")
     asset.sha256 = upload_result.get("sha256")
-    if upload_result.get("thumbnail_url"):
-        asset.thumbnail_url = upload_result.get("thumbnail_url")
+    thumbnail_url_value = upload_result.get("thumbnail_url")
+    if thumbnail_url_value:
+        asset.thumbnail_url = url_to_filename(thumbnail_url_value)  # 存储文件名
     if upload_result.get("page_count"):
         asset.page_count = upload_result.get("page_count")
     
     await db.commit()
     await db.refresh(asset)
     
-    return LibraryAssetDetail.model_validate(asset)
+    # 转换URL为完整URL
+    asset_dict = LibraryAssetDetail.model_validate(asset).model_dump()
+    return LibraryAssetDetail(**_convert_asset_urls(asset_dict, request))
 
 
 @router.get("/{asset_id}/versions", response_model=LibraryAssetVersionListResponse)

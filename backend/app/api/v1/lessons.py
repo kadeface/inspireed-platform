@@ -84,9 +84,16 @@ def _convert_content_urls(content: Any, request: Optional[Request] = None) -> An
                     # blob URL和data URL不转换
                     if value.startswith(("blob:", "data:")):
                         result[key] = value
-                    # 如果已经是完整URL，不转换
+                    # 如果是完整URL，检查是否是资源URL，如果是则提取文件名后重新构建（使用动态服务器地址）
                     elif value.startswith(("http://", "https://")):
-                        result[key] = value
+                        # 检查是否是资源URL（/uploads/resources/或/uploads/thumbnails/）
+                        if "/uploads/resources/" in value or "/uploads/thumbnails/" in value:
+                            # 提取文件名，然后使用动态服务器地址重新构建URL
+                            filename = url_to_filename(value)
+                            result[key] = filename_to_url(filename, request)
+                        else:
+                            # 不是资源URL，保持原样（可能是外部链接）
+                            result[key] = value
                     # 如果是文件名或相对路径，转换为完整URL
                     # 使用 filename_to_url：动态服务器地址 + .env目录 + 文件名
                     else:
