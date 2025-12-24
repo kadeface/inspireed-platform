@@ -2,6 +2,26 @@
 
 echo "🚀 启动 InspireEd 教师教研系统..."
 
+# 等待 Docker 启动（最多等待 2 分钟）
+WAIT_DOCKER=${WAIT_DOCKER:-false}
+if [ "$WAIT_DOCKER" = "true" ]; then
+    echo "⏳ 等待 Docker 启动..."
+    max_attempts=24
+    attempt=0
+    while [ $attempt -lt $max_attempts ]; do
+        if docker info > /dev/null 2>&1; then
+            echo "✅ Docker 已启动"
+            sleep 3  # 额外等待确保 Docker 完全就绪
+            break
+        fi
+        attempt=$((attempt + 1))
+        if [ $((attempt % 5)) -eq 0 ]; then
+            echo "等待 Docker 启动中... ($attempt/$max_attempts)"
+        fi
+        sleep 5
+    done
+fi
+
 # 检查 Docker 是否运行
 if ! docker info > /dev/null 2>&1; then
     echo "❌ Docker 未运行，请先启动 Docker"

@@ -6,6 +6,24 @@
 
 - `docker-compose.yml`: 开发环境配置（仅包含基础服务：PostgreSQL, Redis, MinIO, Kafka）
 - `docker-compose.prod.yml`: 生产环境配置（包含所有服务，包括后端和前端）
+- `DOCKER_AUTOSTART.md`: Docker 自动启动配置指南
+
+## 🔄 自动启动配置
+
+所有 Docker 服务已配置为 `restart: unless-stopped`，这意味着：
+
+- ✅ 容器会在 Docker 守护进程启动时自动启动
+- ✅ 容器异常退出时会自动重启
+- ✅ 手动停止的容器不会自动启动
+
+**设置系统级自动启动：**
+
+1. **macOS 用户**：运行自动启动设置脚本
+   ```bash
+   ./scripts/setup-docker-autostart.sh
+   ```
+
+2. **详细说明**：查看 [DOCKER_AUTOSTART.md](./DOCKER_AUTOSTART.md) 了解完整的自动启动配置方法
 
 ## 🚀 快速开始
 
