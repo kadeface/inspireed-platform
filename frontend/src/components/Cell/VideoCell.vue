@@ -223,6 +223,7 @@
         :loop="displayConfig?.loop"
         :muted="displayConfig?.muted"
         :preload="'metadata'"
+        crossorigin="anonymous"
         @loadedmetadata="handleVideoLoaded"
         @timeupdate="handleTimeUpdate"
         @ended="handleVideoEnded"
@@ -345,12 +346,21 @@ const displayVideoUrl = computed(() => {
   return url
 })
 
-const displayContent = computed(() => {
+const displayContent = computed((): VideoCell['content'] => {
   const content = props.editable ? localContent.value : (props.cell.content || {} as VideoCell['content'])
   // 处理thumbnail URL（后端应该返回完整URL，这里保留向后兼容）
   if (content.thumbnail) {
-    // 如果是blob URL或data URL，直接返回
-    if (content.thumbnail.startsWith('blob:') || content.thumbnail.startsWith('data:')) {
+    // 如果thumbnail是blob URL，过滤掉它（blob URL不应该存储到数据库，也不应该用于poster）
+    // blob URL是临时性的，不应该持久化，应该使用data URL或服务器URL
+    if (content.thumbnail.startsWith('blob:')) {
+      // 返回没有thumbnail的内容（设为undefined），让视频显示第一帧
+      return {
+        ...content,
+        thumbnail: undefined
+      }
+    }
+    // 如果是data URL，可以直接使用（用于临时生成的缩略图）
+    if (content.thumbnail.startsWith('data:')) {
       return content
     }
     // 如果URL是文件名（不包含/），需要转换为完整URL（向后兼容旧数据）
@@ -361,6 +371,8 @@ const displayContent = computed(() => {
         thumbnail: `${baseURL}/uploads/resources/${content.thumbnail}`
       }
     }
+    // 如果已经是完整URL，直接返回
+    return content
   }
   return content
 })
@@ -392,7 +404,12 @@ watch(() => props.cell, (newCell) => {
       if (!newCell.content.videoUrl.startsWith('blob:')) {
         // 服务器 URL，直接同步
         isUpdatingFromProps = true
-        localContent.value = { ...newCell.content }
+        // 过滤掉blob URL的thumbnail，因为它们不应该从数据库加载
+        const contentToSync = { ...newCell.content }
+        if (contentToSync.thumbnail && contentToSync.thumbnail.startsWith('blob:')) {
+          delete contentToSync.thumbnail
+        }
+        localContent.value = contentToSync
         localConfig.value = { ...(newCell.config || {}) }
         isUpdatingFromProps = false
       } else if (newCell.content.videoUrl !== blobUrl.value) {
@@ -403,7 +420,12 @@ watch(() => props.cell, (newCell) => {
         }
         blobUrl.value = newCell.content.videoUrl
         isUpdatingFromProps = true
-        localContent.value = { ...newCell.content }
+        // 过滤掉blob URL的thumbnail
+        const contentToSync = { ...newCell.content }
+        if (contentToSync.thumbnail && contentToSync.thumbnail.startsWith('blob:')) {
+          delete contentToSync.thumbnail
+        }
+        localContent.value = contentToSync
         localConfig.value = { ...(newCell.config || {}) }
         isUpdatingFromProps = false
       }
@@ -611,9 +633,14 @@ function updateCell() {
     contentToSave.videoUrl = extractFilename(contentToSave.videoUrl)
   }
   
-  // 提取thumbnail的文件名
+  // 提取thumbnail的文件名（过滤掉blob URL和data URL，因为它们不应该保存到数据库）
   if (contentToSave.thumbnail) {
-    contentToSave.thumbnail = extractFilename(contentToSave.thumbnail)
+    // blob URL和data URL不应该保存到数据库
+    if (contentToSave.thumbnail.startsWith('blob:') || contentToSave.thumbnail.startsWith('data:')) {
+      delete contentToSave.thumbnail
+    } else {
+      contentToSave.thumbnail = extractFilename(contentToSave.thumbnail)
+    }
   }
   
   const updatedCell: VideoCell = {
@@ -638,7 +665,10 @@ function handleVideoLoaded() {
       ? localContent.value.thumbnail 
       : (props.cell.content?.thumbnail)
     
-    if (!currentThumbnail && video.videoWidth > 0 && video.videoHeight > 0) {
+    // 忽略blob URL，因为它们不应该用于poster（临时性的）
+    const validThumbnail = currentThumbnail && !currentThumbnail.startsWith('blob:')
+    
+    if (!validThumbnail && video.videoWidth > 0 && video.videoHeight > 0) {
       generateVideoThumbnail()
     }
     
@@ -701,22 +731,25 @@ function generateVideoThumbnail() {
           // 恢复原来的播放时间（如果需要）
           // video.currentTime = originalTime
           
-          // 将canvas转换为blob URL
-          canvas.toBlob((blob) => {
-            if (blob && videoPlayer.value) {
-              const thumbnailUrl = URL.createObjectURL(blob)
-              
-              // 直接更新video元素的poster属性（这样无论编辑模式还是非编辑模式都能显示）
-              videoPlayer.value.poster = thumbnailUrl
-              
-              // 仅在编辑模式下更新localContent（用于可能的保存操作）
-              if (props.editable) {
-                isUpdatingFromProps = true
-                localContent.value.thumbnail = thumbnailUrl
-                isUpdatingFromProps = false
-              }
+          // 将canvas转换为data URL（避免blob URL的问题）
+          // 使用data URL可以直接设置到poster属性，不需要存储到响应式数据中
+          try {
+            const dataUrl = canvas.toDataURL('image/png', 0.8)
+            
+            // 直接更新video元素的poster属性（这样无论编辑模式还是非编辑模式都能显示）
+            if (videoPlayer.value) {
+              videoPlayer.value.poster = dataUrl
             }
-          }, 'image/png', 0.8)
+          } catch (error: any) {
+            // Canvas被污染（CORS问题），无法生成缩略图
+            // 这种情况下，不设置poster，让浏览器自然显示第一帧
+            if (error.name === 'SecurityError' || error.message?.includes('Tainted')) {
+              console.debug('视频跨域，无法生成缩略图，将使用浏览器默认的第一帧显示')
+              // 不设置poster，让video元素自己显示第一帧（preload="metadata"时浏览器会自动显示第一帧）
+            } else {
+              console.warn('生成视频缩略图失败:', error)
+            }
+          }
         } catch (error) {
           console.warn('截取视频第一帧失败:', error)
         }

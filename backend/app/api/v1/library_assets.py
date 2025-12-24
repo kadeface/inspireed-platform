@@ -48,7 +48,9 @@ def _check_library_access(current_user: User) -> None:
     ) == UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="学生无权访问资源库")
     
-    if current_user.school_id is None:
+    user_role = cast(UserRole, current_user.role)
+    # 管理员和教研员可以访问资源库，即使没有 school_id
+    if current_user.school_id is None and user_role not in {UserRole.ADMIN, UserRole.RESEARCHER}:
         raise HTTPException(status_code=400, detail="用户必须归属某个学校才能使用资源库")
 
 
@@ -165,14 +167,15 @@ async def get_library_asset(
     if not asset:
         raise HTTPException(status_code=404, detail="资源库资产不存在")
     
-    # 校验归属学校
-    asset_school_id = cast(int, asset.school_id)
-    user_school_id = cast(int, current_user.school_id)
-    if asset_school_id != user_school_id:
-        raise HTTPException(status_code=403, detail="无权访问其他学校的资源")
+    # 校验归属学校（管理员和教研员可以访问所有学校的资源）
+    user_role = cast(UserRole, current_user.role)
+    if user_role not in {UserRole.ADMIN, UserRole.RESEARCHER}:
+        asset_school_id = cast(int, asset.school_id)
+        user_school_id = cast(int, current_user.school_id)
+        if asset_school_id != user_school_id:
+            raise HTTPException(status_code=403, detail="无权访问其他学校的资源")
     
     # 可见性校验：教师只能访问自己上传的或全校可见的
-    user_role = cast(UserRole, current_user.role)
     user_id = cast(int, current_user.id)
     asset_owner_id = cast(int, asset.owner_user_id)
     asset_visibility = cast(str, asset.visibility)

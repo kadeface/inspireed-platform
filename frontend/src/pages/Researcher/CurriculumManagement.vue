@@ -104,6 +104,14 @@
               <span class="text-sm text-gray-500">({{ subject.code }})</span>
               <span v-if="!subject.is_active" class="px-2 py-1 bg-red-100 text-red-600 text-xs rounded">已禁用</span>
               <span class="text-sm text-gray-600">{{ subject.lesson_count }} 个教案</span>
+              <button
+                v-if="subject.lesson_count > 0"
+                @click.stop="toggleSubjectLessons(subject.id)"
+                class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200"
+                title="展开/收起教案"
+              >
+                {{ expandedSubjectLessons.has(subject.id) ? '▼' : '▶' }} 教案
+              </button>
             </div>
             <div class="flex gap-2" @click.stop>
               <button
@@ -114,6 +122,14 @@
                 {{ subject.is_active ? '禁用' : '启用' }}
               </button>
             </div>
+          </div>
+
+          <!-- Subject Lessons -->
+          <div v-if="expandedSubjectLessons.has(subject.id)" class="ml-8 mt-2">
+            <SubjectGradeCourseLessonList
+              :subject-id="subject.id"
+              @view="handleViewLesson"
+            />
           </div>
 
           <!-- Grades -->
@@ -133,6 +149,14 @@
                   <span class="font-medium">{{ grade.name }}</span>
                   <span v-if="!grade.is_active" class="px-2 py-1 bg-red-100 text-red-600 text-xs rounded">已禁用</span>
                   <span class="text-sm text-gray-600">{{ grade.lesson_count }} 个教案</span>
+                  <button
+                    v-if="grade.lesson_count > 0"
+                    @click.stop="toggleGradeLessons(subject.id, grade.id)"
+                    class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200"
+                    title="展开/收起教案"
+                  >
+                    {{ expandedGradeLessons.has(`${subject.id}-${grade.id}`) ? '▼' : '▶' }} 教案
+                  </button>
                 </div>
                 <div class="flex gap-2" @click.stop>
                   <button
@@ -143,6 +167,15 @@
                     {{ grade.is_active ? '禁用' : '启用' }}
                   </button>
                 </div>
+              </div>
+
+              <!-- Grade Lessons -->
+              <div v-if="expandedGradeLessons.has(`${subject.id}-${grade.id}`)" class="ml-6 mt-2">
+                <SubjectGradeCourseLessonList
+                  :subject-id="subject.id"
+                  :grade-id="grade.id"
+                  @view="handleViewLesson"
+                />
               </div>
 
               <!-- Courses -->
@@ -165,6 +198,14 @@
                       <span v-if="course.code" class="text-sm text-gray-500">({{ course.code }})</span>
                       <span v-if="!course.is_active" class="px-2 py-1 bg-red-100 text-red-600 text-xs rounded">已禁用</span>
                       <span class="text-sm text-gray-600">{{ course.lesson_count }} 个教案</span>
+                      <button
+                        v-if="course.lesson_count > 0"
+                        @click.stop="toggleCourseLessons(course.id)"
+                        class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200"
+                        title="展开/收起教案"
+                      >
+                        {{ expandedCourseLessons.has(course.id) ? '▼' : '▶' }} 教案
+                      </button>
                       <span v-if="courseChapters.has(course.id)" class="text-sm text-purple-600">
                         {{ courseChapters.get(course.id)?.length || 0 }} 个章节
                       </span>
@@ -193,6 +234,14 @@
                         删除
                       </button>
                     </div>
+                  </div>
+
+                  <!-- Course Lessons -->
+                  <div v-if="expandedCourseLessons.has(course.id)" class="ml-8 mt-2">
+                    <SubjectGradeCourseLessonList
+                      :course-id="course.id"
+                      @view="handleViewLesson"
+                    />
                   </div>
 
                   <!-- Chapters -->
@@ -502,6 +551,7 @@ import ChapterEditModal from '../../components/Curriculum/ChapterEditModal.vue'
 import ChapterResourceUploadModal from '../../components/Curriculum/ChapterResourceUploadModal.vue'
 import ChapterResourceList from '../../components/Curriculum/ChapterResourceList.vue'
 import ChapterLessonList from '../../components/Curriculum/ChapterLessonList.vue'
+import SubjectGradeCourseLessonList from '../../components/Curriculum/SubjectGradeCourseLessonList.vue'
 import AssociateLessonModal from '../../components/Curriculum/AssociateLessonModal.vue'
 import CourseMergeModal from '../../components/Curriculum/CourseMergeModal.vue'
 import { useToast } from '@/composables/useToast'
@@ -520,6 +570,9 @@ const expandedGrades = ref(new Set<string>())
 const expandedCourses = ref(new Set<number>())
 const expandedResources = ref(new Set<number>())
 const expandedLessons = ref(new Set<number>())
+const expandedSubjectLessons = ref(new Set<number>())
+const expandedGradeLessons = ref(new Set<string>())
+const expandedCourseLessons = ref(new Set<number>())
 const courseChapters = ref<Map<number, any[]>>(new Map())
 const loadingChapters = ref(new Set<number>())
 
@@ -597,6 +650,31 @@ function toggleChapterLessons(chapterId: number) {
     expandedLessons.value.delete(chapterId)
   } else {
     expandedLessons.value.add(chapterId)
+  }
+}
+
+function toggleSubjectLessons(subjectId: number) {
+  if (expandedSubjectLessons.value.has(subjectId)) {
+    expandedSubjectLessons.value.delete(subjectId)
+  } else {
+    expandedSubjectLessons.value.add(subjectId)
+  }
+}
+
+function toggleGradeLessons(subjectId: number, gradeId: number) {
+  const key = `${subjectId}-${gradeId}`
+  if (expandedGradeLessons.value.has(key)) {
+    expandedGradeLessons.value.delete(key)
+  } else {
+    expandedGradeLessons.value.add(key)
+  }
+}
+
+function toggleCourseLessons(courseId: number) {
+  if (expandedCourseLessons.value.has(courseId)) {
+    expandedCourseLessons.value.delete(courseId)
+  } else {
+    expandedCourseLessons.value.add(courseId)
   }
 }
 
@@ -970,7 +1048,8 @@ function findChapterInTree(chapters: any[], chapterId: number): any {
 // 查看教案
 function handleViewLesson(lesson: any) {
   // 在新窗口中打开教案编辑页面
-  const lessonUrl = `/lessons/${lesson.id}`
+  // 使用教研员专用的教案查看路由
+  const lessonUrl = `/researcher/lesson/${lesson.id}`
   window.open(lessonUrl, '_blank')
 }
 

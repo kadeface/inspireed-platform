@@ -193,6 +193,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'researcher', title: '课程管理 - InspireEd' },
   },
   {
+    path: '/researcher/lesson/:id',
+    name: 'ResearcherLessonView',
+    component: () => import('../pages/Teacher/LessonEditor.vue'),
+    meta: { requiresAuth: true, role: 'researcher', title: '查看教案 - InspireEd' },
+  },
+  {
     path: '/admin',
     name: 'Admin',
     component: () => import('../pages/Admin/Dashboard.vue'),

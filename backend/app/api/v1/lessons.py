@@ -330,33 +330,40 @@ async def list_lessons(
             if status_enum:
                 base_query = base_query.where(Lesson.status == status_enum)
         else:
-            # 默认行为：可以看到自己创建的教案 + 所有已发布的教案（共享教案）
-            if status_enum:
-                # 如果指定了状态筛选
-                if status_enum == LessonStatus.PUBLISHED:
-                    # 查看已发布教案时，显示自己的 + 所有已发布的
+            # 管理员和教研员可以看到所有教案（用于课程体系管理）
+            if user_role in {UserRole.ADMIN, UserRole.RESEARCHER}:
+                # 管理员和教研员：可以看到所有教案
+                if status_enum:
+                    base_query = base_query.where(Lesson.status == status_enum)
+                # 如果没有状态筛选，显示所有状态的教案（不添加状态过滤）
+            else:
+                # 教师：默认行为：可以看到自己创建的教案 + 所有已发布的教案（共享教案）
+                if status_enum:
+                    # 如果指定了状态筛选
+                    if status_enum == LessonStatus.PUBLISHED:
+                        # 查看已发布教案时，显示自己的 + 所有已发布的
+                        base_query = base_query.where(
+                            or_(
+                                Lesson.creator_id == current_user.id,
+                                Lesson.status == LessonStatus.PUBLISHED
+                            )
+                        )
+                    else:
+                        # 查看其他状态时，只显示自己创建的
+                        base_query = base_query.where(
+                            and_(
+                                Lesson.creator_id == current_user.id,
+                                Lesson.status == status_enum
+                            )
+                        )
+                else:
+                    # 没有状态筛选时，显示自己创建的 + 所有已发布的
                     base_query = base_query.where(
                         or_(
                             Lesson.creator_id == current_user.id,
                             Lesson.status == LessonStatus.PUBLISHED
                         )
                     )
-                else:
-                    # 查看其他状态时，只显示自己创建的
-                    base_query = base_query.where(
-                        and_(
-                            Lesson.creator_id == current_user.id,
-                            Lesson.status == status_enum
-                        )
-                    )
-            else:
-                # 没有状态筛选时，显示自己创建的 + 所有已发布的
-                base_query = base_query.where(
-                    or_(
-                        Lesson.creator_id == current_user.id,
-                        Lesson.status == LessonStatus.PUBLISHED
-                    )
-                )
 
     if search:
         base_query = base_query.where(Lesson.title.ilike(f"%{search}%"))
@@ -637,7 +644,12 @@ async def get_lesson(
         }
         if classroom_id is None or classroom_id not in assigned_classroom_ids:
             raise HTTPException(status_code=403, detail="该教案未分配到你的班级")
+    elif user_role in {UserRole.ADMIN, UserRole.RESEARCHER}:
+        # 管理员和教研员可以查看所有教案（包括草稿状态）
+        # 不需要额外的权限检查
+        pass
     else:
+        # 教师：只能查看自己创建的教案或已发布的教案
         if creator_id != current_user.id and lesson_status != LessonStatus.PUBLISHED:
             raise HTTPException(status_code=403, detail="无权访问该教案")
 
