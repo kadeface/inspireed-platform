@@ -282,7 +282,8 @@ const editor = useEditor({
     let html = editor.getHTML()
     const baseURL = getServerBaseUrl()
     
-    // 替换所有包含localhost、127.0.0.1或IP地址的图片URL为相对路径
+    // 将所有指向 /uploads/ 路径的完整URL转换为相对路径（无论主机名是什么）
+    // 这样可以确保数据库存储的是相对路径，而不是包含服务器IP的完整URL
     html = html.replace(/<img\s+([^>]*?)>/gi, (match, attrs) => {
       const srcMatch = attrs.match(/\ssrc\s*=\s*(["'])([^"']+)\1/i) || attrs.match(/\ssrc\s*=\s*([^\s>]+)/i)
       if (srcMatch) {
@@ -294,20 +295,17 @@ const editor = useEditor({
           return match
         }
         
-        // 如果URL包含localhost、127.0.0.1或IP地址，提取相对路径
-        if (src.includes('localhost') || src.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(src)) {
+        // 如果是完整URL且指向 /uploads/ 路径，提取相对路径
+        if (src.startsWith('http://') || src.startsWith('https://')) {
           try {
             const url = new URL(src)
-            // 如果是资源路径（/uploads/resources/），提取相对路径
-            if (url.pathname.startsWith('/uploads/resources/')) {
+            // 对于所有指向 /uploads/ 的URL，无论主机名是什么，都提取相对路径
+            // 这样可以避免在数据库中存储服务器IP地址
+            if (url.pathname.startsWith('/uploads/')) {
               const relativePath = url.pathname + (url.search || '') + (url.hash || '')
               const newSrcAttr = ` src=${quote}${relativePath}${quote}`
               return match.replace(srcMatch[0], newSrcAttr)
             }
-            // 如果是其他路径，也提取相对路径
-            const relativePath = url.pathname + (url.search || '') + (url.hash || '')
-            const newSrcAttr = ` src=${quote}${relativePath}${quote}`
-            return match.replace(srcMatch[0], newSrcAttr)
           } catch {
             // URL解析失败，尝试直接提取路径
             const pathMatch = src.match(/\/uploads\/[^"'\s]+/)
@@ -315,26 +313,6 @@ const editor = useEditor({
               const newSrcAttr = ` src=${quote}${pathMatch[0]}${quote}`
               return match.replace(srcMatch[0], newSrcAttr)
             }
-          }
-        }
-        // 如果URL是完整URL但指向当前服务器，也转换为相对路径
-        else if (src.startsWith('http://') || src.startsWith('https://')) {
-          try {
-            const url = new URL(src)
-            const baseUrlObj = new URL(baseURL)
-            // 检查是否是资源路径
-            if (url.pathname.startsWith('/uploads/resources/')) {
-              // 验证主机名是否匹配当前服务器
-              if (url.hostname === baseUrlObj.hostname && url.port === baseUrlObj.port) {
-                // 如果是当前服务器，转换为相对路径
-                const relativePath = url.pathname + (url.search || '') + (url.hash || '')
-                const newSrcAttr = ` src=${quote}${relativePath}${quote}`
-                return match.replace(srcMatch[0], newSrcAttr)
-              }
-              // 如果不是当前服务器，保持原样（不转换）
-            }
-          } catch {
-            // URL解析失败，保持原样
           }
         }
       }
@@ -371,11 +349,13 @@ const editor = useEditor({
     
     // 替换PDF查看按钮中的data-pdf-view-url属性为相对路径
     html = html.replace(/data-pdf-view-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
-      if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url) || url.startsWith('http')) {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
         try {
           const urlObj = new URL(url)
-          const relativePath = urlObj.pathname
-          return `data-pdf-view-url=${quote}${relativePath}${quote}`
+          if (urlObj.pathname.startsWith('/uploads/')) {
+            const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
+            return `data-pdf-view-url=${quote}${relativePath}${quote}`
+          }
         } catch {
           const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
           if (pathMatch) {
@@ -386,27 +366,15 @@ const editor = useEditor({
       return match
     })
     
-    // 替换文件下载链接中的href为相对路径（仅当URL指向当前服务器时）
+    // 替换文件下载链接中的href为相对路径（所有指向 /uploads/ 的URL）
     html = html.replace(/href\s*=\s*(["'])([^"']+)\1[^>]*download/gi, (match, quote, url) => {
       if (url.startsWith('http://') || url.startsWith('https://')) {
         try {
           const urlObj = new URL(url)
-          const baseUrlObj = new URL(baseURL)
-          // 验证主机名是否匹配当前服务器
-          if (urlObj.hostname === baseUrlObj.hostname && urlObj.port === baseUrlObj.port) {
+          if (urlObj.pathname.startsWith('/uploads/')) {
             const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
             return `href=${quote}${relativePath}${quote} download`
           }
-          // 如果不是当前服务器，保持原样
-        } catch {
-          // URL解析失败，保持原样
-        }
-      } else if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url)) {
-        // 处理包含localhost或IP地址的URL（这些通常是本地开发环境）
-        try {
-          const urlObj = new URL(url)
-          const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
-          return `href=${quote}${relativePath}${quote} download`
         } catch {
           const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
           if (pathMatch) {
@@ -417,27 +385,15 @@ const editor = useEditor({
       return match
     })
     
-    // 替换data-file-download-url属性为相对路径（仅当URL指向当前服务器时）
+    // 替换data-file-download-url属性为相对路径（所有指向 /uploads/ 的URL）
     html = html.replace(/data-file-download-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
       if (url.startsWith('http://') || url.startsWith('https://')) {
         try {
           const urlObj = new URL(url)
-          const baseUrlObj = new URL(baseURL)
-          // 验证主机名是否匹配当前服务器
-          if (urlObj.hostname === baseUrlObj.hostname && urlObj.port === baseUrlObj.port) {
+          if (urlObj.pathname.startsWith('/uploads/')) {
             const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
             return `data-file-download-url=${quote}${relativePath}${quote}`
           }
-          // 如果不是当前服务器，保持原样
-        } catch {
-          // URL解析失败，保持原样
-        }
-      } else if (url.includes('localhost') || url.includes('127.0.0.1') || /https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(url)) {
-        // 处理包含localhost或IP地址的URL（这些通常是本地开发环境）
-        try {
-          const urlObj = new URL(url)
-          const relativePath = urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
-          return `data-file-download-url=${quote}${relativePath}${quote}`
         } catch {
           const pathMatch = url.match(/\/uploads\/[^"'\s]+/)
           if (pathMatch) {

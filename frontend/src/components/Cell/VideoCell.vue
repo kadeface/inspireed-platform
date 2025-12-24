@@ -475,13 +475,8 @@ async function handleFileUpload(event: Event) {
       timeout: 300000, // 5分钟超时，适应大文件上传
     })
 
-    // 构建完整的视频 URL
-    let videoUrl = response.file_url
-    if (videoUrl.startsWith('/uploads/')) {
-      // 构建完整 URL
-      const baseURL = getServerBaseUrl()
-      videoUrl = `${baseURL}${videoUrl}`
-    }
+    // 使用相对路径保存到数据库（后端返回的已经是相对路径）
+    const videoUrl = response.file_url
 
     // 清理临时 blob URL
     if (blobUrl.value === tempBlobUrl) {
@@ -489,7 +484,7 @@ async function handleFileUpload(event: Event) {
       blobUrl.value = null
     }
 
-    // 更新为服务器 URL
+    // 保存相对路径到localContent（数据库存储相对路径）
     isUpdatingFromProps = true
     localContent.value.videoUrl = videoUrl
     isUpdatingFromProps = false
@@ -538,15 +533,43 @@ async function handleFileUpload(event: Event) {
   }
 }
 
+// 将完整URL转换为相对路径（用于保存到数据库）
+function convertUrlToRelative(url: string): string {
+  if (!url || url.startsWith('blob:') || url.startsWith('data:')) {
+    return url
+  }
+  
+  // 如果是完整URL且指向 /uploads/ 路径，提取相对路径
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      const urlObj = new URL(url)
+      if (urlObj.pathname.startsWith('/uploads/')) {
+        return urlObj.pathname + (urlObj.search || '') + (urlObj.hash || '')
+      }
+    } catch {
+      // URL解析失败，尝试直接提取路径
+      const pathMatch = url.match(/\/uploads\/[^\s"']+/)
+      if (pathMatch) {
+        return pathMatch[0]
+      }
+    }
+  }
+  
+  // 如果已经是相对路径或无法解析，返回原值
+  return url
+}
+
 // 处理资源库视频选择
 function handleVideoAssetSelect(asset: LibraryAssetSummary | null) {
   if (asset && asset.asset_type === 'video') {
     selectedVideoAsset.value = asset
     isUpdatingFromProps = true
-    localContent.value.videoUrl = asset.public_url || ''
+    // 将完整URL转换为相对路径保存到数据库
+    localContent.value.videoUrl = convertUrlToRelative(asset.public_url || '')
     localContent.value.title = localContent.value.title || asset.title
     localContent.value.description = localContent.value.description || undefined
-    localContent.value.thumbnail = asset.thumbnail_url || undefined
+    // thumbnail也需要转换为相对路径
+    localContent.value.thumbnail = asset.thumbnail_url ? convertUrlToRelative(asset.thumbnail_url) : undefined
     if (asset.duration_seconds) {
       localContent.value.duration = asset.duration_seconds
     }
@@ -568,9 +591,22 @@ function clearVideoAsset() {
 }
 
 function updateCell() {
+  // 在保存到数据库前，确保所有URL都是相对路径
+  const contentToSave = { ...localContent.value }
+  
+  // 转换videoUrl为相对路径
+  if (contentToSave.videoUrl) {
+    contentToSave.videoUrl = convertUrlToRelative(contentToSave.videoUrl)
+  }
+  
+  // 转换thumbnail为相对路径
+  if (contentToSave.thumbnail) {
+    contentToSave.thumbnail = convertUrlToRelative(contentToSave.thumbnail)
+  }
+  
   const updatedCell: VideoCell = {
     ...props.cell,
-    content: { ...localContent.value },
+    content: contentToSave,
     config: { ...localConfig.value }
   }
   emit('update', updatedCell)
