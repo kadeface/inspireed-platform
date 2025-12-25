@@ -359,8 +359,8 @@
       </div>
     </div>
 
-    <!-- 批量导入模态框 -->
-    <BatchImportModal
+    <!-- 统一导入模态框 -->
+    <UnifiedImportModal
       :show="showBatchImportModal"
       @close="showBatchImportModal = false"
       @success="onBatchImportSuccess"
@@ -381,7 +381,7 @@ import adminService, {
 } from '@/services/admin'
 import curriculumService from '@/services/curriculum'
 import type { Grade } from '@/types/curriculum'
-import BatchImportModal from '@/components/Admin/BatchImportModal.vue'
+import UnifiedImportModal from '@/components/Admin/UnifiedImportModal.vue'
 
 const toast = useToast()
 

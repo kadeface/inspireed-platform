@@ -451,11 +451,12 @@ export const activityService = {
    */
   async getFormativeAssessments(
     lessonId: number,
-    filters: { studentId?: number; phase?: string; riskLevel?: string } = {}
+    filters: { studentId?: number; phase?: string; sessionId?: number; riskLevel?: string } = {}
   ): Promise<FormativeAssessmentRecord[]> {
     const params: Record<string, any> = {}
     if (filters.studentId !== undefined) params.student_id = filters.studentId
     if (filters.phase) params.phase = filters.phase
+    if (filters.sessionId !== undefined) params.session_id = filters.sessionId
     if (filters.riskLevel) params.risk_level = filters.riskLevel
     const response = await api.get<FormativeAssessmentRecord[]>(
       `/activities/lessons/${lessonId}/formative-assessments`,
@@ -470,13 +471,16 @@ export const activityService = {
   async recomputeFormativeAssessment(
     lessonId: number,
     studentId: number,
-    phase?: string
+    phase?: string,
+    sessionId?: number
   ): Promise<FormativeAssessmentRecord> {
-    const params = phase ? { phase } : undefined
+    const params: Record<string, any> = {}
+    if (phase) params.phase = phase
+    if (sessionId !== undefined) params.session_id = sessionId
     const response = await api.post<FormativeAssessmentRecord>(
       `/activities/lessons/${lessonId}/formative-assessments/${studentId}/recompute`,
       undefined,
-      { params }
+      { params: Object.keys(params).length > 0 ? params : undefined }
     )
     return response
   },

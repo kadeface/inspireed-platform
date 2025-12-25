@@ -391,6 +391,7 @@ export interface FormativeAssessmentRecord {
   lessonId: number
   studentId: number
   phase?: string
+  sessionId?: number  // 课堂会话ID，undefined表示整个教案的评估
   metrics: Record<string, any>
   riskLevel?: 'low' | 'medium' | 'high'
   recommendations?: Array<Record<string, any>>

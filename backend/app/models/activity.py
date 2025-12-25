@@ -325,7 +325,7 @@ class FormativeAssessment(Base):
     __tablename__ = "formative_assessments"
     __table_args__ = (
         UniqueConstraint(
-            "lesson_id", "student_id", "phase", name="uq_formative_assessment_scope"
+            "lesson_id", "student_id", "phase", "session_id", name="uq_formative_assessment_scope"
         ),
     )
 
@@ -333,6 +333,9 @@ class FormativeAssessment(Base):
     lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     phase = Column(String(32), nullable=True, index=True)
+    session_id = Column(
+        Integer, ForeignKey("class_sessions.id"), nullable=True, index=True
+    )  # 课堂会话ID，NULL表示整个教案的评估
 
     metrics = Column(JSON, nullable=False, default=dict)
     risk_level = Column(String(16), nullable=True)
@@ -345,11 +348,12 @@ class FormativeAssessment(Base):
 
     lesson = relationship("Lesson", foreign_keys=[lesson_id])
     student = relationship("User", foreign_keys=[student_id])
+    class_session = relationship("ClassSession", foreign_keys=[session_id])
 
     def __repr__(self) -> str:
         return (
             f"<FormativeAssessment(lesson_id={self.lesson_id}, "
-            f"student_id={self.student_id}, phase={self.phase})>"
+            f"student_id={self.student_id}, phase={self.phase}, session_id={self.session_id})>"
         )
 
 
@@ -375,4 +379,8 @@ Index(
     "idx_formative_assessment_student",
     FormativeAssessment.student_id,
     FormativeAssessment.lesson_id,
+)
+Index(
+    "idx_formative_assessment_session",
+    FormativeAssessment.session_id,
 )

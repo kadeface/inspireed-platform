@@ -726,12 +726,6 @@
               >
                 + 添加成员
               </button>
-              <button
-                @click="openBatchImportModal"
-                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                📥 批量导入
-              </button>
             </div>
             <button
               @click="loadMembers"
@@ -819,7 +813,7 @@
 
     <!-- 添加/编辑成员模态框 -->
     <div v-if="showMemberModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div class="px-6 py-4 border-b flex items-center justify-between flex-shrink-0">
           <h3 class="text-lg font-semibold text-gray-900">
             {{ editingMember ? '编辑成员' : '添加成员' }}
@@ -833,7 +827,108 @@
 
         <div class="flex-1 overflow-y-auto">
           <form @submit.prevent="saveMember" class="p-6 space-y-4">
-          <div v-if="!editingMember">
+          <!-- 添加模式切换 -->
+          <div v-if="!editingMember" class="mb-4">
+            <div class="flex gap-2">
+              <button
+                type="button"
+                @click="batchAddMode = false"
+                :class="[
+                  'flex-1 px-4 py-2 rounded-lg border transition-colors',
+                  !batchAddMode
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                ]"
+              >
+                单个添加
+              </button>
+              <button
+                type="button"
+                @click="batchAddMode = true; loadSourceClassroomStudents()"
+                :class="[
+                  'flex-1 px-4 py-2 rounded-lg border transition-colors',
+                  batchAddMode
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                ]"
+              >
+                批量添加（从班级选择）
+              </button>
+            </div>
+          </div>
+
+          <!-- 批量添加模式 -->
+          <div v-if="!editingMember && batchAddMode" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                选择来源班级 <span class="text-red-500">*</span>
+              </label>
+              <select
+                v-model="sourceClassroomFilter"
+                @change="loadSourceClassroomStudents"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">请选择班级</option>
+                <option v-for="classroom in allClassrooms" :key="classroom.id" :value="classroom.id">
+                  {{ classroom.name }} ({{ classroom.code || `ID: ${classroom.id}` }})
+                </option>
+              </select>
+              <p class="text-xs text-gray-500 mt-1">
+                💡 提示：选择一个班级后，将显示该班级的所有学生，可以选择多个学生批量添加到当前班级
+              </p>
+            </div>
+
+            <div v-if="sourceStudentsLoading" class="text-center text-gray-500 py-4 text-sm">
+              加载中...
+            </div>
+            <div v-else-if="sourceClassroomFilter && sourceClassroomStudents.length > 0" class="border border-gray-300 rounded-lg">
+              <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-700">
+                  学生列表（{{ sourceClassroomStudents.length }} 人）
+                </span>
+                <button
+                  type="button"
+                  @click="toggleSelectAllStudents"
+                  class="text-xs text-blue-600 hover:text-blue-800"
+                >
+                  {{ selectedStudentIds.size === sourceClassroomStudents.length ? '取消全选' : '全选' }}
+                </button>
+              </div>
+              <div class="max-h-64 overflow-y-auto">
+                <div
+                  v-for="student in sourceClassroomStudents"
+                  :key="student.userId"
+                  @click="toggleStudentSelection(student.userId)"
+                  class="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 flex items-center gap-3"
+                  :class="{ 'bg-blue-50': selectedStudentIds.has(student.userId) }"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="selectedStudentIds.has(student.userId)"
+                    @click.stop="toggleStudentSelection(student.userId)"
+                    class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <div class="flex-1">
+                    <div class="font-medium text-gray-900">{{ student.userFullName || student.userName || '未设置' }}</div>
+                    <div class="text-xs text-gray-500">
+                      ID: {{ student.userId }} | {{ student.userUsername || '' }}
+                      <span v-if="student.studentNo" class="ml-2 text-blue-600">学号: {{ student.studentNo }}</span>
+                      <span v-if="student.seatNo !== null && student.seatNo !== undefined" class="ml-2">座号: {{ student.seatNo }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="selectedStudentIds.size > 0" class="bg-blue-50 px-4 py-2 border-t border-gray-200">
+                <span class="text-sm text-blue-700 font-medium">已选择 {{ selectedStudentIds.size }} 个学生</span>
+              </div>
+            </div>
+            <div v-else-if="sourceClassroomFilter && !sourceStudentsLoading" class="text-center text-gray-500 py-4 text-sm border border-gray-200 rounded-lg">
+              该班级暂无学生
+            </div>
+          </div>
+
+          <!-- 单个添加模式 -->
+          <div v-if="!editingMember && !batchAddMode">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               选择用户 <span class="text-red-500">*</span>
             </label>
@@ -889,7 +984,7 @@
               提示：搜索用户并点击选择，或直接在下方输入用户ID
             </p>
           </div>
-          <div v-if="!editingMember">
+          <div v-if="!editingMember && !batchAddMode">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               或直接输入用户ID <span class="text-red-500">*</span>
             </label>
@@ -915,7 +1010,7 @@
             <p class="text-xs text-gray-500 mt-1">编辑模式下无法更改用户</p>
           </div>
 
-          <div>
+          <div v-if="!batchAddMode">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               角色 <span class="text-red-500">*</span>
             </label>
@@ -932,7 +1027,7 @@
             </select>
           </div>
 
-          <div v-if="memberForm.roleInClass === RoleInClass.STUDENT">
+          <div v-if="!batchAddMode && memberForm.roleInClass === RoleInClass.STUDENT">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               学号
               <span class="text-gray-500 text-xs font-normal ml-1">(建议填写，便于管理)</span>
@@ -964,7 +1059,7 @@
             </p>
           </div>
 
-          <div v-if="memberForm.roleInClass === RoleInClass.CADRE">
+          <div v-if="!batchAddMode && memberForm.roleInClass === RoleInClass.CADRE">
             <label class="block text-sm font-medium text-gray-700 mb-2">职务名称</label>
             <input
               v-model="memberForm.cadreTitle"
@@ -974,7 +1069,7 @@
             />
           </div>
 
-          <div>
+          <div v-if="!batchAddMode">
             <label class="flex items-center">
               <input
                 v-model="memberForm.isPrimaryClass"
@@ -1010,11 +1105,11 @@
           </button>
           <button
             type="button"
-            @click="saveMember"
-            :disabled="memberSaving"
+            @click="batchAddMode ? batchAddMembers() : saveMember()"
+            :disabled="memberSaving || (batchAddMode && selectedStudentIds.size === 0)"
             class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            {{ memberSaving ? '保存中...' : '保存' }}
+            {{ memberSaving ? '保存中...' : (batchAddMode ? `批量添加 (${selectedStudentIds.size})` : '保存') }}
           </button>
         </div>
       </div>
@@ -1034,8 +1129,17 @@
                 v-model="classroomForm.name"
                 type="text"
                 required
+                placeholder="01 或 10"
+                @input="classroomNameError = ''"
                 class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2"
+                :class="{ 'border-red-500': classroomNameError }"
               />
+              <p class="mt-1 text-xs text-gray-500">
+                格式说明：1-9班请使用 01-09 格式（例如：01 表示1班）；10班及以上使用正常数字格式（例如：10 表示10班，11 表示11班）
+              </p>
+              <p v-if="classroomNameError" class="mt-1 text-xs text-red-600">
+                {{ classroomNameError }}
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">所属年级</label>
@@ -1046,9 +1150,12 @@
               >
                 <option value="">请选择年级</option>
                 <option v-for="grade in grades" :key="grade.id" :value="grade.id">
-                  {{ grade.name }}
+                  {{ grade.name }} (ID: {{ grade.id }})
                 </option>
               </select>
+              <p class="mt-1 text-xs text-gray-500">
+                💡 提示：年级名称后括号内显示的是年级ID，导入用户时可使用此ID
+              </p>
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
@@ -1108,13 +1215,6 @@
       </div>
     </div>
 
-    <!-- 批量导入成员模态框 -->
-    <BatchImportClassroomMembersModal
-      :show="showBatchImportModal"
-      :classroom-id="selectedClassroom?.id || 0"
-      @close="showBatchImportModal = false"
-      @success="handleBatchImportSuccess"
-    />
   </div>
 </template>
 
@@ -1130,7 +1230,6 @@ import type {
   ClassroomMembershipCreate,
   ClassroomMembershipUpdate,
 } from '@/types/classroomAssistant'
-import BatchImportClassroomMembersModal from '@/components/Admin/BatchImportClassroomMembersModal.vue'
 import { RoleInClass } from '@/types/classroomAssistant'
 
 const toast = useToast()
@@ -1199,6 +1298,7 @@ const classroomForm = ref({
   description: '',
   is_active: true,
 })
+const classroomNameError = ref('')
 
 // 所有班级列表状态（用于班级成员管理标签页）
 const allClassrooms = ref<Classroom[]>([])
@@ -1211,7 +1311,6 @@ const selectedClassroom = ref<Classroom | null>(null)
 const members = ref<ClassroomMembership[]>([])
 const membersLoading = ref(false)
 const showMemberModal = ref(false)
-const showBatchImportModal = ref(false)
 const editingMember = ref<ClassroomMembership | null>(null)
 const memberSaving = ref(false)
 const memberError = ref('')
@@ -1231,6 +1330,13 @@ const userRoleFilter = ref<string>('')
 const searchedUsers = ref<User[]>([])
 const userSearchLoading = ref(false)
 const selectedUserInfo = ref<User | null>(null)
+
+// 批量添加成员状态
+const batchAddMode = ref(false) // true: 批量模式, false: 单个模式
+const sourceClassroomFilter = ref<number | ''>('') // 筛选来源班级
+const sourceClassroomStudents = ref<ClassroomMembership[]>([])
+const sourceStudentsLoading = ref(false)
+const selectedStudentIds = ref<Set<number>>(new Set()) // 选中的学生ID集合
 
 // 计算属性
 const regionTotalPages = computed(() => Math.ceil(regionTotal.value / regionPageSize.value))
@@ -1603,6 +1709,7 @@ function openCreateClassroomModal() {
     description: '',
     is_active: true,
   }
+  classroomNameError.value = ''
   showClassroomModal.value = true
 }
 
@@ -1616,6 +1723,7 @@ function editClassroom(classroom: Classroom) {
     description: classroom.description || '',
     is_active: classroom.is_active,
   }
+  classroomNameError.value = ''
   showClassroomModal.value = true
 }
 
@@ -1676,6 +1784,10 @@ function openAddMemberModal() {
   userRoleFilter.value = ''
   searchedUsers.value = []
   selectedUserInfo.value = null
+  batchAddMode.value = false
+  sourceClassroomFilter.value = ''
+  sourceClassroomStudents.value = []
+  selectedStudentIds.value = new Set()
   memberForm.value = {
     classroomId: selectedClassroom.value.id,
     userId: 0,
@@ -1686,15 +1798,6 @@ function openAddMemberModal() {
     isPrimaryClass: false,
   }
   showMemberModal.value = true
-}
-
-function openBatchImportModal() {
-  if (!selectedClassroom.value) return
-  showBatchImportModal.value = true
-}
-
-function handleBatchImportSuccess() {
-  loadMembers()
 }
 
 async function searchUsersForMember() {
@@ -1794,6 +1897,10 @@ function closeMemberModal() {
   userRoleFilter.value = ''
   searchedUsers.value = []
   selectedUserInfo.value = null
+  batchAddMode.value = false
+  sourceClassroomFilter.value = ''
+  sourceClassroomStudents.value = []
+  selectedStudentIds.value = new Set()
 }
 
 async function saveMember() {
@@ -1843,6 +1950,120 @@ async function saveMember() {
   }
 }
 
+// 加载来源班级的学生列表
+async function loadSourceClassroomStudents() {
+  if (!sourceClassroomFilter.value) {
+    sourceClassroomStudents.value = []
+    selectedStudentIds.value = new Set()
+    return
+  }
+  
+  try {
+    sourceStudentsLoading.value = true
+    const sourceMembers = await classroomAssistantService.getClassroomMembers(Number(sourceClassroomFilter.value))
+    // 只显示学生角色
+    let students = sourceMembers.filter(m => m.roleInClass === RoleInClass.STUDENT)
+    
+    // 排除已经是当前班级成员的学生
+    if (selectedClassroom.value) {
+      try {
+        const currentMembers = await classroomAssistantService.getClassroomMembers(selectedClassroom.value.id)
+        const currentMemberUserIds = new Set(currentMembers.filter(m => m.isActive).map(m => m.userId))
+        students = students.filter(s => !currentMemberUserIds.has(s.userId))
+      } catch (error) {
+        // 如果获取当前班级成员失败，忽略错误，继续显示所有学生
+        console.warn('获取当前班级成员失败:', error)
+      }
+    }
+    
+    sourceClassroomStudents.value = students
+    selectedStudentIds.value = new Set()
+  } catch (error: any) {
+    console.error('加载班级学生失败:', error)
+    toast.error(error.response?.data?.detail || '加载班级学生失败')
+    sourceClassroomStudents.value = []
+  } finally {
+    sourceStudentsLoading.value = false
+  }
+}
+
+// 切换学生选择状态
+function toggleStudentSelection(userId: number) {
+  if (selectedStudentIds.value.has(userId)) {
+    selectedStudentIds.value.delete(userId)
+  } else {
+    selectedStudentIds.value.add(userId)
+  }
+}
+
+// 全选/取消全选
+function toggleSelectAllStudents() {
+  if (selectedStudentIds.value.size === sourceClassroomStudents.value.length) {
+    selectedStudentIds.value = new Set()
+  } else {
+    selectedStudentIds.value = new Set(sourceClassroomStudents.value.map(s => s.userId))
+  }
+}
+
+// 批量添加成员
+async function batchAddMembers() {
+  if (!selectedClassroom.value || selectedStudentIds.value.size === 0) return
+  
+  try {
+    memberSaving.value = true
+    memberError.value = ''
+    
+    const errors: string[] = []
+    let successCount = 0
+    
+    // 逐个添加选中的学生
+    for (const userId of selectedStudentIds.value) {
+      try {
+        const student = sourceClassroomStudents.value.find(s => s.userId === userId)
+        if (!student) continue
+        
+        const createData: ClassroomMembershipCreate = {
+          classroomId: selectedClassroom.value.id,
+          userId: userId,
+          roleInClass: RoleInClass.STUDENT,
+          studentNo: student.studentNo || null,
+          seatNo: student.seatNo || null,
+          cadreTitle: null,
+          isPrimaryClass: false,
+        }
+        
+        await classroomAssistantService.addClassroomMember(selectedClassroom.value.id, createData)
+        successCount++
+      } catch (error: any) {
+        const studentName = sourceClassroomStudents.value.find(s => s.userId === userId)?.userFullName || `ID: ${userId}`
+        const errorMsg = error.response?.data?.detail || '添加失败'
+        errors.push(`${studentName}: ${errorMsg}`)
+        console.error(`添加成员失败 (userId: ${userId}):`, error)
+      }
+    }
+    
+    if (successCount > 0) {
+      toast.success(`成功添加 ${successCount} 个成员${errors.length > 0 ? `，${errors.length} 个失败` : ''}`)
+    }
+    
+    if (errors.length > 0 && successCount === 0) {
+      memberError.value = errors.join('\n')
+      toast.error('批量添加失败')
+    }
+    
+    if (successCount > 0) {
+      closeMemberModal()
+      await loadMembers()
+    }
+  } catch (error: any) {
+    console.error('批量添加成员失败:', error)
+    memberError.value = error.response?.data?.detail || '批量添加失败'
+    toast.error(error.response?.data?.detail || '批量添加失败')
+  } finally {
+    memberSaving.value = false
+  }
+}
+
 async function removeMember(member: ClassroomMembership) {
   if (!selectedClassroom.value) return
   if (!confirm(`确定要移除用户ID ${member.userId} 吗？`)) {
@@ -1862,6 +2083,7 @@ async function removeMember(member: ClassroomMembership) {
 function closeClassroomModal() {
   showClassroomModal.value = false
   editingClassroom.value = null
+  classroomNameError.value = ''
 }
 
 async function saveClassroom() {
@@ -1869,12 +2091,24 @@ async function saveClassroom() {
     toast.error('请先选择学校')
     return
   }
+  
+  // 验证班级名称格式
+  const name = classroomForm.value.name.trim()
+  // 允许：01-09（两位数格式）或 10 及以上的数字
+  // 正则说明：0[1-9] 匹配 01-09，[1-9]\d+ 匹配 10 及以上的数字（不以0开头）
+  const namePattern = /^(0[1-9]|[1-9]\d+)$/
+  if (!namePattern.test(name)) {
+    classroomNameError.value = '班级名称格式错误：1-9班请输入 01-09（例如：01 表示1班），10班及以上请输入正常数字（例如：10 表示10班）'
+    return
+  }
+  classroomNameError.value = ''
+  
   try {
     const enrollmentYearNumber = classroomForm.value.enrollment_year
       ? Number(classroomForm.value.enrollment_year)
       : undefined
     const payload: any = {
-      name: classroomForm.value.name,
+      name: classroomForm.value.name.trim(),
       grade_id: classroomForm.value.grade_id ? Number(classroomForm.value.grade_id) : undefined,
       school_id: classroomSchool.value.id,
       is_active: classroomForm.value.is_active,

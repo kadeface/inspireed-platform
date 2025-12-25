@@ -270,6 +270,7 @@ class FormativeAssessmentResponse(BaseModel):
     lesson_id: int
     student_id: int
     phase: Optional[str] = None
+    session_id: Optional[int] = None
     metrics: Dict[str, Any]
     risk_level: Optional[str] = None
     recommendations: Optional[List[Dict[str, Any]]] = None

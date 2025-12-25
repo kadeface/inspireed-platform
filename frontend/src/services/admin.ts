@@ -98,6 +98,42 @@ export interface BatchImportResult {
   error_count: number
 }
 
+export interface UnifiedImportItem {
+  student_id_number?: string
+  username?: string
+  email?: string
+  full_name?: string
+  password?: string
+  role?: string
+  is_active?: boolean
+  region_id?: number
+  school_id?: number
+  grade_id?: number
+  classroom_id?: number
+  seat_no?: number
+  role_in_class?: string
+  cadre_title?: string
+  is_primary_class?: boolean
+  student_no?: string
+}
+
+export interface UnifiedImportResult {
+  message: string
+  created_users: User[]
+  added_members: Array<{
+    user_id: number
+    username: string
+    full_name?: string
+    classroom_id: number
+    classroom_name?: string
+  }>
+  errors: string[]
+  success_count: number
+  error_count: number
+  created_user_count: number
+  added_member_count: number
+}
+
 export interface Region {
   id: number
   name: string
@@ -246,6 +282,20 @@ export const adminService = {
    */
   async getImportTemplate(): Promise<{ template: string; filename: string }> {
     return await api.get('/admin/users/export/template')
+  },
+
+  /**
+   * 统一导入（支持创建用户和添加到班级）
+   */
+  async unifiedImport(items: UnifiedImportItem[]): Promise<UnifiedImportResult> {
+    return await api.post('/admin/users/unified-import', { items })
+  },
+
+  /**
+   * 下载统一导入模板
+   */
+  async getUnifiedImportTemplate(): Promise<{ template: string; filename: string; note: string }> {
+    return await api.get('/admin/users/export/unified-template')
   },
 
   // ==================== 组织架构管理 ====================

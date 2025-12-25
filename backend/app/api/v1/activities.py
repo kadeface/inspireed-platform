@@ -592,11 +592,13 @@ async def create_and_submit(
         
         # 更新过程性评估
         phase_value = data.activity_phase
+        session_id_value = getattr(data, "session_id", None)
         await recompute_formative_assessment(
             db,
             data.lesson_id,
             cast(int, current_user.id),
             phase=phase_value,
+            session_id=session_id_value,
         )
         
         # ===== WebSocket 实时通知 =====
@@ -805,12 +807,14 @@ async def submit_activity(
     )
 
     phase_value = cast(Optional[str], getattr(submission, "activity_phase", None))
+    session_id_value = cast(Optional[int], getattr(submission, "session_id", None))
 
     await recompute_formative_assessment(
         db,
         cast(int, submission.lesson_id),
         cast(int, submission.student_id),
         phase=phase_value,
+        session_id=session_id_value,
     )
 
     # ===== WebSocket 实时通知 =====
@@ -1123,6 +1127,7 @@ async def get_formative_assessments(
     lesson_id: int,
     student_id: Optional[int] = Query(None),
     phase: Optional[str] = Query(None),
+    session_id: Optional[int] = Query(None),
     risk_level: Optional[str] = Query(None),
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
@@ -1140,6 +1145,8 @@ async def get_formative_assessments(
         query = query.where(FormativeAssessment.student_id == student_id)
     if phase:
         query = query.where(FormativeAssessment.phase == phase)
+    if session_id is not None:
+        query = query.where(FormativeAssessment.session_id == session_id)
     if risk_level:
         query = query.where(FormativeAssessment.risk_level == risk_level)
 
@@ -1157,6 +1164,7 @@ async def recompute_formative_assessment_endpoint(
     lesson_id: int,
     student_id: int,
     phase: Optional[str] = Query(None),
+    session_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
@@ -1167,7 +1175,7 @@ async def recompute_formative_assessment_endpoint(
         raise HTTPException(status_code=403, detail="权限不足")
 
     record = await recompute_formative_assessment(
-        db, lesson_id=lesson_id, student_id=student_id, phase=phase
+        db, lesson_id=lesson_id, student_id=student_id, phase=phase, session_id=session_id
     )
     return record
 
@@ -1223,12 +1231,14 @@ async def grade_submission(
     )
 
     phase_value = cast(Optional[str], getattr(submission, "activity_phase", None))
+    session_id_value = cast(Optional[int], getattr(submission, "session_id", None))
 
     await recompute_formative_assessment(
         db,
         cast(int, submission.lesson_id),
         cast(int, submission.student_id),
         phase=phase_value,
+        session_id=session_id_value,
     )
 
     # ===== WebSocket 实时通知 =====

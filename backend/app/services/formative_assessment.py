@@ -63,17 +63,29 @@ async def calculate_student_metrics(
     lesson_id: int,
     student_id: int,
     phase: Optional[str] = None,
+    session_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Aggregate formative assessment metrics for a student within a lesson.
+    
+    Args:
+        db: Database session
+        lesson_id: Lesson ID
+        student_id: Student ID
+        phase: Optional phase filter
+        session_id: Optional session ID filter. If provided, only submissions from this session are included.
     """
 
-    submission_stmt = select(ActivitySubmission).where(
-        and_(
-            ActivitySubmission.lesson_id == lesson_id,
-            ActivitySubmission.student_id == student_id,
-        )
-    )
+    submission_conditions = [
+        ActivitySubmission.lesson_id == lesson_id,
+        ActivitySubmission.student_id == student_id,
+    ]
+    
+    # Filter by session_id if provided
+    if session_id is not None:
+        submission_conditions.append(ActivitySubmission.session_id == session_id)
+    
+    submission_stmt = select(ActivitySubmission).where(and_(*submission_conditions))
     submission_result = await db.execute(submission_stmt)
     submissions = submission_result.scalars().all()
 
@@ -96,17 +108,34 @@ async def calculate_student_metrics(
     avg_time = _calc_average_time(submitted)
 
     # Flowchart insight
-    flowchart_stmt = (
-        select(FlowchartSnapshot)
-        .where(
-            and_(
-                FlowchartSnapshot.lesson_id == lesson_id,
-                FlowchartSnapshot.student_id == student_id,
+    # If session_id is provided, filter by submissions from that session
+    if session_id is not None:
+        # Join with ActivitySubmission to filter by session_id
+        flowchart_stmt = (
+            select(FlowchartSnapshot)
+            .join(ActivitySubmission, FlowchartSnapshot.submission_id == ActivitySubmission.id)
+            .where(
+                and_(
+                    FlowchartSnapshot.lesson_id == lesson_id,
+                    FlowchartSnapshot.student_id == student_id,
+                    ActivitySubmission.session_id == session_id,
+                )
             )
+            .order_by(FlowchartSnapshot.updated_at.desc())
+            .limit(1)
         )
-        .order_by(FlowchartSnapshot.updated_at.desc())
-        .limit(1)
-    )
+    else:
+        flowchart_stmt = (
+            select(FlowchartSnapshot)
+            .where(
+                and_(
+                    FlowchartSnapshot.lesson_id == lesson_id,
+                    FlowchartSnapshot.student_id == student_id,
+                )
+            )
+            .order_by(FlowchartSnapshot.updated_at.desc())
+            .limit(1)
+        )
     flowchart_result = await db.execute(flowchart_stmt)
     flowchart = flowchart_result.scalar_one_or_none()
     flowchart_metrics: Dict[str, Any] = {}
@@ -209,12 +238,14 @@ async def upsert_formative_assessment(
     student_id: int,
     metrics: Dict[str, Any],
     phase: Optional[str] = None,
+    session_id: Optional[int] = None,
 ) -> FormativeAssessment:
     stmt = select(FormativeAssessment).where(
         and_(
             FormativeAssessment.lesson_id == lesson_id,
             FormativeAssessment.student_id == student_id,
             FormativeAssessment.phase == phase,
+            FormativeAssessment.session_id == session_id,
         )
     )
     result = await db.execute(stmt)
@@ -226,6 +257,7 @@ async def upsert_formative_assessment(
     if record:
         record.metrics = metrics
         record.phase = phase
+        record.session_id = session_id
         record.risk_level = risk_level
         record.recommendations = recommendations
         record.updated_at = datetime.utcnow()
@@ -234,6 +266,7 @@ async def upsert_formative_assessment(
             lesson_id=lesson_id,
             student_id=student_id,
             phase=phase,
+            session_id=session_id,
             metrics=metrics,
             risk_level=risk_level,
             recommendations=recommendations,
@@ -251,10 +284,13 @@ async def recompute_formative_assessment(
     lesson_id: int,
     student_id: int,
     phase: Optional[str] = None,
+    session_id: Optional[int] = None,
 ) -> FormativeAssessment:
-    metrics = await calculate_student_metrics(db, lesson_id, student_id, phase=phase)
+    metrics = await calculate_student_metrics(
+        db, lesson_id, student_id, phase=phase, session_id=session_id
+    )
     return await upsert_formative_assessment(
-        db, lesson_id, student_id, metrics=metrics, phase=phase
+        db, lesson_id, student_id, metrics=metrics, phase=phase, session_id=session_id
     )
 
 
