@@ -48,6 +48,16 @@
               </svg>
               查看
             </button>
+            <button
+              @click="handleDelete(lesson)"
+              class="action-btn action-btn-danger"
+              title="删除教案"
+            >
+              <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              删除
+            </button>
           </div>
         </div>
       </div>
@@ -79,6 +89,7 @@
   const emit = defineEmits<{
     view: [lesson: Lesson]
     refresh: []
+    deleted: [lessonId: number]
   }>()
   
   const toast = useToast()
@@ -120,6 +131,27 @@
   // 查看教案
   function handleView(lesson: Lesson) {
     emit('view', lesson)
+  }
+
+  // 删除教案
+  async function handleDelete(lesson: Lesson) {
+    if (!confirm(`确定要删除教案"${lesson.title}"吗？此操作不可撤销。`)) {
+      return
+    }
+
+    try {
+      await lessonService.deleteLesson(lesson.id)
+      toast.success('教案删除成功')
+      // 从列表中移除
+      lessons.value = lessons.value.filter(l => l.id !== lesson.id)
+      // 触发删除事件
+      emit('deleted', lesson.id)
+      // 触发刷新事件
+      emit('refresh')
+    } catch (error: any) {
+      console.error('Failed to delete lesson:', error)
+      toast.error(error.response?.data?.detail || error.message || '删除教案失败')
+    }
   }
   
   // 格式化日期
@@ -292,6 +324,17 @@
 
   .action-btn-secondary:hover {
     background: #f9fafb;
+  }
+
+  .action-btn-danger {
+    background: white;
+    color: #dc2626;
+    border: 1px solid #fca5a5;
+  }
+
+  .action-btn-danger:hover {
+    background: #fef2f2;
+    border-color: #dc2626;
   }
 
   .empty-state {

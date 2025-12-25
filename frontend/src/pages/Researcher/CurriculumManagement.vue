@@ -129,6 +129,7 @@
             <SubjectGradeCourseLessonList
               :subject-id="subject.id"
               @view="handleViewLesson"
+              @deleted="handleLessonDeleted"
             />
           </div>
 
@@ -175,6 +176,7 @@
                   :subject-id="subject.id"
                   :grade-id="grade.id"
                   @view="handleViewLesson"
+                  @deleted="handleLessonDeleted"
                 />
               </div>
 
@@ -241,6 +243,7 @@
                     <SubjectGradeCourseLessonList
                       :course-id="course.id"
                       @view="handleViewLesson"
+                      @deleted="handleLessonDeleted"
                     />
                   </div>
 
@@ -1051,6 +1054,12 @@ function handleViewLesson(lesson: any) {
   // 使用教研员专用的教案查看路由
   const lessonUrl = `/researcher/lesson/${lesson.id}`
   window.open(lessonUrl, '_blank')
+}
+
+// 处理教案删除事件
+async function handleLessonDeleted(lessonId: number) {
+  // 重新加载课程树以更新教案数量
+  await loadCurriculumTree()
 }
 
 </script>

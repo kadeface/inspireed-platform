@@ -525,11 +525,12 @@
                 @edit="handleEdit"
                 @edit-published="handleEditPublished"
                 @duplicate="handleDuplicate"
-              @delete="handleDeleteClick"
-              @publish="handlePublish"
-              @unpublish="handleUnpublish"
-              @view="handleView"
-            />
+                @delete="handleDeleteClick"
+                @publish="handlePublish"
+                @unpublish="handleUnpublish"
+                @view="handleView"
+                @updated="handleLessonUpdated"
+              />
             </template>
             
             <!-- 共享教案列表 -->
@@ -716,7 +717,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { useUserStore } from '../../store/user'
 import { useLessonStore } from '../../store/lesson'
 import { LessonStatus } from '../../types/lesson'
-import type { LessonCreate, LessonRelatedMaterial } from '../../types/lesson'
+import type { Lesson, LessonCreate, LessonRelatedMaterial } from '../../types/lesson'
 import LessonCard from '../../components/Lesson/LessonCard.vue'
 import CreateLessonModal from '../../components/Lesson/CreateLessonModal.vue'
 import ClassroomSelectorModal from '../../components/Lesson/ClassroomSelectorModal.vue'
@@ -1188,6 +1189,15 @@ async function handleEditPublished(lessonId: number) {
 // 查看教案
 function handleView(lessonId: number) {
   router.push(`/teacher/lesson/${lessonId}`)
+}
+
+// 处理教案更新（如描述更新）
+function handleLessonUpdated(updatedLesson: Lesson) {
+  // 更新本地列表中的教案数据
+  const index = lessonStore.lessons.findIndex(l => l.id === updatedLesson.id)
+  if (index !== -1) {
+    lessonStore.lessons[index] = updatedLesson
+  }
 }
 
 // 复制教案

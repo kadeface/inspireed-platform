@@ -1268,6 +1268,7 @@ async def import_courses(
             "lessons": {"created": 0, "skipped": 0},
             "resources": {"created": 0, "skipped": 0},
             "errors": [],
+            "warnings": [],
         }
 
         # 创建映射字典
@@ -1395,7 +1396,7 @@ async def import_courses(
                 grade_id = grade_level_map.get(course_grade_level)
 
                 if not subject_id:
-                    import_result["errors"].append(
+                    import_result["warnings"].append(
                         f"导入课程失败 {course_data.get('name', '未知')}: 学科代码 '{course_data['subject_code']}' 不存在（请确保在导入文件中包含该学科）"
                     )
                     continue
@@ -1655,7 +1656,7 @@ async def import_courses(
                     course_id = await get_or_create_default_course(db, current_user)
                     # 记录提示信息（作为警告而不是错误）
                     lesson_title = lesson_data.get('title', '未知')
-                    import_result["errors"].append(
+                    import_result["warnings"].append(
                         f"提示：教案 '{lesson_title}' 的课程代码 '{course_code}' 不存在，已自动归类到'未分类课程'"
                     )
 
@@ -1817,6 +1818,7 @@ async def import_courses(
                     ]
                 ),
                 "total_errors": len(import_result["errors"]),
+                "total_warnings": len(import_result.get("warnings", [])),
             },
         }
 

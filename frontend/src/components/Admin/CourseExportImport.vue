@@ -205,7 +205,7 @@
         <div v-if="importResult && importResult.summary && importResult.result" class="mb-4">
           <h4 class="text-md font-medium text-gray-800 mb-2">导入结果</h4>
           <div class="bg-gray-50 rounded-md p-4">
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div class="text-center">
                 <div class="text-2xl font-bold text-green-600">{{ importResult.summary?.total_created ?? 0 }}</div>
                 <div class="text-sm text-gray-600">成功创建</div>
@@ -217,6 +217,10 @@
               <div class="text-center">
                 <div class="text-2xl font-bold text-red-600">{{ importResult.summary?.total_errors ?? 0 }}</div>
                 <div class="text-sm text-gray-600">错误数量</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-yellow-600">{{ importResult.summary?.total_warnings ?? 0 }}</div>
+                <div class="text-sm text-gray-600">警告数量</div>
               </div>
             </div>
             
@@ -263,8 +267,18 @@
               </div>
             </div>
             
+            <div v-if="importResult.result?.warnings && importResult.result.warnings.length > 0" class="mt-4">
+              <h5 class="text-sm font-medium text-yellow-600 mb-2">⚠️ 警告信息:</h5>
+              <ul class="text-sm text-yellow-600 space-y-1">
+                <li v-for="warning in importResult.result.warnings" :key="warning" class="flex items-start">
+                  <span class="mr-2">•</span>
+                  <span>{{ warning }}</span>
+                </li>
+              </ul>
+            </div>
+            
             <div v-if="importResult.result?.errors && importResult.result.errors.length > 0" class="mt-4">
-              <h5 class="text-sm font-medium text-red-600 mb-2">错误详情:</h5>
+              <h5 class="text-sm font-medium text-red-600 mb-2">❌ 错误详情:</h5>
               <ul class="text-sm text-red-600 space-y-1">
                 <li v-for="error in importResult.result.errors" :key="error" class="flex items-start">
                   <span class="mr-2">•</span>
@@ -425,10 +439,15 @@ const importCourses = async () => {
     
     importResult.value = result
     
-    if (result.summary.total_errors === 0) {
+    const hasErrors = (result.summary.total_errors ?? 0) > 0
+    const hasWarnings = (result.summary.total_warnings ?? 0) > 0
+    
+    if (!hasErrors && !hasWarnings) {
       toast.success('课程导入成功')
-    } else {
+    } else if (hasErrors) {
       toast.warning(`导入完成，但有 ${result.summary.total_errors} 个错误`)
+    } else if (hasWarnings) {
+      toast.warning(`导入完成，但有 ${result.summary.total_warnings} 个警告`)
     }
     
     // 重新加载课程列表

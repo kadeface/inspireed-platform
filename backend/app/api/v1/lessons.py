@@ -1015,7 +1015,18 @@ async def delete_lesson(
     if not lesson:
         raise HTTPException(status_code=404, detail="教案不存在")
 
-    if cast(Optional[int], lesson.creator_id) != current_user.id:
+    # 权限检查：创建者可以删除，管理员和教研员也可以删除（用于课程管理）
+    role_value = cast(str, getattr(current_user.role, "value", current_user.role))
+    try:
+        user_role = UserRole(role_value)
+    except ValueError:
+        user_role = None
+    
+    is_admin = user_role == UserRole.ADMIN
+    is_researcher = user_role == UserRole.RESEARCHER
+    is_creator = cast(Optional[int], lesson.creator_id) == current_user.id
+    
+    if not (is_creator or is_admin or is_researcher):
         raise HTTPException(status_code=403, detail="无权删除该教案")
 
     await db.delete(lesson)

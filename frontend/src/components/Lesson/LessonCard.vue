@@ -75,9 +75,68 @@
           </h3>
 
           <!-- 描述 -->
-          <p class="text-sm leading-relaxed text-gray-600 line-clamp-2 min-h-[2.75rem]">
-            {{ displayDescription }}
-          </p>
+          <div v-if="!isEditingDescription" class="relative group/desc">
+            <p 
+              v-if="showActions"
+              class="text-sm leading-relaxed text-gray-600 line-clamp-2 min-h-[2.75rem] cursor-pointer hover:text-emerald-600 transition-colors"
+              @click.stop="startEditDescription"
+              :title="displayDescription === '暂无描述' ? '点击添加描述' : '点击编辑描述'"
+            >
+              {{ displayDescription }}
+            </p>
+            <p 
+              v-else
+              class="text-sm leading-relaxed text-gray-600 line-clamp-2 min-h-[2.75rem]"
+            >
+              {{ displayDescription }}
+            </p>
+            <button
+              v-if="showActions"
+              class="absolute top-0 right-0 hidden group-hover/desc:flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors"
+              @click.stop="startEditDescription"
+              title="编辑描述"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+          </div>
+          <!-- 编辑描述 -->
+          <div v-else class="space-y-2" @click.stop>
+            <textarea
+              v-model="editingDescription"
+              class="w-full text-sm leading-relaxed text-gray-900 border border-emerald-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none min-h-[2.75rem]"
+              placeholder="请输入教案描述..."
+              rows="2"
+              @keydown.esc="cancelEditDescription"
+              @keydown.ctrl.enter="saveDescription"
+              ref="descriptionTextareaRef"
+            ></textarea>
+            <div class="flex items-center gap-2">
+              <button
+                @click="saveDescription"
+                :disabled="savingDescription"
+                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg v-if="savingDescription" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <svg v-else class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                保存
+              </button>
+              <button
+                @click="cancelEditDescription"
+                :disabled="savingDescription"
+                class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                取消
+              </button>
+              <span class="text-xs text-gray-400 ml-auto">按 Esc 取消，Ctrl+Enter 保存</span>
+            </div>
+          </div>
         </div>
 
         <button
@@ -243,13 +302,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import dayjs from 'dayjs'
 import type { Lesson } from '../../types/lesson'
 import { LessonStatus } from '../../types/lesson'
 import { getServerBaseUrl } from '../../utils/url'
 import courseExportService from '../../services/courseExport'
 import { useToast } from '@/composables/useToast'
+import { lessonService } from '../../services/lesson'
 
 interface Props {
   lesson: Lesson
@@ -266,6 +326,12 @@ const imageLoadError = ref(false)
 // 导出状态
 const exporting = ref(false)
 const toast = useToast()
+
+// 描述编辑状态
+const isEditingDescription = ref(false)
+const editingDescription = ref('')
+const savingDescription = ref(false)
+const descriptionTextareaRef = ref<HTMLTextAreaElement | null>(null)
 
 // 构建完整的封面图片URL
 const coverImageUrl = computed(() => {
@@ -302,6 +368,7 @@ const emit = defineEmits<{
   publish: [lessonId: number]
   unpublish: [lessonId: number]
   view: [lessonId: number]
+  updated: [lesson: Lesson]
 }>()
 
 const statusLabel = computed(() => {
@@ -436,6 +503,46 @@ async function handleExport() {
     toast.error(error.response?.data?.detail || error.message || '导出教案失败')
   } finally {
     exporting.value = false
+  }
+}
+
+// 开始编辑描述
+function startEditDescription() {
+  if (!showActions.value) return
+  editingDescription.value = props.lesson.description || ''
+  isEditingDescription.value = true
+  nextTick(() => {
+    descriptionTextareaRef.value?.focus()
+    descriptionTextareaRef.value?.select()
+  })
+}
+
+// 取消编辑描述
+function cancelEditDescription() {
+  isEditingDescription.value = false
+  editingDescription.value = ''
+}
+
+// 保存描述
+async function saveDescription() {
+  if (savingDescription.value) return
+  
+  savingDescription.value = true
+  try {
+    const updatedLesson = await lessonService.updateLesson(props.lesson.id, {
+      description: editingDescription.value.trim() || undefined
+    })
+    
+    // 发出更新事件，让父组件更新数据
+    emit('updated', updatedLesson)
+    
+    isEditingDescription.value = false
+    toast.success('描述已更新')
+  } catch (error: any) {
+    console.error('更新描述失败:', error)
+    toast.error(error.message || '更新描述失败')
+  } finally {
+    savingDescription.value = false
   }
 }
 </script>

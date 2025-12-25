@@ -22,11 +22,13 @@ export interface ImportResult {
     lessons: { created: number; skipped: number }
     resources: { created: number; skipped: number }
     errors: string[]
+    warnings?: string[]
   }
   summary: {
     total_created: number
     total_skipped: number
     total_errors: number
+    total_warnings?: number
   }
 }
 
