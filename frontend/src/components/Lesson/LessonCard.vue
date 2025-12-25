@@ -508,7 +508,7 @@ async function handleExport() {
 
 // 开始编辑描述
 function startEditDescription() {
-  if (!showActions.value) return
+  if (!props.showActions) return
   editingDescription.value = props.lesson.description || ''
   isEditingDescription.value = true
   nextTick(() => {
