@@ -33,6 +33,9 @@ class AssistantContext(BaseModel):
     progress: Optional[int] = Field(
         None, ge=0, le=100, description="学习进度（学生端使用）"
     )
+    agent_prompt: Optional[str] = Field(
+        None, description="自定义智能体的提示词，用于定义AI的角色和行为"
+    )
 
 
 class AssistantRequest(BaseModel):

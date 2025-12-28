@@ -22,6 +22,7 @@ export interface AssistantContextPayload {
   recent_lessons?: AssistantLessonSnapshot[]
   lesson_outline?: string
   progress?: number
+  agent_prompt?: string
 }
 
 export interface AssistantRequest {
@@ -59,3 +60,21 @@ export type TeacherAssistantInsight = AssistantInsight
 export type TeacherAssistantAction = AssistantAction
 export type TeacherAssistantContextPayload = AssistantContextPayload
 export type TeacherAssistantLessonSnapshot = AssistantLessonSnapshot
+
+// 智能体相关类型
+export interface CustomAgent {
+  id: string
+  name: string
+  prompt: string
+  description?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AgentOption {
+  id: string
+  name: string
+  prompt?: string
+  description?: string
+  isCustom?: boolean
+}

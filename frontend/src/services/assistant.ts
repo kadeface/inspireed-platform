@@ -14,13 +14,38 @@ class AssistantService {
     payload: TeacherAssistantRequest
   ): Promise<TeacherAssistantResponse> {
     try {
-      return await api.post<TeacherAssistantResponse>(
+      console.log('📤 Sending AI Assistant request:', {
+        path: `${this.teacherBasePath}/query`,
+        hasAgentPrompt: !!payload.context?.agent_prompt,
+        questionLength: payload.question?.length,
+        topic: payload.topic,
+      })
+      
+      const response = await api.post<TeacherAssistantResponse>(
         `${this.teacherBasePath}/query`,
         payload
       )
+      
+      console.log('📥 AI Assistant response received:', {
+        model: response.model_used,
+        confidence: response.confidence,
+        answerLength: response.answer?.length,
+      })
+      
+      return response
     } catch (error: any) {
-      console.error('Teacher assistant request failed:', error)
-      throw new Error(error.response?.data?.detail || 'AI 助手服务暂不可用')
+      console.error('❌ Teacher assistant request failed:', {
+        error,
+        errorType: error?.constructor?.name,
+        errorMessage: error?.message,
+        responseStatus: error?.response?.status,
+        responseData: error?.response?.data,
+        requestUrl: error?.config?.url,
+        requestMethod: error?.config?.method,
+      })
+      
+      // 保留原始错误信息，让调用方处理
+      throw error
     }
   }
 

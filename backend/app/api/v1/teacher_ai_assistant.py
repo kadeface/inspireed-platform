@@ -188,6 +188,22 @@ async def query_teacher_assistant(
     """
     调用 AI 助理，为教师提供课堂洞察与建议。
     """
+    import sys
+    import datetime
+    
+    # 强制刷新输出，确保日志立即显示
+    def log_print(*args, **kwargs):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        message = f"[{timestamp}] " + " ".join(str(arg) for arg in args)
+        print(message, **kwargs, flush=True)
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+    log_print("=" * 80)
+    log_print("🤖 AI Assistant Request Received")
+    log_print(f"User: {current_user.username} (ID: {current_user.id})")
+    log_print(f"Question: {payload.question[:100]}...")
+    log_print(f"Topic: {payload.topic}")
 
     role_value = cast(str, getattr(current_user.role, "value", current_user.role))
     if role_value != UserRole.TEACHER.value:
@@ -199,15 +215,32 @@ async def query_teacher_assistant(
         if lesson is None or lesson.creator_id != current_user.id:
             raise HTTPException(status_code=404, detail="未找到指定教案")
         lesson_title = lesson.title
+        log_print(f"Lesson: {lesson_title}")
 
     context_lines = _build_context_lines(payload)
     context_text = "\n".join(context_lines) if context_lines else None
 
+    # 提取智能体提示词（如果存在）
+    agent_prompt = None
+    if payload.context and payload.context.agent_prompt:
+        agent_prompt = payload.context.agent_prompt
+        log_print("✅ Using CUSTOM AGENT PROMPT")
+        log_print(f"   Agent prompt length: {len(agent_prompt)}")
+        log_print(f"   Agent prompt preview: {agent_prompt[:200]}...")
+    else:
+        log_print("⚠️  No agent prompt provided, using DEFAULT system prompt")
+
+    log_print("-" * 80)
     ai_result = await ai_qa_service.ask_question(
         question=payload.question,
         context=context_text,
         lesson_title=lesson_title,
+        agent_prompt=agent_prompt,
     )
+    log_print(f"✅ AI Response received (model: {ai_result.model_used}, confidence: {ai_result.confidence})")
+    log_print(f"   Answer length: {len(ai_result.answer)}")
+    log_print(f"   Answer preview: {ai_result.answer[:150]}...")
+    log_print("=" * 80)
 
     insights, actions, follow_ups = _generate_structured_feedback(payload)
 

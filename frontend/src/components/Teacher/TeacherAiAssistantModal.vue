@@ -198,6 +198,74 @@
                 </div>
               </div>
 
+              <!-- 智能体选择 -->
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <label class="text-sm font-semibold text-gray-900">智能体</label>
+                  <button
+                    type="button"
+                    @click="showCreateAgentModal = true"
+                    class="inline-flex items-center gap-1 rounded-full border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 transition hover:bg-violet-50 hover:border-violet-400"
+                  >
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    创建智能体
+                  </button>
+                </div>
+                <div class="space-y-2">
+                  <select
+                    v-model="selectedAgentId"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  >
+                    <option value="">默认智能体（无特殊提示词）</option>
+                    <optgroup v-if="customAgents.length > 0" label="自定义智能体">
+                      <option
+                        v-for="agent in customAgents"
+                        :key="agent.id"
+                        :value="agent.id"
+                      >
+                        {{ agent.name }}
+                      </option>
+                    </optgroup>
+                    <optgroup label="预设智能体">
+                      <option
+                        v-for="agent in presetAgents"
+                        :key="agent.id"
+                        :value="agent.id"
+                      >
+                        {{ agent.name }}
+                      </option>
+                    </optgroup>
+                  </select>
+                  <div
+                    v-if="selectedAgent && selectedAgent.description"
+                    class="rounded-lg border border-emerald-100 bg-emerald-50/50 px-3 py-2 text-xs text-emerald-700"
+                  >
+                    {{ selectedAgent.description }}
+                  </div>
+                  <div
+                    v-if="selectedAgent && selectedAgent.isCustom"
+                    class="flex items-center justify-end gap-2"
+                  >
+                    <button
+                      type="button"
+                      @click="handleEditAgent(selectedAgent)"
+                      class="text-xs text-gray-600 hover:text-gray-900 transition"
+                    >
+                      编辑
+                    </button>
+                    <button
+                      type="button"
+                      @click="handleDeleteAgent(selectedAgent.id)"
+                      class="text-xs text-red-600 hover:text-red-800 transition"
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <!-- 教案优化功能（仅在教案共创主题显示） -->
               <div v-if="selectedTopic === 'lesson_plan'" class="space-y-3">
                 <div class="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-teal-50/60 p-4 shadow-sm">
@@ -314,38 +382,60 @@
                 ></textarea>
               </div>
 
-              <div class="flex items-center justify-between gap-3">
-                <p class="text-xs text-gray-600">
-                  AI 会综合当前仪表盘数据，生成总结与下一步行动建议。
-                </p>
-                <button
-                  type="button"
-                  :disabled="!isReady || isSubmitting"
-                  class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition enabled:hover:shadow-xl enabled:hover:shadow-emerald-500/40 enabled:focus:outline-none enabled:focus:ring-2 enabled:focus:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-60"
-                  @click="handleSubmit"
+              <div class="space-y-2">
+                <!-- 显示当前使用的智能体 -->
+                <div
+                  v-if="selectedAgent"
+                  class="rounded-lg border border-violet-200 bg-violet-50/50 px-3 py-2 text-xs"
                 >
-                  <svg
-                    v-if="isSubmitting"
-                    class="h-4 w-4 animate-spin"
-                    viewBox="0 0 24 24"
-                    fill="none"
+                  <div class="flex items-center gap-2">
+                    <svg class="h-3.5 w-3.5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    <span class="font-medium text-violet-900">使用智能体：</span>
+                    <span class="text-violet-700">{{ selectedAgent.name }}</span>
+                    <span v-if="selectedAgent.description" class="text-violet-600">- {{ selectedAgent.description }}</span>
+                  </div>
+                </div>
+                
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-xs text-gray-600">
+                    <span v-if="selectedAgent">
+                      将使用 <strong>{{ selectedAgent.name }}</strong> 的角色设定来生成回答。
+                    </span>
+                    <span v-else>
+                      AI 会综合当前仪表盘数据，生成总结与下一步行动建议。
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    :disabled="!isReady || isSubmitting"
+                    class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition enabled:hover:shadow-xl enabled:hover:shadow-emerald-500/40 enabled:focus:outline-none enabled:focus:ring-2 enabled:focus:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-60"
+                    @click="handleSubmit"
                   >
-                    <circle
-                      class="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      stroke-width="4"
-                    />
-                    <path
-                      class="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                    />
-                  </svg>
-                  <span>{{ isSubmitting ? '生成中...' : '生成建议' }}</span>
-                </button>
+                    <svg
+                      v-if="isSubmitting"
+                      class="h-4 w-4 animate-spin"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      />
+                    </svg>
+                    <span>{{ isSubmitting ? '生成中...' : '生成建议' }}</span>
+                  </button>
+                </div>
               </div>
 
               <p v-if="errorMessage" class="rounded-xl border border-red-200 bg-red-50/80 backdrop-blur-sm px-3 py-2 text-xs text-red-700 shadow-sm">
@@ -361,7 +451,18 @@
                 class="flex-1 overflow-y-auto rounded-2xl bg-white/90 backdrop-blur-sm p-5 text-sm text-gray-900 shadow-inner border border-gray-100"
               >
                 <div class="flex items-center justify-between gap-3 border-b border-gray-200 pb-3">
-                  <h3 class="text-base font-semibold text-gray-900">助手回答</h3>
+                  <div class="flex items-center gap-3">
+                    <h3 class="text-base font-semibold text-gray-900">助手回答</h3>
+                    <div
+                      v-if="selectedAgent"
+                      class="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs text-violet-700"
+                    >
+                      <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      <span>{{ selectedAgent.name }}</span>
+                    </div>
+                  </div>
                   <div class="flex items-center gap-3 text-xs text-gray-600">
                     <span v-if="response.model_used">模型：{{ response.model_used }}</span>
                     <span v-if="response.response_time_ms">
@@ -476,6 +577,139 @@
       </div>
     </div>
   </Transition>
+
+  <!-- 创建/编辑智能体模态框 -->
+  <Transition name="modal">
+    <div
+      v-if="showCreateAgentModal"
+      class="fixed inset-0 z-[60] overflow-y-auto"
+      @click.self="showCreateAgentModal = false"
+    >
+      <div class="flex min-h-screen items-center justify-center p-4">
+        <div class="fixed inset-0 bg-slate-900/60"></div>
+        <div
+          class="relative w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all"
+        >
+          <div class="px-6 py-5 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+              <h3 class="text-lg font-semibold text-gray-900">
+                {{ editingAgent ? '编辑智能体' : '创建自定义智能体' }}
+              </h3>
+              <button
+                type="button"
+                @click="showCreateAgentModal = false"
+                class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+              >
+                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fill-rule="evenodd"
+                    d="M10 8.586l4.95-4.95a1 1 0 111.414 1.414L11.414 10l4.95 4.95a1 1 0 01-1.414 1.414L10 11.414l-4.95 4.95a1 1 0 01-1.414-1.414L8.586 10l-4.95-4.95A1 1 0 115.05 3.636L10 8.586z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                智能体名称 <span class="text-red-500">*</span>
+              </label>
+              <input
+                v-model="agentForm.name"
+                type="text"
+                placeholder="例如：课程设计专家、学习评估助手"
+                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                描述（可选）
+              </label>
+              <input
+                v-model="agentForm.description"
+                type="text"
+                placeholder="简要描述这个智能体的用途"
+                class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                提示词 <span class="text-red-500">*</span>
+              </label>
+              <textarea
+                v-model="agentForm.prompt"
+                rows="8"
+                placeholder="输入自定义提示词，定义智能体的角色、能力和行为方式。例如：&#10;&#10;你是一位专注于STEM教育的课程设计专家，擅长基于建构主义学习理论设计探究式教学活动。你的回答应该：&#10;1. 结合5E教学模型（参与、探索、解释、深化、评价）&#10;2. 考虑不同学习风格的学生需求&#10;3. 提供可操作的具体建议&#10;4. 使用简洁、专业的语言"
+                class="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 font-mono"
+              ></textarea>
+              <div class="mt-2 flex items-center justify-between">
+                <p class="text-xs text-gray-500">
+                  提示词将作为系统提示词，影响AI的回答风格和内容
+                </p>
+                <button
+                  type="button"
+                  @click="showPromptTemplates = !showPromptTemplates"
+                  class="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                >
+                  {{ showPromptTemplates ? '隐藏' : '显示' }}模板
+                </button>
+              </div>
+              <div v-if="showPromptTemplates" class="mt-2 space-y-2">
+                <div class="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-xs">
+                  <p class="font-medium text-emerald-900 mb-2">提示词模板：</p>
+                  <div class="space-y-2">
+                    <button
+                      type="button"
+                      @click="applyPromptTemplate('curriculum')"
+                      class="block w-full text-left text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100 rounded px-2 py-1 transition"
+                    >
+                      📚 课程设计专家模板
+                    </button>
+                    <button
+                      type="button"
+                      @click="applyPromptTemplate('assessment')"
+                      class="block w-full text-left text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100 rounded px-2 py-1 transition"
+                    >
+                      📊 学习评估助手模板
+                    </button>
+                    <button
+                      type="button"
+                      @click="applyPromptTemplate('question')"
+                      class="block w-full text-left text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100 rounded px-2 py-1 transition"
+                    >
+                      ❓ 提问技巧教练模板
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                @click="showCreateAgentModal = false"
+                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                @click="handleSaveAgent"
+                :disabled="!agentForm.name.trim() || !agentForm.prompt.trim()"
+                class="rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition enabled:hover:shadow-xl enabled:hover:shadow-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {{ editingAgent ? '保存' : '创建' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -490,6 +724,8 @@ import type {
   TeacherAssistantContextPayload,
   TeacherAssistantResponse,
   TeacherAssistantTopic,
+  CustomAgent,
+  AgentOption,
 } from '@/types/assistant'
 import assistantService from '@/services/assistant'
 import MarkdownPreview from '@/components/Common/MarkdownPreview.vue'
@@ -555,6 +791,135 @@ const errorMessage = ref<string | null>(null)
 const response = ref<TeacherAssistantResponse | null>(null)
 const optimizationReport = ref<any>(null)
 const suggestionOffset = ref(0)
+
+// 智能体相关状态
+const selectedAgentId = ref<string>('')
+const showCreateAgentModal = ref(false)
+const editingAgent = ref<CustomAgent | null>(null)
+const showPromptTemplates = ref(false)
+const agentForm = ref({
+  name: '',
+  description: '',
+  prompt: '',
+})
+
+// 预设智能体
+const presetAgents: AgentOption[] = [
+  {
+    id: 'curriculum_designer',
+    name: '课程设计专家',
+    description: '专注于各学科的教学设计，基于建构主义学习理论',
+    prompt: `你是一位专业的教学助手，专门帮助教师设计各学科（语文、数学、科学、STEM等）的课程和教案。
+
+你的核心职责是：
+1. **理解教学需求**：仔细分析教师提出的教学设计问题，理解课程内容、学生特点和教学目标
+2. **提供教学设计方案**：基于建构主义学习理论和学习科学原理，设计完整的教学方案
+3. **应用教学模型**：结合5E教学模型（参与、探索、解释、深化、评价）或其他适合的教学模型
+4. **考虑学生差异**：考虑不同学习风格（视觉型、听觉型、动觉型）和认知水平的学生需求
+5. **提供具体建议**：给出可操作、可实施的具体教学步骤和活动设计
+
+重要提醒：
+- 你是一个**教学助手**，专注于帮助教师设计课程和教案
+- 当教师提出教学设计问题时，你应该提供完整的教学方案，包括教学目标、活动设计、评价方式等
+- 不要回答编程、技术实现等非教学相关的问题
+- 使用简洁、专业、易懂的教学语言
+
+请始终以教学设计的角度来回答教师的问题。`,
+  },
+  {
+    id: 'assessment_specialist',
+    name: '学习评估助手',
+    description: '专注于形成性评价和元认知反思设计',
+    prompt: '你是一位学习评估专家，擅长设计形成性评价和促进学生元认知反思的活动。你的回答应该：1. 基于布鲁姆分类法设计评价层次 2. 提供多元化的评价方式 3. 强调学生的自我监控和反思能力',
+  },
+  {
+    id: 'question_coach',
+    name: '提问技巧教练',
+    description: '擅长苏格拉底式提问和引导学生思考',
+    prompt: '你是一位提问技巧教练，擅长使用苏格拉底式提问法引导学生深入思考。你的回答应该：1. 提供澄清性、探索性、证据性等不同类型的问题 2. 帮助学生识别知识缺口 3. 促进元认知反思',
+  },
+]
+
+// 从 localStorage 加载自定义智能体
+const loadCustomAgents = (): CustomAgent[] => {
+  try {
+    const stored = localStorage.getItem('teacher_custom_agents')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      // 验证数据格式
+      if (Array.isArray(parsed)) {
+        return parsed.filter((agent) => 
+          agent && 
+          typeof agent.id === 'string' && 
+          typeof agent.name === 'string' && 
+          typeof agent.prompt === 'string'
+        )
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load custom agents:', error)
+  }
+  return []
+}
+
+// 保存自定义智能体到 localStorage
+const saveCustomAgents = (agents: CustomAgent[]) => {
+  try {
+    const json = JSON.stringify(agents)
+    localStorage.setItem('teacher_custom_agents', json)
+    
+    // 验证保存是否成功
+    const verify = localStorage.getItem('teacher_custom_agents')
+    if (verify === json) {
+      console.log('✓ Custom agents saved successfully:', agents.length, 'agents')
+    } else {
+      console.error('✗ Custom agents save verification failed')
+    }
+  } catch (error) {
+    console.error('Failed to save custom agents:', error)
+    // 如果存储失败（可能是存储空间不足），尝试清理旧数据
+    try {
+      localStorage.removeItem('teacher_custom_agents')
+      console.warn('Cleared corrupted custom agents data')
+    } catch (clearError) {
+      console.error('Failed to clear custom agents:', clearError)
+    }
+  }
+}
+
+const customAgents = ref<CustomAgent[]>(loadCustomAgents())
+
+// 所有可用的智能体（预设 + 自定义）
+const allAgents = computed<AgentOption[]>(() => {
+  const agents: AgentOption[] = [...presetAgents]
+  customAgents.value.forEach((agent) => {
+    agents.push({
+      id: agent.id,
+      name: agent.name,
+      description: agent.description,
+      prompt: agent.prompt,
+      isCustom: true,
+    })
+  })
+  return agents
+})
+
+// 当前选中的智能体
+const selectedAgent = computed<AgentOption | null>(() => {
+  if (!selectedAgentId.value) return null
+  const agent = allAgents.value.find((a) => a.id === selectedAgentId.value) || null
+  // 调试：如果找到智能体但prompt为空，记录警告
+  if (agent && (!agent.prompt || !agent.prompt.trim())) {
+    console.warn('⚠️ Found agent but prompt is empty:', {
+      id: agent.id,
+      name: agent.name,
+      hasPrompt: !!agent.prompt,
+      promptType: typeof agent.prompt,
+      promptValue: agent.prompt
+    })
+  }
+  return agent
+})
 
 const topicOptions: Array<{ label: string; value: TeacherAssistantTopic }> = [
   { label: '教学循环 (PDCA)', value: 'pdca' },
@@ -683,6 +1048,127 @@ function refreshSuggestions() {
   suggestionOffset.value += 1
 }
 
+// 智能体相关函数
+function handleSaveAgent() {
+  if (!agentForm.value.name.trim() || !agentForm.value.prompt.trim()) {
+    return
+  }
+
+  const now = new Date().toISOString()
+
+  if (editingAgent.value) {
+    // 更新现有智能体
+    const index = customAgents.value.findIndex((a) => a.id === editingAgent.value!.id)
+    if (index !== -1) {
+      // 使用新数组确保响应式更新
+      const updated = [...customAgents.value]
+      updated[index] = {
+        ...updated[index],
+        name: agentForm.value.name.trim(),
+        description: agentForm.value.description.trim(),
+        prompt: agentForm.value.prompt.trim(),
+        updated_at: now,
+      }
+      customAgents.value = updated
+      saveCustomAgents(customAgents.value)
+      console.log('Agent updated:', updated[index].name)
+    }
+  } else {
+    // 创建新智能体
+    const description = agentForm.value.description.trim()
+    const newAgent: CustomAgent = {
+      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: agentForm.value.name.trim(),
+      description: description || undefined,
+      prompt: agentForm.value.prompt.trim(),
+      created_at: now,
+      updated_at: now,
+    }
+    // 使用新数组确保响应式更新
+    customAgents.value = [...customAgents.value, newAgent]
+    saveCustomAgents(customAgents.value)
+    selectedAgentId.value = newAgent.id
+    console.log('Agent created:', newAgent.name, 'Total agents:', customAgents.value.length)
+  }
+
+  // 重置表单并关闭模态框
+  agentForm.value = { name: '', description: '', prompt: '' }
+  editingAgent.value = null
+  showCreateAgentModal.value = false
+}
+
+function handleEditAgent(agent: AgentOption) {
+  if (!agent.isCustom) return
+
+  const customAgent = customAgents.value.find((a) => a.id === agent.id)
+  if (customAgent) {
+    editingAgent.value = customAgent
+    agentForm.value = {
+      name: customAgent.name,
+      description: customAgent.description || '',
+      prompt: customAgent.prompt,
+    }
+    showCreateAgentModal.value = true
+  }
+}
+
+function handleDeleteAgent(agentId: string) {
+  if (confirm('确定要删除这个智能体吗？')) {
+    // 使用新数组确保响应式更新
+    customAgents.value = customAgents.value.filter((a) => a.id !== agentId)
+    saveCustomAgents(customAgents.value)
+    if (selectedAgentId.value === agentId) {
+      selectedAgentId.value = ''
+    }
+    console.log('Agent deleted. Remaining agents:', customAgents.value.length)
+  }
+}
+
+// 提示词模板
+const promptTemplates = {
+  curriculum: `你是一位专业的教学助手，专门帮助教师设计各学科（语文、数学、科学、STEM等）的课程和教案。
+
+你的核心职责是：
+1. **理解教学需求**：仔细分析教师提出的教学设计问题，理解课程内容、学生特点和教学目标
+2. **提供教学设计方案**：基于建构主义学习理论和学习科学原理，设计完整的教学方案
+3. **应用教学模型**：结合5E教学模型（参与、探索、解释、深化、评价）或其他适合的教学模型
+4. **考虑学生差异**：考虑不同学习风格（视觉型、听觉型、动觉型）和认知水平的学生需求
+5. **提供具体建议**：给出可操作、可实施的具体教学步骤和活动设计
+
+重要提醒：
+- 你是一个**教学助手**，专注于帮助教师设计课程和教案
+- 当教师提出教学设计问题时，你应该提供完整的教学方案，包括教学目标、活动设计、评价方式等
+- 不要回答编程、技术实现等非教学相关的问题
+- 使用简洁、专业、易懂的教学语言
+
+请始终以教学设计的角度来回答教师的问题。`,
+  assessment: `你是一位学习评估专家，擅长设计形成性评价和促进学生元认知反思的活动。
+
+你的回答应该：
+1. 基于布鲁姆分类法设计多层次的评价方式
+2. 提供多元化的评价方法（自评、互评、师评）
+3. 强调形成性评价和过程性反馈
+4. 设计促进学生自我监控和反思的问题
+5. 结合最近发展区理论提供脚手架支持
+
+使用清晰、结构化的方式呈现评价方案。`,
+  question: `你是一位提问技巧教练，擅长使用苏格拉底式提问法引导学生深入思考。
+
+你的回答应该：
+1. 提供不同类型的提问（澄清性、探索性、证据性、视角性、影响性）
+2. 帮助学生识别知识缺口和认知盲点
+3. 促进元认知反思和自我监控
+4. 设计问题序列，引导学生逐步深入思考
+5. 结合费曼学习法，鼓励学生用自己的话解释概念
+
+使用启发式、引导性的语言，避免直接给出答案。`,
+}
+
+function applyPromptTemplate(templateKey: keyof typeof promptTemplates) {
+  agentForm.value.prompt = promptTemplates[templateKey]
+  showPromptTemplates.value = false
+}
+
 async function handleSubmit() {
   if (!isReady.value || isSubmitting.value) {
     return
@@ -693,16 +1179,133 @@ async function handleSubmit() {
   optimizationReport.value = null
 
   try {
+    // 构建上下文：如果有选中的智能体，将提示词添加到 context 中
+    const contextWithAgent = { ...normalizedContext.value }
+    
+    // 调试信息：检查智能体选择状态
+    console.log('=== Agent Selection Debug ===')
+    console.log('selectedAgentId.value:', selectedAgentId.value)
+    console.log('selectedAgent.value:', selectedAgent.value)
+    console.log('allAgents.value:', allAgents.value.map(a => ({ id: a.id, name: a.name, hasPrompt: !!a.prompt })))
+    
+    // 将智能体的提示词通过 agent_prompt 字段传递
+    if (selectedAgent.value) {
+      console.log('=== Agent Found ===')
+      console.log('Agent name:', selectedAgent.value.name)
+      console.log('Agent ID:', selectedAgent.value.id)
+      console.log('Agent prompt exists:', !!selectedAgent.value.prompt)
+      console.log('Agent prompt type:', typeof selectedAgent.value.prompt)
+      
+      if (selectedAgent.value.prompt && selectedAgent.value.prompt.trim()) {
+        contextWithAgent.agent_prompt = selectedAgent.value.prompt.trim()
+        console.log('✅ Agent prompt set, length:', contextWithAgent.agent_prompt.length)
+        console.log('Prompt preview:', contextWithAgent.agent_prompt.substring(0, 200))
+      } else {
+        console.warn('⚠️ Agent selected but prompt is empty or undefined')
+        console.warn('Agent prompt value:', selectedAgent.value.prompt)
+      }
+      console.log('Question:', question.value.trim())
+    } else {
+      console.log('=== Using Default Assistant ===')
+      console.log('No agent selected or agent not found')
+      console.log('selectedAgentId:', selectedAgentId.value)
+      console.log('Available agents count:', allAgents.value.length)
+      if (selectedAgentId.value) {
+        console.warn('⚠️ selectedAgentId is set but agent not found in allAgents')
+        console.warn('Looking for ID:', selectedAgentId.value)
+        const found = allAgents.value.find(a => a.id === selectedAgentId.value)
+        console.warn('Found agent:', found)
+      }
+    }
+
+    console.log('=== Request Payload ===')
+    console.log('Question:', question.value.trim())
+    console.log('Topic:', selectedTopic.value)
+    console.log('Has agent_prompt:', !!contextWithAgent.agent_prompt)
+    console.log('Agent prompt value:', contextWithAgent.agent_prompt ? contextWithAgent.agent_prompt.substring(0, 100) + '...' : null)
+    console.log('Context keys:', Object.keys(contextWithAgent))
+
     const assistantResponse = await assistantService.askTeacherAssistant({
       question: question.value.trim(),
       topic: selectedTopic.value,
-      context: normalizedContext.value,
+      context: contextWithAgent,
       lesson_id: selectedLessonId.value || undefined,
     })
 
+    console.log('✅ AI Response received:', {
+      model: assistantResponse.model_used,
+      confidence: assistantResponse.confidence,
+      answerLength: assistantResponse.answer?.length,
+      hasInsights: assistantResponse.insights?.length > 0,
+      hasActions: assistantResponse.suggested_actions?.length > 0,
+    })
+    
+    // 打印完整的回答内容，便于调试
+    console.log('📝 AI Answer Content:', assistantResponse.answer)
+    console.log('📝 AI Answer Preview (first 500 chars):', assistantResponse.answer?.substring(0, 500))
+    
+    // 检查回答内容是否符合预期
+    if (selectedAgent.value && selectedAgent.value.prompt) {
+      const isProgrammingAnswer = assistantResponse.answer?.includes('编程') || 
+                                   assistantResponse.answer?.includes('代码') ||
+                                   assistantResponse.answer?.includes('def ') ||
+                                   assistantResponse.answer?.includes('function')
+      const isTeachingAnswer = assistantResponse.answer?.includes('教学') ||
+                               assistantResponse.answer?.includes('教案') ||
+                               assistantResponse.answer?.includes('设计') ||
+                               assistantResponse.answer?.includes('目标')
+      
+      if (isProgrammingAnswer && !isTeachingAnswer) {
+        console.warn('⚠️ 警告：选择了课程设计专家，但回答似乎是编程相关的内容')
+        console.warn('   这可能说明智能体的提示词没有生效')
+      } else {
+        console.log('✅ 回答内容符合预期（教学设计相关）')
+      }
+    }
+
     response.value = assistantResponse
   } catch (error: any) {
-    errorMessage.value = error.message || '请求 AI 助手失败，请稍后重试。'
+    // 详细的错误日志
+    console.error('❌ AI Assistant Error:', {
+      error,
+      errorType: error?.constructor?.name,
+      errorMessage: error?.message,
+      errorResponse: error?.response,
+      errorResponseData: error?.response?.data,
+      errorResponseStatus: error?.response?.status,
+      errorStack: error?.stack,
+    })
+    
+    // 构建详细的错误消息
+    let detailedError = '请求 AI 助手失败，请稍后重试。'
+    
+    if (error?.response?.data?.detail) {
+      detailedError = `服务器错误: ${error.response.data.detail}`
+    } else if (error?.response?.status) {
+      detailedError = `请求失败 (状态码: ${error.response.status})`
+      if (error.response.status === 500) {
+        detailedError += ' - 服务器内部错误，请检查后端日志'
+      } else if (error.response.status === 401) {
+        detailedError += ' - 未授权，请重新登录'
+      } else if (error.response.status === 403) {
+        detailedError += ' - 权限不足'
+      }
+    } else if (error?.message) {
+      detailedError = error.message
+    } else if (error?.toString) {
+      detailedError = error.toString()
+    }
+    
+    errorMessage.value = detailedError
+    
+    // 如果是网络错误，提供更多信息
+    if (!error?.response) {
+      console.error('⚠️  可能是网络连接问题或后端服务未启动')
+      console.error('   请检查：')
+      console.error('   1. 后端服务是否运行在 http://localhost:8000')
+      console.error('   2. 网络连接是否正常')
+      console.error('   3. 查看后端日志: tail -f logs/backend.log')
+    }
   } finally {
     isSubmitting.value = false
   }
@@ -733,13 +1336,22 @@ async function handleOptimizeLesson() {
 - 优势、待改进点、具体优化建议
 - 基于学习科学理论的详细优化方案`
 
+    // 构建上下文，包含智能体提示词（如果选择了智能体）
+    const contextWithAgent = {
+      ...normalizedContext.value,
+      lesson_outline: selectedLesson ? `教案标题：${selectedLesson.title}\n状态：${selectedLesson.status}` : undefined,
+    }
+    
+    // 将智能体的提示词通过 agent_prompt 字段传递
+    if (selectedAgent.value && selectedAgent.value.prompt) {
+      contextWithAgent.agent_prompt = selectedAgent.value.prompt
+      console.log('Using agent for lesson optimization:', selectedAgent.value.name)
+    }
+
     const assistantResponse = await assistantService.askTeacherAssistant({
       question: optimizationQuestion,
       topic: 'lesson_plan',
-      context: {
-        ...normalizedContext.value,
-        lesson_outline: selectedLesson ? `教案标题：${selectedLesson.title}\n状态：${selectedLesson.status}` : undefined,
-      },
+      context: contextWithAgent,
       lesson_id: selectedLessonId.value,
     })
 
@@ -861,9 +1473,27 @@ watch(
       optimizationReport.value = null
       selectedLessonId.value = null
       suggestionOffset.value = 0
+      // 重新加载自定义智能体（可能在其他地方被修改）
+      const loaded = loadCustomAgents()
+      customAgents.value = loaded
+      console.log('Modal opened. Loaded agents:', loaded.length)
     }
   }
 )
+
+// 监听创建模态框打开，重新加载数据（以防在其他标签页被修改）
+watch(showCreateAgentModal, (isOpen) => {
+  if (isOpen) {
+    // 打开时重新加载，确保数据是最新的
+    const loaded = loadCustomAgents()
+    customAgents.value = loaded
+    console.log('Create agent modal opened. Loaded agents:', loaded.length)
+  } else {
+    // 关闭时重置表单
+    agentForm.value = { name: '', description: '', prompt: '' }
+    editingAgent.value = null
+  }
+})
 
 watch(
   () => selectedTopic.value,

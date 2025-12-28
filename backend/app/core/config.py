@@ -112,11 +112,14 @@ class Settings(BaseSettings):
     JUPYTERHUB_API_TOKEN: str = "your-jupyterhub-token"
 
     # OpenAI配置
-    OPENAI_API_KEY: str = ""
+    # 注意：配置优先级（从高到低）：
+    # 1. 系统环境变量 > 2. .env 文件 > 3. 这里的默认值
+    # 推荐在 .env 文件中配置 OPENAI_API_KEY，而不是修改这里的默认值
+    OPENAI_API_KEY: str = ""  # 默认值为空，应在 .env 文件中配置
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_MODEL: str = "gpt-3.5-turbo"
     DEFAULT_AI_MODEL: str = "gpt-3.5-turbo"
-    AI_MAX_TOKENS: int = 1000
+    AI_MAX_TOKENS: int = 20000  # 增加到20000，确保有足够空间生成完整的教学设计方案
     AI_TEMPERATURE: float = 0.7
 
     # 邮件配置（可选）
