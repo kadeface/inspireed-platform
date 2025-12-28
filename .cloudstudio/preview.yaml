@@ -82,9 +82,11 @@ apps: # 支持配置多个应用
       # 创建环境配置（如果不存在）
       if [ ! -f ".env.local" ]; then
         cp env.example .env.local
-        # 设置后端 API 地址（Cloud Studio 会自动分配后端端口）
-        echo "VITE_API_BASE_URL=http://localhost:8000/api/v1" >> .env.local
       fi
+      
+      # 注意：在 Cloud Studio 环境中，VITE_API_BASE_URL 会根据前端URL自动计算
+      # 如果后端URL与前端URL不同，请在 .env.local 中手动设置：
+      # VITE_API_BASE_URL=https://your-backend-url.cloudstudio.club/api/v1
       
       # 启动前端服务
       echo "🚀 启动前端服务 (端口 5173)..."
