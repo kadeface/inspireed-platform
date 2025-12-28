@@ -162,18 +162,103 @@ def upgrade() -> None:
     """
     )
 
-    # Add course_id column to lessons table (nullable initially for existing data)
-    # Check if lessons table exists first
+    # Create lessons table if it doesn't exist
+    # This is needed for fresh database deployments (e.g., on cloud servers)
+    # where init_db() hasn't been run before migrations
     conn = op.get_bind()
     inspector = inspect(conn)
-    if 'lessons' in inspector.get_table_names():
-        op.add_column("lessons", sa.Column("course_id", sa.Integer(), nullable=True))
+    
+    if 'lessons' not in inspector.get_table_names():
+        # Create lessons table with basic structure
+        # Note: Some fields will be added by later migrations
+        op.create_table(
+            "lessons",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("title", sa.String(length=200), nullable=False),
+            sa.Column("description", sa.Text(), nullable=True),
+            # 教案创建者 (users table may not exist yet, so nullable initially)
+            sa.Column("creator_id", sa.Integer(), nullable=True),
+            # 所属课程 (will be set to NOT NULL in later migration)
+            sa.Column("course_id", sa.Integer(), nullable=True),
+            # 状态
+            sa.Column(
+                "status",
+                sa.Enum("draft", "published", "archived", name="lessonstatus"),
+                nullable=False,
+                server_default="draft",
+            ),
+            # 教案内容（JSON格式存储Cell配置）
+            sa.Column("content", sa.JSON(), nullable=False, server_default="[]"),
+            # 版本控制
+            sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
+            sa.Column("parent_id", sa.Integer(), nullable=True),
+            # 国家平台资源映射
+            sa.Column("national_resource_id", sa.String(length=100), nullable=True),
+            # 标签
+            sa.Column("tags", sa.JSON(), nullable=True),
+            # 封面图
+            sa.Column("cover_image_url", sa.String(length=500), nullable=True),
+            # 时间戳
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
+            sa.Column("published_at", sa.DateTime(), nullable=True),
+            sa.PrimaryKeyConstraint("id"),
+        )
+        op.create_index(op.f("ix_lessons_id"), "lessons", ["id"], unique=False)
+        op.create_index(
+            op.f("ix_lessons_national_resource_id"), 
+            "lessons", 
+            ["national_resource_id"], 
+            unique=False
+        )
+        
+        # Add foreign keys if referenced tables exist
+        if 'users' in inspector.get_table_names():
+            op.create_foreign_key(
+                "fk_lessons_creator_id",
+                "lessons",
+                "users",
+                ["creator_id"],
+                ["id"],
+            )
+        
+        # Add course_id foreign key (courses table was just created above)
         op.create_index(
             op.f("ix_lessons_course_id"), "lessons", ["course_id"], unique=False
         )
         op.create_foreign_key(
             "fk_lessons_course_id", "lessons", "courses", ["course_id"], ["id"]
         )
+        
+        # Self-referential foreign key for parent_id
+        op.create_foreign_key(
+            "fk_lessons_parent_id",
+            "lessons",
+            "lessons",
+            ["parent_id"],
+            ["id"],
+        )
+    else:
+        # Table exists, just add course_id column if it doesn't exist
+        existing_columns = [col['name'] for col in inspector.get_columns('lessons')]
+        if 'course_id' not in existing_columns:
+            op.add_column("lessons", sa.Column("course_id", sa.Integer(), nullable=True))
+            op.create_index(
+                op.f("ix_lessons_course_id"), "lessons", ["course_id"], unique=False
+            )
+            op.create_foreign_key(
+                "fk_lessons_course_id", "lessons", "courses", ["course_id"], ["id"]
+            )
 
 
 def downgrade() -> None:
