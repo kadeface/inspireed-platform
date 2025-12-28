@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏三：楼梯搭建师</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.2em;
+        }
+
+        .formula-display {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .formula-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .formula-text {
+            font-size: 2em;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-family: 'Courier New', monospace;
+        }
+
+        .building-section {
+            background: linear-gradient(to bottom, #87ceeb 0%, #e0f6ff 100%);
+            padding: 40px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            min-height: 500px;
+        }
+
+        .building {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .floor {
+            width: 100%;
+            height: 80px;
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+            border: 3px solid #5d6d7e;
+            border-bottom: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .floor:last-child {
+            border-bottom: 3px solid #5d6d7e;
+        }
+
+        .floor-label {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2c3e50;
+            background: rgba(255,255,255,0.8);
+            padding: 8px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .staircase {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            margin: 0 20px;
+        }
+
+        .stair {
+            width: 120px;
+            height: 20px;
+            background: linear-gradient(135deg, #d4a574 0%, #c19a6b 100%);
+            border: 2px solid #8b6914;
+            border-radius: 3px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .stair.built {
+            background: linear-gradient(135deg, #f4a460 0%, #daa520 100%);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            animation: buildStair 0.5s ease-out;
+        }
+
+        @keyframes buildStair {
+            0% {
+                transform: scaleY(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scaleY(1.2);
+            }
+            100% {
+                transform: scaleY(1);
+                opacity: 1;
+            }
+        }
+
+        .stair.highlight {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            box-shadow: 0 0 20px rgba(255,215,0,0.8);
+            animation: highlight 1s infinite;
+        }
+
+        @keyframes highlight {
+            0%, 100% { box-shadow: 0 0 20px rgba(255,215,0,0.8); }
+            50% { box-shadow: 0 0 30px rgba(255,215,0,1); }
+        }
+
+        .control-panel {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .control-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .input-item {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .input-label {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2980b9;
+            margin-bottom: 10px;
+        }
+
+        .input-field {
+            padding: 15px;
+            font-size: 1.5em;
+            border: 3px solid #ddd;
+            border-radius: 10px;
+            width: 100%;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .calculate-btn {
+            display: block;
+            width: 100%;
+            padding: 20px;
+            font-size: 1.5em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            background: #4caf50;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .calculate-btn:hover {
+            background: #45a049;
+            transform: scale(1.02);
+        }
+
+        .result-panel {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .result-label {
+            font-size: 1.3em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .result-value {
+            font-size: 3em;
+            font-weight: bold;
+            color: #2980b9;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .result-formula {
+            font-size: 1.5em;
+            color: #666;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .challenge-section {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .challenge-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .question-container {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+        }
+
+        .question-text {
+            font-size: 1.4em;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .options-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .option-button {
+            padding: 20px;
+            font-size: 1.2em;
+            border: 3px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .option-button:hover {
+            background: #f0f0f0;
+            border-color: #4facfe;
+            transform: scale(1.05);
+        }
+
+        .option-button.correct {
+            background: #4caf50;
+            color: white;
+            border-color: #4caf50;
+        }
+
+        .option-button.incorrect {
+            background: #f44336;
+            color: white;
+            border-color: #f44336;
+        }
+
+        .feedback {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        }
+
+        .feedback.correct {
+            background: #c8e6c9;
+            color: #2e7d32;
+            display: block;
+        }
+
+        .feedback.incorrect {
+            background: #ffcdd2;
+            color: #c62828;
+            display: block;
+        }
+
+        .explanation {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            border-radius: 5px;
+            font-size: 1.1em;
+            color: #1565c0;
+            display: none;
+        }
+
+        .explanation.show {
+            display: block;
+        }
+
+        .reset-button {
+            display: block;
+            margin: 30px auto;
+            padding: 15px 40px;
+            font-size: 1.3em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: transform 0.3s;
+        }
+
+        .reset-button:hover {
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 768px) {
+            .input-group {
+                grid-template-columns: 1fr;
+            }
+
+            .options-container {
+                grid-template-columns: 1fr;
+            }
+
+            .floor {
+                height: 60px;
+                padding: 0 15px;
+            }
+
+            .stair {
+                width: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🏗️ 游戏三：楼梯搭建师</h1>
+        <div class="subtitle">理解：N层楼 = N-1段楼梯</div>
+
+        <div class="formula-display">
+            <div class="formula-title">📐 核心公式</div>
+            <div class="formula-text">基数（楼梯数）= 终点序数 - 起点序数</div>
+        </div>
+
+        <div class="building-section">
+            <div class="building" id="building">
+                <!-- 楼层和楼梯将通过JavaScript生成 -->
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-title">🎮 搭建控制</div>
+            <div class="input-group">
+                <div class="input-item">
+                    <div class="input-label">起点楼层（序数）</div>
+                    <input type="number" id="startFloor" class="input-field" min="1" max="10" value="1" onchange="updateBuilding()">
+                </div>
+                <div class="input-item">
+                    <div class="input-label">终点楼层（序数）</div>
+                    <input type="number" id="endFloor" class="input-field" min="1" max="10" value="5" onchange="updateBuilding()">
+                </div>
+            </div>
+            <button class="calculate-btn" onclick="calculateStairs()">🔨 计算并搭建楼梯</button>
+            <div class="result-panel" id="resultPanel" style="display: none;">
+                <div class="result-label">需要搭建的楼梯数（基数）</div>
+                <div class="result-value" id="resultValue">0</div>
+                <div class="result-formula" id="resultFormula"></div>
+            </div>
+        </div>
+
+        <div class="challenge-section">
+            <div class="challenge-title">📝 挑战练习</div>
+            <div class="question-container">
+                <div class="question-text" id="questionText">问题将显示在这里</div>
+                <div class="options-container" id="optionsContainer">
+                    <!-- 选项将通过JavaScript动态生成 -->
+                </div>
+                <div class="feedback" id="feedback"></div>
+                <div class="explanation" id="explanation"></div>
+            </div>
+        </div>
+
+        <button class="reset-button" onclick="resetGame()">🔄 重新开始</button>
+    </div>
+
+    <script>
+        const totalFloors = 10;
+        let currentQuestion = 0;
+
+        // 问题库
+        const questions = [
+            {
+                question: "从第1层到第5层，需要搭建几段楼梯？",
+                options: ["4段", "5段", "6段", "3段"],
+                correct: 0,
+                explanation: "从第1层到第5层，需要搭建4段楼梯（5-1=4）。记住：楼梯数 = 终点楼层 - 起点楼层。"
+            },
+            {
+                question: "从第2层到第8层，需要搭建几段楼梯？",
+                options: ["5段", "6段", "7段", "8段"],
+                correct: 1,
+                explanation: "从第2层到第8层，需要搭建6段楼梯（8-2=6）。"
+            },
+            {
+                question: "搭建了5段楼梯，从第3层开始，到达第几层？",
+                options: ["第5层", "第6层", "第7层", "第8层"],
+                correct: 3,
+                explanation: "从第3层开始，搭建5段楼梯，到达第8层（3+5=8）。"
+            },
+            {
+                question: "从第4层到第4层，需要搭建几段楼梯？",
+                options: ["0段", "1段", "2段", "4段"],
+                correct: 0,
+                explanation: "从第4层到第4层，起点和终点相同，不需要搭建楼梯（4-4=0）。"
+            },
+            {
+                question: "从第10层到第1层，需要搭建几段楼梯？",
+                options: ["8段", "9段", "10段", "11段"],
+                correct: 1,
+                explanation: "从第10层到第1层，需要搭建9段楼梯（10-1=9）。注意：即使向下走，楼梯数也是终点-起点。"
+            }
+        ];
+
+        // 初始化建筑
+        function initBuilding() {
+            updateBuilding();
+        }
+
+        // 更新建筑显示
+        function updateBuilding() {
+            const building = document.getElementById('building');
+            building.innerHTML = '';
+            
+            const startFloor = parseInt(document.getElementById('startFloor').value) || 1;
+            const endFloor = parseInt(document.getElementById('endFloor').value) || 5;
+            
+            // 确保起点小于等于终点
+            if (startFloor > endFloor) {
+                document.getElementById('endFloor').value = startFloor;
+                return updateBuilding();
+            }
+            
+            // 创建楼层
+            for (let i = totalFloors; i >= 1; i--) {
+                const floor = document.createElement('div');
+                floor.className = 'floor';
+                
+                const label = document.createElement('div');
+                label.className = 'floor-label';
+                label.textContent = `第${i}层`;
+                floor.appendChild(label);
+                
+                // 在起点和终点之间添加楼梯
+                if (i > startFloor && i <= endFloor) {
+                    const staircase = document.createElement('div');
+                    staircase.className = 'staircase';
+                    
+                    const stair = document.createElement('div');
+                    stair.className = 'stair';
+                    if (i === endFloor) {
+                        stair.classList.add('highlight');
+                    }
+                    staircase.appendChild(stair);
+                    
+                    floor.appendChild(staircase);
+                }
+                
+                building.appendChild(floor);
+            }
+        }
+
+        // 计算楼梯数
+        function calculateStairs() {
+            const startFloor = parseInt(document.getElementById('startFloor').value) || 1;
+            const endFloor = parseInt(document.getElementById('endFloor').value) || 5;
+            
+            if (startFloor > endFloor) {
+                alert('起点楼层不能大于终点楼层！');
+                return;
+            }
+            
+            const stairsCount = endFloor - startFloor;
+            
+            // 显示结果
+            document.getElementById('resultPanel').style.display = 'block';
+            document.getElementById('resultValue').textContent = stairsCount;
+            document.getElementById('resultFormula').textContent = `${endFloor} - ${startFloor} = ${stairsCount}`;
+            
+            // 高亮楼梯
+            setTimeout(() => {
+                const stairs = document.querySelectorAll('.stair');
+                stairs.forEach((stair, index) => {
+                    setTimeout(() => {
+                        stair.classList.add('built');
+                    }, index * 200);
+                });
+            }, 100);
+        }
+
+        // 显示问题
+        function showQuestion() {
+            if (currentQuestion >= questions.length) {
+                currentQuestion = 0;
+            }
+            
+            const q = questions[currentQuestion];
+            document.getElementById('questionText').textContent = q.question;
+            
+            const optionsContainer = document.getElementById('optionsContainer');
+            optionsContainer.innerHTML = '';
+            
+            q.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.className = 'option-button';
+                button.textContent = option;
+                button.onclick = () => checkAnswer(index);
+                optionsContainer.appendChild(button);
+            });
+            
+            // 清除之前的反馈
+            document.getElementById('feedback').className = 'feedback';
+            document.getElementById('explanation').className = 'explanation';
+        }
+
+        // 检查答案
+        function checkAnswer(selectedIndex) {
+            const q = questions[currentQuestion];
+            const buttons = document.querySelectorAll('#optionsContainer .option-button');
+            const feedback = document.getElementById('feedback');
+            const explanation = document.getElementById('explanation');
+            
+            // 禁用所有按钮
+            buttons.forEach(btn => {
+                btn.style.pointerEvents = 'none';
+                const btnIndex = Array.from(buttons).indexOf(btn);
+                if (btnIndex === q.correct) {
+                    btn.classList.add('correct');
+                } else if (btnIndex === selectedIndex) {
+                    btn.classList.add('incorrect');
+                }
+            });
+            
+            if (selectedIndex === q.correct) {
+                feedback.textContent = '✅ 答对了！';
+                feedback.className = 'feedback correct';
+            } else {
+                feedback.textContent = '❌ 答错了，再想想！';
+                feedback.className = 'feedback incorrect';
+            }
+            
+            explanation.textContent = q.explanation;
+            explanation.classList.add('show');
+            
+            // 3秒后显示下一题
+            setTimeout(() => {
+                currentQuestion++;
+                showQuestion();
+                buttons.forEach(btn => {
+                    btn.style.pointerEvents = 'auto';
+                    btn.classList.remove('correct', 'incorrect');
+                });
+            }, 3000);
+        }
+
+        // 重置游戏
+        function resetGame() {
+            document.getElementById('startFloor').value = 1;
+            document.getElementById('endFloor').value = 5;
+            document.getElementById('resultPanel').style.display = 'none';
+            currentQuestion = 0;
+            
+            updateBuilding();
+            showQuestion();
+        }
+
+        // 初始化
+        window.addEventListener('load', () => {
+            initBuilding();
+            showQuestion();
+        });
+    </script>
+</body>
+</html>
+

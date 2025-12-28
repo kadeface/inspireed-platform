@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基数与序数互动游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .concept-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .cardinal-section, .ordinal-section {
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .cardinal-section {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .ordinal-section {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .section-description {
+            font-size: 1.2em;
+            color: white;
+            text-align: center;
+            margin-bottom: 25px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .apples-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            min-height: 200px;
+            padding: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .apple {
+            width: 80px;
+            height: 80px;
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .apple:hover {
+            transform: scale(1.15) rotate(5deg);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+
+        .apple.selected {
+            transform: scale(1.2);
+            box-shadow: 0 0 20px rgba(255,255,255,0.8);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1.2); }
+            50% { transform: scale(1.3); }
+        }
+
+        .apple-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9em;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            white-space: nowrap;
+        }
+
+        .apple-cardinal {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        }
+
+        .apple-cardinal:nth-child(1) { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
+        .apple-cardinal:nth-child(2) { background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); }
+        .apple-cardinal:nth-child(3) { background: linear-gradient(135deg, #ffe66d 0%, #ffd93d 100%); }
+        .apple-cardinal:nth-child(4) { background: linear-gradient(135deg, #a8e6cf 0%, #88d8a3 100%); }
+        .apple-cardinal:nth-child(5) { background: linear-gradient(135deg, #ff9ff3 0%, #f368e0 100%); }
+
+        .apple-ordinal {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        }
+
+        .apple-ordinal:nth-child(1) { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); }
+        .apple-ordinal:nth-child(2) { background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); }
+        .apple-ordinal:nth-child(3) { background: linear-gradient(135deg, #ffe66d 0%, #ffd93d 100%); }
+        .apple-ordinal:nth-child(4) { background: linear-gradient(135deg, #a8e6cf 0%, #88d8a3 100%); }
+        .apple-ordinal:nth-child(5) { background: linear-gradient(135deg, #ff9ff3 0%, #f368e0 100%); }
+
+        .example-text {
+            font-size: 1.3em;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .practice-section {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 40px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .practice-title {
+            font-size: 2em;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            margin-bottom: 25px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .question-container {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .question-text {
+            font-size: 1.4em;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .options-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .option-button {
+            padding: 20px;
+            font-size: 1.2em;
+            border: 3px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .option-button:hover {
+            background: #f0f0f0;
+            border-color: #4facfe;
+            transform: scale(1.05);
+        }
+
+        .option-button.correct {
+            background: #4caf50;
+            color: white;
+            border-color: #4caf50;
+        }
+
+        .option-button.incorrect {
+            background: #f44336;
+            color: white;
+            border-color: #f44336;
+        }
+
+        .feedback {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        }
+
+        .feedback.correct {
+            background: #c8e6c9;
+            color: #2e7d32;
+            display: block;
+        }
+
+        .feedback.incorrect {
+            background: #ffcdd2;
+            color: #c62828;
+            display: block;
+        }
+
+        .explanation {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            border-radius: 5px;
+            font-size: 1.1em;
+            color: #1565c0;
+            display: none;
+        }
+
+        .explanation.show {
+            display: block;
+        }
+
+        .tricky-question {
+            background: linear-gradient(135deg, #ff9a56 0%, #ff6a88 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 40px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .tricky-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .tricky-note {
+            background: rgba(255,255,255,0.9);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            color: #d32f2f;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .people-line {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 30px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .person {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: bold;
+            position: relative;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: transform 0.3s;
+        }
+
+        .person:hover {
+            transform: scale(1.1);
+        }
+
+        .person.highlighted {
+            transform: scale(1.3);
+            box-shadow: 0 0 20px rgba(255,255,0,0.8);
+            animation: highlight 1s infinite;
+        }
+
+        @keyframes highlight {
+            0%, 100% { box-shadow: 0 0 20px rgba(255,255,0,0.8); }
+            50% { box-shadow: 0 0 30px rgba(255,255,0,1); }
+        }
+
+        .person-number {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9em;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .reset-button {
+            display: block;
+            margin: 30px auto;
+            padding: 15px 40px;
+            font-size: 1.3em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: transform 0.3s;
+        }
+
+        .reset-button:hover {
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 768px) {
+            .concept-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .options-container {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .section-title {
+                font-size: 1.4em;
+            }
+
+            .apple {
+                width: 60px;
+                height: 60px;
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🍎 基数与序数互动游戏 🍎</h1>
+
+        <!-- 概念展示区域 -->
+        <div class="concept-section">
+            <!-- 基数部分 -->
+            <div class="cardinal-section">
+                <div class="section-title">基数 (Cardinal Numbers)</div>
+                <div class="section-description">表示数量 - "有多少个"</div>
+                <div class="apples-container" id="cardinalApples">
+                    <div class="apple apple-cardinal" data-index="0">🍎</div>
+                    <div class="apple apple-cardinal" data-index="1">🍎</div>
+                    <div class="apple apple-cardinal" data-index="2">🍎</div>
+                    <div class="apple apple-cardinal" data-index="3">🍎</div>
+                    <div class="apple apple-cardinal" data-index="4">🍎</div>
+                </div>
+                <div class="example-text" id="cardinalText">共有 <span id="cardinalCount">5</span> 个苹果</div>
+            </div>
+
+            <!-- 序数部分 -->
+            <div class="ordinal-section">
+                <div class="section-title">序数 (Ordinal Numbers)</div>
+                <div class="section-description">表示位置 - "第几个"</div>
+                <div class="apples-container" id="ordinalApples">
+                    <div class="apple apple-ordinal" data-index="0" data-position="1">🍎</div>
+                    <div class="apple apple-ordinal" data-index="1" data-position="2">🍎</div>
+                    <div class="apple apple-ordinal" data-index="2" data-position="3">🍎</div>
+                    <div class="apple apple-ordinal" data-index="3" data-position="4">🍎</div>
+                    <div class="apple apple-ordinal" data-index="4" data-position="5">🍎</div>
+                </div>
+                <div class="example-text" id="ordinalText">点击苹果查看位置</div>
+            </div>
+        </div>
+
+        <!-- 练习区域 -->
+        <div class="practice-section">
+            <div class="practice-title">📝 练习时间</div>
+            <div class="question-container">
+                <div class="question-text" id="questionText">问题将显示在这里</div>
+                <div class="options-container" id="optionsContainer">
+                    <!-- 选项将通过JavaScript动态生成 -->
+                </div>
+                <div class="feedback" id="feedback"></div>
+                <div class="explanation" id="explanation"></div>
+            </div>
+        </div>
+
+        <!-- 容易错点 -->
+        <div class="tricky-question">
+            <div class="tricky-title">⚠️ 容易错点</div>
+            <div class="tricky-note">问：小明排第5，他前面有几个人？</div>
+            <div class="people-line" id="peopleLine">
+                <div class="person" data-position="1">👤</div>
+                <div class="person" data-position="2">👤</div>
+                <div class="person" data-position="3">👤</div>
+                <div class="person" data-position="4">👤</div>
+                <div class="person highlighted" data-position="5" id="targetPerson">👤</div>
+            </div>
+            <div class="question-container">
+                <div class="question-text">小明排第5，他前面有几个人？</div>
+                <div class="options-container">
+                    <button class="option-button" onclick="checkTrickyAnswer(5)">5个人</button>
+                    <button class="option-button" onclick="checkTrickyAnswer(4)">4个人</button>
+                    <button class="option-button" onclick="checkTrickyAnswer(3)">3个人</button>
+                    <button class="option-button" onclick="checkTrickyAnswer(0)">0个人</button>
+                </div>
+                <div class="feedback" id="trickyFeedback"></div>
+                <div class="explanation" id="trickyExplanation">
+                    <strong>解析：</strong>小明排第5，说明他前面有第1、第2、第3、第4个人，所以前面有4个人。
+                    注意区分：排第5（序数）和前面有5个人（基数）是不同的概念！
+                </div>
+            </div>
+        </div>
+
+        <button class="reset-button" onclick="resetGame()">🔄 重新开始</button>
+    </div>
+
+    <script>
+        let currentQuestion = 0;
+        let selectedOrdinalApple = null;
+
+        // 问题库
+        const questions = [
+            {
+                question: "桌子上有3个苹果，这里的'3'是什么数？",
+                options: ["基数", "序数", "分数", "小数"],
+                correct: 0,
+                explanation: "这里的'3'表示数量，所以是基数。"
+            },
+            {
+                question: "小红在比赛中获得第2名，这里的'2'是什么数？",
+                options: ["基数", "序数", "分数", "小数"],
+                correct: 1,
+                explanation: "这里的'2'表示位置（第2名），所以是序数。"
+            },
+            {
+                question: "教室里有25个学生，这里的'25'是什么数？",
+                options: ["基数", "序数", "分数", "小数"],
+                correct: 0,
+                explanation: "这里的'25'表示数量，所以是基数。"
+            },
+            {
+                question: "这是第10个问题，这里的'10'是什么数？",
+                options: ["基数", "序数", "分数", "小数"],
+                correct: 1,
+                explanation: "这里的'10'表示位置（第10个），所以是序数。"
+            },
+            {
+                question: "篮子里有8个鸡蛋，这里的'8'是什么数？",
+                options: ["基数", "序数", "分数", "小数"],
+                correct: 0,
+                explanation: "这里的'8'表示数量，所以是基数。"
+            }
+        ];
+
+        // 初始化基数苹果
+        function initCardinalApples() {
+            const apples = document.querySelectorAll('.apple-cardinal');
+            apples.forEach((apple, index) => {
+                apple.addEventListener('click', () => {
+                    apples.forEach(a => a.classList.remove('selected'));
+                    apple.classList.add('selected');
+                    updateCardinalText(index + 1);
+                });
+            });
+        }
+
+        // 更新基数文本
+        function updateCardinalText(count) {
+            document.getElementById('cardinalCount').textContent = count;
+        }
+
+        // 初始化序数苹果
+        function initOrdinalApples() {
+            const apples = document.querySelectorAll('.apple-ordinal');
+            apples.forEach((apple) => {
+                apple.addEventListener('click', () => {
+                    apples.forEach(a => {
+                        a.classList.remove('selected');
+                        const label = a.querySelector('.apple-label');
+                        if (label) label.remove();
+                    });
+                    
+                    apple.classList.add('selected');
+                    const position = apple.getAttribute('data-position');
+                    selectedOrdinalApple = position;
+                    
+                    // 添加标签
+                    const label = document.createElement('div');
+                    label.className = 'apple-label';
+                    label.textContent = `第${position}个`;
+                    apple.appendChild(label);
+                    
+                    updateOrdinalText(position);
+                });
+            });
+        }
+
+        // 更新序数文本
+        function updateOrdinalText(position) {
+            document.getElementById('ordinalText').textContent = `这是第${position}个苹果`;
+        }
+
+        // 显示问题
+        function showQuestion() {
+            if (currentQuestion >= questions.length) {
+                currentQuestion = 0;
+            }
+            
+            const q = questions[currentQuestion];
+            document.getElementById('questionText').textContent = q.question;
+            
+            const optionsContainer = document.getElementById('optionsContainer');
+            optionsContainer.innerHTML = '';
+            
+            q.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.className = 'option-button';
+                button.textContent = option;
+                button.onclick = () => checkAnswer(index);
+                optionsContainer.appendChild(button);
+            });
+            
+            // 清除之前的反馈
+            document.getElementById('feedback').className = 'feedback';
+            document.getElementById('explanation').className = 'explanation';
+        }
+
+        // 检查答案
+        function checkAnswer(selectedIndex) {
+            const q = questions[currentQuestion];
+            const buttons = document.querySelectorAll('#optionsContainer .option-button');
+            const feedback = document.getElementById('feedback');
+            const explanation = document.getElementById('explanation');
+            
+            // 禁用所有按钮
+            buttons.forEach(btn => {
+                btn.style.pointerEvents = 'none';
+                if (parseInt(btn.textContent) === q.correct || btn.textContent === q.options[q.correct]) {
+                    btn.classList.add('correct');
+                } else if (buttons.indexOf(btn) === selectedIndex) {
+                    btn.classList.add('incorrect');
+                }
+            });
+            
+            if (selectedIndex === q.correct) {
+                feedback.textContent = '✅ 答对了！';
+                feedback.className = 'feedback correct';
+            } else {
+                feedback.textContent = '❌ 答错了，再想想！';
+                feedback.className = 'feedback incorrect';
+            }
+            
+            explanation.textContent = q.explanation;
+            explanation.classList.add('show');
+            
+            // 2秒后显示下一题
+            setTimeout(() => {
+                currentQuestion++;
+                showQuestion();
+                buttons.forEach(btn => {
+                    btn.style.pointerEvents = 'auto';
+                    btn.classList.remove('correct', 'incorrect');
+                });
+            }, 3000);
+        }
+
+        // 检查容易错点的答案
+        function checkTrickyAnswer(answer) {
+            const buttons = document.querySelectorAll('.tricky-question .option-button');
+            const feedback = document.getElementById('trickyFeedback');
+            const explanation = document.getElementById('trickyExplanation');
+            const correctAnswer = 4;
+            
+            buttons.forEach(btn => {
+                btn.style.pointerEvents = 'none';
+                const btnValue = parseInt(btn.textContent);
+                if (btnValue === correctAnswer) {
+                    btn.classList.add('correct');
+                } else if (btnValue === answer) {
+                    btn.classList.add('incorrect');
+                }
+            });
+            
+            if (answer === correctAnswer) {
+                feedback.textContent = '✅ 答对了！小明排第5，前面有4个人（第1、2、3、4个）。';
+                feedback.className = 'feedback correct';
+            } else {
+                feedback.textContent = '❌ 答错了！记住：排第5（序数）意味着前面有4个人（基数）。';
+                feedback.className = 'feedback incorrect';
+            }
+            
+            explanation.classList.add('show');
+        }
+
+        // 重置游戏
+        function resetGame() {
+            currentQuestion = 0;
+            selectedOrdinalApple = null;
+            
+            // 清除基数选择
+            document.querySelectorAll('.apple-cardinal').forEach(apple => {
+                apple.classList.remove('selected');
+            });
+            updateCardinalText(5);
+            
+            // 清除序数选择
+            document.querySelectorAll('.apple-ordinal').forEach(apple => {
+                apple.classList.remove('selected');
+                const label = apple.querySelector('.apple-label');
+                if (label) label.remove();
+            });
+            document.getElementById('ordinalText').textContent = '点击苹果查看位置';
+            
+            // 重置练习
+            showQuestion();
+            
+            // 重置容易错点
+            const trickyButtons = document.querySelectorAll('.tricky-question .option-button');
+            trickyButtons.forEach(btn => {
+                btn.style.pointerEvents = 'auto';
+                btn.classList.remove('correct', 'incorrect');
+            });
+            document.getElementById('trickyFeedback').className = 'feedback';
+            document.getElementById('trickyExplanation').classList.remove('show');
+        }
+
+        // 初始化
+        window.addEventListener('load', () => {
+            initCardinalApples();
+            initOrdinalApples();
+            showQuestion();
+        });
+    </script>
+</body>
+</html>

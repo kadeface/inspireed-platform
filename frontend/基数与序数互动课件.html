@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基数与序数的奥秘 - 互动教学课件</title>
+    <style>
+        :root {
+            --cardinal-blue: #2196F3;
+            --ordinal-red: #F44336;
+            --quiz-gold: #FFC107;
+            --bg-color: #f0f0f0;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: background-color 0.5s ease;
+            background-color: var(--bg-color);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* 模式切换样式 */
+        body.mode-cardinal { background-color: #e3f2fd; }
+        body.mode-ordinal { background-color: #ffebee; }
+
+        #header {
+            text-align: center;
+            padding: 20px;
+            width: 100%;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .controls {
+            margin: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 25px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-weight: bold;
+        }
+
+        button:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15); 
+        }
+
+        .btn-blue { background-color: var(--cardinal-blue); color: white; }
+        .btn-red { background-color: var(--ordinal-red); color: white; }
+        .btn-rand { background-color: #4caf50; color: white; }
+        .btn-quiz { background-color: var(--quiz-gold); color: #333; }
+
+        /* 挑战区域样式 */
+        #quiz-area {
+            background: white;
+            border: 3px solid var(--quiz-gold);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 10px;
+            width: 90%;
+            max-width: 800px;
+            display: none; /* 默认隐藏 */
+            text-align: center;
+        }
+
+        .quiz-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        select {
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 2px solid #ddd;
+            min-width: 80px;
+        }
+
+        #result-msg {
+            font-weight: bold;
+            margin-top: 15px;
+            font-size: 18px;
+        }
+
+        /* 舞台区 */
+        #stage {
+            position: relative;
+            width: 90%;
+            max-width: 1000px;
+            min-height: 400px;
+            padding: 40px;
+            margin: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 15px;
+            border-radius: 20px;
+            transition: all 0.5s;
+        }
+
+        /* 基数模式下的圈圈 */
+        .mode-cardinal #stage {
+            border: 5px dashed var(--cardinal-blue);
+            background: rgba(33, 150, 243, 0.05);
+        }
+
+        .apple {
+            font-size: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.2s;
+            padding: 5px;
+            border-radius: 8px;
+        }
+
+        .apple:hover { transform: scale(1.2); }
+
+        /* 序数模式下的领奖台 */
+        .podium {
+            display: none;
+            width: 40px;
+            height: 20px;
+            background: #d32f2f;
+            color: white;
+            font-size: 12px;
+            text-align: center;
+            line-height: 20px;
+            border-radius: 3px;
+            margin-top: 5px;
+        }
+
+        .mode-ordinal .podium { display: block; }
+
+        /* 重点跳动的苹果（挑战模式） */
+        .active-apple {
+            background: rgba(255, 193, 7, 0.3);
+            box-shadow: 0 0 20px var(--quiz-gold);
+            animation: jumping 0.6s infinite alternate;
+            z-index: 10;
+            border-radius: 12px;
+        }
+
+        @keyframes jumping {
+            from { transform: translateY(0) scale(1); }
+            to { transform: translateY(-15px) scale(1.1); }
+        }
+
+        /* 气泡提示 */
+        #msg-box {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 20px 40px;
+            border-radius: 50px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 100;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+        }
+
+        .info-panel {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            margin: 10px;
+            max-width: 800px;
+            line-height: 1.6;
+            border-left: 10px solid #ccc;
+        }
+
+        .mode-cardinal .info-panel { border-color: var(--cardinal-blue); }
+        .mode-ordinal .info-panel { border-color: var(--ordinal-red); }
+
+        .error-tip {
+            color: #e67e22;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        /* 动画 */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        .bounce { animation: bounce 0.5s ease; }
+    </style>
+</head>
+<body class="mode-cardinal">
+
+<div id="header">
+    <h1>🍎 基数与序数的数学实验室</h1>
+    <div class="controls">
+        <button class="btn-rand" onclick="randomize()">随机生长苹果 (0-100)</button>
+        <button class="btn-blue" onclick="switchMode('cardinal')">蓝色：基数模式</button>
+        <button class="btn-red" onclick="switchMode('ordinal')">红色：序数模式</button>
+        <button class="btn-quiz" onclick="startQuiz()">💡 进入逻辑挑战</button>
+    </div>
+</div>
+
+<div class="info-panel" id="definition">
+    <div id="def-text"><b>数学家用基数表示数量：</b>它告诉我们一共有多少个物体。</div>
+    <div class="error-tip" id="error-tip">💡 易错点：如果排在第5位，说明前面有 5-1=4 个苹果！</div>
+</div>
+
+<!-- 逻辑挑战区域 -->
+<div id="quiz-area">
+    <h2 style="margin:0">逻辑挑战：前面与后面</h2>
+    <p id="quiz-desc">一共有 <span id="q-total" style="color:blue">?</span> 个苹果，正在跳动的是第 <span id="q-index" style="color:red">?</span> 个。</p>
+    
+    <div class="quiz-inputs">
+        <div>
+            它前面有几个？
+            <select id="select-front"></select>
+        </div>
+        <div>
+            它后面有几个？
+            <select id="select-behind"></select>
+        </div>
+    </div>
+    
+    <button class="btn-quiz" style="margin-top:15px" onclick="checkAnswer()">提交答案</button>
+    <div id="result-msg"></div>
+</div>
+
+<div id="stage">
+    <!-- 苹果将在这里生成 -->
+</div>
+
+<div id="msg-box"></div>
+
+<script>
+    let currentMode = 'cardinal';
+    let appleCount = 5;
+    let quizIndex = -1; // 当前挑战的苹果索引
+    const appleEmojis = ['🍎', '🍏', '🍎', '🍎', '🍏', '🍒', '🍓', '🍅'];
+
+    function randomize() {
+        appleCount = Math.floor(Math.random() * 101);
+        quizIndex = -1;
+        document.getElementById('quiz-area').style.display = 'none';
+        // 清除所有活跃状态
+        document.querySelectorAll('.apple').forEach(a => a.classList.remove('active-apple'));
+        render();
+        hideMsg();
+    }
+
+    function switchMode(mode) {
+        currentMode = mode;
+        document.body.className = 'mode-' + mode;
+        const defText = document.getElementById('def-text');
+        
+        if(mode === 'cardinal') {
+            defText.innerHTML = `<b>数学家用基数表示数量：</b>它告诉我们共有多少个苹果。此时我们关注的是"总量"。`;
+            showMsg(`共有 ${appleCount} 个苹果`, 'var(--cardinal-blue)');
+        } else {
+            defText.innerHTML = `<b>数学家用序数表示序号：</b>它告诉我们苹果排在第几位。此时我们关注的是"位置"。`;
+            hideMsg();
+        }
+    }
+
+    function render() {
+        const stage = document.getElementById('stage');
+        stage.innerHTML = '';
+        
+        for (let i = 1; i <= appleCount; i++) {
+            const div = document.createElement('div');
+            div.className = 'apple';
+            div.id = 'apple-' + i;
+            const emoji = appleEmojis[Math.floor(Math.random() * appleEmojis.length)];
+            
+            div.innerHTML = `
+                <span>${emoji}</span>
+                <div class="podium">第${i}</div>
+            `;
+            
+            div.onclick = (e) => handleAppleClick(i, div);
+            stage.appendChild(div);
+        }
+
+        if(currentMode === 'cardinal') {
+            showMsg(`这里共有 ${appleCount} 个苹果`, 'var(--cardinal-blue)');
+        }
+    }
+
+    function handleAppleClick(index, element) {
+        // 如果正在挑战模式，点击苹果不触发普通交互
+        if (quizIndex !== -1) {
+            return;
+        }
+
+        // 添加跳跃动画
+        element.classList.add('bounce');
+        setTimeout(() => element.classList.remove('bounce'), 500);
+
+        if (currentMode === 'cardinal') {
+            showMsg(`这是总数中的 1 个，当前共 ${appleCount} 个`, 'var(--cardinal-blue)');
+        } else {
+            showMsg(`我是第 ${index} 个苹果！`, 'var(--ordinal-red)');
+            // 易错点逻辑：
+            const tip = document.getElementById('error-tip');
+            if(index > 0) {
+                tip.innerHTML = `💡 思考：第 ${index} 个苹果前面有 ${index - 1} 个苹果。`;
+            }
+        }
+    }
+
+    function startQuiz() {
+        if (appleCount === 0) {
+            alert("没有苹果可以挑战，请先随机生长！");
+            return;
+        }
+        
+        // 1. 选中随机苹果
+        quizIndex = Math.floor(Math.random() * appleCount) + 1;
+        
+        // 2. 更新UI
+        document.querySelectorAll('.apple').forEach(a => a.classList.remove('active-apple'));
+        const activeApple = document.getElementById('apple-' + quizIndex);
+        if (activeApple) {
+            activeApple.classList.add('active-apple');
+            activeApple.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+
+        // 3. 显示挑战面板
+        document.getElementById('quiz-area').style.display = 'block';
+        document.getElementById('q-total').innerText = appleCount;
+        document.getElementById('q-index').innerText = quizIndex;
+        document.getElementById('result-msg').innerText = '';
+
+        // 4. 初始化下拉框 (0 到 appleCount)
+        fillSelect('select-front');
+        fillSelect('select-behind');
+        
+        switchMode('ordinal'); // 自动切到红色模式方便计数
+    }
+
+    function fillSelect(id) {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '<option value="">请选择</option>';
+        for (let i = 0; i <= appleCount; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.innerText = i;
+            sel.appendChild(opt);
+        }
+    }
+
+    function checkAnswer() {
+        const ansFront = parseInt(document.getElementById('select-front').value);
+        const ansBehind = parseInt(document.getElementById('select-behind').value);
+
+        if (isNaN(ansFront) || isNaN(ansBehind)) {
+            alert("请先选择两个问题的答案！");
+            return;
+        }
+
+        const correctFront = quizIndex - 1;
+        const correctBehind = appleCount - quizIndex;
+
+        const msgBox = document.getElementById('result-msg');
+        if (ansFront === correctFront && ansBehind === correctBehind) {
+            msgBox.innerHTML = `<span style="color:green">太棒了！答对了！🎉<br>
+                公式：前面 (${quizIndex}-1) = ${correctFront} 个；
+                后面 (${appleCount}-${quizIndex}) = ${correctBehind} 个。</span>`;
+            // 答对后清除挑战状态，允许正常交互
+            setTimeout(() => {
+                quizIndex = -1;
+                document.querySelectorAll('.apple').forEach(a => a.classList.remove('active-apple'));
+            }, 2000);
+        } else {
+            msgBox.innerHTML = `<span style="color:red">再数数看？❌<br>
+                提示：第 ${quizIndex} 个苹果前面的人数就是它的序号减1。</span>`;
+        }
+    }
+
+    function showMsg(text, color) {
+        const box = document.getElementById('msg-box');
+        box.innerText = text;
+        box.style.backgroundColor = color;
+        box.style.color = 'white';
+        box.style.display = 'block';
+    }
+
+    function hideMsg() {
+        document.getElementById('msg-box').style.display = 'none';
+    }
+
+    // 初始化显示5个
+    render();
+</script>
+
+</body>
+</html>
