@@ -49,12 +49,13 @@ def upgrade() -> None:
         sa.Column("project_type", sa.String(50), nullable=True),
         sa.Column(
             "status",
-            sa.Enum(
+            postgresql.ENUM(
                 "draft",
                 "in_progress",
                 "completed",
                 "submitted",
                 name="projectstatus",
+                create_type=False,  # 枚举类型已在上方手动创建
             ),
             nullable=False,
             server_default="draft",
@@ -138,19 +139,20 @@ def upgrade() -> None:
         sa.Column("project_id", sa.Integer(), nullable=False),
         sa.Column(
             "stage",
-            sa.Enum(
+            postgresql.ENUM(
                 "engage",
                 "explore",
                 "explain",
                 "elaborate",
                 "evaluate",
                 name="projectstage",
+                create_type=False,  # 枚举类型已在上方手动创建
             ),
             nullable=False,
         ),
         sa.Column(
             "cell_type",
-            sa.Enum(
+            postgresql.ENUM(
                 "TEXT",
                 "VIDEO",
                 "CODE",
@@ -163,6 +165,7 @@ def upgrade() -> None:
                 "FLOWCHART",
                 "BROWSER",
                 name="celltype",
+                create_type=False,  # celltype枚举类型已在迁移005中创建
             ),
             nullable=False,
         ),
