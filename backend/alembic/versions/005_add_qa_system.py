@@ -9,6 +9,7 @@ Create Date: 2025-10-24 12:00:00.000000
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision = "005_add_qa_system"
@@ -18,6 +19,72 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Check if cells table exists, create it if not
+    # This is needed for fresh database deployments where init_db() hasn't been run
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    
+    if 'cells' not in inspector.get_table_names():
+        # Create cells table with basic structure
+        # Note: cognitive_level, prerequisite_cells, mastery_criteria will be added by migration 006
+        op.execute("""
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'celltype') THEN
+                    CREATE TYPE celltype AS ENUM (
+                        'TEXT', 'VIDEO', 'CODE', 'SIM', 'QA', 'CHART', 
+                        'CONTEST', 'PARAM', 'ACTIVITY', 'FLOWCHART', 'BROWSER'
+                    );
+                END IF;
+            END $$;
+        """)
+        
+        op.create_table(
+            "cells",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("lesson_id", sa.Integer(), nullable=False),
+            sa.Column(
+                "cell_type",
+                postgresql.ENUM(
+                    "TEXT", "VIDEO", "CODE", "SIM", "QA", "CHART",
+                    "CONTEST", "PARAM", "ACTIVITY", "FLOWCHART", "BROWSER",
+                    name="celltype",
+                    create_type=False,
+                ),
+                nullable=False,
+            ),
+            sa.Column("title", sa.String(length=200), nullable=True),
+            sa.Column("content", sa.JSON(), nullable=False, server_default="{}"),
+            sa.Column("config", sa.JSON(), nullable=True),
+            sa.Column("order", sa.Integer(), nullable=False, server_default="0"),
+            sa.Column("editable", sa.Boolean(), nullable=False, server_default="false"),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
+            sa.PrimaryKeyConstraint("id"),
+        )
+        op.create_index(op.f("ix_cells_id"), "cells", ["id"], unique=False)
+        
+        # Add foreign key to lessons table
+        if 'lessons' in inspector.get_table_names():
+            op.create_foreign_key(
+                "fk_cells_lesson_id",
+                "cells",
+                "lessons",
+                ["lesson_id"],
+                ["id"],
+                ondelete="CASCADE",
+            )
+    
     # 创建问题表
     op.create_table(
         "questions",
