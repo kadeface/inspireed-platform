@@ -1,0 +1,98 @@
+# Cloud Studio Preview 配置
+# 点击运行后会调用该文件配置自动运行应用
+
+autoOpen: false # 打开应用时是否自动开启所有下方apps的预览
+
+apps: # 支持配置多个应用
+  # 后端 API 服务
+  - port: 8000 # 后端应用端口
+    run: |
+      # 检查并启动 Docker 服务
+      if ! docker info > /dev/null 2>&1; then
+        echo "❌ Docker 未运行，请先启动 Docker"
+        exit 1
+      fi
+      
+      # 启动基础服务（如果未运行）
+      cd docker && docker-compose up -d && cd ..
+      
+      # 等待服务启动
+      sleep 5
+      
+      # 进入后端目录
+      cd backend
+      
+      # 检查并创建虚拟环境
+      if [ ! -d "venv" ]; then
+        echo "📦 创建 Python 虚拟环境..."
+        python3 -m venv venv
+      fi
+      
+      # 激活虚拟环境
+      source venv/bin/activate
+      
+      # 安装依赖（如果需要）
+      if [ ! -f ".installed" ]; then
+        echo "📥 安装后端依赖..."
+        pip install -r requirements.txt
+        touch .installed
+      fi
+      
+      # 创建环境配置（如果不存在）
+      if [ ! -f ".env" ]; then
+        cp env.example .env
+      fi
+      
+      # 运行数据库迁移
+      echo "🗄️ 运行数据库迁移..."
+      alembic upgrade head
+      
+      # 启动后端服务
+      echo "🚀 启动后端服务 (端口 8000)..."
+      uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    root: / # 应用的启动目录
+    name: backend-api # 应用名称
+    description: InspireEd 后端 API 服务 (FastAPI)，提供 RESTful API 和 Swagger 文档 # 应用描述
+    autoOpen: true # 打开应用时自动开启预览
+
+  # 前端 Web 应用
+  - port: 5173 # 前端应用端口
+    run: |
+      # 检查并启动 Docker 服务（确保后端已启动）
+      if ! docker info > /dev/null 2>&1; then
+        echo "❌ Docker 未运行，请先启动 Docker"
+        exit 1
+      fi
+      
+      # 启动基础服务（如果未运行）
+      cd docker && docker-compose up -d && cd ..
+      
+      # 等待服务启动
+      sleep 3
+      
+      # 进入前端目录
+      cd frontend
+      
+      # 安装依赖（如果需要）
+      if [ ! -d "node_modules" ]; then
+        echo "📥 安装前端依赖..."
+        pnpm install
+      fi
+      
+      # 创建环境配置（如果不存在）
+      if [ ! -f ".env.local" ]; then
+        cp env.example .env.local
+        # 设置后端 API 地址（Cloud Studio 会自动分配后端端口）
+        echo "VITE_API_BASE_URL=http://localhost:8000/api/v1" >> .env.local
+      fi
+      
+      # 启动前端服务
+      echo "🚀 启动前端服务 (端口 5173)..."
+      echo "📝 提示：前端 API 地址已配置为 http://localhost:8000/api/v1"
+      echo "   如果后端端口不同，请修改 frontend/.env.local 中的 VITE_API_BASE_URL"
+      pnpm dev --host 0.0.0.0
+    root: / # 应用的启动目录
+    name: frontend-app # 应用名称
+    description: InspireEd 前端 Web 应用 (Vue 3 + Vite)，用户界面 # 应用描述
+    autoOpen: false # 打开应用时是否自动开启预览
+
