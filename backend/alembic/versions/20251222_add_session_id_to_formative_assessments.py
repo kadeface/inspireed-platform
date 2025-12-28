@@ -1,6 +1,6 @@
 """add session_id to formative_assessments
 
-Revision ID: add_session_id_to_formative_assessments
+Revision ID: session_id_formative
 Revises: add_student_id_number_to_users
 Create Date: 2025-12-22 00:00:00.000000+00:00
 
@@ -13,7 +13,7 @@ from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
-revision: str = "add_session_id_to_formative_assessments"
+revision: str = "session_id_formative"
 down_revision: Union[str, None] = "add_student_id_number_to_users"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

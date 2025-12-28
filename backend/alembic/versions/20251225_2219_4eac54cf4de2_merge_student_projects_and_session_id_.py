@@ -1,7 +1,7 @@
 """merge student_projects and session_id_to_formative_assessments
 
 Revision ID: 4eac54cf4de2
-Revises: 20250122_add_student_projects, add_session_id_to_formative_assessments
+Revises: 20250122_add_student_projects, session_id_formative
 Create Date: 2025-12-25 22:19:19.065744+00:00
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '4eac54cf4de2'
-down_revision = ('20250122_add_student_projects', 'add_session_id_to_formative_assessments')
+down_revision = ('20250122_add_student_projects', 'session_id_formative')
 branch_labels = None
 depends_on = None
 
