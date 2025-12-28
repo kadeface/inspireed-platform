@@ -40,7 +40,7 @@ def upgrade():
         "cells",
         sa.Column(
             "cognitive_level",
-            sa.Enum(
+            postgresql.ENUM(
                 "remember",
                 "understand",
                 "apply",
@@ -48,6 +48,7 @@ def upgrade():
                 "evaluate",
                 "create",
                 name="cognitivelevel",
+                create_type=False,  # 枚举类型已在上方创建
             ),
             nullable=True,
             comment="认知层级（基于Bloom分类学）：remember/understand/apply/analyze/evaluate/create",

@@ -8,6 +8,7 @@ Create Date: 2025-11-07
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "009_add_subject_groups"
@@ -17,6 +18,22 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 创建枚举类型（如果不存在）
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE groupscope AS ENUM ('school', 'region', 'national');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE memberrole AS ENUM ('owner', 'admin', 'member');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    
     # 创建 subject_groups 表
     op.create_table(
         "subject_groups",
@@ -26,7 +43,7 @@ def upgrade() -> None:
         sa.Column("subject_id", sa.Integer(), nullable=False, comment="关联学科"),
         sa.Column(
             "scope",
-            sa.Enum("school", "region", "national", name="groupscope"),
+            postgresql.ENUM("school", "region", "national", name="groupscope", create_type=False),
             nullable=False,
             comment="教研组范围",
         ),
@@ -94,7 +111,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Integer(), nullable=False, comment="用户ID"),
         sa.Column(
             "role",
-            sa.Enum("owner", "admin", "member", name="memberrole"),
+            postgresql.ENUM("owner", "admin", "member", name="memberrole", create_type=False),
             nullable=False,
             server_default="member",
             comment="成员角色",

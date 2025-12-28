@@ -19,6 +19,29 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Create enum types for QA system (if not exist)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE asktype AS ENUM ('teacher', 'ai', 'both');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE questionstatus AS ENUM ('pending', 'answered', 'resolved', 'closed');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE answerertype AS ENUM ('teacher', 'ai');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    
     # Check if cells table exists, create it if not
     # This is needed for fresh database deployments where init_db() hasn't been run
     conn = op.get_bind()
@@ -95,11 +118,13 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=200), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column(
-            "ask_type", sa.Enum("teacher", "ai", "both", name="asktype"), nullable=False
+            "ask_type", 
+            postgresql.ENUM("teacher", "ai", "both", name="asktype", create_type=False),
+            nullable=False
         ),
         sa.Column(
             "status",
-            sa.Enum("pending", "answered", "resolved", "closed", name="questionstatus"),
+            postgresql.ENUM("pending", "answered", "resolved", "closed", name="questionstatus", create_type=False),
             nullable=False,
         ),
         sa.Column("is_public", sa.Boolean(), nullable=False, server_default="true"),
@@ -134,7 +159,7 @@ def upgrade() -> None:
         sa.Column("question_id", sa.Integer(), nullable=False),
         sa.Column(
             "answerer_type",
-            sa.Enum("teacher", "ai", name="answerertype"),
+            postgresql.ENUM("teacher", "ai", name="answerertype", create_type=False),
             nullable=False,
         ),
         sa.Column("answerer_id", sa.Integer(), nullable=True),

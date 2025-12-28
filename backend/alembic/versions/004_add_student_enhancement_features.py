@@ -23,6 +23,15 @@ depends_on = None
 
 def upgrade():
     """升级"""
+    # 创建难度等级枚举类型（如果不存在）
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE difficultylevel AS ENUM ('beginner', 'intermediate', 'advanced');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    
     # 创建收藏表
     op.create_table(
         "favorites",
@@ -76,7 +85,7 @@ def upgrade():
         sa.Column("creator_id", sa.Integer(), nullable=False, comment="创建者ID"),
         sa.Column(
             "difficulty_level",
-            sa.Enum("beginner", "intermediate", "advanced", name="difficultylevel"),
+            postgresql.ENUM("beginner", "intermediate", "advanced", name="difficultylevel", create_type=False),
             nullable=False,
             comment="难度等级",
         ),
@@ -128,7 +137,7 @@ def upgrade():
         "lessons",
         sa.Column(
             "difficulty_level",
-            sa.Enum("beginner", "intermediate", "advanced", name="difficultylevel"),
+            postgresql.ENUM("beginner", "intermediate", "advanced", name="difficultylevel", create_type=False),
             nullable=True,
             comment="难度等级",
         ),
