@@ -5,18 +5,18 @@ FROM node:18-alpine AS builder
 # 安装 pnpm
 RUN npm install -g pnpm
 
-# 设置工作目录为 frontend
+# 设置工作目录
 WORKDIR /app
 
-# 复制 frontend package.json
-COPY frontend/package.json ./
+# 复制 package.json
+COPY package.json ./
 
-# 安装依赖（不使用 workspace 模式，直接在 frontend 目录安装）
-# 注意：这里不使用 --frozen-lockfile，因为 lockfile 在根目录
+# 安装依赖（不使用 workspace 模式，直接在当前目录安装）
+# 注意：这里不使用 --frozen-lockfile，因为可能没有 lockfile
 RUN pnpm install
 
-# 复制 frontend 源代码
-COPY frontend/ ./
+# 复制源代码
+COPY . ./
 
 # 构建参数（API 地址）
 ARG VITE_API_BASE_URL=http://localhost:8000/api/v1
@@ -29,10 +29,10 @@ RUN pnpm build
 FROM nginx:alpine
 
 # 复制构建产物到 Nginx 目录
-COPY --from=builder /app/frontend/dist /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # 复制 Nginx 配置
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # 暴露端口
 EXPOSE 80
