@@ -115,8 +115,8 @@ services:
   # 前端 Vue 应用
   frontend:
     build:
-      context: ..  # 改为项目根目录，因为需要访问根目录的 pnpm-lock.yaml
-      dockerfile: frontend/Dockerfile
+      context: ../frontend  # 改回 frontend 目录，因为现在不使用 workspace 模式
+      dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
     container_name: inspireed-frontend

@@ -5,31 +5,24 @@ FROM node:18-alpine AS builder
 # 安装 pnpm
 RUN npm install -g pnpm
 
-# 设置工作目录
+# 设置工作目录为 frontend
 WORKDIR /app
 
-# 复制 pnpm workspace 配置和 lockfile
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-
-# 创建 shared 目录和最小 package.json（pnpm workspace 要求所有列出的包都存在）
-RUN mkdir -p shared && echo '{"name":"shared","version":"1.0.0","private":true}' > shared/package.json
-
 # 复制 frontend package.json
-COPY frontend/package.json ./frontend/
+COPY frontend/package.json ./
 
-# 安装依赖（使用 workspace）
-RUN pnpm install --frozen-lockfile
+# 安装依赖（不使用 workspace 模式，直接在 frontend 目录安装）
+# 注意：这里不使用 --frozen-lockfile，因为 lockfile 在根目录
+RUN pnpm install
 
 # 复制 frontend 源代码
-COPY frontend/ ./frontend/
+COPY frontend/ ./
 
 # 构建参数（API 地址）
 ARG VITE_API_BASE_URL=http://localhost:8000/api/v1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # 构建应用
-# 使用 pnpm --filter 并指定工作目录，或者直接进入 frontend 目录构建
-WORKDIR /app/frontend
 RUN pnpm build
 
 # 阶段2: 运行阶段 - 使用 Nginx 提供静态文件
