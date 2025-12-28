@@ -73,6 +73,9 @@ services:
     environment:
       # 数据库配置（Docker 网络中使用服务名，覆盖 backend/.env 中的 localhost）
       POSTGRES_SERVER: postgres  # Docker 网络中使用服务名
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: inspireed
       POSTGRES_PORT: 5432
       # Redis 配置（Docker 网络中使用服务名）
       REDIS_HOST: redis
