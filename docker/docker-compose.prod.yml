@@ -6,11 +6,11 @@ services:
     image: timescale/timescaledb:latest-pg16
     container_name: inspireed-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-inspireed}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres  # 硬编码密码，与 docker-compose.yml 保持一致
+      POSTGRES_DB: inspireed
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -26,9 +26,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: inspireed-redis
-    command: redis-server --requirepass ${REDIS_PASSWORD:-}
+    command: redis-server  # 不使用密码，与 docker-compose.yml 保持一致
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -46,11 +46,11 @@ services:
     container_name: inspireed-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin  # 硬编码密码，与 docker-compose.yml 保持一致
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "9000:9000"
+      - "9001:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -68,30 +68,20 @@ services:
       context: ../backend
       dockerfile: Dockerfile
     container_name: inspireed-backend
+    # backend/.env 通过 volume mount 挂载到容器中，应用会自动读取
+    # 但需要覆盖一些 Docker 网络相关的配置
     environment:
-      # 数据库配置
-      POSTGRES_SERVER: ${POSTGRES_SERVER:-postgres}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-inspireed}
+      # 数据库配置（Docker 网络中使用服务名，覆盖 backend/.env 中的 localhost）
+      POSTGRES_SERVER: postgres  # Docker 网络中使用服务名
       POSTGRES_PORT: 5432
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-inspireed}
-      
-      # Redis 配置
-      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
-      
-      # MinIO 配置
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-inspireed}
-      
-      # 应用配置
-      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
-      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-["http://localhost","http://localhost:80","http://localhost:5173"]}
-      ALLOW_LAN_ACCESS: ${ALLOW_LAN_ACCESS:-false}
+      # Redis 配置（Docker 网络中使用服务名）
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # MinIO 配置（Docker 网络中使用服务名）
+      MINIO_ENDPOINT: minio:9000
+      MINIO_SECURE: "false"
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "8000:8000"
     volumes:
       - ../backend:/app
       - backend_storage:/app/storage
