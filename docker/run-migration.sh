@@ -15,6 +15,13 @@ if ! docker ps | grep -q inspireed-backend; then
     exit 1
 fi
 
+echo "🔍 检查数据库连接配置..."
+echo "   数据库服务器:"
+docker exec inspireed-backend python -c "from app.core.config import settings; print(f'  POSTGRES_SERVER={settings.POSTGRES_SERVER}')" 2>&1 || echo "  ⚠️  无法读取配置"
+echo "   数据库 URI (隐藏密码):"
+docker exec inspireed-backend python -c "from app.core.config import settings; uri = str(settings.DATABASE_URI); print(f'  {uri.split(\"@\")[1] if \"@\" in uri else \"***\"}')" 2>&1 || echo "  ⚠️  无法读取 URI"
+echo ""
+
 echo "📊 检查当前数据库版本..."
 docker exec inspireed-backend alembic current 2>&1 || echo "⚠️  无法获取当前版本（可能是新数据库）"
 echo ""

@@ -49,8 +49,17 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     """Run migrations in 'online' mode with async engine."""
+    # 确保使用 settings.DATABASE_URI，而不是 alembic.ini 中的配置
+    # 这样可以正确使用 Docker 环境变量（如 POSTGRES_SERVER=postgres）
+    database_url = str(settings.DATABASE_URI)
+    print(f"🔗 Using database URL: {database_url.split('@')[1] if '@' in database_url else '***'}")
+    
+    # 创建配置字典，确保使用正确的数据库 URL
+    configuration = config.get_section(config.config_ini_section, {})
+    configuration["sqlalchemy.url"] = database_url
+    
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
