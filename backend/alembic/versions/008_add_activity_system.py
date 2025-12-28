@@ -61,12 +61,13 @@ def upgrade() -> None:
         sa.Column("auto_graded", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column(
             "status",
-            sa.Enum(
+            postgresql.ENUM(
                 "draft",
                 "submitted",
                 "graded",
                 "returned",
                 name="activitysubmissionstatus",
+                create_type=False,  # 枚举类型已在上方手动创建
             ),
             nullable=False,
             server_default="draft",
@@ -149,7 +150,13 @@ def upgrade() -> None:
         sa.Column("comment", sa.Text(), nullable=True),
         sa.Column(
             "status",
-            sa.Enum("pending", "in_progress", "completed", name="peerreviewstatus"),
+            postgresql.ENUM(
+                "pending",
+                "in_progress",
+                "completed",
+                name="peerreviewstatus",
+                create_type=False,  # 枚举类型已在上方手动创建
+            ),
             nullable=False,
             server_default="pending",
         ),
