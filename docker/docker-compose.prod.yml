@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL 数据库
   postgres:
@@ -139,5 +137,6 @@ volumes:
 
 networks:
   inspireed-network:
+    name: docker_inspireed-network
     driver: bridge
 

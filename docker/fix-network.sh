@@ -30,19 +30,24 @@ echo ""
 
 # 检查目标网络
 TARGET_NET="docker_inspireed-network"
-if [ -z "$(docker network ls | grep $TARGET_NET)" ]; then
-    echo "⚠️  目标网络不存在，将创建..."
-    docker network create $TARGET_NET 2>/dev/null || true
-fi
 
 # 2. 停止所有服务
 echo "🛑 停止所有服务..."
 docker-compose -f docker-compose.prod.yml down
 echo ""
 
-# 3. 确保网络存在
-echo "🌐 确保网络存在..."
-docker network create docker_inspireed-network 2>/dev/null || echo "   网络已存在"
+# 3. 清理现有网络（如果存在且为空）
+echo "🌐 清理现有网络..."
+if docker network inspect $TARGET_NET >/dev/null 2>&1; then
+    # 检查网络是否被使用
+    CONTAINERS=$(docker network inspect $TARGET_NET --format='{{len .Containers}}' 2>/dev/null || echo "0")
+    if [ "$CONTAINERS" = "0" ]; then
+        echo "   删除空网络: $TARGET_NET"
+        docker network rm $TARGET_NET 2>/dev/null || echo "   无法删除网络（可能正在使用）"
+    else
+        echo "   网络正在被 $CONTAINERS 个容器使用，跳过删除"
+    fi
+fi
 echo ""
 
 # 4. 重新启动所有服务
