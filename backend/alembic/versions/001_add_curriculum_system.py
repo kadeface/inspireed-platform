@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 from datetime import datetime
 
 
@@ -76,6 +77,7 @@ def upgrade() -> None:
     op.create_index(op.f("ix_grades_id"), "grades", ["id"], unique=False)
 
     # Create courses table
+    # Note: created_by foreign key will be added separately if users table exists
     op.create_table(
         "courses",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -107,14 +109,22 @@ def upgrade() -> None:
             ["grade_id"],
             ["grades.id"],
         ),
-        sa.ForeignKeyConstraint(
-            ["created_by"],
-            ["users.id"],
-        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("subject_id", "grade_id", name="uix_subject_grade"),
     )
     op.create_index(op.f("ix_courses_id"), "courses", ["id"], unique=False)
+    
+    # Add created_by foreign key if users table exists
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    if 'users' in inspector.get_table_names():
+        op.create_foreign_key(
+            "fk_courses_created_by",
+            "courses",
+            "users",
+            ["created_by"],
+            ["id"],
+        )
 
     # Seed subjects data
     op.execute(
@@ -153,24 +163,44 @@ def upgrade() -> None:
     )
 
     # Add course_id column to lessons table (nullable initially for existing data)
-    op.add_column("lessons", sa.Column("course_id", sa.Integer(), nullable=True))
-    op.create_index(
-        op.f("ix_lessons_course_id"), "lessons", ["course_id"], unique=False
-    )
-    op.create_foreign_key(
-        "fk_lessons_course_id", "lessons", "courses", ["course_id"], ["id"]
-    )
+    # Check if lessons table exists first
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    if 'lessons' in inspector.get_table_names():
+        op.add_column("lessons", sa.Column("course_id", sa.Integer(), nullable=True))
+        op.create_index(
+            op.f("ix_lessons_course_id"), "lessons", ["course_id"], unique=False
+        )
+        op.create_foreign_key(
+            "fk_lessons_course_id", "lessons", "courses", ["course_id"], ["id"]
+        )
 
 
 def downgrade() -> None:
     """Remove curriculum tables and course_id from lessons"""
 
-    # Remove course_id from lessons
-    op.drop_constraint("fk_lessons_course_id", "lessons", type_="foreignkey")
-    op.drop_index(op.f("ix_lessons_course_id"), table_name="lessons")
-    op.drop_column("lessons", "course_id")
+    # Remove course_id from lessons (if exists)
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    if 'lessons' in inspector.get_table_names():
+        try:
+            op.drop_constraint("fk_lessons_course_id", "lessons", type_="foreignkey")
+        except:
+            pass
+        try:
+            op.drop_index(op.f("ix_lessons_course_id"), table_name="lessons")
+        except:
+            pass
+        try:
+            op.drop_column("lessons", "course_id")
+        except:
+            pass
 
     # Drop courses table
+    try:
+        op.drop_constraint("fk_courses_created_by", "courses", type_="foreignkey")
+    except:
+        pass
     op.drop_index(op.f("ix_courses_id"), table_name="courses")
     op.drop_table("courses")
 
