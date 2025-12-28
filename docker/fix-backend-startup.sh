@@ -54,6 +54,21 @@ echo "   - 数据库连接和初始化"
 echo "   - 健康检查通过"
 echo ""
 
+# 5.5. 运行数据库迁移（如果需要）
+echo "🔄 检查是否需要运行数据库迁移..."
+if docker exec inspireed-backend alembic current >/dev/null 2>&1; then
+    echo "   检测到 Alembic 迁移系统，运行数据库迁移..."
+    if docker exec inspireed-backend alembic upgrade head; then
+        echo "✅ 数据库迁移完成"
+    else
+        echo "⚠️  数据库迁移失败，但继续启动流程"
+        echo "   可以稍后手动运行：docker exec inspireed-backend alembic upgrade head"
+    fi
+else
+    echo "   未检测到迁移系统，跳过迁移步骤"
+fi
+echo ""
+
 for i in {1..12}; do
     sleep 5
     STATUS=$(docker inspect inspireed-backend --format='{{.State.Health.Status}}' 2>/dev/null || echo "starting")

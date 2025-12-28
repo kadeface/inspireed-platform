@@ -181,12 +181,28 @@ docker-compose -f docker-compose.prod.yml ps
 
 ### 步骤 5：运行数据库迁移
 
+**重要**：数据库迁移是必需的，用于创建和更新数据库表结构。
+
 ```bash
+# 方法 1：使用迁移脚本（推荐）
+cd docker
+./run-migration.sh
+
+# 方法 2：手动运行迁移
 # 等待后端服务完全启动
 sleep 20
 
 # 运行数据库迁移
 docker exec inspireed-backend alembic upgrade head
+```
+
+**验证迁移**：
+```bash
+# 查看当前数据库版本
+docker exec inspireed-backend alembic current
+
+# 查看迁移历史
+docker exec inspireed-backend alembic history
 ```
 
 ### 步骤 6：查看服务日志
