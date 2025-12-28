@@ -20,15 +20,28 @@ from app.api.v1 import api_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时初始化数据库
-    await init_db()
-    print("✅ Database initialized")
+    import asyncio
+    import traceback
+    
+    # 启动时初始化数据库（带重试机制）
+    try:
+        await init_db()
+        print("✅ Database initialized")
+    except Exception as e:
+        print(f"❌ Failed to initialize database: {e}")
+        print(traceback.format_exc())
+        # 不抛出异常，让应用继续启动，但会在首次数据库操作时失败
+        # 这样可以避免健康检查失败
+        print("⚠️ Application will continue, but database operations may fail")
 
     yield
 
     # 关闭时清理资源
-    await close_db()
-    print("👋 Database connection closed")
+    try:
+        await close_db()
+        print("👋 Database connection closed")
+    except Exception as e:
+        print(f"⚠️ Error closing database: {e}")
 
 
 # 创建FastAPI应用

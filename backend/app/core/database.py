@@ -49,9 +49,26 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """
     初始化数据库（创建所有表）
+    增加重试机制，防止数据库连接失败导致应用无法启动
     """
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    import asyncio
+    max_retries = 5
+    retry_delay = 5
+    
+    for attempt in range(max_retries):
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            print(f"✅ Database initialized successfully")
+            return
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"⚠️ Database initialization failed (attempt {attempt + 1}/{max_retries}): {e}")
+                print(f"⏳ Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            else:
+                print(f"❌ Database initialization failed after {max_retries} attempts: {e}")
+                raise
 
 
 async def close_db() -> None:

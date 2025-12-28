@@ -418,7 +418,60 @@ docker exec -it inspireed-postgres psql -U postgres -c "SELECT version();"
    docker exec inspireed-frontend wget -O- http://backend:8000/health
    ```
 
-### 问题 7：磁盘空间不足
+### 问题 7：后端容器无法启动（unhealthy）
+
+如果后端容器状态为 `unhealthy` 或无法启动，请按以下步骤排查：
+
+**快速诊断**：
+```bash
+# 运行诊断脚本
+cd docker
+./diagnose-backend.sh
+```
+
+**手动排查步骤**：
+
+1. **查看后端日志**：
+   ```bash
+   docker logs inspireed-backend --tail 100
+   ```
+
+2. **检查依赖服务**：
+   ```bash
+   docker-compose -f docker-compose.prod.yml ps
+   ```
+   确保 PostgreSQL、Redis、MinIO 都是 `Healthy` 状态
+
+3. **检查环境变量**：
+   ```bash
+   docker exec inspireed-backend env | grep -E "POSTGRES|REDIS|MINIO"
+   ```
+   应该看到：
+   - `POSTGRES_SERVER=postgres`（不是 localhost）
+   - `REDIS_HOST=redis`（不是 localhost）
+   - `MINIO_ENDPOINT=minio:9000`
+
+4. **测试健康端点**：
+   ```bash
+   docker exec inspireed-backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"
+   ```
+
+5. **重启服务**：
+   ```bash
+   docker-compose -f docker-compose.prod.yml restart backend
+   # 等待 60-90 秒让健康检查通过
+   sleep 90
+   docker-compose -f docker-compose.prod.yml ps
+   ```
+
+**常见原因**：
+- 数据库连接失败：检查 `POSTGRES_SERVER` 环境变量
+- 健康检查超时：已优化为 60s 启动等待时间
+- 应用启动失败：查看日志找出具体错误
+
+**详细修复指南**：请参考 [CLOUDSTUDIO_BACKEND_FIX.md](./CLOUDSTUDIO_BACKEND_FIX.md)
+
+### 问题 8：磁盘空间不足
 
 ```bash
 # 查看磁盘使用情况
@@ -450,6 +503,7 @@ docker volume prune
 
 - [Docker 部署说明](./README.md)
 - [Docker 自动启动配置](./DOCKER_AUTOSTART.md)
+- [后端容器启动问题修复指南](./CLOUDSTUDIO_BACKEND_FIX.md)
 - [项目 README](../README.md)
 
 ## 💡 CloudStudio 优势
