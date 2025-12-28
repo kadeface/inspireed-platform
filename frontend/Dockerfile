@@ -8,30 +8,33 @@ RUN npm install -g pnpm
 # 设置工作目录
 WORKDIR /app
 
-# 复制依赖文件
-COPY package.json pnpm-lock.yaml* ./
+# 复制 pnpm workspace 文件（从项目根目录）
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
-# 安装依赖
+# 复制 frontend package.json
+COPY frontend/package.json ./frontend/
+
+# 安装依赖（使用 workspace）
 RUN pnpm install --frozen-lockfile
 
-# 复制源代码
-COPY . .
+# 复制 frontend 源代码
+COPY frontend/ ./frontend/
 
 # 构建参数（API 地址）
 ARG VITE_API_BASE_URL=http://localhost:8000/api/v1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-# 构建应用
-RUN pnpm build
+# 构建应用（使用 workspace filter）
+RUN pnpm --filter frontend build
 
 # 阶段2: 运行阶段 - 使用 Nginx 提供静态文件
 FROM nginx:alpine
 
 # 复制构建产物到 Nginx 目录
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
-# 复制 Nginx 配置（如果存在则使用，否则使用默认配置）
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# 复制 Nginx 配置
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # 暴露端口
 EXPOSE 80

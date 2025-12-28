@@ -7,6 +7,7 @@
 - `docker-compose.yml`: 开发环境配置（仅包含基础服务：PostgreSQL, Redis, MinIO, Kafka）
 - `docker-compose.prod.yml`: 生产环境配置（包含所有服务，包括后端和前端）
 - `DOCKER_AUTOSTART.md`: Docker 自动启动配置指南
+- `CLOUDSTUDIO_DEPLOYMENT.md`: CloudStudio 云端 IDE 部署指南
 
 ## 🔄 自动启动配置
 
@@ -26,6 +27,8 @@
 2. **详细说明**：查看 [DOCKER_AUTOSTART.md](./DOCKER_AUTOSTART.md) 了解完整的自动启动配置方法
 
 ## 🚀 快速开始
+
+> 💡 **在 CloudStudio 上部署？** 请查看 [CLOUDSTUDIO_DEPLOYMENT.md](./CLOUDSTUDIO_DEPLOYMENT.md) 获取详细的 CloudStudio 部署指南。CloudStudio 已预装 Docker，无需手动安装！
 
 ### 开发环境（仅基础服务）
 
