@@ -27,9 +27,10 @@ COPY frontend/ ./frontend/
 ARG VITE_API_BASE_URL=http://localhost:8000/api/v1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-# 构建应用（使用 workspace filter，从根目录执行）
-WORKDIR /app
-RUN pnpm --filter frontend build
+# 构建应用
+# 使用 pnpm --filter 并指定工作目录，或者直接进入 frontend 目录构建
+WORKDIR /app/frontend
+RUN pnpm build
 
 # 阶段2: 运行阶段 - 使用 Nginx 提供静态文件
 FROM nginx:alpine
