@@ -4,7 +4,7 @@ from logging.config import fileConfig
 import asyncio
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import AsyncConnection, async_engine_from_config
 
 from alembic import context
 
@@ -65,7 +65,9 @@ async def run_async_migrations() -> None:
     )
 
     async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
+        # connection 是 AsyncConnection 类型，具有 run_sync 方法
+        connection_typed: AsyncConnection = connection
+        await connection_typed.run_sync(do_run_migrations)
 
     await connectable.dispose()
 
