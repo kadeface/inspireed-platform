@@ -122,6 +122,17 @@ docker exec inspireed-backend python scripts/ensure_admin_user.py
    docker logs inspireed-backend --tail 50
    ```
 
+4. **运行诊断脚本**（推荐）：
+   ```bash
+   docker exec inspireed-backend python scripts/diagnose_login.py
+   ```
+   这个脚本会检查：
+   - 数据库连接
+   - admin用户是否存在
+   - 密码验证是否正常
+   - 密码哈希生成是否正常
+   - 配置是否正确
+
 ## 安全建议
 
 ⚠️ **重要**：首次登录后，请立即：

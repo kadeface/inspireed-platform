@@ -111,47 +111,84 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
 ) -> Any:
     """用户登录"""
-    # 查找用户（支持邮箱或用户名登录）
-    result = await db.execute(
-        select(User).where(
-            (User.email == form_data.username) | (User.username == form_data.username)
+    import traceback
+    
+    try:
+        # 查找用户（支持邮箱或用户名登录）
+        result = await db.execute(
+            select(User).where(
+                (User.email == form_data.username) | (User.username == form_data.username)
+            )
         )
-    )
-    user = result.scalar_one_or_none()
+        user = result.scalar_one_or_none()
 
-    if not user:
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="用户名或密码错误",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # 验证密码（添加错误处理）
+        try:
+            password_valid = verify_password(form_data.password, cast(str, user.hashed_password))
+        except Exception as e:
+            print(f"❌ 密码验证错误: {type(e).__name__}: {e}")
+            print(traceback.format_exc())
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"密码验证失败: {str(e)}",
+            )
+        
+        if not password_valid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="用户名或密码错误",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # 检查用户激活状态
+        is_active = cast(bool, user.is_active)
+        if not is_active:
+            raise HTTPException(
+                status_code=400,
+                detail=f"用户未激活，请联系管理员。用户ID: {user.id}, 用户名: {user.username}, 角色: {user.role}",
+            )
+
+        # 更新最后登录时间
+        try:
+            user.last_login = datetime.utcnow()  # type: ignore[assignment]
+            await db.commit()
+        except Exception as e:
+            print(f"⚠️ 更新最后登录时间失败: {e}")
+            # 不阻止登录，继续执行
+
+        # 创建访问令牌
+        try:
+            access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                subject=user.id, expires_delta=access_token_expires
+            )
+        except Exception as e:
+            print(f"❌ 创建访问令牌错误: {type(e).__name__}: {e}")
+            print(traceback.format_exc())
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"创建访问令牌失败: {str(e)}",
+            )
+
+        return {"access_token": access_token, "token_type": "bearer"}
+    except HTTPException:
+        # 重新抛出 HTTP 异常
+        raise
+    except Exception as e:
+        # 捕获所有其他异常
+        print(f"❌ 登录过程发生未预期的错误: {type(e).__name__}: {e}")
+        print(traceback.format_exc())
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"登录失败: {str(e)}",
         )
-
-    if not verify_password(form_data.password, cast(str, user.hashed_password)):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # 检查用户激活状态
-    is_active = cast(bool, user.is_active)
-    if not is_active:
-        raise HTTPException(
-            status_code=400,
-            detail=f"用户未激活，请联系管理员。用户ID: {user.id}, 用户名: {user.username}, 角色: {user.role}",
-        )
-
-    # 更新最后登录时间
-    user.last_login = datetime.utcnow()
-    await db.commit()
-
-    # 创建访问令牌
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        subject=user.id, expires_delta=access_token_expires
-    )
-
-    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.get("/me", response_model=UserResponse)
