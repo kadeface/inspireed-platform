@@ -81,6 +81,8 @@ services:
       # MinIO 配置（Docker 网络中使用服务名）
       MINIO_ENDPOINT: minio:9000
       MINIO_SECURE: "false"
+      # CORS 配置 - CloudStudio 环境需要允许所有来源
+      BACKEND_CORS_ORIGINS: '["*"]'
     ports:
       - "8000:8000"
     volumes:
@@ -103,25 +105,28 @@ services:
     networks:
       - inspireed-network
 
-  # 前端 Vue 应用
+  # 前端 Vue 应用 - CloudStudio 版本（使用开发服务器，端口 5173）
   frontend:
     build:
-      context: ../frontend  # 改回 frontend 目录，因为现在不使用 workspace 模式
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+      context: ../frontend
+      dockerfile: Dockerfile.dev  # 使用开发模式 Dockerfile
     container_name: inspireed-frontend
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "5173:5173"  # CloudStudio 需要端口 5173
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost/health || curl -f http://localhost/health || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:5173 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     restart: unless-stopped
     networks:
       - inspireed-network
