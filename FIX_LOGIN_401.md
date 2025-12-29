@@ -8,14 +8,35 @@
 
 ### 方法 1：在运行中的容器中执行（推荐）
 
-如果您的服务已经在运行，直接在容器中执行初始化脚本：
+如果您的服务已经在运行，需要先修复 bcrypt 版本兼容性问题，然后执行初始化脚本：
 
 ```bash
 # 进入docker目录
 cd docker
 
-# 执行初始化脚本
+# 步骤 1：修复 bcrypt 版本兼容性问题
+docker exec inspireed-backend pip install --upgrade "bcrypt==3.2.2"
+
+# 步骤 2：执行初始化脚本
 docker exec inspireed-backend python scripts/ensure_admin_user.py
+```
+
+**如果遇到 bcrypt 版本错误**，可以使用简化版本（直接使用 bcrypt，不依赖 passlib）：
+
+```bash
+# 使用简化版本脚本（推荐，避免版本兼容性问题）
+docker exec inspireed-backend python scripts/ensure_admin_user_simple.py
+```
+
+或者尝试：
+
+```bash
+# 方法 A：重新安装兼容版本
+docker exec inspireed-backend pip uninstall -y bcrypt && \
+docker exec inspireed-backend pip install "bcrypt==3.2.2"
+
+# 方法 B：使用 setup_test_accounts.py（它会创建所有测试账号，包括admin）
+docker exec inspireed-backend python scripts/setup_test_accounts.py
 ```
 
 ### 方法 2：如果容器未运行，先启动服务
@@ -25,13 +46,16 @@ docker exec inspireed-backend python scripts/ensure_admin_user.py
 cd docker
 
 # 启动服务
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.prod.yml up -d --build
 
 # 等待服务启动（约30秒）
 sleep 30
 
 # 运行数据库迁移（如果还没运行）
 docker exec inspireed-backend alembic upgrade head
+
+# 修复 bcrypt 版本（如果需要）
+docker exec inspireed-backend pip install --upgrade "bcrypt==3.2.2"
 
 # 初始化admin用户
 docker exec inspireed-backend python scripts/ensure_admin_user.py

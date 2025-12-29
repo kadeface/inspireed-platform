@@ -1,5 +1,5 @@
 """
-确保admin用户存在并密码正确
+确保admin用户存在并密码正确（简化版本，直接使用 bcrypt）
 用于部署时初始化管理员账号
 """
 
@@ -10,14 +10,26 @@ import os
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-# 忽略 bcrypt 版本警告
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="passlib")
-
 from sqlalchemy import select
 from app.core.database import AsyncSessionLocal
-from app.core.security import get_password_hash, verify_password
 from app.models import User, UserRole
+import bcrypt
+
+
+def get_password_hash_direct(password: str) -> str:
+    """直接使用 bcrypt 生成密码哈希"""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def verify_password_direct(plain_password: str, hashed_password: str) -> bool:
+    """直接使用 bcrypt 验证密码"""
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode('utf-8'),
+            hashed_password.encode('utf-8')
+        )
+    except Exception:
+        return False
 
 
 async def ensure_admin_user():
@@ -51,18 +63,8 @@ async def ensure_admin_user():
             print(f"   角色: {user.role}")
             print(f"   激活状态: {user.is_active}")
 
-            # 更新密码（捕获可能的错误）
-            try:
-                user.hashed_password = get_password_hash(admin_password)
-            except Exception as e:
-                print(f"   ⚠️  密码哈希错误: {e}")
-                print(f"   尝试使用备用方法...")
-                # 如果 get_password_hash 失败，直接使用 bcrypt
-                import bcrypt
-                user.hashed_password = bcrypt.hashpw(
-                    admin_password.encode('utf-8'), 
-                    bcrypt.gensalt()
-                ).decode('utf-8')
+            # 更新密码（直接使用 bcrypt）
+            user.hashed_password = get_password_hash_direct(admin_password)
             
             # 确保用户是激活的
             user.is_active = True
@@ -76,7 +78,7 @@ async def ensure_admin_user():
             await db.refresh(user)
 
             # 验证密码是否正确
-            is_valid = verify_password(admin_password, user.hashed_password)
+            is_valid = verify_password_direct(admin_password, user.hashed_password)
             print(f"   密码验证: {'✅ 正确' if is_valid else '❌ 错误'}")
 
             print(f"\n✅ Admin用户已更新")
@@ -85,24 +87,11 @@ async def ensure_admin_user():
         else:
             # 用户不存在，创建新用户
             print("📝 创建新的admin用户...")
-            # 尝试获取密码哈希（捕获可能的错误）
-            try:
-                hashed_pwd = get_password_hash(admin_password)
-            except Exception as e:
-                print(f"   ⚠️  密码哈希错误: {e}")
-                print(f"   尝试使用备用方法...")
-                # 如果 get_password_hash 失败，直接使用 bcrypt
-                import bcrypt
-                hashed_pwd = bcrypt.hashpw(
-                    admin_password.encode('utf-8'), 
-                    bcrypt.gensalt()
-                ).decode('utf-8')
-            
             user = User(
                 email=admin_email,
                 username=admin_username,
                 full_name=admin_full_name,
-                hashed_password=hashed_pwd,
+                hashed_password=get_password_hash_direct(admin_password),
                 role=UserRole.ADMIN,
                 is_active=True,
             )
@@ -111,7 +100,7 @@ async def ensure_admin_user():
             await db.refresh(user)
 
             # 验证密码
-            is_valid = verify_password(admin_password, user.hashed_password)
+            is_valid = verify_password_direct(admin_password, user.hashed_password)
             print(f"   密码验证: {'✅ 正确' if is_valid else '❌ 错误'}")
 
             print(f"\n✅ Admin用户已创建")
