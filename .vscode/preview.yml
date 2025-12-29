@@ -1,0 +1,103 @@
+autoOpen: false
+
+apps:
+  - port: 8000
+    run: |
+      set -e
+      
+      if ! docker info > /dev/null 2>&1; then
+        echo "❌ Docker 未运行，请先启动 Docker"
+        exit 1
+      fi
+      
+      cd docker && docker-compose up -d && cd ..
+      
+      echo "⏳ 等待 Docker 服务启动..."
+      sleep 5
+      
+      cd backend
+      
+      if [ ! -d "venv" ]; then
+        echo "📦 创建 Python 虚拟环境..."
+        python3 -m venv venv
+      fi
+      
+      VENV_PYTHON=./venv/bin/python
+      VENV_PIP=./venv/bin/pip
+      
+      echo "📥 检查并安装后端依赖..."
+      $VENV_PIP install --upgrade pip
+      $VENV_PIP install -r requirements.txt
+      
+      if [ ! -f ".env" ]; then
+        echo "⚙️ 创建环境配置文件..."
+        cp env.example .env
+        echo "⚠️  请检查并配置 backend/.env 文件中的数据库连接等信息"
+      fi
+      
+      echo "🗄️ 运行数据库迁移..."
+      $VENV_PYTHON -m alembic upgrade head
+      
+      if command -v lsof > /dev/null 2>&1; then
+        PORT_PID=$(lsof -ti:8000 2>/dev/null)
+        if [ ! -z "$PORT_PID" ]; then
+          echo "⚠️  端口 8000 被进程 $PORT_PID 占用，正在停止..."
+          kill $PORT_PID 2>/dev/null || true
+          sleep 2
+          if lsof -ti:8000 > /dev/null 2>&1; then
+            kill -9 $(lsof -ti:8000) 2>/dev/null || true
+            sleep 1
+          fi
+        fi
+      else
+        pkill -f "uvicorn app.main:app" 2>/dev/null || true
+        sleep 2
+      fi
+      
+      echo "🚀 启动后端服务 (端口 8000)..."
+      $VENV_PYTHON -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    root: .
+    name: backend-api
+    description: InspireEd 后端 API 服务 (FastAPI)，提供 RESTful API 和 Swagger 文档
+    autoOpen: true
+
+  - port: 5173
+    run: |
+      set -e
+      
+      echo "⏳ 等待后端服务启动..."
+      max_attempts=30
+      attempt=0
+      while [ $attempt -lt $max_attempts ]; do
+        if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+          echo "✅ 后端服务已就绪"
+          break
+        fi
+        attempt=$((attempt + 1))
+        if [ $attempt -eq $max_attempts ]; then
+          echo "⚠️  后端服务可能未启动，前端将继续启动"
+        fi
+        sleep 1
+      done
+      
+      cd frontend
+      
+      if [ ! -d "node_modules" ]; then
+        echo "📥 安装前端依赖..."
+        pnpm install
+      fi
+      
+      if [ ! -f ".env.local" ]; then
+        echo "⚙️ 创建前端环境配置文件..."
+        cp env.example .env.local
+        echo "# Cloud Studio 环境：API 地址会自动根据前端 URL 计算" >> .env.local
+        echo "# 如需手动设置，请取消注释并修改下面的配置：" >> .env.local
+        echo "# VITE_API_BASE_URL=https://your-backend-id--8000.region.cloudstudio.club/api/v1" >> .env.local
+      fi
+      
+      echo "🚀 启动前端服务 (端口 5173)..."
+      pnpm dev --host 0.0.0.0
+    root: .
+    name: frontend-app
+    description: InspireEd 前端 Web 应用 (Vue 3 + Vite)，用户界面
+    autoOpen: false
