@@ -1178,12 +1178,13 @@ async def websocket_endpoint(
     origin = websocket.headers.get("origin")
     print(f"🔍 WebSocket Origin: {origin}")
     
-    # 验证 Origin（允许局域网访问）
+    # 验证 Origin（允许局域网访问和 Cloud Studio 域名）
     allowed = False
     if origin:
         import re
-        # 匹配 localhost 和局域网 IP
-        pattern = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$"
+        # 匹配 localhost、局域网 IP 和 Cloud Studio 域名
+        # Cloud Studio URL 格式：https://{id}--{port}.{region}.cloudstudio.club
+        pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
         if re.match(pattern, origin):
             allowed = True
             print(f"✅ Origin 验证通过: {origin}")
@@ -1446,15 +1447,20 @@ async def websocket_teacher_session_endpoint(
     origin = websocket.headers.get("origin")
     print(f"🔍 [教师WebSocket] Origin: {origin}")
     
-    # 验证 Origin（允许局域网访问）
+    # 验证 Origin（允许局域网访问和 Cloud Studio 域名）
     allowed = False
     if origin:
         import re
-        pattern = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$"
+        # 匹配 localhost、局域网 IP 和 Cloud Studio 域名
+        pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
         if re.match(pattern, origin):
             allowed = True
+            print(f"✅ [教师WebSocket] Origin 验证通过: {origin}")
+        else:
+            print(f"❌ [教师WebSocket] Origin 验证失败: {origin}")
     else:
         allowed = True  # 没有 Origin 头也允许
+        print("⚠️ [教师WebSocket] 没有 Origin 头，允许连接")
     
     # 先接受连接（必须先accept才能close）
     await websocket.accept()
