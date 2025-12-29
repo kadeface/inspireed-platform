@@ -43,21 +43,49 @@ fi
 echo "🗄️ 运行数据库迁移..."
 $VENV_PYTHON -m alembic upgrade head
 
-# 检查并清理端口 8000（如果被占用）
+# 检查并清理端口 8000（只终止 uvicorn 进程，避免误杀 Docker 容器）
+echo "🔍 检查端口 8000 占用情况..."
+UVICORN_FOUND=false
+NON_UVICORN_FOUND=false
+
 if command -v lsof > /dev/null 2>&1; then
-  PORT_PID=$(lsof -ti:8000 2>/dev/null)
-  if [ ! -z "$PORT_PID" ]; then
-    echo "⚠️  端口 8000 被进程 $PORT_PID 占用，正在停止..."
-    kill $PORT_PID 2>/dev/null || true
-    sleep 2
-    if lsof -ti:8000 > /dev/null 2>&1; then
-      kill -9 $(lsof -ti:8000) 2>/dev/null || true
-      sleep 1
-    fi
+  # 查找占用端口 8000 的进程，并检查是否是 uvicorn 进程
+  PORT_PIDS=$(lsof -ti:8000 2>/dev/null || true)
+  if [ ! -z "$PORT_PIDS" ]; then
+    for PID in $PORT_PIDS; do
+      # 检查进程的命令行是否包含 uvicorn
+      CMD=$(ps -p $PID -o cmd= 2>/dev/null || true)
+      if echo "$CMD" | grep -q "uvicorn"; then
+        UVICORN_FOUND=true
+        echo "⚠️  发现 uvicorn 进程 $PID 占用端口 8000，正在停止..."
+        kill $PID 2>/dev/null || true
+        sleep 1
+        # 如果还在运行，强制终止
+        if ps -p $PID > /dev/null 2>&1; then
+          kill -9 $PID 2>/dev/null || true
+        fi
+      else
+        # 如果不是 uvicorn 进程（可能是 Docker 容器），只记录不终止
+        NON_UVICORN_FOUND=true
+        echo "ℹ️  端口 8000 被进程 $PID 占用（非 uvicorn 进程，可能是 Docker 容器，跳过）"
+      fi
+    done
+    sleep 1
   fi
-else
-  pkill -f "uvicorn app.main:app" 2>/dev/null || true
-  sleep 2
+fi
+
+# 使用 pkill 作为备选方案，确保所有 uvicorn 进程都被终止
+pkill -f "uvicorn app.main:app" 2>/dev/null && UVICORN_FOUND=true && echo "✅ 已清理 uvicorn 进程" || true
+sleep 1
+
+# 如果仍然有非 uvicorn 进程占用端口，给出警告
+if command -v lsof > /dev/null 2>&1; then
+  REMAINING_PIDS=$(lsof -ti:8000 2>/dev/null || true)
+  if [ ! -z "$REMAINING_PIDS" ]; then
+    echo "⚠️  警告：端口 8000 仍被其他进程占用（可能是 Docker 容器）"
+    echo "   如果后端服务启动失败，请检查并手动释放端口 8000"
+    lsof -i:8000 | head -5
+  fi
 fi
 
 # 启动后端服务
