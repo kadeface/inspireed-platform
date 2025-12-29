@@ -8,6 +8,7 @@ import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 function getApiBaseUrl(): string {
   // 如果环境变量中配置了API地址，优先使用
   if (import.meta.env.VITE_API_BASE_URL) {
+    console.log('🔧 [API] 使用环境变量配置的 API 地址:', import.meta.env.VITE_API_BASE_URL)
     return import.meta.env.VITE_API_BASE_URL
   }
   
@@ -15,6 +16,8 @@ function getApiBaseUrl(): string {
   const hostname = window.location.hostname
   const protocol = window.location.protocol
   const port = window.location.port
+  
+  console.log('🔍 [API] 检测环境 - hostname:', hostname, 'protocol:', protocol, 'port:', port)
   
   // Cloud Studio 环境：如果 hostname 包含 cloudstudio.club 或 coding.net
   // 后端端口通常是 8000，但需要通过 Cloud Studio 分配的 URL 访问
@@ -26,12 +29,16 @@ function getApiBaseUrl(): string {
     if (hostname.includes('--')) {
       // 将 --5173 替换为 --8000
       const backendHostname = hostname.replace(/--\d+/, '--8000')
-      return `${protocol}//${backendHostname}/api/v1`
+      const apiUrl = `${protocol}//${backendHostname}/api/v1`
+      console.log('✅ [API] Cloud Studio 环境，使用后端地址:', apiUrl)
+      return apiUrl
     }
   }
   
   // 本地开发环境：前端端口5173 -> 后端端口8000
-  return `${protocol}//${hostname}:8000/api/v1`
+  const apiUrl = `${protocol}//${hostname}:8000/api/v1`
+  console.log('📍 [API] 本地环境，使用后端地址:', apiUrl)
+  return apiUrl
 }
 
 const API_BASE_URL = getApiBaseUrl()

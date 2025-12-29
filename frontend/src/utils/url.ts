@@ -19,8 +19,21 @@ export function getServerBaseUrl(): string {
   const hostname = window.location.hostname
   const protocol = window.location.protocol
   
-  // 根据主机名构建服务器地址
-  // 前端端口5173 -> 后端端口8000
+  // Cloud Studio 环境：如果 hostname 包含 cloudstudio.club 或 coding.net
+  // 后端端口通常是 8000，但需要通过 Cloud Studio 分配的 URL 访问
+  if (hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) {
+    // Cloud Studio 环境中，URL 格式为：{id}--{port}.{region}.cloudstudio.club
+    // 前端 URL 示例：645cf02ac04c45c38ed3f5cceb49231b--5173.ap-shanghai2.cloudstudio.club
+    // 后端 URL 应该：645cf02ac04c45c38ed3f5cceb49231b--8000.ap-shanghai2.cloudstudio.club
+    // 需要将端口号从 5173 替换为 8000
+    if (hostname.includes('--')) {
+      // 将 --5173 替换为 --8000
+      const backendHostname = hostname.replace(/--\d+/, '--8000')
+      return `${protocol}//${backendHostname}`
+    }
+  }
+  
+  // 本地开发环境：前端端口5173 -> 后端端口8000
   return `${protocol}//${hostname}:8000`
 }
 
