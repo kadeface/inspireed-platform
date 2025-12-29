@@ -67,7 +67,15 @@ if settings.ALLOW_LAN_ACCESS:
     cors_config[
         "allow_origin_regex"
     ] = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
-    print(f"✅ CORS configured with LAN access enabled (regex: {cors_config['allow_origin_regex']})")
+    print(f"✅ CORS configured with LAN access enabled")
+    print(f"   ALLOW_LAN_ACCESS: {settings.ALLOW_LAN_ACCESS}")
+    print(f"   Regex pattern: {cors_config['allow_origin_regex']}")
+    # 测试 Cloud Studio 域名匹配
+    test_origin = "https://0962edcd607544c19e9633d7d198e069--5173.ap-shanghai2.cloudstudio.club"
+    if re.match(cors_config['allow_origin_regex'], test_origin):
+        print(f"   ✅ Test origin matched: {test_origin}")
+    else:
+        print(f"   ❌ Test origin NOT matched: {test_origin}")
 else:
     # 只允许配置的源
     cors_config["allow_origins"] = [
