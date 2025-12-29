@@ -1,6 +1,19 @@
 #!/bin/bash
+#
+# InspireEd 本地开发环境启动脚本
+#
+# 使用场景：本地开发调试
+# - 基础服务（PostgreSQL、Redis、MinIO）在 Docker 中运行
+# - 前后端在本地运行，支持热重载
+# - 前端端口：5173，后端端口：8000
+#
+# 其他启动脚本：
+# - start-prod.sh: 生产环境（全容器化，前端端口 80）
+# - start-cloudstudio.sh: CloudStudio 云端环境（全容器化，前端端口 5173）
+#
+# 详细说明请查看：START_SCRIPTS_GUIDE.md
 
-echo "🚀 启动 InspireEd 教师教研系统..."
+echo "🚀 启动 InspireEd 本地开发环境..."
 
 # 等待 Docker 启动（最多等待 2 分钟）
 WAIT_DOCKER=${WAIT_DOCKER:-false}

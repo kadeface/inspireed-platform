@@ -1,4 +1,17 @@
 #!/bin/bash
+#
+# InspireEd 生产环境启动脚本
+#
+# 使用场景：正式生产服务器部署
+# - 所有服务都在 Docker 容器中运行
+# - 前端使用 Nginx 提供静态文件（生产构建）
+# - 前端端口：80，后端端口：8000
+#
+# 其他启动脚本：
+# - start.sh: 本地开发环境（混合模式，前端端口 5173）
+# - start-cloudstudio.sh: CloudStudio 云端环境（全容器化，前端端口 5173）
+#
+# 详细说明请查看：START_SCRIPTS_GUIDE.md
 
 echo "🚀 启动 InspireEd 生产环境（Docker Compose）..."
 

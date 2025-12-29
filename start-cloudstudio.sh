@@ -1,4 +1,18 @@
 #!/bin/bash
+#
+# InspireEd CloudStudio 云端环境启动脚本
+#
+# 使用场景：腾讯云 CloudStudio 环境
+# - 所有服务都在 Docker 容器中运行
+# - 前端使用 Vite 开发模式（支持热重载）
+# - 前端端口：5173，后端端口：8000
+# - 自动清理端口冲突，自动配置 CORS
+#
+# 其他启动脚本：
+# - start.sh: 本地开发环境（混合模式，前端端口 5173）
+# - start-prod.sh: 生产环境（全容器化，前端端口 80）
+#
+# 详细说明请查看：START_SCRIPTS_GUIDE.md
 
 echo "🚀 启动 InspireEd CloudStudio 环境（Docker Compose）..."
 
@@ -44,12 +58,68 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOCKER_DIR="$SCRIPT_DIR/docker"
 
+# 清理端口 5173（前端端口）
+echo "🔍 检查端口 5173 占用情况..."
+if command -v lsof > /dev/null 2>&1; then
+    PORT_5173_PID=$(lsof -ti:5173 2>/dev/null)
+    if [ ! -z "$PORT_5173_PID" ]; then
+        echo "⚠️  发现端口 5173 被进程 $PORT_5173_PID 占用"
+        echo "📋 进程详情:"
+        ps -p $PORT_5173_PID -o pid,ppid,cmd 2>/dev/null || true
+        echo ""
+        echo "🛑 正在停止进程 $PORT_5173_PID..."
+        kill $PORT_5173_PID 2>/dev/null || true
+        sleep 2
+        
+        # 检查是否还在运行，如果是则强制停止
+        if ps -p $PORT_5173_PID > /dev/null 2>&1; then
+            echo "⚠️  进程仍在运行，强制停止..."
+            kill -9 $PORT_5173_PID 2>/dev/null || true
+            sleep 1
+        fi
+        
+        # 再次检查端口
+        if lsof -ti:5173 > /dev/null 2>&1; then
+            echo "❌ 端口仍然被占用，强制清理所有占用该端口的进程..."
+            kill -9 $(lsof -ti:5173) 2>/dev/null || true
+            sleep 1
+        fi
+        
+        if ! lsof -ti:5173 > /dev/null 2>&1; then
+            echo "✅ 端口 5173 已成功释放"
+        else
+            echo "❌ 端口 5173 仍然被占用，请手动清理:"
+            lsof -i:5173
+            echo ""
+            echo "💡 可以手动执行: kill -9 \$(lsof -ti:5173)"
+        fi
+    else
+        echo "✅ 端口 5173 未被占用"
+    fi
+else
+    # 如果没有 lsof，尝试使用其他方法
+    echo "ℹ️  lsof 不可用，尝试使用其他方法清理端口 5173..."
+    # 尝试停止可能的前端进程
+    pkill -f "vite" 2>/dev/null && echo "✅ 已停止 vite 进程" || echo "ℹ️  没有找到运行中的 vite 进程"
+    pkill -f "pnpm dev" 2>/dev/null && echo "✅ 已停止 pnpm dev 进程" || echo "ℹ️  没有找到运行中的 pnpm dev 进程"
+    sleep 1
+fi
+
 # 进入 docker 目录
 cd "$DOCKER_DIR" || exit 1
 
 # 停止可能存在的旧容器
 echo "🛑 停止可能存在的旧容器..."
 $DOCKER_COMPOSE_CMD -f docker-compose.cloudstudio.yml down 2>/dev/null || true
+
+# 检查是否有其他 Docker 容器占用端口 5173
+echo "🔍 检查是否有 Docker 容器占用端口 5173..."
+CONFLICTING_CONTAINER=$(docker ps --format "{{.Names}}" | xargs -I {} docker port {} 2>/dev/null | grep ":5173" | head -1)
+if [ ! -z "$CONFLICTING_CONTAINER" ]; then
+    echo "⚠️  发现 Docker 容器占用端口 5173，正在停止..."
+    docker stop $(docker ps -q --filter "publish=5173") 2>/dev/null || true
+    sleep 2
+fi
 
 # 启动所有服务（使用 CloudStudio 配置）
 echo "📦 启动所有服务（PostgreSQL, Redis, MinIO, Backend, Frontend）..."
