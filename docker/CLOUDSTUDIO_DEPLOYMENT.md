@@ -205,7 +205,32 @@ docker exec inspireed-backend alembic current
 docker exec inspireed-backend alembic history
 ```
 
-### 步骤 6：查看服务日志
+### 步骤 6：初始化管理员账号
+
+**重要**：首次部署时必须初始化管理员账号，否则无法登录系统。
+
+```bash
+# 方法 1：使用初始化脚本（推荐）
+docker exec inspireed-backend python scripts/ensure_admin_user.py
+
+# 方法 2：使用便捷脚本
+docker exec inspireed-backend bash scripts/init_admin.sh
+```
+
+**默认管理员账号信息**：
+- 用户名：`admin`
+- 密码：`admin123`
+- 邮箱：`admin@inspireed.com`
+
+**⚠️ 安全提示**：
+- 首次登录后，请立即修改管理员密码
+- 生产环境建议使用强密码
+- 可以通过以下命令重置管理员密码：
+  ```bash
+  docker exec inspireed-backend python scripts/ensure_admin_user.py
+  ```
+
+### 步骤 7：查看服务日志
 
 ```bash
 # 查看所有服务日志
@@ -217,7 +242,7 @@ docker-compose -f docker-compose.prod.yml logs -f frontend
 docker-compose -f docker-compose.prod.yml logs -f postgres
 ```
 
-### 步骤 7：访问服务
+### 步骤 8：访问服务
 
 CloudStudio 会自动为运行的服务分配访问地址：
 
