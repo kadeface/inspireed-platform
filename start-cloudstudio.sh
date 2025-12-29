@@ -123,7 +123,13 @@ fi
 
 # 启动所有服务（使用 CloudStudio 配置）
 echo "📦 启动所有服务（PostgreSQL, Redis, MinIO, Backend, Frontend）..."
-$DOCKER_COMPOSE_CMD -f docker-compose.cloudstudio.yml up -d --build
+# 如果设置了 COMPOSE_BAKE=true，使用 Bake 构建以提升性能
+if [ "${COMPOSE_BAKE:-false}" = "true" ]; then
+    echo "⚡ 使用 Bake 构建模式（提升构建性能）..."
+    COMPOSE_BAKE=true $DOCKER_COMPOSE_CMD -f docker-compose.cloudstudio.yml up -d --build
+else
+    $DOCKER_COMPOSE_CMD -f docker-compose.cloudstudio.yml up -d --build
+fi
 
 # 等待服务启动
 echo "⏳ 等待服务启动..."
@@ -199,6 +205,9 @@ echo "   查看所有日志: cd docker && $DOCKER_COMPOSE_CMD -f docker-compose.
 echo "   停止服务: cd docker && $DOCKER_COMPOSE_CMD -f docker-compose.cloudstudio.yml down"
 echo "   重启服务: cd docker && $DOCKER_COMPOSE_CMD -f docker-compose.cloudstudio.yml restart [service_name]"
 echo "   查看状态: cd docker && $DOCKER_COMPOSE_CMD -f docker-compose.cloudstudio.yml ps"
+echo ""
+echo "⚡ 性能优化："
+echo "   使用 Bake 构建（提升构建速度）: COMPOSE_BAKE=true ./start-cloudstudio.sh"
 echo ""
 echo "✨ 开始使用 InspireEd CloudStudio 环境！"
 

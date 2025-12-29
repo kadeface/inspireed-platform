@@ -62,7 +62,13 @@ cd "$DOCKER_DIR" || exit 1
 
 # 启动所有服务（使用生产环境配置）
 echo "📦 启动所有服务（PostgreSQL, Redis, MinIO, Backend, Frontend）..."
-$DOCKER_COMPOSE_CMD -f docker-compose.prod.yml up -d
+# 如果设置了 COMPOSE_BAKE=true，使用 Bake 构建以提升性能
+if [ "${COMPOSE_BAKE:-false}" = "true" ]; then
+    echo "⚡ 使用 Bake 构建模式（提升构建性能）..."
+    COMPOSE_BAKE=true $DOCKER_COMPOSE_CMD -f docker-compose.prod.yml up -d --build
+else
+    $DOCKER_COMPOSE_CMD -f docker-compose.prod.yml up -d
+fi
 
 # 等待服务启动
 echo "⏳ 等待服务启动..."
@@ -157,6 +163,9 @@ echo "💡 提示："
 echo "   - 确保防火墙已开放 80 和 8000 端口"
 echo "   - 如需修改前端端口，设置环境变量: export FRONTEND_PORT=8080"
 echo "   - 如需修改 API 地址，设置环境变量: export VITE_API_BASE_URL=http://your-domain:8000/api/v1"
+echo ""
+echo "⚡ 性能优化："
+echo "   - 使用 Bake 构建（提升构建速度）: COMPOSE_BAKE=true ./start-prod.sh"
 echo ""
 echo "✨ 开始使用 InspireEd 生产环境！"
 
