@@ -8,6 +8,8 @@ import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 function getApiBaseUrl(): string {
   // 动态获取当前主机名（优先于环境变量，确保 CloudStudio 环境能正确检测）
   const hostname = window.location.hostname
+  // 确保使用与当前页面相同的协议（HTTPS 或 HTTP）
+  // 在 CloudStudio 中，前端通常是 HTTPS，后端也应该是 HTTPS
   const protocol = window.location.protocol
   const port = window.location.port
   
@@ -17,20 +19,24 @@ function getApiBaseUrl(): string {
   // 后端端口通常是 8000，但需要通过 Cloud Studio 分配的 URL 访问
   if (hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) {
     // Cloud Studio 环境中，URL 格式为：{id}--{port}.{region}.cloudstudio.club
-    // 前端 URL 示例：d6b1c11750f24ca6b76e34a92dcdf009--5173.ap-shanghai2.cloudstudio.club
-    // 后端 URL 应该：d6b1c11750f24ca6b76e34a92dcdf009--8000.ap-shanghai2.cloudstudio.club
+    // 前端 URL 示例：645cf02ac04c45c38ed3f5cceb49231b--5173.ap-shanghai2.cloudstudio.club
+    // 后端 URL 应该：645cf02ac04c45c38ed3f5cceb49231b--8000.ap-shanghai2.cloudstudio.club
     // 需要将端口号从 5173 替换为 8000
+    // 重要：CloudStudio 使用 HTTPS，必须使用 https:// 协议
     if (hostname.includes('--')) {
       // 将 --5173 或 --其他端口 替换为 --8000
       const backendHostname = hostname.replace(/--\d+/, '--8000')
-      const apiUrl = `${protocol}//${backendHostname}/api/v1`
+      // 强制使用 HTTPS（CloudStudio 环境必须使用 HTTPS）
+      const apiUrl = `https://${backendHostname}/api/v1`
       console.log('✅ [API] Cloud Studio 环境检测成功！')
       console.log('   前端地址:', `${protocol}//${hostname}`)
       console.log('   后端地址:', apiUrl)
       return apiUrl
     } else {
       // 如果没有 -- 分隔符，尝试使用标准格式
-      const apiUrl = `${protocol}//${hostname.replace(/5173/, '8000')}/api/v1`
+      const backendHostname = hostname.replace(/5173/, '8000')
+      // 强制使用 HTTPS
+      const apiUrl = `https://${backendHostname}/api/v1`
       console.log('✅ [API] Cloud Studio 环境（备用检测），使用后端地址:', apiUrl)
       return apiUrl
     }

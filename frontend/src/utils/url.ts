@@ -26,10 +26,12 @@ export function getServerBaseUrl(): string {
     // 前端 URL 示例：645cf02ac04c45c38ed3f5cceb49231b--5173.ap-shanghai2.cloudstudio.club
     // 后端 URL 应该：645cf02ac04c45c38ed3f5cceb49231b--8000.ap-shanghai2.cloudstudio.club
     // 需要将端口号从 5173 替换为 8000
+    // 重要：CloudStudio 使用 HTTPS，必须使用 https:// 协议
     if (hostname.includes('--')) {
       // 将 --5173 替换为 --8000
       const backendHostname = hostname.replace(/--\d+/, '--8000')
-      return `${protocol}//${backendHostname}`
+      // 强制使用 HTTPS（CloudStudio 环境必须使用 HTTPS）
+      return `https://${backendHostname}`
     }
   }
   
