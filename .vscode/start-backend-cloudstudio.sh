@@ -4,6 +4,14 @@
 
 set -e
 
+# 确保输出不被缓冲，立即显示
+export PYTHONUNBUFFERED=1
+
+# 输出启动信息（确保立即显示）
+echo "==========================================" >&2
+echo "🚀 InspireEd 后端服务启动中..." >&2
+echo "==========================================" >&2
+
 # 检查并启动 Docker 服务
 if ! docker info > /dev/null 2>&1; then
   echo "❌ Docker 未运行，请先启动 Docker"
@@ -64,6 +72,17 @@ else
 fi
 
 # 启动后端服务
-echo "🚀 启动后端服务 (端口 8000)..."
-$VENV_PYTHON -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+echo "" >&2
+echo "==========================================" >&2
+echo "🚀 启动后端服务 (端口 8000)..." >&2
+echo "==========================================" >&2
+echo "📍 服务地址: http://localhost:8000" >&2
+echo "📚 API 文档: http://localhost:8000/docs" >&2
+echo "🔍 健康检查: http://localhost:8000/health" >&2
+echo "" >&2
+echo "⏳ 正在启动，请稍候..." >&2
+echo "" >&2
+
+# 启动服务（使用 unbuffered 模式确保输出立即显示）
+exec $VENV_PYTHON -u -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 

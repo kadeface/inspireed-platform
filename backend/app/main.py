@@ -55,8 +55,10 @@ app = FastAPI(
 # 配置CORS
 cors_config = {
     "allow_credentials": True,
-    "allow_methods": ["*"],
-    "allow_headers": ["*"],
+    "allow_methods": ["*"],  # 允许所有 HTTP 方法，包括 OPTIONS（预检请求）
+    "allow_headers": ["*"],  # 允许所有请求头
+    "expose_headers": ["*"],  # 暴露所有响应头
+    "max_age": 3600,  # 预检请求缓存时间（秒）
 }
 
 # 如果启用局域网访问，使用正则表达式匹配所有局域网IP和 Cloud Studio 域名
@@ -86,6 +88,35 @@ else:
     print(f"✅ CORS configured with specific origins: {cors_config['allow_origins']}")
 
 app.add_middleware(CORSMiddleware, **cors_config)
+
+# 添加请求日志中间件（用于调试 CORS）
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """记录所有请求，特别是 OPTIONS 预检请求"""
+    origin = request.headers.get("origin")
+    method = request.method
+    url = str(request.url)
+    
+    # 如果是 OPTIONS 请求（预检请求），记录详细信息
+    if method == "OPTIONS":
+        print(f"🔍 [CORS] OPTIONS 预检请求:")
+        print(f"   Origin: {origin}")
+        print(f"   URL: {url}")
+        print(f"   Headers: {dict(request.headers)}")
+    
+    response = await call_next(request)
+    
+    # 记录响应头（特别是 CORS 相关头）
+    if method == "OPTIONS":
+        cors_headers = {
+            k: v for k, v in response.headers.items() 
+            if k.lower().startswith('access-control-')
+        }
+        print(f"   Response CORS headers: {cors_headers}")
+        if not cors_headers:
+            print(f"   ⚠️ 警告：OPTIONS 响应没有 CORS 头！")
+    
+    return response
 
 
 # 全局异常处理器 - 确保错误响应包含CORS头
