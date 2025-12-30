@@ -116,7 +116,10 @@ services:
     ports:
       - "5173:5173"  # CloudStudio 需要端口 5173
     environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+      # ⚠️ 不设置 VITE_API_BASE_URL，让前端代码自动检测 CloudStudio 环境
+      # 前端代码会自动检测 cloudstudio.club 域名并使用 HTTPS
+      # 如果确实需要设置，可以通过环境变量传入，但代码会自动处理 localhost
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
     volumes:
       - ../frontend:/app
       - /app/node_modules
