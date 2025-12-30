@@ -92,10 +92,22 @@ app.add_middleware(CORSMiddleware, **cors_config)
 # 添加请求日志中间件（用于调试 CORS）
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """记录所有请求，特别是 OPTIONS 预检请求"""
+    """记录所有请求，特别是 OPTIONS 预检请求和 CORS 相关请求"""
     origin = request.headers.get("origin")
     method = request.method
     url = str(request.url)
+    
+    # 记录所有带有 Origin 头的请求（CORS 请求）
+    if origin:
+        print(f"🌐 [CORS] 请求: {method} {url}")
+        print(f"   Origin: {origin}")
+        # 检查 origin 是否匹配正则表达式
+        import re
+        pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
+        if re.match(pattern, origin):
+            print(f"   ✅ Origin 匹配正则表达式")
+        else:
+            print(f"   ❌ Origin 不匹配正则表达式！")
     
     # 如果是 OPTIONS 请求（预检请求），记录详细信息
     if method == "OPTIONS":
@@ -104,19 +116,27 @@ async def log_requests(request: Request, call_next):
         print(f"   URL: {url}")
         print(f"   Headers: {dict(request.headers)}")
     
-    response = await call_next(request)
-    
-    # 记录响应头（特别是 CORS 相关头）
-    if method == "OPTIONS":
-        cors_headers = {
-            k: v for k, v in response.headers.items() 
-            if k.lower().startswith('access-control-')
-        }
-        print(f"   Response CORS headers: {cors_headers}")
-        if not cors_headers:
-            print(f"   ⚠️ 警告：OPTIONS 响应没有 CORS 头！")
-    
-    return response
+    try:
+        response = await call_next(request)
+        
+        # 记录响应头（特别是 CORS 相关头）
+        if origin or method == "OPTIONS":
+            cors_headers = {
+                k: v for k, v in response.headers.items() 
+                if k.lower().startswith('access-control-')
+            }
+            if cors_headers:
+                print(f"   ✅ CORS 响应头: {cors_headers}")
+            else:
+                print(f"   ⚠️ 警告：响应没有 CORS 头！")
+                print(f"   状态码: {response.status_code}")
+        
+        return response
+    except Exception as e:
+        print(f"❌ [CORS] 请求处理异常: {e}")
+        print(f"   Origin: {origin}")
+        print(f"   URL: {url}")
+        raise
 
 
 # 全局异常处理器 - 确保错误响应包含CORS头
