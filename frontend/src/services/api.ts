@@ -106,6 +106,16 @@ class ApiService {
       console.log('✅ [API] 修正后的 API 地址:', finalBaseURL)
     }
     
+    // 在 CloudStudio 环境中，强制使用 HTTPS
+    if ((window.location.hostname.includes('cloudstudio.club') || window.location.hostname.includes('coding.net')) && 
+        finalBaseURL.startsWith('http://')) {
+      console.warn('⚠️ [API] CloudStudio 环境强制使用 HTTPS')
+      finalBaseURL = finalBaseURL.replace('http://', 'https://')
+      console.log('✅ [API] CloudStudio 环境修正后的 API 地址:', finalBaseURL)
+    }
+    
+    console.log('🔧 [API] ApiService 构造函数 - 最终 baseURL:', finalBaseURL)
+    
     this.axiosInstance = axios.create({
       baseURL: finalBaseURL,
       timeout: 120000, // 增加到120秒，适应文档转换等长时间操作
@@ -127,7 +137,19 @@ class ApiService {
           delete config.headers['Content-Type']
         }
         
-        // 调试日志已移除
+        // 最后一道防线：在 HTTPS 页面中，确保 baseURL 使用 HTTPS
+        if (window.location.protocol === 'https:' && config.baseURL?.startsWith('http://')) {
+          console.warn('⚠️ [API] 请求拦截器检测到 HTTP baseURL，自动转换为 HTTPS:', config.baseURL)
+          config.baseURL = config.baseURL.replace('http://', 'https://')
+          console.log('✅ [API] 请求拦截器修正后的 baseURL:', config.baseURL)
+        }
+        
+        // 如果请求 URL 本身是完整的 HTTP URL，也转换为 HTTPS
+        if (window.location.protocol === 'https:' && config.url?.startsWith('http://')) {
+          console.warn('⚠️ [API] 请求拦截器检测到 HTTP 完整 URL，自动转换为 HTTPS:', config.url)
+          config.url = config.url.replace('http://', 'https://')
+          console.log('✅ [API] 请求拦截器修正后的 URL:', config.url)
+        }
         
         return config
       },
