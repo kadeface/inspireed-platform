@@ -47,12 +47,23 @@ function getApiBaseUrl(): string {
   if (import.meta.env.VITE_API_BASE_URL) {
     let envApiUrl = import.meta.env.VITE_API_BASE_URL
     
-    // 在 CloudStudio 环境中，如果环境变量包含 localhost，忽略它
-    // 因为上面的检测已经处理了 CloudStudio 环境，这里主要是为了兼容其他情况
+    // 在 CloudStudio 环境中，如果环境变量包含 localhost，完全忽略它
+    // 重新计算 CloudStudio 的 URL 并返回
     if ((hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) && 
         (envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1'))) {
       console.warn('⚠️ [API] 环境变量包含 localhost，在 CloudStudio 环境中已忽略，使用自动检测的地址')
-      // 这种情况理论上不应该发生，因为上面已经返回了，但为了安全起见保留检查
+      // 重新计算 CloudStudio 的 URL
+      if (hostname.includes('--')) {
+        const backendHostname = hostname.replace(/--\d+/, '--8000')
+        const apiUrl = `https://${backendHostname}/api/v1`
+        console.log('✅ [API] 使用 CloudStudio 自动检测的地址:', apiUrl)
+        return apiUrl
+      } else {
+        const backendHostname = hostname.replace(/5173/, '8000')
+        const apiUrl = `https://${backendHostname}/api/v1`
+        console.log('✅ [API] 使用 CloudStudio 自动检测的地址（备用）:', apiUrl)
+        return apiUrl
+      }
     }
     
     // 如果是 HTTPS 页面，强制使用 HTTPS API（防止混合内容错误）
