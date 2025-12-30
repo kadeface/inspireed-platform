@@ -43,9 +43,16 @@ function getApiBaseUrl(): string {
   }
   
   // 如果环境变量中配置了API地址，且不是 CloudStudio 环境，则使用环境变量
+  // 但如果是 CloudStudio 环境，即使设置了环境变量，也要确保使用 HTTPS
   if (import.meta.env.VITE_API_BASE_URL) {
-    console.log('🔧 [API] 使用环境变量配置的 API 地址:', import.meta.env.VITE_API_BASE_URL)
-    return import.meta.env.VITE_API_BASE_URL
+    let envApiUrl = import.meta.env.VITE_API_BASE_URL
+    // 如果是 CloudStudio 环境，强制使用 HTTPS
+    if ((hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) && envApiUrl.startsWith('http://')) {
+      console.warn('⚠️ [API] 环境变量使用 HTTP，但在 CloudStudio 环境中强制转换为 HTTPS')
+      envApiUrl = envApiUrl.replace('http://', 'https://')
+    }
+    console.log('🔧 [API] 使用环境变量配置的 API 地址:', envApiUrl)
+    return envApiUrl
   }
   
   // 本地开发环境：前端端口5173 -> 后端端口8000
@@ -58,12 +65,28 @@ function getApiBaseUrl(): string {
 
 const API_BASE_URL = getApiBaseUrl()
 
+// 在控制台输出最终的 API 地址，方便调试
+console.log('🚀 [API] 最终使用的 API 基础地址:', API_BASE_URL)
+if (API_BASE_URL.startsWith('http://') && window.location.protocol === 'https:') {
+  console.error('❌ [API] 警告：检测到混合内容问题！')
+  console.error('   当前页面使用 HTTPS，但 API 地址使用 HTTP')
+  console.error('   这会导致浏览器阻止请求')
+}
+
 class ApiService {
   private axiosInstance: AxiosInstance
 
   constructor() {
+    // 再次检查并确保在 HTTPS 页面使用 HTTPS API
+    let finalBaseURL = API_BASE_URL
+    if (window.location.protocol === 'https:' && finalBaseURL.startsWith('http://')) {
+      console.warn('⚠️ [API] 检测到混合内容，自动将 HTTP 转换为 HTTPS')
+      finalBaseURL = finalBaseURL.replace('http://', 'https://')
+      console.log('✅ [API] 修正后的 API 地址:', finalBaseURL)
+    }
+    
     this.axiosInstance = axios.create({
-      baseURL: API_BASE_URL,
+      baseURL: finalBaseURL,
       timeout: 120000, // 增加到120秒，适应文档转换等长时间操作
       headers: {
         'Content-Type': 'application/json',
