@@ -71,6 +71,8 @@ class CourseBase(BaseModel):
     code: Optional[str] = Field(None, max_length=100, description="课程代码")
     description: Optional[str] = Field(None, description="课程描述")
     display_order: int = Field(0, description="显示顺序")
+    is_featured: bool = Field(False, description="是否精选课程")
+    category: Optional[str] = Field(None, max_length=50, description="课程分类：人工智能、无人机、轮式机器人、开源硬件、虚拟仿真、3D打印等")
 
 
 class CourseCreate(CourseBase):
@@ -88,6 +90,8 @@ class CourseUpdate(BaseModel):
     display_order: Optional[int] = Field(None, description="显示顺序")
     is_active: Optional[bool] = Field(None, description="是否启用")
     grade_id: Optional[int] = Field(None, description="年级ID（调整课程年级）")
+    is_featured: Optional[bool] = Field(None, description="是否精选课程")
+    category: Optional[str] = Field(None, max_length=50, description="课程分类：人工智能、无人机、轮式机器人、开源硬件、虚拟仿真、3D打印等")
 
 
 class CourseResponse(CourseBase):
@@ -98,6 +102,8 @@ class CourseResponse(CourseBase):
     created_by: Optional[int]
     created_at: datetime
     updated_at: datetime
+    is_featured: bool
+    category: Optional[str]
 
     # 嵌套关联信息
     subject: Optional[SubjectResponse] = None

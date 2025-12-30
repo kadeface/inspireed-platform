@@ -210,3 +210,62 @@ async def public_get_resource_statistics(
         cell_count=cell_count
     )
 
+
+@router.get("/featured-courses", response_model=List[CourseResponse])
+async def public_get_featured_courses(
+    category: Optional[str] = Query(
+        None,
+        description="课程分类筛选：人工智能、无人机、轮式机器人、开源硬件、虚拟仿真、3D打印等"
+    ),
+    limit: int = Query(20, ge=1, le=100, description="返回数量限制"),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """
+    获取精选科创课程列表（公开，无需登录）
+    
+    支持的分类：
+    - 人工智能 (ai, artificial_intelligence)
+    - 无人机 (drone, uav)
+    - 轮式机器人 (wheeled_robot, robot)
+    - 开源硬件 (open_hardware, hardware)
+    - 虚拟仿真 (simulation, virtual)
+    - 3D打印 (3d_printing, printing)
+    """
+    
+    query = (
+        select(Course)
+        .options(selectinload(Course.subject), selectinload(Course.grade))
+        .where(
+            Course.is_active == True,  # noqa: E712
+            Course.is_featured == True  # noqa: E712
+        )
+        .order_by(Course.display_order, Course.id)
+    )
+    
+    # 如果指定了分类，则按分类筛选
+    if category:
+        # 支持多种分类名称的匹配
+        category_lower = category.lower()
+        if category_lower in ['ai', 'artificial_intelligence', '人工智能']:
+            query = query.where(Course.category.in_(['ai', 'artificial_intelligence', '人工智能']))
+        elif category_lower in ['drone', 'uav', '无人机']:
+            query = query.where(Course.category.in_(['drone', 'uav', '无人机']))
+        elif category_lower in ['wheeled_robot', 'robot', '轮式机器人', '机器人']:
+            query = query.where(Course.category.in_(['wheeled_robot', 'robot', '轮式机器人', '机器人']))
+        elif category_lower in ['open_hardware', 'hardware', '开源硬件', '硬件']:
+            query = query.where(Course.category.in_(['open_hardware', 'hardware', '开源硬件', '硬件']))
+        elif category_lower in ['simulation', 'virtual', '虚拟仿真', '仿真']:
+            query = query.where(Course.category.in_(['simulation', 'virtual', '虚拟仿真', '仿真']))
+        elif category_lower in ['3d_printing', 'printing', '3d打印', '打印']:
+            query = query.where(Course.category.in_(['3d_printing', 'printing', '3D打印', '打印']))
+        else:
+            # 直接匹配 category 字段
+            query = query.where(Course.category == category)
+    
+    query = query.limit(limit)
+    
+    result = await db.execute(query)
+    courses = result.scalars().all()
+    
+    return courses
+

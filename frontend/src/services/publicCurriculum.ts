@@ -27,6 +27,19 @@ export const publicCurriculumService = {
    */
   async getCourseWithChapters(courseId: number): Promise<CourseWithChapters> {
     return await api.get(`/public/curriculum/courses/${courseId}/with-chapters`)
+  },
+
+  /**
+   * 获取精选科创课程列表（公开）
+   * @param category 课程分类：人工智能、无人机、轮式机器人、开源硬件、虚拟仿真、3D打印等
+   * @param limit 返回数量限制，默认20
+   */
+  async getFeaturedCourses(category?: string, limit: number = 20): Promise<Course[]> {
+    const params: any = { limit }
+    if (category) {
+      params.category = category
+    }
+    return await api.get('/public/curriculum/featured-courses', { params })
   }
 }
 

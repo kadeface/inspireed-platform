@@ -76,6 +76,10 @@ class Course(Base):
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     display_order = Column(Integer, default=0, nullable=False)
+    
+    # 精选和分类字段
+    is_featured = Column(Boolean, default=False, nullable=False)  # 是否精选课程
+    category = Column(String(50), nullable=True)  # 课程分类：人工智能、无人机、轮式机器人、开源硬件、虚拟仿真、3D打印等
 
     # 创建者
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)

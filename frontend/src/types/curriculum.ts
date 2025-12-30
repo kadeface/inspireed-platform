@@ -140,6 +140,8 @@ export interface Course {
   created_by?: number
   created_at: string
   updated_at: string
+  is_featured?: boolean
+  category?: string
   subject?: Subject
   grade?: Grade
 }

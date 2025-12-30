@@ -6,7 +6,8 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'Home',
-    redirect: '/login',
+    component: () => import('../pages/HomePage.vue'),
+    meta: { title: '首页 - InspireEd 科创教育平台' },
   },
   {
     path: '/login',
