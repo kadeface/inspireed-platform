@@ -15,6 +15,23 @@ function getApiBaseUrl(): string {
   
   console.log('🔍 [API] 检测环境 - hostname:', hostname, 'protocol:', protocol, 'port:', port, 'full URL:', window.location.href)
   
+  // 如果环境变量中配置了API地址，先检查并处理
+  if (import.meta.env.VITE_API_BASE_URL) {
+    let envApiUrl = import.meta.env.VITE_API_BASE_URL
+    // 如果是 HTTPS 页面，强制使用 HTTPS API（防止混合内容错误）
+    if (protocol === 'https:' && envApiUrl.startsWith('http://')) {
+      console.warn('⚠️ [API] 环境变量使用 HTTP，但在 HTTPS 页面中强制转换为 HTTPS')
+      envApiUrl = envApiUrl.replace('http://', 'https://')
+    }
+    // 如果是 CloudStudio 环境，也强制使用 HTTPS
+    if ((hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) && envApiUrl.startsWith('http://')) {
+      console.warn('⚠️ [API] 环境变量使用 HTTP，但在 CloudStudio 环境中强制转换为 HTTPS')
+      envApiUrl = envApiUrl.replace('http://', 'https://')
+    }
+    console.log('🔧 [API] 使用环境变量配置的 API 地址:', envApiUrl)
+    return envApiUrl
+  }
+  
   // Cloud Studio 环境：如果 hostname 包含 cloudstudio.club 或 coding.net
   // 后端端口通常是 8000，但需要通过 Cloud Studio 分配的 URL 访问
   if (hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) {
@@ -42,27 +59,15 @@ function getApiBaseUrl(): string {
     }
   }
   
-  // 如果环境变量中配置了API地址，且不是 CloudStudio 环境，则使用环境变量
-  // 但如果是 CloudStudio 环境，即使设置了环境变量，也要确保使用 HTTPS
-  if (import.meta.env.VITE_API_BASE_URL) {
-    let envApiUrl = import.meta.env.VITE_API_BASE_URL
-    // 如果是 CloudStudio 环境，强制使用 HTTPS
-    if ((hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) && envApiUrl.startsWith('http://')) {
-      console.warn('⚠️ [API] 环境变量使用 HTTP，但在 CloudStudio 环境中强制转换为 HTTPS')
-      envApiUrl = envApiUrl.replace('http://', 'https://')
-    }
-    console.log('🔧 [API] 使用环境变量配置的 API 地址:', envApiUrl)
-    return envApiUrl
-  }
-  
   // 本地开发环境：前端端口5173 -> 后端端口8000
   // 注意：在 CloudStudio 中，如果 hostname 不包含 cloudstudio.club，也会走到这里
   // 但这种情况应该很少见
-  const apiUrl = `${protocol}//${hostname}:8000/api/v1`
+  // 如果页面是 HTTPS，也使用 HTTPS API
+  const apiProtocol = protocol === 'https:' ? 'https:' : 'http:'
+  const apiUrl = `${apiProtocol}//${hostname}:8000/api/v1`
   console.log('📍 [API] 本地环境，使用后端地址:', apiUrl)
   return apiUrl
 }
-
 const API_BASE_URL = getApiBaseUrl()
 
 // 在控制台输出最终的 API 地址，方便调试
