@@ -119,6 +119,17 @@ async def log_requests(request: Request, call_next):
     try:
         response = await call_next(request)
         
+        # 为 307 重定向响应添加 CORS 头（FastAPI 的尾部斜杠重定向）
+        if response.status_code == 307 and origin:
+            # 检查 origin 是否匹配允许的源
+            pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
+            if re.match(pattern, origin):
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+                response.headers["Access-Control-Allow-Headers"] = "*"
+                print(f"   ✅ 为 307 重定向添加了 CORS 头")
+        
         # 记录响应头（特别是 CORS 相关头）
         if origin or method == "OPTIONS":
             cors_headers = {
