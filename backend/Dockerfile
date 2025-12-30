@@ -4,8 +4,17 @@ FROM python:3.10-slim
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖
-RUN apt-get update && apt-get install -y \
+# 配置使用国内镜像源（阿里云）以加速 apt-get
+# 如果是 CloudStudio 环境，使用国内镜像源可以大幅提升构建速度
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || \
+    (echo "deb http://mirrors.aliyun.com/debian/ bullseye main" > /etc/apt/sources.list && \
+     echo "deb http://mirrors.aliyun.com/debian-security/ bullseye-security main" >> /etc/apt/sources.list && \
+     echo "deb http://mirrors.aliyun.com/debian/ bullseye-updates main" >> /etc/apt/sources.list) || true
+
+# 安装系统依赖（添加超时和重试机制）
+RUN apt-get update --fix-missing && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     gcc \
     postgresql-client \
     libpq-dev \
@@ -14,8 +23,9 @@ RUN apt-get update && apt-get install -y \
 # 复制依赖文件
 COPY requirements.txt .
 
-# 安装 Python 依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 配置 pip 使用国内镜像源（清华大学镜像）以加速安装
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install --no-cache-dir -r requirements.txt
 
 # 复制应用代码
 COPY . .
