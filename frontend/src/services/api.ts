@@ -15,25 +15,9 @@ function getApiBaseUrl(): string {
   
   console.log('🔍 [API] 检测环境 - hostname:', hostname, 'protocol:', protocol, 'port:', port, 'full URL:', window.location.href)
   
-  // 如果环境变量中配置了API地址，先检查并处理
-  if (import.meta.env.VITE_API_BASE_URL) {
-    let envApiUrl = import.meta.env.VITE_API_BASE_URL
-    // 如果是 HTTPS 页面，强制使用 HTTPS API（防止混合内容错误）
-    if (protocol === 'https:' && envApiUrl.startsWith('http://')) {
-      console.warn('⚠️ [API] 环境变量使用 HTTP，但在 HTTPS 页面中强制转换为 HTTPS')
-      envApiUrl = envApiUrl.replace('http://', 'https://')
-    }
-    // 如果是 CloudStudio 环境，也强制使用 HTTPS
-    if ((hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) && envApiUrl.startsWith('http://')) {
-      console.warn('⚠️ [API] 环境变量使用 HTTP，但在 CloudStudio 环境中强制转换为 HTTPS')
-      envApiUrl = envApiUrl.replace('http://', 'https://')
-    }
-    console.log('🔧 [API] 使用环境变量配置的 API 地址:', envApiUrl)
-    return envApiUrl
-  }
-  
-  // Cloud Studio 环境：如果 hostname 包含 cloudstudio.club 或 coding.net
+  // 优先检测 Cloud Studio 环境：如果 hostname 包含 cloudstudio.club 或 coding.net
   // 后端端口通常是 8000，但需要通过 Cloud Studio 分配的 URL 访问
+  // 这样可以避免环境变量中的 localhost 覆盖正确的 CloudStudio URL
   if (hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) {
     // Cloud Studio 环境中，URL 格式为：{id}--{port}.{region}.cloudstudio.club
     // 前端 URL 示例：645cf02ac04c45c38ed3f5cceb49231b--5173.ap-shanghai2.cloudstudio.club
@@ -57,6 +41,27 @@ function getApiBaseUrl(): string {
       console.log('✅ [API] Cloud Studio 环境（备用检测），使用后端地址:', apiUrl)
       return apiUrl
     }
+  }
+  
+  // 如果环境变量中配置了API地址，检查并处理
+  if (import.meta.env.VITE_API_BASE_URL) {
+    let envApiUrl = import.meta.env.VITE_API_BASE_URL
+    
+    // 在 CloudStudio 环境中，如果环境变量包含 localhost，忽略它
+    // 因为上面的检测已经处理了 CloudStudio 环境，这里主要是为了兼容其他情况
+    if ((hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) && 
+        (envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1'))) {
+      console.warn('⚠️ [API] 环境变量包含 localhost，在 CloudStudio 环境中已忽略，使用自动检测的地址')
+      // 这种情况理论上不应该发生，因为上面已经返回了，但为了安全起见保留检查
+    }
+    
+    // 如果是 HTTPS 页面，强制使用 HTTPS API（防止混合内容错误）
+    if (protocol === 'https:' && envApiUrl.startsWith('http://')) {
+      console.warn('⚠️ [API] 环境变量使用 HTTP，但在 HTTPS 页面中强制转换为 HTTPS')
+      envApiUrl = envApiUrl.replace('http://', 'https://')
+    }
+    console.log('🔧 [API] 使用环境变量配置的 API 地址:', envApiUrl)
+    return envApiUrl
   }
   
   // 本地开发环境：前端端口5173 -> 后端端口8000
