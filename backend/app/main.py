@@ -60,7 +60,8 @@ cors_config = {
 }
 
 # 如果启用局域网访问，使用正则表达式匹配所有局域网IP和 Cloud Studio 域名
-if settings.ALLOW_LAN_ACCESS:
+# 或者如果 BACKEND_CORS_ORIGINS 包含 "*"，也使用正则表达式允许所有来源
+if settings.ALLOW_LAN_ACCESS or (settings.BACKEND_CORS_ORIGINS and "*" in [str(o) for o in settings.BACKEND_CORS_ORIGINS]):
     # 匹配 localhost、常见的局域网IP段、以及 Cloud Studio 域名
     # Cloud Studio URL 格式：https://{id}--{port}.{region}.cloudstudio.club
     # 注意：Cloud Studio 的端口在域名内部（--8000），不在后面（:8000）
@@ -69,9 +70,10 @@ if settings.ALLOW_LAN_ACCESS:
     ] = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
     print(f"✅ CORS configured with LAN access enabled")
     print(f"   ALLOW_LAN_ACCESS: {settings.ALLOW_LAN_ACCESS}")
+    print(f"   BACKEND_CORS_ORIGINS: {settings.BACKEND_CORS_ORIGINS}")
     print(f"   Regex pattern: {cors_config['allow_origin_regex']}")
     # 测试 Cloud Studio 域名匹配
-    test_origin = "https://0962edcd607544c19e9633d7d198e069--5173.ap-shanghai2.cloudstudio.club"
+    test_origin = "https://645cf02ac04c45c38ed3f5cceb49231b--5173.ap-shanghai2.cloudstudio.club"
     if re.match(cors_config['allow_origin_regex'], test_origin):
         print(f"   ✅ Test origin matched: {test_origin}")
     else:
