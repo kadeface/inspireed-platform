@@ -1,18 +1,22 @@
-# VS Code Preview 配置
-# 用于 VS Code 的预览功能，支持本地开发环境
-# 注意：这是用于 VS Code 的配置，CloudStudio 使用 .cloudstudio/preview.yaml
-autoOpen: false
-apps:
-  - port: 8000
-    run: bash .vscode/start-backend.sh
-    root: .
-    name: backend-api
-    description: InspireEd 后端 API 服务 (FastAPI)，提供 RESTful API 和 Swagger 文档
-    autoOpen: true
+# CloudStudio Preview 配置
+# CloudStudio 默认读取 .vscode/preview.yml
+# 此配置直接调用启动脚本，简化配置管理
 
-  - port: 5173
-    run: bash .vscode/start-frontend.sh
-    root: .
-    name: frontend-app
-    description: InspireEd 前端 Web 应用 (Vue 3 + Vite)，用户界面（已配置支持 CloudStudio 域名）
-    autoOpen: false
+autoOpen: false # 打开工作空间时是否自动开启所有应用的预览
+
+apps:
+  # 后端 API 服务
+  - port: 8000 # 应用的端口
+    run: bash .vscode/start-backend-cloudstudio.sh # 应用的启动命令
+    root: . # 应用的启动目录
+    name: backend-api # 应用名称
+    description: InspireEd 后端 API 服务 (FastAPI)，提供 RESTful API 和 Swagger 文档 # 应用描述
+    autoOpen: true # 打开工作空间时是否自动开启预览（优先级高于根级 autoOpen）
+
+  # 前端 Web 应用
+  - port: 5173 # 应用的端口
+    run: bash .vscode/start-frontend-cloudstudio.sh # 应用的启动命令
+    root: . # 应用的启动目录
+    name: frontend-app # 应用名称
+    description: InspireEd 前端 Web 应用 (Vue 3 + Vite)，用户界面 # 应用描述
+    autoOpen: false # 打开工作空间时是否自动开启预览
