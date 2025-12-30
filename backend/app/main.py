@@ -102,7 +102,6 @@ async def log_requests(request: Request, call_next):
         print(f"🌐 [CORS] 请求: {method} {url}")
         print(f"   Origin: {origin}")
         # 检查 origin 是否匹配正则表达式
-        import re
         pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
         if re.match(pattern, origin):
             print(f"   ✅ Origin 匹配正则表达式")
