@@ -14,6 +14,7 @@ function getApiBaseUrl(): string {
   const port = window.location.port
   
   console.log('🔍 [API] 检测环境 - hostname:', hostname, 'protocol:', protocol, 'port:', port, 'full URL:', window.location.href)
+  console.log('🔍 [API] VITE_API_BASE_URL 环境变量:', import.meta.env.VITE_API_BASE_URL)
   
   // 优先检测 Cloud Studio 环境：如果 hostname 包含 cloudstudio.club 或 coding.net
   // 后端端口通常是 8000，但需要通过 Cloud Studio 分配的 URL 访问
@@ -139,16 +140,48 @@ class ApiService {
         
         // 最后一道防线：在 HTTPS 页面中，确保 baseURL 使用 HTTPS
         if (window.location.protocol === 'https:' && config.baseURL?.startsWith('http://')) {
-          console.warn('⚠️ [API] 请求拦截器检测到 HTTP baseURL，自动转换为 HTTPS:', config.baseURL)
+          console.error('❌ [API] 请求拦截器检测到 HTTP baseURL！', {
+            baseURL: config.baseURL,
+            url: config.url,
+            fullURL: config.baseURL + (config.url || ''),
+            hostname: window.location.hostname,
+            protocol: window.location.protocol
+          })
+          console.warn('⚠️ [API] 请求拦截器自动转换为 HTTPS:', config.baseURL)
           config.baseURL = config.baseURL.replace('http://', 'https://')
           console.log('✅ [API] 请求拦截器修正后的 baseURL:', config.baseURL)
         }
         
         // 如果请求 URL 本身是完整的 HTTP URL，也转换为 HTTPS
         if (window.location.protocol === 'https:' && config.url?.startsWith('http://')) {
-          console.warn('⚠️ [API] 请求拦截器检测到 HTTP 完整 URL，自动转换为 HTTPS:', config.url)
+          console.error('❌ [API] 请求拦截器检测到 HTTP 完整 URL！', {
+            url: config.url,
+            baseURL: config.baseURL,
+            hostname: window.location.hostname,
+            protocol: window.location.protocol
+          })
+          console.warn('⚠️ [API] 请求拦截器自动转换为 HTTPS:', config.url)
           config.url = config.url.replace('http://', 'https://')
           console.log('✅ [API] 请求拦截器修正后的 URL:', config.url)
+        }
+        
+        // 最终检查：确保完整 URL 使用 HTTPS
+        const finalURL = (config.baseURL || '') + (config.url || '')
+        if (window.location.protocol === 'https:' && finalURL.startsWith('http://')) {
+          console.error('❌ [API] 最终检查：完整 URL 仍然是 HTTP！', {
+            finalURL,
+            baseURL: config.baseURL,
+            url: config.url,
+            hostname: window.location.hostname
+          })
+          // 强制修正
+          if (config.baseURL?.startsWith('http://')) {
+            config.baseURL = config.baseURL.replace('http://', 'https://')
+          }
+          if (config.url?.startsWith('http://')) {
+            config.url = config.url.replace('http://', 'https://')
+          }
+          console.log('✅ [API] 强制修正后的完整 URL:', (config.baseURL || '') + (config.url || ''))
         }
         
         return config
