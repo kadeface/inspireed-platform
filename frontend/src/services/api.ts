@@ -6,36 +6,45 @@ import type { AxiosInstance, AxiosRequestConfig } from 'axios'
  * 根据当前访问的主机名自动适配后端地址
  */
 function getApiBaseUrl(): string {
-  // 如果环境变量中配置了API地址，优先使用
-  if (import.meta.env.VITE_API_BASE_URL) {
-    console.log('🔧 [API] 使用环境变量配置的 API 地址:', import.meta.env.VITE_API_BASE_URL)
-    return import.meta.env.VITE_API_BASE_URL
-  }
-  
-  // 动态获取当前主机名
+  // 动态获取当前主机名（优先于环境变量，确保 CloudStudio 环境能正确检测）
   const hostname = window.location.hostname
   const protocol = window.location.protocol
   const port = window.location.port
   
-  console.log('🔍 [API] 检测环境 - hostname:', hostname, 'protocol:', protocol, 'port:', port)
+  console.log('🔍 [API] 检测环境 - hostname:', hostname, 'protocol:', protocol, 'port:', port, 'full URL:', window.location.href)
   
   // Cloud Studio 环境：如果 hostname 包含 cloudstudio.club 或 coding.net
   // 后端端口通常是 8000，但需要通过 Cloud Studio 分配的 URL 访问
   if (hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) {
     // Cloud Studio 环境中，URL 格式为：{id}--{port}.{region}.cloudstudio.club
-    // 前端 URL 示例：645cf02ac04c45c38ed3f5cceb49231b--5173.ap-shanghai2.cloudstudio.club
-    // 后端 URL 应该：645cf02ac04c45c38ed3f5cceb49231b--8000.ap-shanghai2.cloudstudio.club
+    // 前端 URL 示例：d6b1c11750f24ca6b76e34a92dcdf009--5173.ap-shanghai2.cloudstudio.club
+    // 后端 URL 应该：d6b1c11750f24ca6b76e34a92dcdf009--8000.ap-shanghai2.cloudstudio.club
     // 需要将端口号从 5173 替换为 8000
     if (hostname.includes('--')) {
-      // 将 --5173 替换为 --8000
+      // 将 --5173 或 --其他端口 替换为 --8000
       const backendHostname = hostname.replace(/--\d+/, '--8000')
       const apiUrl = `${protocol}//${backendHostname}/api/v1`
-      console.log('✅ [API] Cloud Studio 环境，使用后端地址:', apiUrl)
+      console.log('✅ [API] Cloud Studio 环境检测成功！')
+      console.log('   前端地址:', `${protocol}//${hostname}`)
+      console.log('   后端地址:', apiUrl)
+      return apiUrl
+    } else {
+      // 如果没有 -- 分隔符，尝试使用标准格式
+      const apiUrl = `${protocol}//${hostname.replace(/5173/, '8000')}/api/v1`
+      console.log('✅ [API] Cloud Studio 环境（备用检测），使用后端地址:', apiUrl)
       return apiUrl
     }
   }
   
+  // 如果环境变量中配置了API地址，且不是 CloudStudio 环境，则使用环境变量
+  if (import.meta.env.VITE_API_BASE_URL) {
+    console.log('🔧 [API] 使用环境变量配置的 API 地址:', import.meta.env.VITE_API_BASE_URL)
+    return import.meta.env.VITE_API_BASE_URL
+  }
+  
   // 本地开发环境：前端端口5173 -> 后端端口8000
+  // 注意：在 CloudStudio 中，如果 hostname 不包含 cloudstudio.club，也会走到这里
+  // 但这种情况应该很少见
   const apiUrl = `${protocol}//${hostname}:8000/api/v1`
   console.log('📍 [API] 本地环境，使用后端地址:', apiUrl)
   return apiUrl
