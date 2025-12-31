@@ -1,22 +1,15 @@
 # CloudStudio Preview 配置
 # CloudStudio 默认读取 .vscode/preview.yml
-# 此配置直接调用启动脚本，简化配置管理
+# 此配置使用统一的 Docker Compose 启动脚本（start-cloudstudio.sh）
 
 autoOpen: false # 打开工作空间时是否自动开启所有应用的预览
 
 apps:
-  # 后端 API 服务
-  - port: 8000 # 应用的端口
-    run: bash .vscode/start-backend-cloudstudio.sh # 应用的启动命令
-    root: . # 应用的启动目录
-    name: backend-api # 应用名称
-    description: InspireEd 后端 API 服务 (FastAPI)，提供 RESTful API 和 Swagger 文档 # 应用描述
-    autoOpen: true # 打开工作空间时是否自动开启预览（优先级高于根级 autoOpen）
-
-  # 前端 Web 应用
-  - port: 5173 # 应用的端口
-    run: bash .vscode/start-frontend-cloudstudio.sh # 应用的启动命令
-    root: . # 应用的启动目录
-    name: frontend-app # 应用名称
-    description: InspireEd 前端 Web 应用 (Vue 3 + Vite)，用户界面 # 应用描述
-    autoOpen: false # 打开工作空间时是否自动开启预览
+  # 使用统一的 Docker Compose 启动脚本
+  # 此脚本会启动所有服务：PostgreSQL, Redis, MinIO, Backend(8000), Frontend(5173)
+  - port: 5173
+    run: bash start-cloudstudio.sh
+    root: .
+    name: inspireed-full-stack
+    description: InspireEd 全栈服务（通过 Docker Compose 启动，包含后端 API 和前端应用）
+    autoOpen: true
