@@ -16,6 +16,47 @@ from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.api.v1 import api_router
 
+# CORS 源匹配正则表达式（与 CORS 配置保持一致）
+CORS_ORIGIN_PATTERN = re.compile(
+    r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
+)
+
+
+def fix_redirect_response(response, origin: str, request: Request) -> None:
+    """
+    修复 307 重定向响应：添加 CORS 头并修复 Location URL
+    
+    Args:
+        response: FastAPI 响应对象
+        origin: 请求的 Origin 头
+        request: FastAPI 请求对象
+    """
+    if not origin or not CORS_ORIGIN_PATTERN.match(origin):
+        return
+    
+    # 添加 CORS 头
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    
+    # 修复 Location URL（HTTP -> HTTPS）
+    if not origin.startswith("https://"):
+        return
+        
+    location = response.headers.get("Location")
+    if not location:
+        return
+    
+    if location.startswith("http://"):
+        # 绝对路径：直接替换
+        response.headers["Location"] = location.replace("http://", "https://")
+    elif location.startswith("/"):
+        # 相对路径：构建完整 HTTPS URL
+        host = request.headers.get("host") or request.headers.get("x-forwarded-host")
+        if host:
+            response.headers["Location"] = f"https://{host}{location}"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,16 +108,14 @@ if settings.ALLOW_LAN_ACCESS or (settings.BACKEND_CORS_ORIGINS and "*" in [str(o
     # 匹配 localhost、常见的局域网IP段、以及 Cloud Studio 域名
     # Cloud Studio URL 格式：https://{id}--{port}.{region}.cloudstudio.club
     # 注意：Cloud Studio 的端口在域名内部（--8000），不在后面（:8000）
-    cors_config[
-        "allow_origin_regex"
-    ] = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
+    cors_config["allow_origin_regex"] = CORS_ORIGIN_PATTERN.pattern
     print(f"✅ CORS configured with LAN access enabled")
     print(f"   ALLOW_LAN_ACCESS: {settings.ALLOW_LAN_ACCESS}")
     print(f"   BACKEND_CORS_ORIGINS: {settings.BACKEND_CORS_ORIGINS}")
     print(f"   Regex pattern: {cors_config['allow_origin_regex']}")
     # 测试 Cloud Studio 域名匹配
     test_origin = "https://645cf02ac04c45c38ed3f5cceb49231b--5173.ap-shanghai2.cloudstudio.club"
-    if re.match(cors_config['allow_origin_regex'], test_origin):
+    if CORS_ORIGIN_PATTERN.match(test_origin):
         print(f"   ✅ Test origin matched: {test_origin}")
     else:
         print(f"   ❌ Test origin NOT matched: {test_origin}")
@@ -102,8 +141,7 @@ async def log_requests(request: Request, call_next):
         print(f"🌐 [CORS] 请求: {method} {url}")
         print(f"   Origin: {origin}")
         # 检查 origin 是否匹配正则表达式
-        pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
-        if re.match(pattern, origin):
+        if CORS_ORIGIN_PATTERN.match(origin):
             print(f"   ✅ Origin 匹配正则表达式")
         else:
             print(f"   ❌ Origin 不匹配正则表达式！")
@@ -120,33 +158,7 @@ async def log_requests(request: Request, call_next):
         
         # 为 307 重定向响应添加 CORS 头并修复 Location URL（FastAPI 的尾部斜杠重定向）
         if response.status_code == 307 and origin:
-            # 检查 origin 是否匹配允许的源
-            pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
-            if re.match(pattern, origin):
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Credentials"] = "true"
-                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
-                response.headers["Access-Control-Allow-Headers"] = "*"
-                
-                # 修复 Location 头：如果是 CloudStudio 环境，将 HTTP 改为 HTTPS
-                location = response.headers.get("Location")
-                if location and origin.startswith("https://"):
-                    # 如果 Location 是相对路径，需要构建完整 URL
-                    if location.startswith("http://"):
-                        # 将 HTTP 替换为 HTTPS
-                        https_location = location.replace("http://", "https://")
-                        response.headers["Location"] = https_location
-                        print(f"   ✅ 修复 Location 头: {location} -> {https_location}")
-                    elif location.startswith("/"):
-                        # 相对路径，需要从 origin 或 request 构建完整 URL
-                        # 从 request 获取 host
-                        host = request.headers.get("host") or request.headers.get("x-forwarded-host")
-                        if host:
-                            https_location = f"https://{host}{location}"
-                            response.headers["Location"] = https_location
-                            print(f"   ✅ 修复 Location 头（相对路径）: {location} -> {https_location}")
-                
-                print(f"   ✅ 为 307 重定向添加了 CORS 头并修复了 Location URL")
+            fix_redirect_response(response, origin, request)
         
         # 记录响应头（特别是 CORS 相关头）
         if origin or method == "OPTIONS":
@@ -191,12 +203,9 @@ async def global_exception_handler(request: Request, exc: Exception):
     # 手动添加CORS头（确保即使异常也能返回CORS头）
     if origin:
         # 检查origin是否匹配允许的源
-        import re
-        if settings.ALLOW_LAN_ACCESS:
-            pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
-            if re.match(pattern, origin):
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Credentials"] = "true"
+        if settings.ALLOW_LAN_ACCESS and CORS_ORIGIN_PATTERN.match(origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
         elif origin in [str(o) for o in settings.BACKEND_CORS_ORIGINS]:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
@@ -252,13 +261,11 @@ async def serve_static_file(file_path: str, request: Request):
     # 手动添加CORS头
     if origin:
         # 检查origin是否匹配允许的源
-        if settings.ALLOW_LAN_ACCESS:
-            pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
-            if re.match(pattern, origin):
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Credentials"] = "true"
-                response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-                response.headers["Access-Control-Allow-Headers"] = "*"
+        if settings.ALLOW_LAN_ACCESS and CORS_ORIGIN_PATTERN.match(origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
         elif origin in [str(o) for o in settings.BACKEND_CORS_ORIGINS]:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
@@ -276,13 +283,11 @@ async def options_static_file(request: Request):
     response = JSONResponse(content={})
     
     if origin:
-        if settings.ALLOW_LAN_ACCESS:
-            pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
-            if re.match(pattern, origin):
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Credentials"] = "true"
-                response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-                response.headers["Access-Control-Allow-Headers"] = "*"
+        if settings.ALLOW_LAN_ACCESS and CORS_ORIGIN_PATTERN.match(origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
         elif origin in [str(o) for o in settings.BACKEND_CORS_ORIGINS]:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
