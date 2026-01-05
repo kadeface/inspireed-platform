@@ -630,6 +630,11 @@ const previewUrl = computed(() => {
   if (url.startsWith('/uploads/')) {
     const baseURL = getServerBaseUrl()
     url = `${baseURL}${url}`
+  } else if (url.startsWith('http://') || url.startsWith('https://')) {
+    // 如果是完整URL，在HTTPS环境下强制转换为HTTPS
+    if (window.location.protocol === 'https:') {
+      url = url.replace(/^http:\/\//, 'https://')
+    }
   }
 
   return url

@@ -414,18 +414,22 @@ const saveToLibraryForm = ref({
 // 解析 URL（处理相对路径）
 function resolveUrl(url: string | undefined): string | null {
   if (!url) return null
-  
-  // 如果是完整 URL，直接返回
+
+  // 如果是完整 URL，检查是否需要转换协议
   if (isValidUrl(url)) {
+    // 如果当前页面是HTTPS，强制将资源URL转换为HTTPS
+    if (window.location.protocol === 'https:') {
+      return url.replace(/^http:\/\//i, 'https://')
+    }
     return url
   }
-  
+
   // 如果是相对路径，转换为完整 URL
   if (url.startsWith('/')) {
     const baseURL = getServerBaseUrl()
     return `${baseURL}${url}`
   }
-  
+
   return null
 }
 
