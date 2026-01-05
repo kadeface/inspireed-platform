@@ -160,6 +160,7 @@ export interface CourseUpdate {
   display_order?: number
   is_active?: boolean
   grade_id?: number  // 年级ID（调整课程年级）
+  subject_id?: number  // 学科ID（调整课程学科，仅限未分类课程）
 }
 
 export interface CourseMergeRequest {

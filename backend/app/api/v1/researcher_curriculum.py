@@ -266,6 +266,29 @@ async def update_course(
     # 更新字段
     update_data = course_in.model_dump(exclude_unset=True)
     
+    # 如果更新学科，需要验证（仅允许未分类课程更新学科）
+    if "subject_id" in update_data:
+        new_subject_id = update_data["subject_id"]
+        current_subject_id = cast(Optional[int], course.subject_id)
+        
+        # 如果课程已有学科，不允许修改
+        if current_subject_id is not None:
+            raise HTTPException(
+                status_code=400, 
+                detail="已有学科的课程不能修改学科，仅未分类课程可以设置学科"
+            )
+        
+        # 验证新学科是否存在且启用
+        if new_subject_id is not None:
+            subject_result = await db.execute(
+                select(Subject).where(Subject.id == new_subject_id)
+            )
+            new_subject = subject_result.scalar_one_or_none()
+            if not new_subject:
+                raise HTTPException(status_code=404, detail="学科不存在")
+            if not new_subject.is_active:
+                raise HTTPException(status_code=400, detail="目标学科已被禁用，无法设置")
+    
     # 如果更新年级，需要验证
     if "grade_id" in update_data:
         new_grade_id = update_data["grade_id"]
