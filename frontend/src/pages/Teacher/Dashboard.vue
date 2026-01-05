@@ -1429,7 +1429,12 @@ watch(searchQuery, () => {
 // 监听状态筛选变化
 watch(currentStatus, () => {
   lessonStore.currentPage = 1 // 重置到第一页
-  loadLessons()
+  sharedLessonsPage.value = 1 // 重置共享教案页码
+  if (lessonTab.value === 'my') {
+    loadLessons()
+  } else {
+    loadSharedLessons()
+  }
 })
 
 // 加载可用章节列表
