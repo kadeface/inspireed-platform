@@ -1024,43 +1024,19 @@ async function loadSharedLessons() {
       creator_only: false, // 明确指定不限制创建者
     })
     
-    // 调试信息：打印API返回的数据
-    console.log('共享教案API返回:', {
-      total: response.total,
-      itemsCount: response.items.length,
-      statusFilter,
-      items: response.items.map((l: any) => ({
-        id: l.id,
-        title: l.title,
-        status: l.status,
-        creatorId: l.creator?.id,
-        creatorName: l.creator?.username || l.creator?.full_name
-      }))
-    })
-    
     // 过滤掉当前用户创建的教案，只保留其他教师创建的共享教案
+    // 注意：使用 creator_id 而不是 creator.id，因为后端返回的是 creator_id 字段
     const currentUserId = userStore.user?.id
     const filteredItems = currentUserId 
-      ? response.items.filter(lesson => lesson.creator?.id !== currentUserId)
+      ? response.items.filter(lesson => lesson.creator_id !== currentUserId)
       : response.items
-    
-    console.log('过滤后的共享教案:', {
-      filteredCount: filteredItems.length,
-      currentUserId,
-      filteredItems: filteredItems.map((l: any) => ({
-        id: l.id,
-        title: l.title,
-        status: l.status,
-        creatorId: l.creator?.id
-      }))
-    })
     
     sharedLessons.value = filteredItems
     // 计算总数：API返回的total减去当前页中当前用户创建的教案数量
     // 注意：这只是近似值，因为其他页可能也有当前用户创建的教案
     // 但这是最实用的方法，因为获取准确总数需要额外的API调用
     const currentUserCreatedInPage = currentUserId 
-      ? response.items.filter(lesson => lesson.creator?.id === currentUserId).length
+      ? response.items.filter(lesson => lesson.creator_id === currentUserId).length
       : 0
     // 从API返回的total中减去当前页被过滤掉的教案数量
     // 如果过滤后还有数据，确保总数至少等于过滤后的数量
