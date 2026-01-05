@@ -124,6 +124,10 @@ function sanitizeUrl(url?: string | null): string | null {
   if (!trimmed) return null
 
   if (/^https?:\/\//i.test(trimmed)) {
+    // 如果当前页面是HTTPS，强制将资源URL转换为HTTPS
+    if (window.location.protocol === 'https:') {
+      return trimmed.replace(/^http:\/\//i, 'https://')
+    }
     return trimmed
   }
 

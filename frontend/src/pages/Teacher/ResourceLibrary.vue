@@ -438,8 +438,12 @@ const formatDate = (dateStr: string) => {
 // 获取完整URL（将相对路径转换为绝对路径）
 const getFullUrl = (url?: string | null): string => {
   if (!url) return ''
-  // 如果已经是完整URL，直接返回
+  // 如果已经是完整URL，检查是否需要转换协议（在HTTPS环境下强制使用HTTPS）
   if (url.startsWith('http://') || url.startsWith('https://')) {
+    // 如果当前页面是HTTPS，强制将资源URL转换为HTTPS
+    if (window.location.protocol === 'https:') {
+      return url.replace(/^http:\/\//, 'https://')
+    }
     return url
   }
   // 如果是相对路径，添加服务器基础URL

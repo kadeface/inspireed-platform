@@ -37,6 +37,8 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
+        # 环境变量优先级高于 .env 文件
+        env_prefix="",
     )
 
     # 基础配置

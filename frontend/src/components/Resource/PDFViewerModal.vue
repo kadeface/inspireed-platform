@@ -1,3 +1,5 @@
+cd docker
+docker-compose -f docker-compose.cloudstudio.yml up -d --build frontend
 <template>
   <Transition name="modal">
     <div
@@ -128,8 +130,12 @@ const isDownloading = ref(false)
 // PDF URL
 const pdfUrl = computed(() => {
   if (!props.resourceId || !resource.value?.file_url) return null
-  // 直接使用后端提供的 file_url
-  return resource.value.file_url
+  // 直接使用后端提供的 file_url，但在HTTPS环境下强制转换为HTTPS
+  let url = resource.value.file_url
+  if (window.location.protocol === 'https:' && url.startsWith('http://')) {
+    url = url.replace(/^http:\/\//, 'https://')
+  }
+  return url
 })
 
 // 监听 resourceId 变化
