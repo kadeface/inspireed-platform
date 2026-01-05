@@ -1009,13 +1009,33 @@ async function loadLessons() {
 async function loadSharedLessons() {
   isLoadingSharedLessons.value = true
   try {
-    // 共享教案：只显示已发布的教案，且排除当前用户创建的
+    // 共享教案：根据状态筛选器显示教案，且排除当前用户创建的
+    // 如果选择了"全部"（null），不传status参数，显示所有状态的共享教案
+    // 如果选择了特定状态，使用选中的状态
+    const statusFilter = currentStatus.value === null 
+      ? undefined  // 选择"全部"时，不传status，显示所有状态
+      : currentStatus.value
+    
     const response = await lessonService.fetchLessons({
       page: sharedLessonsPage.value,
       page_size: lessonStore.pageSize,
-      status: LessonStatus.PUBLISHED,
+      status: statusFilter,
       search: searchQuery.value || undefined,
       creator_only: false, // 明确指定不限制创建者
+    })
+    
+    // 调试信息：打印API返回的数据
+    console.log('共享教案API返回:', {
+      total: response.total,
+      itemsCount: response.items.length,
+      statusFilter,
+      items: response.items.map((l: any) => ({
+        id: l.id,
+        title: l.title,
+        status: l.status,
+        creatorId: l.creator?.id,
+        creatorName: l.creator?.username || l.creator?.full_name
+      }))
     })
     
     // 过滤掉当前用户创建的教案，只保留其他教师创建的共享教案
@@ -1024,6 +1044,17 @@ async function loadSharedLessons() {
     const filteredItems = currentUserId 
       ? response.items.filter(lesson => lesson.creator_id !== currentUserId)
       : response.items
+    
+    console.log('过滤后的共享教案:', {
+      filteredCount: filteredItems.length,
+      currentUserId,
+      filteredItems: filteredItems.map((l: any) => ({
+        id: l.id,
+        title: l.title,
+        status: l.status,
+        creatorId: l.creator?.id
+      }))
+    })
     
     sharedLessons.value = filteredItems
     // 计算总数：API返回的total减去当前页中当前用户创建的教案数量
