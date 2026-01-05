@@ -1019,14 +1019,23 @@ async function loadSharedLessons() {
     })
     
     // 过滤掉当前用户创建的教案，只保留其他教师创建的共享教案
+    // 注意：使用 creator_id 而不是 creator.id，因为后端返回的是 creator_id 字段
     const currentUserId = userStore.user?.id
     const filteredItems = currentUserId 
-      ? response.items.filter(lesson => lesson.creator?.id !== currentUserId)
+      ? response.items.filter(lesson => lesson.creator_id !== currentUserId)
       : response.items
     
     sharedLessons.value = filteredItems
-    // 注意：total可能需要调整，但为了简化，这里使用过滤后的数量
-    sharedLessonsTotal.value = filteredItems.length
+    // 计算总数：API返回的total减去当前页中当前用户创建的教案数量
+    // 注意：这只是近似值，因为其他页可能也有当前用户创建的教案
+    // 但这是最实用的方法，因为获取准确总数需要额外的API调用
+    const currentUserCreatedInPage = currentUserId 
+      ? response.items.filter(lesson => lesson.creator_id === currentUserId).length
+      : 0
+    // 从API返回的total中减去当前页被过滤掉的教案数量
+    // 如果过滤后还有数据，确保总数至少等于过滤后的数量
+    const estimatedTotal = Math.max(0, (response.total || 0) - currentUserCreatedInPage)
+    sharedLessonsTotal.value = Math.max(filteredItems.length, estimatedTotal)
   } catch (error: any) {
     showToast('error', error.message || '加载共享教案列表失败')
     sharedLessons.value = []
