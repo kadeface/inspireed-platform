@@ -1009,11 +1009,17 @@ async function loadLessons() {
 async function loadSharedLessons() {
   isLoadingSharedLessons.value = true
   try {
-    // 共享教案：只显示已发布的教案，且排除当前用户创建的
+    // 共享教案：根据状态筛选器显示教案，且排除当前用户创建的
+    // 如果选择了"全部"（null），默认显示已发布的共享教案（因为共享教案通常应该是已发布的）
+    // 如果选择了特定状态，使用选中的状态
+    const statusFilter = currentStatus.value === null 
+      ? LessonStatus.PUBLISHED  // 选择"全部"时，默认显示已发布的共享教案
+      : currentStatus.value || LessonStatus.PUBLISHED
+    
     const response = await lessonService.fetchLessons({
       page: sharedLessonsPage.value,
       page_size: lessonStore.pageSize,
-      status: LessonStatus.PUBLISHED,
+      status: statusFilter,
       search: searchQuery.value || undefined,
       creator_only: false, // 明确指定不限制创建者
     })
@@ -1389,7 +1395,12 @@ watch(searchQuery, () => {
 // 监听状态筛选变化
 watch(currentStatus, () => {
   lessonStore.currentPage = 1 // 重置到第一页
-  loadLessons()
+  sharedLessonsPage.value = 1 // 重置共享教案页码
+  if (lessonTab.value === 'my') {
+    loadLessons()
+  } else {
+    loadSharedLessons()
+  }
 })
 
 // 加载可用章节列表
