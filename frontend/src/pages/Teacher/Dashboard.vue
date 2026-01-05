@@ -1010,11 +1010,11 @@ async function loadSharedLessons() {
   isLoadingSharedLessons.value = true
   try {
     // 共享教案：根据状态筛选器显示教案，且排除当前用户创建的
-    // 如果选择了"全部"（null），默认显示已发布的共享教案（因为共享教案通常应该是已发布的）
+    // 如果选择了"全部"（null），不传status参数，显示所有状态的共享教案
     // 如果选择了特定状态，使用选中的状态
     const statusFilter = currentStatus.value === null 
-      ? LessonStatus.PUBLISHED  // 选择"全部"时，默认显示已发布的共享教案
-      : currentStatus.value || LessonStatus.PUBLISHED
+      ? undefined  // 选择"全部"时，不传status，显示所有状态
+      : currentStatus.value
     
     const response = await lessonService.fetchLessons({
       page: sharedLessonsPage.value,
@@ -1024,15 +1024,48 @@ async function loadSharedLessons() {
       creator_only: false, // 明确指定不限制创建者
     })
     
+    // 调试信息：打印API返回的数据
+    console.log('共享教案API返回:', {
+      total: response.total,
+      itemsCount: response.items.length,
+      statusFilter,
+      items: response.items.map((l: any) => ({
+        id: l.id,
+        title: l.title,
+        status: l.status,
+        creatorId: l.creator?.id,
+        creatorName: l.creator?.username || l.creator?.full_name
+      }))
+    })
+    
     // 过滤掉当前用户创建的教案，只保留其他教师创建的共享教案
     const currentUserId = userStore.user?.id
     const filteredItems = currentUserId 
       ? response.items.filter(lesson => lesson.creator?.id !== currentUserId)
       : response.items
     
+    console.log('过滤后的共享教案:', {
+      filteredCount: filteredItems.length,
+      currentUserId,
+      filteredItems: filteredItems.map((l: any) => ({
+        id: l.id,
+        title: l.title,
+        status: l.status,
+        creatorId: l.creator?.id
+      }))
+    })
+    
     sharedLessons.value = filteredItems
-    // 注意：total可能需要调整，但为了简化，这里使用过滤后的数量
-    sharedLessonsTotal.value = filteredItems.length
+    // 计算总数：API返回的total减去当前页中当前用户创建的教案数量
+    // 注意：这只是近似值，因为其他页可能也有当前用户创建的教案
+    // 但这是最实用的方法，因为获取准确总数需要额外的API调用
+    const currentUserCreatedInPage = currentUserId 
+      ? response.items.filter(lesson => lesson.creator?.id === currentUserId).length
+      : 0
+    // 从API返回的total中减去当前页被过滤掉的教案数量
+    // 如果过滤后还有数据，确保总数至少等于过滤后的数量
+    const estimatedTotal = Math.max(0, (response.total || 0) - currentUserCreatedInPage)
+    sharedLessonsTotal.value = Math.max(filteredItems.length, estimatedTotal)
   } catch (error: any) {
     showToast('error', error.message || '加载共享教案列表失败')
     sharedLessons.value = []
