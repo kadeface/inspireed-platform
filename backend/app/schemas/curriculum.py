@@ -88,6 +88,7 @@ class CourseUpdate(BaseModel):
     display_order: Optional[int] = Field(None, description="显示顺序")
     is_active: Optional[bool] = Field(None, description="是否启用")
     grade_id: Optional[int] = Field(None, description="年级ID（调整课程年级）")
+    subject_id: Optional[int] = Field(None, description="学科ID（调整课程学科，仅限未分类课程）")
 
 
 class CourseResponse(CourseBase):

@@ -15,7 +15,8 @@
             <select
               v-model="formData.subject_id"
               class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              :disabled="!!course"
+              :class="{ 'border-orange-300': course && !hasSubject }"
+              :disabled="course && hasSubject"
               required
             >
               <option value="">请选择学科</option>
@@ -50,7 +51,8 @@
             </select>
           </div>
         </div>
-        <p v-if="course" class="text-xs text-gray-500 mb-3 -mt-2">学科不可修改</p>
+        <p v-if="course && hasSubject" class="text-xs text-gray-500 mb-3 -mt-2">学科不可修改</p>
+        <p v-else-if="course && !hasSubject" class="text-xs text-orange-600 mb-3 -mt-2">⚠️ 未分类课程，请选择学科</p>
         
         <!-- 年级变更警告 -->
         <div 
@@ -271,6 +273,14 @@ const selectedGradeName = computed(() => {
   return grade?.name ?? ''
 })
 
+// 判断课程是否有学科（用于判断是否可以编辑学科）
+const hasSubject = computed(() => {
+  if (!props.course?.course) return false
+  const course = props.course.course as any
+  const subjectId = course.subject_id ?? props.course.subject?.id ?? null
+  return subjectId !== null && subjectId !== undefined && subjectId !== ''
+})
+
 // 获取课程统计数据
 async function loadCourseStats(courseId: number) {
   try {
@@ -316,6 +326,7 @@ watch(
     } else {
       formData.value = emptyForm()
       originalGradeId.value = null
+      originalSubjectId.value = null
       courseStats.value = { lesson_count: 0, chapter_count: 0 }
       showAdvanced.value = false
     }
@@ -360,6 +371,12 @@ function handleSubmit() {
     // 如果年级改变了，包含 grade_id
     if (originalGradeId.value !== null && formData.value.grade_id !== originalGradeId.value) {
       updateData.grade_id = Number(formData.value.grade_id)
+    }
+    
+    // 如果学科改变了（从未分类到有学科），包含 subject_id
+    const currentSubjectId = formData.value.subject_id ? Number(formData.value.subject_id) : null
+    if (originalSubjectId.value !== currentSubjectId) {
+      updateData.subject_id = currentSubjectId ?? undefined
     }
     
     emit('save', updateData)
