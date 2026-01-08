@@ -1348,7 +1348,6 @@ async def import_courses(
         
         # 更新URL引用（如果有文件映射）
         if url_mapping:
-<<<<<<< HEAD
             print(f"📋 [导入] 开始更新URL引用，映射条目数: {len(url_mapping)}")
             print(f"   URL映射示例（前3条）:")
             for i, (old, new) in enumerate(list(url_mapping.items())[:3]):
@@ -1381,12 +1380,6 @@ async def import_courses(
                                     img_urls = re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', html)
                                     if img_urls:
                                         print(f"     HTML图片URL: {img_urls[:2]}")  # 只显示前2个
-=======
-            print(f"📋 开始更新URL引用，共 {len(url_mapping)} 个映射")
-            print(f"📋 映射示例(前5个): {dict(list(url_mapping.items())[:5])}")
-            data = _update_urls_in_data(data, url_mapping)
-            print(f"✓ URL引用更新完成")
->>>>>>> 66822d3 (fix: 增强课程导入URL映射逻辑，支持完整URL格式匹配)
 
         # 导入结果统计
         import_result = {
