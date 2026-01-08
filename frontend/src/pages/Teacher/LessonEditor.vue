@@ -962,6 +962,9 @@ import api from '../../services/api'
 import courseExportService from '../../services/courseExport'
 import { useToast } from '@/composables/useToast'
 import { getServerBaseUrl } from '@/utils/url'
+import { createLogger } from '../../utils/logger'
+
+const logger = createLogger('LESSON_EDITOR')
 
 // 配置 dayjs
 dayjs.extend(relativeTime)
@@ -1045,7 +1048,7 @@ const classroomPanelData = computed(() => {
 
 // 🔧 处理 TeacherControlPanel 的 session 变化事件
 function handleSessionChanged(session: any | null) {
-  logger.debug("LessonEditor: 收到 session-changed 事件", 事件', {
+  logger.debug("LessonEditor: 收到 session-changed 事件", {
     sessionId: session?.id,
     status: session?.status,
     timestamp: new Date().toLocaleTimeString(),

@@ -334,7 +334,7 @@ provide('classroomSession', session)
 
 // 🔧 监听 session 变化，通知父组件
 watch(session, (newSession) => {
-  logger.debug("TeacherControlPanel: session 变化，通知父组件",，通知父组件', {
+  logger.debug("TeacherControlPanel: session 变化，通知父组件", {
     sessionId: newSession?.id,
     status: newSession?.status,
     timestamp: new Date().toLocaleTimeString(),
