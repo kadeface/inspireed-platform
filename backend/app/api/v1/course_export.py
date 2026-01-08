@@ -469,13 +469,26 @@ async def _process_zip_import(zip_content: bytes, current_user: User) -> tuple[D
                             "http://localhost:8000",
                             "http://127.0.0.1:8000", 
                             "https://localhost:8000",
-                            "http://111.230.61.28:8000",  # 当前服务器IP
+                            "http://111.230.61.28:8000",  # 当前服务器公网IP
                             "https://111.230.61.28:8000",
+                            "http://192.168.2.35:8000",   # 内网IP
+                            "http://192.168.1",           # 常见内网段（匹配192.168.1.x:8000）
+                            "http://192.168.0",           # 常见内网段（匹配192.168.0.x:8000）
+                            "http://10.0",                # 常见内网段（匹配10.0.x.x:8000）
                         ]
                         
                         for prefix in common_prefixes:
+                            # 完整URL映射
                             full_old_url = f"{prefix}/uploads/resources/{original_filename}"
                             url_mapping[full_old_url] = new_url
+                            
+                            # 支持不同端口
+                            if ":8000" in prefix:
+                                # 也添加其他常见端口的映射
+                                base_prefix = prefix.replace(":8000", "")
+                                for port in [":8000", ":8080", ":3000", ":5173", ""]:
+                                    prefixed_url = f"{base_prefix}{port}/uploads/resources/{original_filename}"
+                                    url_mapping[prefixed_url] = new_url
                         
                         print(f"✅ [导入] 文件上传成功 - 原始: {original_filename} → 新文件: {uploaded_filename}")
                         print(f"   URL映射数量: {len(url_mapping)}")
@@ -597,23 +610,33 @@ def _update_urls_in_data(data: Dict, url_mapping: Dict[str, str]) -> Dict:
                     # 使用改进的匹配函数
                     content[key] = match_and_update_url(value)
                 elif key == "html" and isinstance(value, str):
-                    # 更新HTML中的URL
+                    # 更新HTML中的URL - 避免重复替换
                     html = value
+                    import re
+                    
                     # 遍历所有映射进行替换
                     for old_url, new_url in url_mapping.items():
-                        # 直接替换完整URL
-                        html = html.replace(old_url, new_url)
-                        
-                        # 提取文件名进行额外替换
+                        # 提取文件名
                         old_filename = extract_filename_from_url(old_url)
-                        if old_filename:
-                            # 替换各种可能的URL格式
-                            html = html.replace(f"/uploads/resources/{old_filename}", new_url)
-                            html = html.replace(f'"/uploads/resources/{old_filename}"', f'"{new_url}"')
-                            html = html.replace(f"'/uploads/resources/{old_filename}'", f"'{new_url}'")
-                            # 也替换可能包含完整域名的URL
-                            html = html.replace(f'src="{old_url}"', f'src="{new_url}"')
-                            html = html.replace(f"src='{old_url}'", f"src='{new_url}'")
+                        if not old_filename:
+                            continue
+                        
+                        # 使用正则表达式精确匹配，避免重复替换
+                        # 匹配各种URL格式，但不匹配已经替换过的
+                        patterns_to_replace = [
+                            # 完整URL: http://domain/uploads/resources/filename
+                            (rf'https?://[^/\s]+/uploads/resources/{re.escape(old_filename)}', new_url),
+                            # 相对路径: /uploads/resources/filename (但不是 /uploads/resources//uploads/...)
+                            (rf'(?<!/uploads/resources)/uploads/resources/{re.escape(old_filename)}', new_url),
+                            # 在属性中: src="/uploads/resources/filename"
+                            (rf'(src=")https?://[^"]+/uploads/resources/{re.escape(old_filename)}(")', rf'\1{new_url}\2'),
+                            # 在属性中: src='/uploads/resources/filename'
+                            (rf"(src=')https?://[^']+/uploads/resources/{re.escape(old_filename)}(')", rf"\1{new_url}\2"),
+                        ]
+                        
+                        for pattern, replacement in patterns_to_replace:
+                            html = re.sub(pattern, replacement, html, flags=re.IGNORECASE)
+                    
                     content[key] = html
                 else:
                     content[key] = update_urls_in_content(value)
