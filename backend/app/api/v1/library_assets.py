@@ -21,21 +21,11 @@ from app.schemas.library_asset import (
     LibraryAssetVersionDetail,
     LibraryAssetVersionListResponse,
     LibraryAssetCreateVersionRequest,
-    SimilarAssetsResponse,
-    SimilarAssetItem,
-    RelatedAssetsResponse,
-    RelatedAssetItem,
-    RecommendedAssetsResponse,
-    RecommendedAssetItem,
 )
 from app.services.upload import upload_service
-from app.services.neo4j_service import neo4j_service
 from app.api.deps import get_current_user
 from app.utils.resource_url import url_to_filename, filename_to_url
 from fastapi import Request
-import logging
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -317,26 +307,11 @@ async def upload_library_asset(
     await db.commit()
     await db.refresh(library_asset)
     
-    # 同步到 Neo4j（异步处理，失败不影响主流程）
-    try:
-        await neo4j_service.create_or_update_asset(
-            asset_id=cast(int, library_asset.id),
-            title=cast(str, library_asset.title),
-            asset_type=cast(str, library_asset.asset_type),
-            school_id=cast(int, library_asset.school_id),
-            owner_user_id=cast(int, library_asset.owner_user_id),
-            subject_id=cast(Optional[int], library_asset.subject_id),
-            grade_id=cast(Optional[int], library_asset.grade_id),
-            knowledge_point_category=cast(Optional[str], library_asset.knowledge_point_category),
-            knowledge_point_name=cast(Optional[str], library_asset.knowledge_point_name),
-        )
-    except Exception as e:
-        # Neo4j 同步失败不应该影响主流程
-        logger.warning(f"同步资源到 Neo4j 失败 (asset_id={library_asset.id}): {e}")
-    
     # 转换URL为完整URL
-    public_url_value = filename_to_url(cast(str, library_asset.public_url), request) if cast(Optional[str], library_asset.public_url) else None
-    thumbnail_url_value = filename_to_url(cast(str, library_asset.thumbnail_url), request) if cast(Optional[str], library_asset.thumbnail_url) else None
+    public_url_str = cast(Optional[str], library_asset.public_url)
+    thumbnail_url_str = cast(Optional[str], library_asset.thumbnail_url)
+    public_url_value = filename_to_url(public_url_str, request) if public_url_str else None
+    thumbnail_url_value = filename_to_url(thumbnail_url_str, request) if thumbnail_url_str else None
     
     return LibraryAssetUploadResponse(
         id=cast(int, library_asset.id),
@@ -385,23 +360,6 @@ async def update_library_asset(
     await db.commit()
     await db.refresh(asset)
     
-    # 同步到 Neo4j（异步处理，失败不影响主流程）
-    try:
-        await neo4j_service.create_or_update_asset(
-            asset_id=cast(int, asset.id),
-            title=cast(str, asset.title),
-            asset_type=cast(str, asset.asset_type),
-            school_id=cast(int, asset.school_id),
-            owner_user_id=cast(int, asset.owner_user_id),
-            subject_id=cast(Optional[int], asset.subject_id),
-            grade_id=cast(Optional[int], asset.grade_id),
-            knowledge_point_category=cast(Optional[str], asset.knowledge_point_category),
-            knowledge_point_name=cast(Optional[str], asset.knowledge_point_name),
-        )
-    except Exception as e:
-        # Neo4j 同步失败不应该影响主流程
-        logger.warning(f"更新 Neo4j 资源节点失败 (asset_id={asset.id}): {e}")
-    
     # 转换URL为完整URL
     asset_dict = LibraryAssetDetail.model_validate(asset).model_dump()
     return LibraryAssetDetail(**_convert_asset_urls(asset_dict, request))
@@ -446,13 +404,6 @@ async def delete_library_asset(
             status_code=400,
             detail=f"无法删除：该资源正被 {usage_count} 个课程资源引用",
         )
-    
-    # 从 Neo4j 删除节点（在软删除之前）
-    try:
-        await neo4j_service.delete_asset(asset_id)
-    except Exception as e:
-        # Neo4j 删除失败不应该影响主流程
-        logger.warning(f"删除 Neo4j 资源节点失败 (asset_id={asset_id}): {e}")
     
     # 软删除
     setattr(asset, "status", "deleted")
@@ -729,13 +680,18 @@ async def create_asset_version(
     setattr(asset, "version", new_version)
     setattr(asset, "storage_key", new_file_url)  # 存储文件名
     setattr(asset, "public_url", new_file_url)  # 存储文件名
-    setattr(asset, "size_bytes", upload_result.get("file_size"))
-    setattr(asset, "sha256", upload_result.get("sha256"))
+    file_size = upload_result.get("file_size")
+    if file_size is not None:
+        setattr(asset, "size_bytes", file_size)
+    sha256_value = upload_result.get("sha256")
+    if sha256_value is not None:
+        setattr(asset, "sha256", sha256_value)
     thumbnail_url_value = upload_result.get("thumbnail_url")
     if thumbnail_url_value:
         setattr(asset, "thumbnail_url", url_to_filename(thumbnail_url_value))  # 存储文件名
-    if upload_result.get("page_count"):
-        setattr(asset, "page_count", upload_result.get("page_count"))
+    page_count_value = upload_result.get("page_count")
+    if page_count_value is not None:
+        setattr(asset, "page_count", page_count_value)
     
     await db.commit()
     await db.refresh(asset)
@@ -788,213 +744,3 @@ async def get_asset_versions(
         versions=[LibraryAssetVersionDetail.model_validate(v) for v in versions],
         total=len(versions),
     )
-
-
-# ========== Neo4j 图数据库相关 API ==========
-
-@router.get("/{asset_id}/similar", response_model=SimilarAssetsResponse)
-async def get_similar_assets(
-    asset_id: int,
-    limit: int = Query(10, ge=1, le=50, description="返回数量"),
-    min_similarity: float = Query(0.5, ge=0.0, le=1.0, description="最小相似度"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取相似资源（基于 Neo4j 知识图谱）"""
-    _check_library_access(current_user)
-    
-    # 验证资源存在
-    asset = await db.get(LibraryAsset, asset_id)
-    if not asset:
-        raise HTTPException(status_code=404, detail="资源库资产不存在")
-    
-    # 校验归属学校
-    asset_school_id = cast(int, asset.school_id)
-    user_school_id = cast(int, current_user.school_id)
-    if asset_school_id != user_school_id:
-        raise HTTPException(status_code=403, detail="无权访问其他学校的资源")
-    
-    # 从 Neo4j 获取相似资源
-    try:
-        similar_assets = await neo4j_service.get_similar_assets(
-            asset_id=asset_id,
-            limit=limit,
-            min_similarity=min_similarity,
-        )
-        
-        # 从 PostgreSQL 获取完整资源信息
-        if similar_assets:
-            asset_ids = [item["id"] for item in similar_assets]
-            assets_query = select(LibraryAsset).where(
-                LibraryAsset.id.in_(asset_ids),
-                LibraryAsset.status == "active",
-            )
-            result = await db.execute(assets_query)
-            assets = {a.id: a for a in result.scalars().all()}
-            
-            # 合并 Neo4j 相似度数据和 PostgreSQL 资源数据
-            results = []
-            for item in similar_assets:
-                asset_id_item = item["id"]
-                if asset_id_item in assets:
-                    asset_obj = assets[asset_id_item]
-                    asset_dict = LibraryAssetSummary.model_validate(asset_obj).model_dump()
-                    asset_dict["similarity_score"] = item.get("similarity_score", 0.0)
-                    results.append(SimilarAssetItem(**asset_dict))
-            
-            return SimilarAssetsResponse(
-                items=results,
-                total=len(results),
-                asset_id=asset_id,
-                error=None,
-            )
-        else:
-            return SimilarAssetsResponse(
-                items=[],
-                total=0,
-                asset_id=asset_id,
-                error=None,
-            )
-    except Exception as e:
-        logger.error(f"获取相似资源失败 (asset_id={asset_id}): {e}")
-        # 如果 Neo4j 查询失败，返回空结果而不是错误
-        return SimilarAssetsResponse(
-            items=[],
-            total=0,
-            asset_id=asset_id,
-            error="Neo4j 服务不可用",
-        )
-
-
-@router.get("/{asset_id}/related", response_model=RelatedAssetsResponse)
-async def get_related_assets(
-    asset_id: int,
-    limit: int = Query(10, ge=1, le=50, description="返回数量"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取相关资源（基于 Neo4j 知识图谱路径）"""
-    _check_library_access(current_user)
-    
-    # 验证资源存在
-    asset = await db.get(LibraryAsset, asset_id)
-    if not asset:
-        raise HTTPException(status_code=404, detail="资源库资产不存在")
-    
-    # 校验归属学校
-    asset_school_id = cast(int, asset.school_id)
-    user_school_id = cast(int, current_user.school_id)
-    if asset_school_id != user_school_id:
-        raise HTTPException(status_code=403, detail="无权访问其他学校的资源")
-    
-    # 从 Neo4j 获取相关资源
-    try:
-        related_assets = await neo4j_service.get_related_assets(
-            asset_id=asset_id,
-            limit=limit,
-        )
-        
-        # 从 PostgreSQL 获取完整资源信息
-        if related_assets:
-            asset_ids = [item["id"] for item in related_assets]
-            assets_query = select(LibraryAsset).where(
-                LibraryAsset.id.in_(asset_ids),
-                LibraryAsset.status == "active",
-            )
-            result = await db.execute(assets_query)
-            assets = {a.id: a for a in result.scalars().all()}
-            
-            # 合并 Neo4j 相关度数据和 PostgreSQL 资源数据
-            results = []
-            for item in related_assets:
-                asset_id_item = item["id"]
-                if asset_id_item in assets:
-                    asset_obj = assets[asset_id_item]
-                    asset_dict = LibraryAssetSummary.model_validate(asset_obj).model_dump()
-                    asset_dict["relevance_score"] = item.get("relevance_score", 0)
-                    results.append(RelatedAssetItem(**asset_dict))
-            
-            return RelatedAssetsResponse(
-                items=results,
-                total=len(results),
-                asset_id=asset_id,
-                error=None,
-            )
-        else:
-            return RelatedAssetsResponse(
-                items=[],
-                total=0,
-                asset_id=asset_id,
-                error=None,
-            )
-    except Exception as e:
-        logger.error(f"获取相关资源失败 (asset_id={asset_id}): {e}")
-        return RelatedAssetsResponse(
-            items=[],
-            total=0,
-            asset_id=asset_id,
-            error="Neo4j 服务不可用",
-        )
-
-
-@router.get("/recommended", response_model=RecommendedAssetsResponse)
-async def get_recommended_assets(
-    subject_id: Optional[int] = Query(None, description="学科ID"),
-    grade_id: Optional[int] = Query(None, description="年级ID"),
-    limit: int = Query(10, ge=1, le=50, description="返回数量"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """获取推荐资源（基于 Neo4j 知识图谱）"""
-    _check_library_access(current_user)
-    
-    user_id = cast(int, current_user.id)
-    
-    # 从 Neo4j 获取推荐资源
-    try:
-        recommended_assets = await neo4j_service.get_recommended_assets(
-            user_id=user_id,
-            subject_id=subject_id,
-            grade_id=grade_id,
-            limit=limit,
-        )
-        
-        # 从 PostgreSQL 获取完整资源信息
-        if recommended_assets:
-            asset_ids = [item["id"] for item in recommended_assets]
-            assets_query = select(LibraryAsset).where(
-                LibraryAsset.id.in_(asset_ids),
-                LibraryAsset.status == "active",
-                LibraryAsset.school_id == cast(int, current_user.school_id),
-            )
-            result = await db.execute(assets_query)
-            assets = {a.id: a for a in result.scalars().all()}
-            
-            # 合并 Neo4j 推荐度数据和 PostgreSQL 资源数据
-            results = []
-            for item in recommended_assets:
-                asset_id_item = item["id"]
-                if asset_id_item in assets:
-                    asset_obj = assets[asset_id_item]
-                    asset_dict = LibraryAssetSummary.model_validate(asset_obj).model_dump()
-                    asset_dict["recommendation_score"] = item.get("recommendation_score", 0)
-                    results.append(RecommendedAssetItem(**asset_dict))
-            
-            return RecommendedAssetsResponse(
-                items=results,
-                total=len(results),
-                error=None,
-            )
-        else:
-            return RecommendedAssetsResponse(
-                items=[],
-                total=0,
-                error=None,
-            )
-    except Exception as e:
-        logger.error(f"获取推荐资源失败: {e}")
-        return RecommendedAssetsResponse(
-            items=[],
-            total=0,
-            error="Neo4j 服务不可用",
-        )
