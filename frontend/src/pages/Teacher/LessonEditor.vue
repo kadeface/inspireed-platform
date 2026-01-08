@@ -1405,7 +1405,7 @@ const currentCell = computed(() => {
 // 调试：输出课堂控制按钮的显示条件
 watch([isPreviewMode, () => currentLesson.value?.status], ([preview, status]) => {
   if (preview) {
-    logger.debug("课堂控制按钮显示条件:",:', {
+    logger.debug("课堂控制按钮显示条件:", {
       isPreviewMode: preview,
       lessonStatus: status,
       shouldShow: preview && status === 'published'
