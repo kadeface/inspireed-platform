@@ -1081,9 +1081,9 @@ async def import_courses(
     file: UploadFile = File(...),
     overwrite_existing: bool = Form(False),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin_or_researcher),
+    current_user: User = Depends(require_teacher_or_admin_or_researcher),
 ):
-    """导入课程数据（支持ZIP和JSON格式）"""
+    """导入课程数据（支持ZIP和JSON格式）- 教师、管理员或研究员"""
 
     # 验证文件类型
     if not file.filename:
@@ -1396,10 +1396,62 @@ async def import_courses(
                 grade_id = grade_level_map.get(course_grade_level)
 
                 if not subject_id:
-                    import_result["warnings"].append(
-                        f"导入课程失败 {course_data.get('name', '未知')}: 学科代码 '{course_data['subject_code']}' 不存在（请确保在导入文件中包含该学科）"
+                    # 学科不在导入文件中，尝试从数据库中查找或创建
+                    subject_code = course_data.get('subject_code', '')
+                    course_name = course_data.get('name', '未知')
+                    
+                    # 首先尝试从数据库中查找是否已存在
+                    existing_subject_result = await db.execute(
+                        select(Subject).where(Subject.code == subject_code)
                     )
-                    continue
+                    existing_subject = existing_subject_result.scalar_one_or_none()
+                    
+                    if existing_subject:
+                        # 学科已存在，直接使用
+                        subject_id = existing_subject.id
+                        subject_code_map[subject_code] = subject_id
+                        import_result["warnings"].append(
+                            f"提示：学科代码 '{subject_code}' 在导入文件中不存在，但系统中已存在，已使用现有学科"
+                        )
+                    else:
+                        # 学科不存在，尝试创建
+                        try:
+                            new_subject = Subject(
+                                name=subject_code.capitalize() if subject_code else "未分类学科",
+                                code=subject_code if subject_code else "uncategorized",
+                                description=f"自动创建的学科（来自导入）",
+                                is_active=True,
+                                display_order=9999,
+                            )
+                            db.add(new_subject)
+                            await db.commit()
+                            await db.refresh(new_subject)
+                            subject_id = new_subject.id
+                            subject_code_map[subject_code] = subject_id
+                            import_result["warnings"].append(
+                                f"提示：学科代码 '{subject_code}' 不存在，已自动创建学科 '{new_subject.name}'"
+                            )
+                        except Exception as e:
+                            # 如果创建学科失败（可能是唯一约束冲突），再次尝试从数据库查找
+                            await db.rollback()  # 回滚失败的创建操作
+                            retry_result = await db.execute(
+                                select(Subject).where(Subject.code == subject_code)
+                            )
+                            retry_subject = retry_result.scalar_one_or_none()
+                            
+                            if retry_subject:
+                                # 在回滚后找到了学科（可能是并发创建）
+                                subject_id = retry_subject.id
+                                subject_code_map[subject_code] = subject_id
+                                import_result["warnings"].append(
+                                    f"提示：学科代码 '{subject_code}' 已存在，已使用现有学科"
+                                )
+                            else:
+                                # 确实无法创建或找到学科，跳过课程
+                                import_result["warnings"].append(
+                                    f"导入课程失败 {course_name}: 学科代码 '{subject_code}' 不存在，且无法自动创建（{str(e)}）。课程已跳过，但教案将导入到'未分类课程'"
+                                )
+                                continue
                 
                 if not grade_id:
                     import_result["errors"].append(
@@ -1649,6 +1701,10 @@ async def import_courses(
             try:
                 # 获取课程ID
                 course_code = lesson_data.get("course_code")
+                # 处理 course_code 为 None、字符串 "None" 或空字符串的情况
+                if course_code in [None, "None", "", "null"]:
+                    course_code = None
+                
                 course_id = course_code_map.get(course_code) if course_code else None
                 
                 # 如果找不到课程，使用默认的"未分类"课程
@@ -1656,25 +1712,33 @@ async def import_courses(
                     course_id = await get_or_create_default_course(db, current_user)
                     # 记录提示信息（作为警告而不是错误）
                     lesson_title = lesson_data.get('title', '未知')
-                    import_result["warnings"].append(
-                        f"提示：教案 '{lesson_title}' 的课程代码 '{course_code}' 不存在，已自动归类到'未分类课程'"
-                    )
+                    if course_code:
+                        import_result["warnings"].append(
+                            f"提示：教案 '{lesson_title}' 的课程代码 '{course_code}' 不存在，已自动归类到'未分类课程'"
+                        )
+                    else:
+                        import_result["warnings"].append(
+                            f"提示：教案 '{lesson_title}' 没有课程代码，已自动归类到'未分类课程'"
+                        )
 
                 # 获取章节ID
                 chapter_id = None
                 if lesson_data.get("chapter_code"):
                     chapter_id = chapter_code_map.get(lesson_data["chapter_code"])
                     if not chapter_id:
-                        import_result["errors"].append(
-                            f"教案 {lesson_data.get('title', '')} 的章节不存在"
+                        # 章节不存在时，记录警告但继续导入（不设置章节ID）
+                        lesson_title = lesson_data.get('title', '未知')
+                        import_result["warnings"].append(
+                            f"提示：教案 '{lesson_title}' 的章节代码 '{lesson_data.get('chapter_code')}' 不存在，已导入但不关联章节"
                         )
-                        continue
+                        chapter_id = None  # 明确设置为None，继续导入
 
-                # 检查是否已存在
+                # 检查是否已存在（同时检查创建者，避免不同用户导入相同标题的教案时被误判为已存在）
                 existing = await db.execute(
                     select(Lesson).where(
                         Lesson.course_id == course_id,
                         Lesson.title == lesson_data["title"],
+                        Lesson.creator_id == current_user.id,  # 只检查当前用户创建的教案
                     )
                 )
                 existing_lesson = existing.scalar_one_or_none()
@@ -1690,21 +1754,39 @@ async def import_courses(
                         import_result["lessons"]["skipped"] += 1
                     else:
                         import_result["lessons"]["skipped"] += 1
+                        import_result["warnings"].append(
+                            f"提示：教案 '{lesson_data.get('title', '未知')}' 已存在，已跳过（如需覆盖，请启用覆盖选项）"
+                        )
                 else:
                     # 创建新教案
-                    # 导入的教案默认设置为PUBLISHED状态，实现共享功能
-                    # 因为教师导出教案就表示愿意与他人分享
+                    # 根据用户角色决定导入教案的默认状态
                     imported_status = lesson_data.get("status", "draft")
-                    # 如果导出时是已发布状态，保持已发布；如果是草稿，也设为已发布（共享）
-                    if imported_status and imported_status in ["published", "draft"]:
-                        final_status = LessonStatus.PUBLISHED
-                    elif imported_status:
-                        try:
-                            final_status = LessonStatus(imported_status)
-                        except (ValueError, TypeError):
-                            final_status = LessonStatus.PUBLISHED
+                    role_value = cast(str, getattr(current_user.role, "value", current_user.role))
+                    try:
+                        user_role = UserRole(role_value)
+                    except ValueError:
+                        user_role = UserRole.TEACHER  # 默认教师角色
+                    
+                    if user_role == UserRole.TEACHER:
+                        # 教师导入的教案默认设置为DRAFT状态，让教师自己决定是否发布
+                        if imported_status:
+                            try:
+                                final_status = LessonStatus(imported_status)
+                            except (ValueError, TypeError):
+                                final_status = LessonStatus.DRAFT
+                        else:
+                            final_status = LessonStatus.DRAFT
                     else:
-                        final_status = LessonStatus.PUBLISHED
+                        # 管理员或研究员导入的教案默认设置为PUBLISHED状态，实现共享功能
+                        if imported_status and imported_status in ["published", "draft"]:
+                            final_status = LessonStatus.PUBLISHED
+                        elif imported_status:
+                            try:
+                                final_status = LessonStatus(imported_status)
+                            except (ValueError, TypeError):
+                                final_status = LessonStatus.PUBLISHED
+                        else:
+                            final_status = LessonStatus.PUBLISHED
                     
                     lesson = Lesson(
                         course_id=course_id,
@@ -1729,9 +1811,20 @@ async def import_courses(
                     import_result["lessons"]["created"] += 1
 
             except Exception as e:
-                import_result["errors"].append(
-                    f"导入教案失败 {lesson_data.get('title', '')}: {str(e)}"
-                )
+                # 如果是因为事务回滚导致的错误，尝试回滚并继续
+                error_msg = str(e)
+                if "transaction has been rolled back" in error_msg.lower() or "rollback" in error_msg.lower():
+                    try:
+                        await db.rollback()
+                        import_result["warnings"].append(
+                            f"导入教案 '{lesson_data.get('title', '未知')}' 时遇到事务错误，已回滚并跳过该教案。请检查导入文件或联系管理员。"
+                        )
+                    except:
+                        pass
+                else:
+                    import_result["errors"].append(
+                        f"导入教案失败 {lesson_data.get('title', '')}: {str(e)}"
+                    )
 
         # 6. 导入资源
         resources = data.get("resources") or []

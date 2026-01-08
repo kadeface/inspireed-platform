@@ -35,10 +35,65 @@ if [ "$WAIT_DOCKER" = "true" ]; then
     done
 fi
 
-# 检查 Docker 是否运行
+# 检查 Docker 是否运行，如果未运行则尝试启动
 if ! docker info > /dev/null 2>&1; then
-    echo "❌ Docker 未运行，请先启动 Docker"
-    exit 1
+    echo "⚠️  Docker 未运行，尝试自动启动 Docker..."
+    
+    # 根据操作系统尝试启动 Docker
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS - 启动 Docker Desktop
+        if command -v open &> /dev/null; then
+            echo "🚀 正在启动 Docker Desktop..."
+            open -a Docker
+        else
+            echo "❌ 无法启动 Docker Desktop（未找到 open 命令）"
+            exit 1
+        fi
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux - 尝试使用 systemctl 或 service 启动
+        if command -v systemctl &> /dev/null; then
+            echo "🚀 正在启动 Docker 服务 (systemd)..."
+            sudo systemctl start docker 2>/dev/null || {
+                echo "⚠️  需要 root 权限启动 Docker，请手动执行: sudo systemctl start docker"
+                exit 1
+            }
+        elif command -v service &> /dev/null; then
+            echo "🚀 正在启动 Docker 服务 (service)..."
+            sudo service docker start 2>/dev/null || {
+                echo "⚠️  需要 root 权限启动 Docker，请手动执行: sudo service docker start"
+                exit 1
+            }
+        else
+            echo "❌ 无法启动 Docker（未找到 systemctl 或 service 命令）"
+            exit 1
+        fi
+    else
+        echo "❌ 不支持的操作系统，请手动启动 Docker"
+        exit 1
+    fi
+    
+    # 等待 Docker 启动（最多等待 2 分钟）
+    echo "⏳ 等待 Docker 启动..."
+    max_attempts=24
+    attempt=0
+    while [ $attempt -lt $max_attempts ]; do
+        if docker info > /dev/null 2>&1; then
+            echo "✅ Docker 已启动"
+            sleep 3  # 额外等待确保 Docker 完全就绪
+            break
+        fi
+        attempt=$((attempt + 1))
+        if [ $((attempt % 5)) -eq 0 ]; then
+            echo "等待 Docker 启动中... ($attempt/$max_attempts)"
+        fi
+        sleep 5
+    done
+    
+    # 再次检查 Docker 是否成功启动
+    if ! docker info > /dev/null 2>&1; then
+        echo "❌ Docker 启动超时，请手动启动 Docker 后重试"
+        exit 1
+    fi
 fi
 
 # 启动基础服务
