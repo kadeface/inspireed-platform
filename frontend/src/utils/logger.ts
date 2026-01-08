@@ -1,151 +1,141 @@
 /**
- * 统一的日志工具
- * 可以通过环境变量控制是否输出调试日志
+ * 统一的调试日志工具
+ * 在生产环境自动禁用所有调试日志
  */
 
-// 从环境变量读取配置，生产环境默认关闭调试日志
-const isDevelopment = import.meta.env.MODE === 'development'
-const ENABLE_DEBUG_LOGS = import.meta.env.VITE_ENABLE_DEBUG_LOGS === 'true' || isDevelopment
-
-// 日志级别
 export enum LogLevel {
-  DEBUG = 'DEBUG',
-  INFO = 'INFO',
-  WARN = 'WARN',
-  ERROR = 'ERROR',
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
 }
 
-// 日志模块
-export enum LogModule {
-  API = 'API',
-  LESSON = 'LESSON',
-  ACTIVITY = 'ACTIVITY',
-  WEBSOCKET = 'WEBSOCKET',
-  SESSION = 'SESSION',
-  ASSISTANT = 'ASSISTANT',
-  CLASSROOM = 'CLASSROOM',
-  GENERAL = 'GENERAL',
+// 当前日志级别（从环境变量读取，默认为 INFO）
+let currentLogLevel: LogLevel = LogLevel.INFO
+
+// 从环境变量读取日志级别
+if (import.meta.env.VITE_LOG_LEVEL === 'DEBUG') {
+  currentLogLevel = LogLevel.DEBUG
+} else if (import.meta.env.VITE_LOG_LEVEL === 'WARN') {
+  currentLogLevel = LogLevel.WARN
+} else if (import.meta.env.VITE_LOG_LEVEL === 'ERROR') {
+  currentLogLevel = LogLevel.ERROR
 }
 
-class Logger {
-  private enabledModules: Set<string>
-  private minLevel: LogLevel
+// 是否启用调试日志
+const isDebugEnabled = import.meta.env.VITE_ENABLE_DEBUG_LOGS === 'true' && import.meta.env.DEV
 
-  constructor() {
-    // 可以通过环境变量配置启用的模块
-    const enabledModulesStr = import.meta.env.VITE_DEBUG_MODULES || ''
-    this.enabledModules = new Set(enabledModulesStr.split(',').filter(Boolean))
-    
-    // 如果没有指定模块，则启用所有模块
-    if (this.enabledModules.size === 0 && ENABLE_DEBUG_LOGS) {
-      Object.values(LogModule).forEach(module => this.enabledModules.add(module))
-    }
-
-    // 最小日志级别
-    const minLevelStr = import.meta.env.VITE_LOG_LEVEL || 'INFO'
-    this.minLevel = LogLevel[minLevelStr as keyof typeof LogLevel] || LogLevel.INFO
+/**
+ * 判断是否应该输出日志
+ */
+function shouldLog(level: LogLevel, moduleName?: string): boolean {
+  // 如果禁用了调试日志，只输出 ERROR 级别
+  if (!isDebugEnabled && level !== LogLevel.ERROR) {
+    return false
   }
 
-  private shouldLog(level: LogLevel, module: LogModule): boolean {
-    // 生产环境只输出 ERROR
-    if (!ENABLE_DEBUG_LOGS && level !== LogLevel.ERROR) {
+  // 检查日志级别
+  if (level < currentLogLevel) {
+    return false
+  }
+
+  // 检查模块是否在允许列表中
+  if (import.meta.env.VITE_DEBUG_MODULES) {
+    const modules = import.meta.env.VITE_DEBUG_MODULES.split(',').map(m => m.trim())
+    // 如果指定了模块，并且当前模块不在列表中，不输出
+    if (modules.length > 0 && !modules.includes('*') && moduleName && !modules.includes(moduleName)) {
       return false
     }
-
-    // 检查模块是否启用
-    if (!this.enabledModules.has(module)) {
-      return false
-    }
-
-    // 检查日志级别
-    const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR]
-    const currentIndex = levels.indexOf(level)
-    const minIndex = levels.indexOf(this.minLevel)
-    
-    return currentIndex >= minIndex
   }
 
-  private formatMessage(level: LogLevel, module: LogModule, emoji: string, message: string): string {
-    const timestamp = new Date().toLocaleTimeString()
-    return `[${timestamp}] ${emoji} [${module}/${level}] ${message}`
-  }
+  return true
+}
 
-  debug(module: LogModule, message: string, data?: any, emoji: string = '🔍') {
-    if (!this.shouldLog(LogLevel.DEBUG, module)) return
-    
-    const formattedMessage = this.formatMessage(LogLevel.DEBUG, module, emoji, message)
-    if (data !== undefined) {
-      console.log(formattedMessage, data)
-    } else {
-      console.log(formattedMessage)
-    }
-  }
+/**
+ * 获取日志前缀
+ */
+function getPrefix(moduleName?: string): string {
+  return moduleName ? `[${moduleName}] ` : ''
+}
 
-  info(module: LogModule, message: string, data?: any, emoji: string = '✅') {
-    if (!this.shouldLog(LogLevel.INFO, module)) return
-    
-    const formattedMessage = this.formatMessage(LogLevel.INFO, module, emoji, message)
-    if (data !== undefined) {
-      console.log(formattedMessage, data)
-    } else {
-      console.log(formattedMessage)
-    }
-  }
-
-  warn(module: LogModule, message: string, data?: any, emoji: string = '⚠️') {
-    if (!this.shouldLog(LogLevel.WARN, module)) return
-    
-    const formattedMessage = this.formatMessage(LogLevel.WARN, module, emoji, message)
-    if (data !== undefined) {
-      console.warn(formattedMessage, data)
-    } else {
-      console.warn(formattedMessage)
-    }
-  }
-
-  error(module: LogModule, message: string, error?: any, emoji: string = '❌') {
-    // ERROR 级别始终输出
-    const formattedMessage = this.formatMessage(LogLevel.ERROR, module, emoji, message)
-    if (error !== undefined) {
-      console.error(formattedMessage, error)
-    } else {
-      console.error(formattedMessage)
-    }
-  }
-
-  // 便捷方法
-  lesson = {
-    load: (message: string, data?: any) => this.debug(LogModule.LESSON, message, data, '📥'),
-    save: (message: string, data?: any) => this.debug(LogModule.LESSON, message, data, '💾'),
-    success: (message: string, data?: any) => this.info(LogModule.LESSON, message, data, '✅'),
-  }
-
-  activity = {
-    mount: (message: string, data?: any) => this.debug(LogModule.ACTIVITY, message, data, '🔍'),
-    create: (message: string, data?: any) => this.info(LogModule.ACTIVITY, message, data, '✅'),
-    submit: (message: string, data?: any) => this.info(LogModule.ACTIVITY, message, data, '✅'),
-  }
-
-  api = {
-    request: (message: string, data?: any) => this.debug(LogModule.API, message, data, '🔍'),
-    success: (message: string, data?: any) => this.info(LogModule.API, message, data, '✅'),
-    error: (message: string, error?: any) => this.error(LogModule.API, message, error, '❌'),
-  }
-
-  websocket = {
-    connect: (message: string, data?: any) => this.info(LogModule.WEBSOCKET, message, data, '✅'),
-    message: (message: string, data?: any) => this.debug(LogModule.WEBSOCKET, message, data, '📥'),
-    disconnect: (message: string, data?: any) => this.info(LogModule.WEBSOCKET, message, data, '✅'),
-  }
-
-  session = {
-    create: (message: string, data?: any) => this.info(LogModule.SESSION, message, data, '✅'),
-    update: (message: string, data?: any) => this.debug(LogModule.SESSION, message, data, '🔍'),
+/**
+ * 调试日志（仅在开发环境）
+ */
+export function debug(message: any, ...args: any[]) {
+  if (shouldLog(LogLevel.DEBUG)) {
+    console.log(message, ...args)
   }
 }
 
-// 导出单例
-export const logger = new Logger()
+/**
+ * 信息日志（带图标）
+ */
+export function log(message: any, ...args: any[]) {
+  if (shouldLog(LogLevel.INFO)) {
+    console.log(message, ...args)
+  }
+}
+
+/**
+ * 带图标的日志
+ */
+export function logWithEmoji(emoji: string, moduleName: string, message: any, ...args: any[]) {
+  if (shouldLog(LogLevel.INFO, moduleName)) {
+    console.log(`${emoji} ${getPrefix(moduleName)}`, message, ...args)
+  }
+}
+
+/**
+ * 警告日志
+ */
+export function warn(message: any, ...args: any[]) {
+  if (shouldLog(LogLevel.WARN)) {
+    console.warn(message, ...args)
+  }
+}
+
+/**
+ * 错误日志（始终输出）
+ */
+export function error(message: any, ...args: any[]) {
+  // ERROR 级别始终输出
+  console.error(message, ...args)
+}
+
+// 模块化日志导出
+export const createLogger = (moduleName: string) => ({
+  debug: (message: any, ...args: any[]) => {
+    if (shouldLog(LogLevel.DEBUG, moduleName)) {
+      console.log(getPrefix(moduleName), message, ...args)
+    }
+  },
+  info: (message: any, ...args: any[]) => {
+    if (shouldLog(LogLevel.INFO, moduleName)) {
+      console.log(getPrefix(moduleName), message, ...args)
+    }
+  },
+  warn: (message: any, ...args: any[]) => {
+    if (shouldLog(LogLevel.WARN, moduleName)) {
+      console.warn(getPrefix(moduleName), message, ...args)
+    }
+  },
+  error: (message: any, ...args: any[]) => {
+    console.error(getPrefix(moduleName), message, ...args)
+  },
+  // 带图标的日志方法
+  logWithEmoji: (emoji: string, message: any, ...args: any[]) => {
+    if (shouldLog(LogLevel.INFO, moduleName)) {
+      console.log(`${emoji} ${getPrefix(moduleName)}`, message, ...args)
+    }
+  },
+})
 
 // 默认导出
-export default logger
+export default {
+  debug,
+  log,
+  logWithEmoji,
+  warn,
+  error,
+  createLogger,
+}

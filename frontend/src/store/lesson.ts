@@ -8,6 +8,9 @@ import type {
 } from '../types/lesson'
 import type { Cell } from '../types/cell'
 import type { LessonListParams } from '../types/api'
+import { createLogger } from '../utils/logger'
+
+const logger = createLogger('LESSON')
 import { lessonService } from '../services/lesson'
 
 export const useLessonStore = defineStore('lesson', () => {
@@ -145,9 +148,9 @@ export const useLessonStore = defineStore('lesson', () => {
     
     try {
       const lesson = await lessonService.fetchLessonById(id)
-      
-      // 调试日志：记录加载的数据
-      console.log('📥 加载教案:', {
+
+      // 调试日志：记录加载的数据（仅在开发环境）
+      logger.debug('加载教案:', {
         lessonId: lesson.id,
         title: lesson.title,
         contentLength: lesson.content?.length || 0,
@@ -162,7 +165,7 @@ export const useLessonStore = defineStore('lesson', () => {
         version: lesson.version,
         updatedAt: lesson.updated_at,
       })
-      
+
       currentLesson.value = lesson
       return lesson
     } catch (err: any) {
