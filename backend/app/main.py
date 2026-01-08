@@ -216,11 +216,20 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """请求验证异常处理器"""
+    # 安全处理body，避免FormData等不可序列化对象
+    body_content = exc.body
+    try:
+        # 尝试序列化body，如果失败则转为字符串
+        import json
+        json.dumps(body_content)
+    except (TypeError, ValueError):
+        body_content = str(body_content) if body_content else None
+    
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "detail": exc.errors(),
-            "body": exc.body,
+            "body": body_content,
         },
     )
 
