@@ -1045,7 +1045,7 @@ const classroomPanelData = computed(() => {
 
 // 🔧 处理 TeacherControlPanel 的 session 变化事件
 function handleSessionChanged(session: any | null) {
-  console.log('📨 LessonEditor: 收到 session-changed 事件', {
+  logger.debug("LessonEditor: 收到 session-changed 事件", 事件', {
     sessionId: session?.id,
     status: session?.status,
     timestamp: new Date().toLocaleTimeString(),
@@ -1061,7 +1061,7 @@ function handleSessionChanged(session: any | null) {
   } else {
     currentSessionId.value = undefined
     providedSessionRef.value = null
-    console.log('⚠️ LessonEditor: session 已清除')
+    logger.debug("LessonEditor: session 已清除")')
   }
 }
 
@@ -1402,7 +1402,7 @@ const currentCell = computed(() => {
 // 调试：输出课堂控制按钮的显示条件
 watch([isPreviewMode, () => currentLesson.value?.status], ([preview, status]) => {
   if (preview) {
-    console.log('🔍 课堂控制按钮显示条件:', {
+    logger.debug("课堂控制按钮显示条件:",:', {
       isPreviewMode: preview,
       lessonStatus: status,
       shouldShow: preview && status === 'published'
