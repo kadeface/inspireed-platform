@@ -408,6 +408,7 @@ async def _process_zip_import(zip_content: bytes, current_user: User) -> tuple[D
                     # 创建UploadFile对象（使用BytesIO）
                     from io import BytesIO
                     file_stream = BytesIO(file_content)
+                    file_stream.seek(0)  # 重置指针到开头，确保可以读取
                     upload_file = UploadFile(
                         filename=original_filename,
                         file=file_stream
@@ -415,17 +416,37 @@ async def _process_zip_import(zip_content: bytes, current_user: User) -> tuple[D
                     
                     # 上传文件
                     try:
+                        print(f"🔄 [导入] 开始上传文件: {original_filename}")
+                        print(f"   文件大小: {len(file_content)} 字节")
+                        print(f"   临时文件路径: {file_path}")
+                        
                         upload_result = await upload_service.upload_file(upload_file)
+                        
+                        print(f"   upload_service.resources_dir: {upload_service.resources_dir}")
+                        print(f"   上传返回结果: {upload_result}")
                         
                         # 检查上传结果
                         if not upload_result or "file_url" not in upload_result:
-                            print(f"警告: 文件 {original_filename} 上传失败或返回格式不正确")
+                            print(f"❌ [导入] 文件 {original_filename} 上传失败或返回格式不正确")
                             continue
                         
                         # upload_service.upload_file() 返回的 file_url 只是文件名（UUID.ext）
                         # 需要添加路径前缀以匹配数据库中的存储格式
                         uploaded_filename = upload_result["file_url"]
                         new_url = f"/uploads/resources/{uploaded_filename}"
+                        
+                        # 验证文件是否真正保存成功
+                        saved_file_path = os.path.join(upload_service.resources_dir, uploaded_filename)
+                        file_exists = os.path.exists(saved_file_path)
+                        print(f"   新文件名: {uploaded_filename}")
+                        print(f"   新URL: {new_url}")
+                        print(f"   保存路径: {saved_file_path}")
+                        print(f"   文件存在: {file_exists}")
+                        
+                        if not file_exists:
+                            print(f"⚠️  [导入] 警告: 文件上传后未找到实际文件！")
+                            print(f"   当前工作目录: {os.getcwd()}")
+                            print(f"   绝对路径: {os.path.abspath(saved_file_path)}")
                         
                         # 记录URL映射 - 记录多种可能的URL格式
                         old_url = f"/uploads/resources/{original_filename}"
@@ -444,10 +465,12 @@ async def _process_zip_import(zip_content: bytes, current_user: User) -> tuple[D
                             if new_url_path != old_url:
                                 url_mapping[new_url_path] = new_url
                         
-                        print(f"调试: 文件上传成功 - 原始: {original_filename}, 新文件: {uploaded_filename}, 新URL: {new_url}")
+                        print(f"✅ [导入] 文件上传成功 - 原始: {original_filename}, 新文件: {uploaded_filename}, 新URL: {new_url}")
                         
                     except Exception as e:
-                        print(f"警告: 上传文件 {original_filename} 时出错: {str(e)}")
+                        import traceback
+                        print(f"❌ [导入] 上传文件 {original_filename} 时出错: {str(e)}")
+                        print(f"   错误堆栈: {traceback.format_exc()}")
                         continue
         
         # 确保 import_data 不为 None
