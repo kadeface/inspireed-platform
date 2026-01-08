@@ -422,21 +422,29 @@ async def _process_zip_import(zip_content: bytes, current_user: User) -> tuple[D
                             print(f"警告: 文件 {original_filename} 上传失败或返回格式不正确")
                             continue
                         
-                            # 记录URL映射 - 记录多种可能的URL格式
+                        # upload_service.upload_file() 返回的 file_url 只是文件名（UUID.ext）
+                        # 需要添加路径前缀以匹配数据库中的存储格式
+                        uploaded_filename = upload_result["file_url"]
+                        new_url = f"/uploads/resources/{uploaded_filename}"
+                        
+                        # 记录URL映射 - 记录多种可能的URL格式
                         old_url = f"/uploads/resources/{original_filename}"
-                        new_url = upload_result["file_url"]
                         
                         # 映射各种可能的URL格式（包括完整路径和文件名）
                         url_mapping[old_url] = new_url
                         url_mapping[original_filename] = new_url
                         url_mapping[f"resources/{original_filename}"] = new_url
                         url_mapping[f"/resources/{original_filename}"] = new_url
+                        # 也映射新文件名（不带路径）到新URL
+                        url_mapping[uploaded_filename] = new_url
                         # 处理可能包含服务器地址的完整URL
                         # 提取URL路径部分进行匹配（忽略服务器地址）
                         if "/" in new_url:
                             new_url_path = "/" + "/".join(new_url.split("/")[3:])  # 移除协议和域名部分
                             if new_url_path != old_url:
                                 url_mapping[new_url_path] = new_url
+                        
+                        print(f"调试: 文件上传成功 - 原始: {original_filename}, 新文件: {uploaded_filename}, 新URL: {new_url}")
                         
                     except Exception as e:
                         print(f"警告: 上传文件 {original_filename} 时出错: {str(e)}")
@@ -1479,9 +1487,12 @@ async def import_courses(
 
                 if existing_course:
                     # 如果找到相同 code 的课程，检查学科和年级是否匹配
-                    if existing_course.subject_id != subject_id or existing_course.grade_id != grade_id:
+                    # 获取属性值（从数据库加载的对象，属性值是 Python 原生类型）
+                    existing_subject_id: Optional[int] = getattr(existing_course, 'subject_id', None)
+                    existing_grade_id: Optional[int] = getattr(existing_course, 'grade_id', None)
+                    if existing_subject_id != subject_id or existing_grade_id != grade_id:
                         import_result["errors"].append(
-                            f"导入课程失败 {course_data.get('name', '未知')}: 课程代码 '{course_code}' 已存在，但属于不同的学科或年级（现有：学科ID={existing_course.subject_id}, 年级ID={existing_course.grade_id}；导入：学科ID={subject_id}, 年级ID={grade_id}）"
+                            f"导入课程失败 {course_data.get('name', '未知')}: 课程代码 '{course_code}' 已存在，但属于不同的学科或年级（现有：学科ID={existing_subject_id}, 年级ID={existing_grade_id}；导入：学科ID={subject_id}, 年级ID={grade_id}）"
                         )
                         continue
 
