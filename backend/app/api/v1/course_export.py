@@ -449,23 +449,29 @@ async def _process_zip_import(zip_content: bytes, current_user: User) -> tuple[D
                             print(f"   绝对路径: {os.path.abspath(saved_file_path)}")
                         
                         # 记录URL映射 - 记录多种可能的URL格式
+                        # 原始文件的各种可能格式
                         old_url = f"/uploads/resources/{original_filename}"
                         
-                        # 映射各种可能的URL格式（包括完整路径和文件名）
-                        url_mapping[old_url] = new_url
-                        url_mapping[original_filename] = new_url
-                        url_mapping[f"resources/{original_filename}"] = new_url
-                        url_mapping[f"/resources/{original_filename}"] = new_url
-                        # 也映射新文件名（不带路径）到新URL
-                        url_mapping[uploaded_filename] = new_url
-                        # 处理可能包含服务器地址的完整URL
-                        # 提取URL路径部分进行匹配（忽略服务器地址）
-                        if "/" in new_url:
-                            new_url_path = "/" + "/".join(new_url.split("/")[3:])  # 移除协议和域名部分
-                            if new_url_path != old_url:
-                                url_mapping[new_url_path] = new_url
+                        # 映射各种可能的旧URL格式到新URL
+                        url_mapping[old_url] = new_url  # /uploads/resources/filename.ext -> /uploads/resources/uuid.ext
+                        url_mapping[original_filename] = new_url  # filename.ext -> /uploads/resources/uuid.ext
+                        url_mapping[f"resources/{original_filename}"] = new_url  # resources/filename.ext
+                        url_mapping[f"/resources/{original_filename}"] = new_url  # /resources/filename.ext
+                        
+                        # 映射新文件名（不带路径）到新URL（避免重复映射）
+                        if uploaded_filename != original_filename:
+                            url_mapping[uploaded_filename] = new_url
+                        
+                        # 处理可能包含服务器地址的完整URL（如 http://localhost:8000/uploads/resources/xxx.png）
+                        # 添加常见的服务器地址格式映射
+                        for prefix in ["http://localhost:8000", "https://localhost:8000", 
+                                      "http://127.0.0.1:8000", "https://127.0.0.1:8000"]:
+                            full_old_url = f"{prefix}{old_url}"
+                            url_mapping[full_old_url] = new_url
                         
                         print(f"✅ [导入] 文件上传成功 - 原始: {original_filename}, 新文件: {uploaded_filename}, 新URL: {new_url}")
+                        print(f"   URL映射数量: {len(url_mapping)}")
+
                         
                     except Exception as e:
                         import traceback
@@ -537,13 +543,33 @@ def _update_urls_in_data(data: Dict, url_mapping: Dict[str, str]) -> Dict:
                     # 更新HTML中的URL
                     html = value
                     for old_url, new_url in url_mapping.items():
-                        # 替换各种可能的URL格式
+                        # 提取文件名用于精确匹配
+                        filename = old_url.split("/")[-1] if "/" in old_url else old_url
+                        
+                        # 1. 直接替换完整的旧URL（包括各种可能的格式）
                         html = html.replace(old_url, new_url)
-                        filename = old_url.split("/")[-1]
-                        if filename in html:
-                            html = html.replace(f"/uploads/resources/{filename}", new_url)
-                            html = html.replace(f'"/uploads/resources/{filename}"', f'"{new_url}"')
-                            html = html.replace(f"'/uploads/resources/{filename}'", f"'{new_url}'")
+                        
+                        # 2. 处理可能包含服务器地址的完整URL（如 http://localhost:8000/uploads/resources/xxx.png）
+                        # 使用正则表达式匹配并替换
+                        import re
+                        # 匹配格式: http(s)://任意域名或IP/uploads/resources/文件名
+                        pattern = re.compile(
+                            r'https?://[^/\s]+(/uploads/resources/)?' + re.escape(filename),
+                            re.IGNORECASE
+                        )
+                        html = pattern.sub(new_url, html)
+                        
+                        # 3. 替换相对路径格式（避免重复添加前缀）
+                        # 只有当filename不在new_url路径中时才替换
+                        if filename in html and filename != new_url:
+                            # 使用正则确保不会重复替换已经是正确格式的URL
+                            # 匹配 /uploads/resources/filename 但不匹配 /uploads/resources//uploads/resources/filename
+                            relative_pattern = re.compile(
+                                r'(?<!/uploads/resources)/uploads/resources/' + re.escape(filename),
+                                re.IGNORECASE
+                            )
+                            html = relative_pattern.sub(new_url, html)
+                    
                     content[key] = html
                 else:
                     content[key] = update_urls_in_content(value)
@@ -1288,7 +1314,38 @@ async def import_courses(
         
         # 更新URL引用（如果有文件映射）
         if url_mapping:
+            print(f"📋 [导入] 开始更新URL引用，映射条目数: {len(url_mapping)}")
+            print(f"   URL映射示例（前3条）:")
+            for i, (old, new) in enumerate(list(url_mapping.items())[:3]):
+                print(f"     {old} -> {new}")
+            
             data = _update_urls_in_data(data, url_mapping)
+            
+            # 验证更新后的URL格式
+            print(f"🔍 [导入] 验证更新后的教案URL...")
+            for lesson in data.get("lessons", [])[:2]:  # 只检查前2个教案
+                print(f"   教案: {lesson.get('title', '未知')}")
+                if lesson.get("cover_image_url"):
+                    print(f"     封面图URL: {lesson['cover_image_url']}")
+                # 检查content中的URL
+                content = lesson.get("content", [])
+                if isinstance(content, list):
+                    for cell in content[:3]:  # 只检查前3个cell
+                        if isinstance(cell, dict):
+                            cell_content = cell.get("content", {})
+                            if isinstance(cell_content, dict):
+                                # 检查各种URL字段
+                                for url_field in ["file_url", "videoUrl", "video_url", "preview_url", "download_url"]:
+                                    if cell_content.get(url_field):
+                                        print(f"     {url_field}: {cell_content[url_field]}")
+                                # 检查HTML中的URL
+                                if "html" in cell_content and isinstance(cell_content["html"], str):
+                                    html = cell_content["html"]
+                                    import re
+                                    # 查找所有图片URL
+                                    img_urls = re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', html)
+                                    if img_urls:
+                                        print(f"     HTML图片URL: {img_urls[:2]}")  # 只显示前2个
 
         # 导入结果统计
         import_result = {
