@@ -377,6 +377,18 @@
                 </svg>
                 创建新教案
               </button>
+
+              <!-- 导入教案按钮（仅在我的教案显示） -->
+              <button
+                v-if="lessonTab === 'my'"
+                @click="showImportModal = true"
+                class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium rounded-xl hover:from-blue-600 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transform hover:scale-105"
+              >
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                导入教案
+              </button>
               </div>
             </div>
           </div>
@@ -629,6 +641,12 @@
       @insert-material="handleInsertMaterial"
     />
 
+    <!-- 导入教案对话框 -->
+    <ImportLessonModal
+      v-model:show="showImportModal"
+      @success="handleImportSuccess"
+    />
+
     <ClassroomSelectorModal
       v-model="showPublishModal"
       :classrooms="availableClassrooms"
@@ -726,6 +744,7 @@ import CurriculumWithResources from '../../components/Curriculum/CurriculumWithR
 import CurriculumTreeView from '../../components/Curriculum/CurriculumTreeView.vue'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import TeacherAiAssistantModal from '@/components/Teacher/TeacherAiAssistantModal.vue'
+import ImportLessonModal from '@/components/Teacher/ImportLessonModal.vue'
 import questionService from '@/services/question'
 import { lessonService } from '@/services/lesson'
 import curriculumService from '@/services/curriculum'
@@ -762,6 +781,7 @@ const gradeName = computed(() => userStore.user?.grade_name || '')
 
 // 本地状态
 const showCreateModal = ref(false)
+const showImportModal = ref(false)
 const showDeleteConfirm = ref(false)
 const deleteTargetId = ref<number | null>(null)
 const searchQuery = ref('')
@@ -1176,6 +1196,44 @@ const debouncedSearch = useDebounceFn(() => {
 }, 300)
 
 // 创建教案
+// 处理导入成功
+async function handleImportSuccess() {
+  // 关闭模态框
+  showImportModal.value = false
+  
+  // 如果当前在"我的教案"标签页，刷新列表
+  if (lessonTab.value === 'my') {
+    // 重置到第一页，确保新导入的教案可见
+    lessonStore.currentPage = 1
+    // 清除状态筛选，显示所有状态的教案（包括新导入的DRAFT状态教案）
+    const previousStatus = currentStatus.value
+    currentStatus.value = null
+    // 清除搜索和筛选条件，确保能看到新导入的教案
+    const previousSearch = searchQuery.value
+    const previousGrade = selectedGrade.value
+    const previousChapter = selectedChapterId.value
+    
+    searchQuery.value = ''
+    selectedGrade.value = null
+    selectedGradeName.value = ''
+    selectedChapterId.value = null
+    selectedChapterName.value = ''
+    
+    // 重新加载教案列表
+    await loadLessons()
+    
+    // 恢复之前的筛选条件（可选，如果用户希望保持筛选）
+    // currentStatus.value = previousStatus
+    // searchQuery.value = previousSearch
+    // selectedGrade.value = previousGrade
+    // selectedChapterId.value = previousChapter
+  }
+  
+  // 刷新PDCA概览
+  refreshPdcaOverview()
+  showToast('success', '教案导入成功，列表已更新')
+}
+
 async function handleCreate(lessonData: LessonCreate) {
   try {
     const newLesson = await lessonStore.createNewLesson(lessonData)

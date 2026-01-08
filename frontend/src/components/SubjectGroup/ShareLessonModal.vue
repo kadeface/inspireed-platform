@@ -78,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { shareLessonToGroup } from '@/services/subjectGroup'
 import { lessonService } from '@/services/lesson'
 import type { SharedLessonCreate } from '@/types/subjectGroup'
@@ -129,8 +129,22 @@ async function handleSubmit() {
   }
 }
 
+// 处理 ESC 键关闭模态框
+const handleEscape = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    emit('close')
+  }
+}
+
 onMounted(() => {
   loadMyLessons()
+  // 添加键盘事件监听
+  document.addEventListener('keydown', handleEscape)
+})
+
+onUnmounted(() => {
+  // 清理事件监听
+  document.removeEventListener('keydown', handleEscape)
 })
 </script>
 

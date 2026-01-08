@@ -191,20 +191,33 @@ onMounted(() => {
   const isDev = process.env.NODE_ENV === 'development'
   
   // 只在开发环境且 sessionId 为空时输出警告
-  if (isDev && !sessionId.value) {
+  // 但在教师编辑模式下，sessionId 不是必需的，不输出警告
+  const isEditingMode = props.editable || (isTeacher.value && !injectedSession?.value)
+  
+  if (isDev && !sessionId.value && !isEditingMode) {
+    // 只有在非编辑模式下才输出警告（编辑模式下 sessionId 不是必需的）
     console.warn('⚠️ ActivityCell: 无法获取 sessionId', {
       cellId: props.cell.id,
       hasInjectedSession: !!injectedSession,
       hasInjectedSessionId: !!injectedSessionId,
       injectedSessionValue: injectedSession?.value,
       injectedSessionIdValue: injectedSessionId?.value,
+      isEditingMode,
     })
-  } else if (isDev) {
+  } else if (isDev && sessionId.value) {
     // 有 sessionId 时使用 debug 级别
     console.debug('ActivityCell 已挂载', {
       cellId: props.cell.id,
       sessionId: sessionId.value,
       isTeacher: isTeacher.value,
+      isEditingMode,
+    })
+  } else if (isDev && isEditingMode) {
+    // 编辑模式下，没有 sessionId 是正常的，使用 debug 级别
+    console.debug('ActivityCell 已挂载（编辑模式，无需 sessionId）', {
+      cellId: props.cell.id,
+      isTeacher: isTeacher.value,
+      editable: props.editable,
     })
   }
 })
