@@ -17,8 +17,9 @@ from app.core.database import init_db, close_db
 from app.api.v1 import api_router
 
 # CORS 源匹配正则表达式（与 CORS 配置保持一致）
+# 支持：localhost、所有IP地址（包括公网和局域网）、Cloud Studio 域名
 CORS_ORIGIN_PATTERN = re.compile(
-    r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
+    r"^https?://((localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
 )
 
 
