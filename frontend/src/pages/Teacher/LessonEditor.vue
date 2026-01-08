@@ -1064,7 +1064,7 @@ function handleSessionChanged(session: any | null) {
   } else {
     currentSessionId.value = undefined
     providedSessionRef.value = null
-    logger.debug("LessonEditor: session 已清除")')
+    logger.debug("LessonEditor: session 已清除")
   }
 }
 
