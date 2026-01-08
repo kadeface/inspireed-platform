@@ -1,117 +1,151 @@
 /**
- * 日志工具 - 支持日志级别控制，减少生产环境的日志噪音
+ * 统一的日志工具
+ * 可以通过环境变量控制是否输出调试日志
  */
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+// 从环境变量读取配置，生产环境默认关闭调试日志
+const isDevelopment = import.meta.env.MODE === 'development'
+const ENABLE_DEBUG_LOGS = import.meta.env.VITE_ENABLE_DEBUG_LOGS === 'true' || isDevelopment
 
-// 从环境变量获取日志级别，默认在生产环境只显示 warn 和 error
-const getLogLevel = (): LogLevel => {
-  if (import.meta.env.DEV) {
-    // 开发环境：可以通过 localStorage 控制日志级别
-    const stored = localStorage.getItem('logLevel')
-    if (stored && ['debug', 'info', 'warn', 'error'].includes(stored)) {
-      return stored as LogLevel
+// 日志级别
+export enum LogLevel {
+  DEBUG = 'DEBUG',
+  INFO = 'INFO',
+  WARN = 'WARN',
+  ERROR = 'ERROR',
+}
+
+// 日志模块
+export enum LogModule {
+  API = 'API',
+  LESSON = 'LESSON',
+  ACTIVITY = 'ACTIVITY',
+  WEBSOCKET = 'WEBSOCKET',
+  SESSION = 'SESSION',
+  ASSISTANT = 'ASSISTANT',
+  CLASSROOM = 'CLASSROOM',
+  GENERAL = 'GENERAL',
+}
+
+class Logger {
+  private enabledModules: Set<string>
+  private minLevel: LogLevel
+
+  constructor() {
+    // 可以通过环境变量配置启用的模块
+    const enabledModulesStr = import.meta.env.VITE_DEBUG_MODULES || ''
+    this.enabledModules = new Set(enabledModulesStr.split(',').filter(Boolean))
+    
+    // 如果没有指定模块，则启用所有模块
+    if (this.enabledModules.size === 0 && ENABLE_DEBUG_LOGS) {
+      Object.values(LogModule).forEach(module => this.enabledModules.add(module))
     }
-    return 'debug' // 开发环境默认显示所有日志
+
+    // 最小日志级别
+    const minLevelStr = import.meta.env.VITE_LOG_LEVEL || 'INFO'
+    this.minLevel = LogLevel[minLevelStr as keyof typeof LogLevel] || LogLevel.INFO
   }
-  return 'warn' // 生产环境默认只显示警告和错误
-}
 
-const currentLogLevel = getLogLevel()
+  private shouldLog(level: LogLevel, module: LogModule): boolean {
+    // 生产环境只输出 ERROR
+    if (!ENABLE_DEBUG_LOGS && level !== LogLevel.ERROR) {
+      return false
+    }
 
-const logLevels: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
-}
+    // 检查模块是否启用
+    if (!this.enabledModules.has(module)) {
+      return false
+    }
 
-const shouldLog = (level: LogLevel): boolean => {
-  return logLevels[level] >= logLevels[currentLogLevel]
-}
-
-// 日志去重：相同内容的日志在短时间内只输出一次
-const logCache = new Map<string, number>()
-const LOG_DEDUP_INTERVAL = 5000 // 5秒内相同日志只输出一次
-
-const getLogKey = (level: LogLevel, message: string, ...args: any[]): string => {
-  return `${level}:${message}:${JSON.stringify(args)}`
-}
-
-const checkDedup = (key: string): boolean => {
-  const now = Date.now()
-  const lastTime = logCache.get(key)
-  
-  if (lastTime && now - lastTime < LOG_DEDUP_INTERVAL) {
-    return false // 跳过重复日志
+    // 检查日志级别
+    const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR]
+    const currentIndex = levels.indexOf(level)
+    const minIndex = levels.indexOf(this.minLevel)
+    
+    return currentIndex >= minIndex
   }
-  
-  logCache.set(key, now)
-  
-  // 定期清理缓存（避免内存泄漏）
-  if (logCache.size > 1000) {
-    const cutoff = now - LOG_DEDUP_INTERVAL * 2
-    for (const [k, v] of logCache.entries()) {
-      if (v < cutoff) {
-        logCache.delete(k)
-      }
+
+  private formatMessage(level: LogLevel, module: LogModule, emoji: string, message: string): string {
+    const timestamp = new Date().toLocaleTimeString()
+    return `[${timestamp}] ${emoji} [${module}/${level}] ${message}`
+  }
+
+  debug(module: LogModule, message: string, data?: any, emoji: string = '🔍') {
+    if (!this.shouldLog(LogLevel.DEBUG, module)) return
+    
+    const formattedMessage = this.formatMessage(LogLevel.DEBUG, module, emoji, message)
+    if (data !== undefined) {
+      console.log(formattedMessage, data)
+    } else {
+      console.log(formattedMessage)
     }
   }
-  
-  return true
-}
 
-export const logger = {
-  debug: (message: string, ...args: any[]) => {
-    if (!shouldLog('debug')) return
-    const key = getLogKey('debug', message, ...args)
-    if (!checkDedup(key)) return
-    console.log(`🔍 [DEBUG] ${message}`, ...args)
-  },
-  
-  info: (message: string, ...args: any[]) => {
-    if (!shouldLog('info')) return
-    const key = getLogKey('info', message, ...args)
-    if (!checkDedup(key)) return
-    console.log(`ℹ️ [INFO] ${message}`, ...args)
-  },
-  
-  warn: (message: string, ...args: any[]) => {
-    if (!shouldLog('warn')) return
-    const key = getLogKey('warn', message, ...args)
-    if (!checkDedup(key)) return
-    console.warn(`⚠️ [WARN] ${message}`, ...args)
-  },
-  
-  error: (message: string, ...args: any[]) => {
-    if (!shouldLog('error')) return
-    // 错误日志不去重，确保重要错误都能看到
-    console.error(`❌ [ERROR] ${message}`, ...args)
-  },
-  
-  // 轮询专用日志：只在开发环境且明确启用时输出
-  poll: (message: string, ...args: any[]) => {
-    // 轮询日志默认不输出，除非在开发环境且设置了 debugPolling
-    if (import.meta.env.DEV && localStorage.getItem('debugPolling') === 'true') {
-      const key = getLogKey('debug', `[POLL] ${message}`, ...args)
-      if (!checkDedup(key)) return
-      console.log(`🔄 [POLL] ${message}`, ...args)
+  info(module: LogModule, message: string, data?: any, emoji: string = '✅') {
+    if (!this.shouldLog(LogLevel.INFO, module)) return
+    
+    const formattedMessage = this.formatMessage(LogLevel.INFO, module, emoji, message)
+    if (data !== undefined) {
+      console.log(formattedMessage, data)
+    } else {
+      console.log(formattedMessage)
     }
-  },
-  
-  // 设置日志级别（用于运行时调整）
-  setLevel: (level: LogLevel) => {
-    localStorage.setItem('logLevel', level)
-    // 重新加载页面以应用新设置（或手动刷新）
-    console.log(`日志级别已设置为: ${level}`)
-  },
-  
-  // 获取当前日志级别
-  getLevel: (): LogLevel => {
-    return currentLogLevel
-  },
+  }
+
+  warn(module: LogModule, message: string, data?: any, emoji: string = '⚠️') {
+    if (!this.shouldLog(LogLevel.WARN, module)) return
+    
+    const formattedMessage = this.formatMessage(LogLevel.WARN, module, emoji, message)
+    if (data !== undefined) {
+      console.warn(formattedMessage, data)
+    } else {
+      console.warn(formattedMessage)
+    }
+  }
+
+  error(module: LogModule, message: string, error?: any, emoji: string = '❌') {
+    // ERROR 级别始终输出
+    const formattedMessage = this.formatMessage(LogLevel.ERROR, module, emoji, message)
+    if (error !== undefined) {
+      console.error(formattedMessage, error)
+    } else {
+      console.error(formattedMessage)
+    }
+  }
+
+  // 便捷方法
+  lesson = {
+    load: (message: string, data?: any) => this.debug(LogModule.LESSON, message, data, '📥'),
+    save: (message: string, data?: any) => this.debug(LogModule.LESSON, message, data, '💾'),
+    success: (message: string, data?: any) => this.info(LogModule.LESSON, message, data, '✅'),
+  }
+
+  activity = {
+    mount: (message: string, data?: any) => this.debug(LogModule.ACTIVITY, message, data, '🔍'),
+    create: (message: string, data?: any) => this.info(LogModule.ACTIVITY, message, data, '✅'),
+    submit: (message: string, data?: any) => this.info(LogModule.ACTIVITY, message, data, '✅'),
+  }
+
+  api = {
+    request: (message: string, data?: any) => this.debug(LogModule.API, message, data, '🔍'),
+    success: (message: string, data?: any) => this.info(LogModule.API, message, data, '✅'),
+    error: (message: string, error?: any) => this.error(LogModule.API, message, error, '❌'),
+  }
+
+  websocket = {
+    connect: (message: string, data?: any) => this.info(LogModule.WEBSOCKET, message, data, '✅'),
+    message: (message: string, data?: any) => this.debug(LogModule.WEBSOCKET, message, data, '📥'),
+    disconnect: (message: string, data?: any) => this.info(LogModule.WEBSOCKET, message, data, '✅'),
+  }
+
+  session = {
+    create: (message: string, data?: any) => this.info(LogModule.SESSION, message, data, '✅'),
+    update: (message: string, data?: any) => this.debug(LogModule.SESSION, message, data, '🔍'),
+  }
 }
 
-// 导出默认实例
+// 导出单例
+export const logger = new Logger()
+
+// 默认导出
 export default logger
-
