@@ -60,6 +60,53 @@
         </select>
       </div>
 
+      <!-- 推荐资源区域 -->
+      <div v-if="recommendedAssets.length > 0" class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            推荐资源
+          </h3>
+          <button
+            @click="loadRecommendedAssets"
+            class="text-sm text-blue-600 hover:text-blue-700"
+            :disabled="loadingRecommended"
+          >
+            {{ loadingRecommended ? '加载中...' : '刷新' }}
+          </button>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div
+            v-for="item in recommendedAssets"
+            :key="item.id"
+            @click="viewAsset(item)"
+            class="group relative overflow-hidden rounded-lg border border-blue-200 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all cursor-pointer"
+          >
+            <div class="aspect-video bg-gray-100 flex items-center justify-center relative overflow-hidden">
+              <img
+                v-if="item.thumbnail_url"
+                :src="item.thumbnail_url"
+                :alt="item.title"
+                class="w-full h-full object-cover"
+              />
+              <span v-else class="text-4xl">{{ getAssetIcon(item.asset_type) }}</span>
+            </div>
+            <div class="p-2">
+              <h4 class="text-xs font-medium text-gray-900 truncate mb-1">{{ item.title }}</h4>
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-500">{{ getAssetTypeName(item.asset_type) }}</span>
+                <span class="text-blue-600 font-medium">{{ item.recommendation_score }}</span>
+              </div>
+            </div>
+            <div class="absolute top-1 right-1 px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded">
+              推荐
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 双栏布局 -->
       <div class="flex gap-6">
         <!-- 左侧：树形目录 -->
@@ -256,7 +303,7 @@ import { useUserStore } from '@/store/user'
 import { authService } from '@/services/auth'
 import { libraryService } from '@/services/library'
 import { curriculumService } from '@/services/curriculum'
-import type { LibraryAssetSummary, ResourceFilter } from '@/types/library'
+import type { LibraryAssetSummary, ResourceFilter, RecommendedAssetItem } from '@/types/library'
 import type { Subject, Grade } from '@/types/curriculum'
 import { getAssetTypeIcon, getAssetTypeName, getVisibilityName, formatFileSize } from '@/types/library'
 import UploadAssetModal from '@/components/Library/UploadAssetModal.vue'
@@ -291,6 +338,10 @@ const showDetailModal = ref(false)
 const selectedAssetId = ref<number | null>(null)
 const showPreviewModal = ref(false)
 const previewAssetId = ref<number | null>(null)
+
+// 推荐资源
+const recommendedAssets = ref<RecommendedAssetItem[]>([])
+const loadingRecommended = ref(false)
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
@@ -469,6 +520,25 @@ const loadGrades = async () => {
   }
 }
 
+// 加载推荐资源
+const loadRecommendedAssets = async () => {
+  loadingRecommended.value = true
+  try {
+    const response = await libraryService.getRecommendedAssets(undefined, undefined, 6)
+    if (response.error) {
+      console.warn('推荐资源加载失败:', response.error)
+      recommendedAssets.value = []
+    } else {
+      recommendedAssets.value = response.items
+    }
+  } catch (error) {
+    console.error('Failed to load recommended assets:', error)
+    recommendedAssets.value = []
+  } finally {
+    loadingRecommended.value = false
+  }
+}
+
 // 返回上一页
 const handleBack = () => {
   router.push('/teacher')
@@ -493,6 +563,7 @@ onMounted(() => {
     loadSubjects()
     loadGrades()
     loadAssets()
+    loadRecommendedAssets()
   }
   initialize()
 })

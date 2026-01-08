@@ -30,7 +30,8 @@ class Neo4jService:
 
         try:
             async with driver.session(database=settings.NEO4J_DATABASE) as session:
-                result = await session.run(query, parameters or {})
+                # type: ignore - Neo4j driver accepts string queries
+                result = await session.run(query, parameters or {})  # type: ignore[arg-type]
                 records = []
                 async for record in result:
                     records.append(record.values())
@@ -54,7 +55,8 @@ class Neo4jService:
 
         try:
             async with driver.session(database=settings.NEO4J_DATABASE) as session:
-                await session.run(query, parameters or {})
+                # type: ignore - Neo4j driver accepts string queries
+                await session.run(query, parameters or {})  # type: ignore[arg-type]
                 return True
         except Exception as e:
             logger.error(f"Neo4j 写入查询执行失败: {e}")
@@ -62,6 +64,7 @@ class Neo4jService:
 
     # ========== 节点创建和更新 ==========
 
+    @staticmethod
     async def create_or_update_asset(
         asset_id: int,
         title: str,
@@ -128,6 +131,7 @@ class Neo4jService:
             },
         )
 
+    @staticmethod
     async def delete_asset(asset_id: int) -> bool:
         """删除资源资产节点及其所有关系"""
         query = """
@@ -138,6 +142,7 @@ class Neo4jService:
 
     # ========== 关系创建 ==========
 
+    @staticmethod
     async def create_similarity_relationship(
         asset_id_1: int,
         asset_id_2: int,
@@ -160,6 +165,7 @@ class Neo4jService:
             },
         )
 
+    @staticmethod
     async def create_used_together_relationship(
         asset_id_1: int,
         asset_id_2: int,
@@ -184,6 +190,7 @@ class Neo4jService:
 
     # ========== 查询功能 ==========
 
+    @staticmethod
     async def get_similar_assets(
         asset_id: int,
         limit: int = 10,
@@ -222,6 +229,7 @@ class Neo4jService:
                 )
         return results
 
+    @staticmethod
     async def get_related_assets(
         asset_id: int,
         limit: int = 10,
@@ -260,6 +268,7 @@ class Neo4jService:
                 )
         return results
 
+    @staticmethod
     async def get_recommended_assets(
         user_id: Optional[int] = None,
         subject_id: Optional[int] = None,
@@ -312,6 +321,7 @@ class Neo4jService:
                 )
         return results
 
+    @staticmethod
     async def get_assets_by_knowledge_point(
         knowledge_point_category: str,
         knowledge_point_name: str,
@@ -347,6 +357,7 @@ class Neo4jService:
                 )
         return results
 
+    @staticmethod
     async def get_knowledge_point_graph(
         knowledge_point_category: Optional[str] = None,
         max_depth: int = 2,
@@ -377,6 +388,7 @@ class Neo4jService:
 
     # ========== 统计分析 ==========
 
+    @staticmethod
     async def calculate_asset_similarity(
         asset_id_1: int,
         asset_id_2: int,
@@ -413,6 +425,7 @@ class Neo4jService:
             return float(records[0][0] or 0.0)
         return 0.0
 
+    @staticmethod
     async def sync_all_assets_from_postgres(
         assets: List[Dict[str, Any]],
     ) -> int:

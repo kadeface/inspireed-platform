@@ -198,3 +198,49 @@ class LibraryAssetCreateVersionRequest(BaseModel):
     """创建新版本请求 Schema"""
 
     change_note: Optional[str] = Field(None, description="版本变更说明")
+
+
+# ========== Neo4j 图数据库相关 Schema ==========
+
+class SimilarAssetItem(LibraryAssetSummary):
+    """相似资源项（包含相似度分数）"""
+
+    similarity_score: float = Field(..., ge=0.0, le=1.0, description="相似度分数（0-1）")
+
+
+class SimilarAssetsResponse(BaseModel):
+    """相似资源查询响应"""
+
+    items: List[SimilarAssetItem] = Field(default_factory=list, description="相似资源列表")
+    total: int = Field(..., description="相似资源总数")
+    asset_id: int = Field(..., description="查询的资源ID")
+    error: Optional[str] = Field(None, description="错误信息（如果 Neo4j 服务不可用）")
+
+
+class RelatedAssetItem(LibraryAssetSummary):
+    """相关资源项（包含相关度分数）"""
+
+    relevance_score: int = Field(..., ge=0, description="相关度分数（路径数量）")
+
+
+class RelatedAssetsResponse(BaseModel):
+    """相关资源查询响应"""
+
+    items: List[RelatedAssetItem] = Field(default_factory=list, description="相关资源列表")
+    total: int = Field(..., description="相关资源总数")
+    asset_id: int = Field(..., description="查询的资源ID")
+    error: Optional[str] = Field(None, description="错误信息（如果 Neo4j 服务不可用）")
+
+
+class RecommendedAssetItem(LibraryAssetSummary):
+    """推荐资源项（包含推荐度分数）"""
+
+    recommendation_score: int = Field(..., ge=0, description="推荐度分数")
+
+
+class RecommendedAssetsResponse(BaseModel):
+    """推荐资源查询响应"""
+
+    items: List[RecommendedAssetItem] = Field(default_factory=list, description="推荐资源列表")
+    total: int = Field(..., description="推荐资源总数")
+    error: Optional[str] = Field(None, description="错误信息（如果 Neo4j 服务不可用）")

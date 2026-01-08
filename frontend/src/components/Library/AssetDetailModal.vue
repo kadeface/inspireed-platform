@@ -296,11 +296,51 @@
 
           <!-- 查看模式 -->
           <template v-else-if="!isEditingCode">
-            <!-- 基本信息 -->
-            <div>
-              <h4 class="text-lg font-medium text-gray-900">{{ asset.title }}</h4>
-              <p v-if="asset.description" class="mt-2 text-gray-600">{{ asset.description }}</p>
+            <!-- 标签页导航 -->
+            <div class="border-b border-gray-200">
+              <nav class="flex space-x-4" aria-label="Tabs">
+                <button
+                  @click="activeTab = 'info'"
+                  :class="[
+                    'py-2 px-4 text-sm font-medium border-b-2 transition-colors',
+                    activeTab === 'info'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ]"
+                >
+                  基本信息
+                </button>
+                <button
+                  @click="activeTab = 'similar'"
+                  :class="[
+                    'py-2 px-4 text-sm font-medium border-b-2 transition-colors',
+                    activeTab === 'similar'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ]"
+                >
+                  相似资源
+                </button>
+                <button
+                  @click="activeTab = 'related'"
+                  :class="[
+                    'py-2 px-4 text-sm font-medium border-b-2 transition-colors',
+                    activeTab === 'related'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ]"
+                >
+                  相关资源
+                </button>
+              </nav>
             </div>
+
+            <!-- 基本信息标签页 -->
+            <div v-show="activeTab === 'info'">
+              <div>
+                <h4 class="text-lg font-medium text-gray-900">{{ asset.title }}</h4>
+                <p v-if="asset.description" class="mt-2 text-gray-600">{{ asset.description }}</p>
+              </div>
 
             <!-- 元数据 -->
             <div class="grid grid-cols-2 gap-4 text-sm">
@@ -429,6 +469,95 @@
                 删除
               </button>
             </div>
+            </div>
+
+            <!-- 相似资源标签页 -->
+            <div v-show="activeTab === 'similar'" class="py-4">
+              <div v-if="loadingSimilar" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                <p class="mt-2 text-sm text-gray-600">加载相似资源中...</p>
+              </div>
+              <div v-else-if="similarError" class="text-center py-8">
+                <p class="text-sm text-red-600">{{ similarError }}</p>
+                <button
+                  @click="loadSimilarAssets"
+                  class="mt-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  重试
+                </button>
+              </div>
+              <div v-else-if="similarAssets.length === 0" class="text-center py-8">
+                <p class="text-sm text-gray-500">暂无相似资源</p>
+              </div>
+              <div v-else class="space-y-3">
+                <div
+                  v-for="item in similarAssets"
+                  :key="item.id"
+                  @click="viewSimilarAsset(item)"
+                  class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <h5 class="font-medium text-gray-900">{{ item.title }}</h5>
+                      <p class="mt-1 text-sm text-gray-500">
+                        {{ getAssetTypeName(item.asset_type) }}
+                        <span v-if="item.size_bytes"> • {{ formatSize(item.size_bytes) }}</span>
+                      </p>
+                    </div>
+                    <div class="ml-4 text-right">
+                      <div class="text-sm font-medium text-blue-600">
+                        {{ (item.similarity_score * 100).toFixed(0) }}%
+                      </div>
+                      <div class="text-xs text-gray-500">相似度</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 相关资源标签页 -->
+            <div v-show="activeTab === 'related'" class="py-4">
+              <div v-if="loadingRelated" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                <p class="mt-2 text-sm text-gray-600">加载相关资源中...</p>
+              </div>
+              <div v-else-if="relatedError" class="text-center py-8">
+                <p class="text-sm text-red-600">{{ relatedError }}</p>
+                <button
+                  @click="loadRelatedAssets"
+                  class="mt-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  重试
+                </button>
+              </div>
+              <div v-else-if="relatedAssets.length === 0" class="text-center py-8">
+                <p class="text-sm text-gray-500">暂无相关资源</p>
+              </div>
+              <div v-else class="space-y-3">
+                <div
+                  v-for="item in relatedAssets"
+                  :key="item.id"
+                  @click="viewRelatedAsset(item)"
+                  class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <h5 class="font-medium text-gray-900">{{ item.title }}</h5>
+                      <p class="mt-1 text-sm text-gray-500">
+                        {{ getAssetTypeName(item.asset_type) }}
+                        <span v-if="item.size_bytes"> • {{ formatSize(item.size_bytes) }}</span>
+                      </p>
+                    </div>
+                    <div class="ml-4 text-right">
+                      <div class="text-sm font-medium text-green-600">
+                        {{ item.relevance_score }}
+                      </div>
+                      <div class="text-xs text-gray-500">相关度</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </template>
         </div>
       </div>
@@ -543,7 +672,12 @@
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { libraryService } from '@/services/library'
 import { curriculumService } from '@/services/curriculum'
-import type { LibraryAssetDetail, LibraryAssetUpdateRequest } from '@/types/library'
+import type {
+  LibraryAssetDetail,
+  LibraryAssetUpdateRequest,
+  SimilarAssetItem,
+  RelatedAssetItem,
+} from '@/types/library'
 import type { Subject, Grade } from '@/types/curriculum'
 import { getAssetTypeName, getVisibilityName, formatFileSize } from '@/types/library'
 import { getServerBaseUrl } from '@/utils/url'
@@ -586,6 +720,19 @@ const versions = ref<Array<{
   created_at: string
 }>>([])
 const loadingVersions = ref(false)
+
+// 标签页状态
+const activeTab = ref<'info' | 'similar' | 'related'>('info')
+
+// 相似资源
+const similarAssets = ref<SimilarAssetItem[]>([])
+const loadingSimilar = ref(false)
+const similarError = ref<string | null>(null)
+
+// 相关资源
+const relatedAssets = ref<RelatedAssetItem[]>([])
+const loadingRelated = ref(false)
+const relatedError = ref<string | null>(null)
 
 // 编辑表单数据
 const editForm = ref<{
@@ -704,8 +851,23 @@ watch(() => props.isOpen, (isOpen) => {
     changeNote.value = ''
     showVersions.value = false
     versions.value = []
+    activeTab.value = 'info'
+    similarAssets.value = []
+    relatedAssets.value = []
+    similarError.value = null
+    relatedError.value = null
   }
 }, { immediate: true })
+
+// 监听标签页切换，加载对应数据
+watch(activeTab, (newTab) => {
+  if (!asset.value) return
+  if (newTab === 'similar' && similarAssets.value.length === 0 && !loadingSimilar.value) {
+    loadSimilarAssets()
+  } else if (newTab === 'related' && relatedAssets.value.length === 0 && !loadingRelated.value) {
+    loadRelatedAssets()
+  }
+})
 
 const handleClose = () => {
   if (saving.value) return
@@ -896,6 +1058,88 @@ const handleSaveCode = async () => {
     alert(error.response?.data?.detail || error.message || '保存失败')
   } finally {
     savingCode.value = false
+  }
+}
+
+// 加载相似资源
+const loadSimilarAssets = async () => {
+  if (!asset.value) return
+  loadingSimilar.value = true
+  similarError.value = null
+  try {
+    const response = await libraryService.getSimilarAssets(asset.value.id, 10, 0.5)
+    if (response.error) {
+      similarError.value = response.error
+    } else {
+      similarAssets.value = response.items
+    }
+  } catch (error: any) {
+    console.error('Failed to load similar assets:', error)
+    similarError.value = error.response?.data?.detail || '加载相似资源失败'
+  } finally {
+    loadingSimilar.value = false
+  }
+}
+
+// 加载相关资源
+const loadRelatedAssets = async () => {
+  if (!asset.value) return
+  loadingRelated.value = true
+  relatedError.value = null
+  try {
+    const response = await libraryService.getRelatedAssets(asset.value.id, 10)
+    if (response.error) {
+      relatedError.value = response.error
+    } else {
+      relatedAssets.value = response.items
+    }
+  } catch (error: any) {
+    console.error('Failed to load related assets:', error)
+    relatedError.value = error.response?.data?.detail || '加载相关资源失败'
+  } finally {
+    loadingRelated.value = false
+  }
+}
+
+// 查看相似资源
+const viewSimilarAsset = async (item: SimilarAssetItem) => {
+  if (!item.id) return
+  // 直接加载新资源详情，不关闭模态框
+  loading.value = true
+  activeTab.value = 'info'
+  try {
+    asset.value = await libraryService.getAsset(item.id)
+    // 重置相似和相关资源列表，因为资源已切换
+    similarAssets.value = []
+    relatedAssets.value = []
+    similarError.value = null
+    relatedError.value = null
+  } catch (error: any) {
+    console.error('Failed to load asset:', error)
+    alert(error.response?.data?.detail || '加载资源失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 查看相关资源
+const viewRelatedAsset = async (item: RelatedAssetItem) => {
+  if (!item.id) return
+  // 直接加载新资源详情，不关闭模态框
+  loading.value = true
+  activeTab.value = 'info'
+  try {
+    asset.value = await libraryService.getAsset(item.id)
+    // 重置相似和相关资源列表，因为资源已切换
+    similarAssets.value = []
+    relatedAssets.value = []
+    similarError.value = null
+    relatedError.value = null
+  } catch (error: any) {
+    console.error('Failed to load asset:', error)
+    alert(error.response?.data?.detail || '加载资源失败')
+  } finally {
+    loading.value = false
   }
 }
 

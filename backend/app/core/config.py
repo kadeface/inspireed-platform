@@ -149,5 +149,12 @@ class Settings(BaseSettings):
     # 如果为空，则从 Request.base_url 自动获取
     RESOURCE_BASE_URL: Optional[str] = None
 
+    # Neo4j 图数据库配置
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "neo4j"
+    NEO4J_DATABASE: str = "neo4j"
+    NEO4J_ENABLED: bool = False  # 默认禁用，需要时在 .env 中设置为 true
+
 
 settings = Settings()

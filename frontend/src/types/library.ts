@@ -217,3 +217,43 @@ export interface ResourceFilter {
   visibility?: AssetVisibility
   knowledge_point_category?: string
 }
+
+// ========== Neo4j 图数据库相关类型 ==========
+
+// 相似资源项
+export interface SimilarAssetItem extends LibraryAssetSummary {
+  similarity_score: number  // 相似度分数 (0-1)
+}
+
+// 相似资源响应
+export interface SimilarAssetsResponse {
+  items: SimilarAssetItem[]
+  total: number
+  asset_id: number
+  error?: string  // 错误信息，如果Neo4j服务不可用
+}
+
+// 相关资源项
+export interface RelatedAssetItem extends LibraryAssetSummary {
+  relevance_score: number  // 相关度分数（基于路径数量）
+}
+
+// 相关资源响应
+export interface RelatedAssetsResponse {
+  items: RelatedAssetItem[]
+  total: number
+  asset_id: number
+  error?: string  // 错误信息，如果Neo4j服务不可用
+}
+
+// 推荐资源项
+export interface RecommendedAssetItem extends LibraryAssetSummary {
+  recommendation_score: number  // 推荐度分数
+}
+
+// 推荐资源响应
+export interface RecommendedAssetsResponse {
+  items: RecommendedAssetItem[]
+  total: number
+  error?: string  // 错误信息，如果Neo4j服务不可用
+}

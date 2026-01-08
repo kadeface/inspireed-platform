@@ -10,6 +10,9 @@ import type {
   LibraryAssetUpdateRequest,
   LibraryAssetUploadResponse,
   LibraryAssetUsageResponse,
+  SimilarAssetsResponse,
+  RelatedAssetsResponse,
+  RecommendedAssetsResponse,
 } from '../types/library'
 
 export interface LibraryAssetListParams {
@@ -219,6 +222,68 @@ class LibraryService {
       return await api.get(`${this.basePath}/${assetId}/versions`)
     } catch (error) {
       console.error(`Failed to get versions for asset ${assetId}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * 获取相似资源（基于 Neo4j 知识图谱）
+   */
+  async getSimilarAssets(
+    assetId: number,
+    limit: number = 10,
+    minSimilarity: number = 0.5
+  ): Promise<SimilarAssetsResponse> {
+    try {
+      const queryParams = new URLSearchParams()
+      queryParams.append('limit', limit.toString())
+      queryParams.append('min_similarity', minSimilarity.toString())
+      return await api.get<SimilarAssetsResponse>(
+        `${this.basePath}/${assetId}/similar?${queryParams.toString()}`
+      )
+    } catch (error) {
+      console.error(`Failed to get similar assets for ${assetId}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * 获取相关资源（基于 Neo4j 知识图谱路径）
+   */
+  async getRelatedAssets(
+    assetId: number,
+    limit: number = 10
+  ): Promise<RelatedAssetsResponse> {
+    try {
+      const queryParams = new URLSearchParams()
+      queryParams.append('limit', limit.toString())
+      return await api.get<RelatedAssetsResponse>(
+        `${this.basePath}/${assetId}/related?${queryParams.toString()}`
+      )
+    } catch (error) {
+      console.error(`Failed to get related assets for ${assetId}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * 获取推荐资源（基于 Neo4j 知识图谱）
+   */
+  async getRecommendedAssets(
+    subjectId?: number,
+    gradeId?: number,
+    limit: number = 10
+  ): Promise<RecommendedAssetsResponse> {
+    try {
+      const queryParams = new URLSearchParams()
+      if (subjectId !== undefined) queryParams.append('subject_id', subjectId.toString())
+      if (gradeId !== undefined) queryParams.append('grade_id', gradeId.toString())
+      queryParams.append('limit', limit.toString())
+      const queryString = queryParams.toString()
+      const url = queryString ? `${this.basePath}/recommended?${queryString}` : `${this.basePath}/recommended`
+      return await api.get<RecommendedAssetsResponse>(url)
+    } catch (error) {
+      console.error('Failed to get recommended assets:', error)
       throw error
     }
   }
