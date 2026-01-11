@@ -7,7 +7,7 @@ set -e
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PLIST_NAME="com.inspireed.plist"
-PLIST_TEMPLATE="$PROJECT_DIR/$PLIST_NAME"
+PLIST_TEMPLATE="$PROJECT_DIR/scripts/config/$PLIST_NAME"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 PLIST_TARGET="$LAUNCH_AGENTS_DIR/$PLIST_NAME"
 
