@@ -67,6 +67,17 @@ function getApiBaseUrl(): string {
       }
     }
     
+    // 🆕 在局域网环境下，如果环境变量包含 localhost，且当前 hostname 是 IP 地址，自动适配
+    // 检测 hostname 是否为 IP 地址（IPv4）
+    const isIpAddress = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)
+    if (isIpAddress && (envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1'))) {
+      console.warn('⚠️ [API] 环境变量包含 localhost，但当前通过 IP 地址访问，自动适配为当前 IP')
+      const apiProtocol = protocol === 'https:' ? 'https:' : 'http:'
+      const apiUrl = `${apiProtocol}//${hostname}:8000/api/v1`
+      console.log('✅ [API] 使用自动适配的地址:', apiUrl)
+      return apiUrl
+    }
+    
     // 如果是 HTTPS 页面，强制使用 HTTPS API（防止混合内容错误）
     if (protocol === 'https:' && envApiUrl.startsWith('http://')) {
       console.warn('⚠️ [API] 环境变量使用 HTTP，但在 HTTPS 页面中强制转换为 HTTPS')
