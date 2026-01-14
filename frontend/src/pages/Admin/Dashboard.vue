@@ -40,15 +40,18 @@
         </div>
       </router-link>
 
-      <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-6 text-white opacity-50 cursor-not-allowed">
+      <router-link
+        to="/district-admin/exams"
+        class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-6 text-white hover:shadow-lg transition-shadow"
+      >
         <div class="flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-semibold mb-2">系统设置</h3>
-            <p class="text-sm text-purple-100">开发中...</p>
+            <h3 class="text-lg font-semibold mb-2">考试管理</h3>
+            <p class="text-sm text-purple-100">考试管理和增值评价</p>
           </div>
           <div class="text-4xl">⚙️</div>
         </div>
-      </div>
+      </router-link>
     </div>
 
     <!-- Loading State -->
