@@ -18,7 +18,11 @@ from app.api.v1 import (
     classroom_sessions,
     course_export,
     curriculum,
+    daily_performance,
+    evaluations,
+    exams,
     favorites,
+    import_tasks,
     learning_paths,
     lessons,
     library_assets,
@@ -28,10 +32,13 @@ from app.api.v1 import (
     researcher_curriculum,
     resources,
     reviews,
+    scores,
+    semesters,
     student_projects,
     subject_groups,
     student_ai_assistant,
     teacher_ai_assistant,
+    total_scores,
     upload,
     users,
 )
@@ -111,4 +118,27 @@ api_router.include_router(
 )
 api_router.include_router(
     project_cells.router, prefix="/project-cells", tags=["项目-单元"]
+)
+
+# 评价系统路由
+api_router.include_router(
+    semesters.router, prefix="/semesters", tags=["评价-学期管理"]
+)
+api_router.include_router(
+    exams.router, prefix="/exams", tags=["评价-考试管理"]
+)
+api_router.include_router(
+    scores.router, prefix="/scores", tags=["评价-成绩查询"]
+)
+api_router.include_router(
+    daily_performance.router, prefix="/daily-performance", tags=["评价-日常表现成绩"]
+)
+api_router.include_router(
+    total_scores.router, prefix="/total-scores", tags=["评价-高中总分"]
+)
+api_router.include_router(
+    evaluations.router, prefix="/evaluations", tags=["评价-增值评价"]
+)
+api_router.include_router(
+    import_tasks.router, prefix="/import-tasks", tags=["评价-导入任务"]
 )
