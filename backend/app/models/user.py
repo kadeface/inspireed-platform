@@ -20,12 +20,37 @@ from app.core.validators import normalize_user_role
 
 
 class UserRole(str, Enum):
-    """用户角色枚举"""
+    """用户角色枚举（简化为6种）"""
 
-    ADMIN = "admin"
-    TEACHER = "teacher"
-    STUDENT = "student"
-    RESEARCHER = "researcher"
+    # 系统角色
+    ADMIN = "admin"                    # 系统管理员
+
+    # 管理员角色
+    DISTRICT_ADMIN = "district_admin"  # 区县管理员（包含考试管理、教研员职责）
+    SCHOOL_ADMIN = "school_admin"      # 学校管理员（包含考试管理、教研员职责）
+
+    # 专业角色
+    RESEARCHER = "researcher"          # 教研员（区县/学校）
+    TEACHER = "teacher"                # 教师（含班主任）
+
+    # 学生角色
+    STUDENT = "student"                # 学生
+
+
+class StudentType(str, Enum):
+    """学生类型枚举（用于文理科区分）
+
+    适用场景：
+    - 小学生、初中生：通常为 NONE
+    - 高一未分科阶段：NONE（如第一学期，或选科前）
+    - 高二、高三已分科：ARTS（文科）或 SCIENCE（理科）
+
+    注意：分科时间因地区和学校而异，由学校根据实际情况设置
+    """
+
+    NONE = "none"           # 未分科（小学、初中、高中未分科阶段）
+    ARTS = "arts"           # 文科（历史方向/偏文）
+    SCIENCE = "science"     # 理科（物理方向/偏理）
 
 
 class User(Base):
@@ -41,6 +66,18 @@ class User(Base):
     
     # 学籍号（唯一，跟随学生整个学习经历，不变）
     student_id_number = Column(String(50), unique=True, nullable=True, index=True, comment="学籍号/身份证号等唯一标识")
+
+    # 学生类型（用于高中文理科区分）
+    student_type = Column(
+        SQLEnum(
+            StudentType,
+            native_enum=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        default=StudentType.NONE,
+        nullable=True,
+        comment="学生类型：none(未分科/非高中)/arts(文科)/science(理科)",
+    )
 
     role = Column(
         SQLEnum(

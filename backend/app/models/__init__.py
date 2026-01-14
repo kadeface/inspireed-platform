@@ -2,7 +2,7 @@
 数据库模型包
 """
 
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, StudentType
 from app.models.lesson import Lesson, LessonStatus, DifficultyLevel, LessonClassroom
 from app.models.cell import Cell, CellType, CognitiveLevel
 from app.models.logs import ExecutionLog, QARecord, ExecutionStatus
@@ -63,10 +63,29 @@ from app.models.student_project import (
     ProjectStage,
 )
 from app.models.project_cell import ProjectCell
+from app.models.evaluation import (
+    Semester,
+    Exam,
+    ExamType,
+    ExamStatus,
+    ExamSubject,
+    ExamNumberMapping,
+    Score,
+    ExamTotalScore,
+    DailyPerformanceScore,
+    EvaluationMetric,
+    MetricType,
+    MetricCategory,
+    ValueAddedEvaluation,
+    EvaluationDetail,
+    ImportTask,
+    ImportStatus,
+)
 
 __all__ = [
     "User",
     "UserRole",
+    "StudentType",
     "Lesson",
     "LessonStatus",
     "DifficultyLevel",
@@ -130,4 +149,21 @@ __all__ = [
     "ProjectStatus",
     "ProjectStage",
     "ProjectCell",
+    # 增值评价系统
+    "Semester",
+    "Exam",
+    "ExamType",
+    "ExamStatus",
+    "ExamSubject",
+    "ExamNumberMapping",
+    "Score",
+    "ExamTotalScore",
+    "DailyPerformanceScore",
+    "EvaluationMetric",
+    "MetricType",
+    "MetricCategory",
+    "ValueAddedEvaluation",
+    "EvaluationDetail",
+    "ImportTask",
+    "ImportStatus",
 ]

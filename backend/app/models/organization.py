@@ -101,6 +101,7 @@ class Classroom(Base):
         nullable=True,
         comment="班级设置（JSON格式，如可见性控制等）",
     )
+    capacity = Column(Integer, nullable=True, comment="班级容量（计划人数）")
     is_active = Column(Boolean, default=True, comment="是否激活")
     description = Column(Text, nullable=True, comment="班级描述")
     created_at = Column(
