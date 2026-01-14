@@ -222,6 +222,54 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/Admin/OrganizationManagement.vue'),
     meta: { requiresAuth: true, role: 'admin', title: '组织管理 - InspireEd' },
   },
+  // 增值评价系统 - 区县考试管理员
+  {
+    path: '/district-admin',
+    name: 'DistrictAdmin',
+    redirect: '/district-admin/exams',
+  },
+  {
+    path: '/district-admin/exams',
+    name: 'DistrictExamManagement',
+    component: () => import('../pages/DistrictExamAdmin/Dashboard.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '增值评价管理 - InspireEd' },
+  },
+  {
+    path: '/district-admin/semesters',
+    name: 'DistrictSemesterManagement',
+    component: () => import('../pages/DistrictExamAdmin/SemesterManagement.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '学期管理 - InspireEd' },
+  },
+  {
+    path: '/district-admin/exam-management',
+    name: 'DistrictExamManagementPage',
+    component: () => import('../pages/DistrictExamAdmin/ExamManagement.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '考试管理 - InspireEd' },
+  },
+  {
+    path: '/district-admin/student-import',
+    name: 'DistrictStudentImport',
+    component: () => import('../pages/DistrictExamAdmin/StudentImport.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '导入考生信息 - InspireEd' },
+  },
+  {
+    path: '/district-admin/score-import',
+    name: 'DistrictScoreImport',
+    component: () => import('../pages/DistrictExamAdmin/ScoreImport.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '导入成绩 - InspireEd' },
+  },
+  {
+    path: '/district-admin/evaluation-report',
+    name: 'DistrictEvaluationReport',
+    component: () => import('../pages/DistrictExamAdmin/EvaluationReport.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '评价报告 - InspireEd' },
+  },
+  {
+    path: '/district-admin/semester-performance',
+    name: 'DistrictSemesterPerformance',
+    component: () => import('../pages/DistrictExamAdmin/SemesterPerformance.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '学期表现 - InspireEd' },
+  },
 ]
 
 const router = createRouter({
