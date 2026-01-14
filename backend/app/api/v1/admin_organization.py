@@ -3,17 +3,21 @@
 提供区域、学校等组织单位的管理功能
 """
 
-from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+import logging
+from typing import Any, List, Optional, Dict
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 from app.core.database import get_db
 from app.models import User, Region, School, Grade, Classroom
 from app.api.deps import get_current_admin
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
@@ -186,6 +190,50 @@ class ClassroomListResponse(BaseModel):
     page: int
     size: int
     total_pages: int
+
+
+# ==================== School Import Models ====================
+
+
+class SchoolImportItem(BaseModel):
+    """学校导入项"""
+
+    region_name: str = Field(..., description="区域名称")
+    school_name: str = Field(..., description="学校名称")
+    school_code: Optional[str] = Field(None, description="学校代码（可选，用于精确匹配）")
+    school_type: Optional[str] = Field(None, description="学校类型：小学/初中/高中/大学等")
+    address: Optional[str] = Field(None, description="学校地址")
+    phone: Optional[str] = Field(None, description="联系电话")
+    email: Optional[str] = Field(None, description="邮箱")
+    principal: Optional[str] = Field(None, description="校长姓名")
+
+
+class SchoolImportRequest(BaseModel):
+    """学校批量导入请求"""
+
+    schools: List[SchoolImportItem]
+    auto_create_region: bool = Field(True, description="是否自动创建不存在的区域")
+
+
+class SchoolImportError(BaseModel):
+    """学校导入错误"""
+
+    row: int = Field(..., description="行号")
+    field: Optional[str] = Field(None, description="字段名")
+    message: str = Field(..., description="错误信息")
+
+
+class SchoolImportResponse(BaseModel):
+    """学校批量导入响应"""
+
+    total: int = Field(..., description="总记录数")
+    success: int = Field(..., description="成功数")
+    failed: int = Field(..., description="失败数")
+    created_regions: int = Field(0, description="创建的区域数")
+    created_schools: int = Field(0, description="创建的学校数")
+    updated_schools: int = Field(0, description="更新的学校数")
+    skipped_schools: int = Field(0, description="跳过的学校数（已存在）")
+    errors: List[SchoolImportError] = Field(default_factory=list, description="错误列表")
 
 
 # ==================== Region Endpoints ====================
@@ -576,6 +624,124 @@ async def delete_school(
     await db.commit()
 
     return {"message": "学校删除成功"}
+
+
+# ==================== School Import Endpoints ====================
+
+
+@router.post("/schools/import", response_model=SchoolImportResponse)
+async def import_schools(
+    file: UploadFile = File(...),
+    auto_create_region: bool = Query(True, description="是否自动创建不存在的区域"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """批量导入学校
+    
+    Excel格式要求：
+    - 必需列：区域名称、学校名称
+    - 可选列：学校代码、学校类型、地址、联系电话、邮箱、校长
+    - 支持格式：.xlsx, .xls
+    """
+    import tempfile
+    import os
+    from app.services.school_import_service import (
+        SchoolImportService,
+        SchoolImportServiceError
+    )
+
+    # 验证文件类型
+    if not file.filename:
+        logger.error("文件上传失败: 文件名为空")
+        raise HTTPException(status_code=400, detail="必须上传文件")
+
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in [".xlsx", ".xls"]:
+        logger.error(f"文件上传失败: 不支持的文件格式 {file_ext}, 文件名: {file.filename}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"只支持Excel文件格式 (.xlsx, .xls)，当前文件格式: {file_ext}"
+        )
+
+    # 保存文件到临时目录
+    temp_file_path = None
+    try:
+        # 创建临时文件
+        logger.info(f"开始处理文件上传: {file.filename}, 大小: {file.size if hasattr(file, 'size') else 'unknown'}")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+            content = await file.read()
+            if not content:
+                logger.error("文件上传失败: 文件内容为空")
+                raise HTTPException(status_code=400, detail="上传的文件为空")
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+            logger.info(f"文件已保存到临时路径: {temp_file_path}, 大小: {len(content)} 字节")
+
+        # 解析Excel文件
+        try:
+            logger.info("开始解析Excel文件...")
+            records, parse_errors = await SchoolImportService.parse_school_excel(temp_file_path)
+            logger.info(f"Excel解析完成: 记录数={len(records)}, 错误数={len(parse_errors)}")
+        except SchoolImportServiceError as e:
+            logger.error(f"Excel解析失败: {str(e)}")
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error(f"Excel解析异常: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=400, detail=f"解析Excel文件失败: {str(e)}")
+
+        # 如果解析有错误，返回错误信息
+        if parse_errors:
+            return SchoolImportResponse(
+                total=len(records) + len(parse_errors),
+                success=0,
+                failed=len(parse_errors),
+                created_regions=0,
+                created_schools=0,
+                updated_schools=0,
+                skipped_schools=0,
+                errors=[SchoolImportError(**err) for err in parse_errors]
+            )
+
+        # 导入学校
+        result = await SchoolImportService.import_schools(
+            db, records, auto_create_region
+        )
+
+        # 提交事务
+        await db.commit()
+
+        # 转换错误列表为SchoolImportError对象
+        error_objects: List[SchoolImportError] = [
+            SchoolImportError(**err) for err in result["errors"]
+        ]
+
+        return SchoolImportResponse(
+            total=result["total"],
+            success=result["success"],
+            failed=result["failed"],
+            created_regions=result["created_regions"],
+            created_schools=result["created_schools"],
+            updated_schools=result["updated_schools"],
+            skipped_schools=result["skipped_schools"],
+            errors=error_objects
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"导入学校失败: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"导入失败: {str(e)}"
+        )
+    finally:
+        # 清理临时文件
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+            except Exception as e:
+                logger.warning(f"删除临时文件失败: {str(e)}")
 
 
 # ==================== Classroom Endpoints ====================

@@ -186,6 +186,12 @@
               + 创建学校
             </button>
             <button
+              @click="openSchoolImportDialog"
+              class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              📥 批量导入
+            </button>
+            <button
               @click="loadSchools"
               class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
             >
@@ -289,6 +295,190 @@
         </div>
       </div>
     </div>
+
+    <!-- 学校批量导入对话框 -->
+    <el-dialog
+      v-model="showSchoolImportDialog"
+      title="批量导入学校"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="school-import-content">
+        <!-- 步骤指示 -->
+        <el-steps :active="importStep" finish-status="success" style="margin-bottom: 20px;">
+          <el-step title="下载模板" />
+          <el-step title="上传文件" />
+          <el-step title="导入结果" />
+        </el-steps>
+
+        <!-- 步骤1: 下载模板 -->
+        <div v-if="importStep === 0" class="import-step">
+          <el-alert
+            title="导入说明"
+            type="info"
+            :closable="false"
+            style="margin-bottom: 20px;"
+          >
+            <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+              <li>请先下载Excel模板，按照模板格式填写学校信息</li>
+              <li>必需字段：区域名称、学校名称</li>
+              <li>可选字段：学校代码、学校类型、地址、联系电话、邮箱、校长</li>
+              <li>支持格式：.xlsx, .xls</li>
+            </ul>
+          </el-alert>
+
+          <div class="template-fields">
+            <h4>模板字段说明</h4>
+            <el-table :data="templateFields" border size="small" style="margin-top: 10px;">
+              <el-table-column prop="field" label="字段名" width="120" />
+              <el-table-column prop="required" label="是否必填" width="100" />
+              <el-table-column prop="description" label="说明" />
+              <el-table-column prop="example" label="示例" width="150" />
+            </el-table>
+          </div>
+
+          <div class="step-actions" style="margin-top: 20px; text-align: center;">
+            <el-button type="primary" @click="downloadSchoolTemplate">
+              <el-icon><Download /></el-icon>
+              <span style="margin-left: 8px;">下载Excel模板</span>
+            </el-button>
+            <el-button @click="importStep = 1">
+              已有模板，下一步
+              <el-icon style="margin-left: 8px;"><ArrowRight /></el-icon>
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 步骤2: 上传文件 -->
+        <div v-if="importStep === 1" class="import-step">
+          <el-form :model="importForm" label-width="120px">
+            <el-form-item label="自动创建区域">
+              <el-switch
+                v-model="importForm.autoCreateRegion"
+                active-text="是"
+                inactive-text="否"
+              />
+              <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+                如果区域不存在，是否自动创建
+              </span>
+            </el-form-item>
+          </el-form>
+
+          <el-upload
+            ref="uploadRef"
+            class="upload-demo"
+            drag
+            action="#"
+            :auto-upload="false"
+            :limit="1"
+            :on-change="handleFileChange"
+            :on-exceed="handleExceed"
+            accept=".xlsx,.xls"
+          >
+            <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+            <div class="el-upload__text">
+              将文件拖到此处，或<em>点击上传</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip">
+                只能上传 xlsx/xls 文件，且不超过 10MB
+              </div>
+            </template>
+          </el-upload>
+
+          <div v-if="selectedFile" class="file-info" style="margin-top: 20px;">
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="文件名">{{ selectedFile.name }}</el-descriptions-item>
+              <el-descriptions-item label="文件大小">{{ formatFileSize(selectedFile.size) }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+
+          <div class="step-actions" style="margin-top: 20px; text-align: center;">
+            <el-button @click="importStep = 0">
+              <el-icon><ArrowLeft /></el-icon>
+              上一步
+            </el-button>
+            <el-button
+              type="primary"
+              @click="startSchoolImport"
+              :loading="importing"
+              :disabled="!selectedFile"
+            >
+              <el-icon><Upload /></el-icon>
+              <span style="margin-left: 8px;">开始导入</span>
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 步骤3: 导入结果 -->
+        <div v-if="importStep === 2" class="import-step">
+          <el-alert
+            :title="importResult.success > 0 ? '✅ 导入完成' : '❌ 导入失败'"
+            :type="importResult.success > 0 ? 'success' : 'error'"
+            :closable="false"
+            style="margin-bottom: 20px;"
+          />
+
+          <div v-if="importResult.total > 0">
+            <h4>📊 导入统计</h4>
+            <el-row :gutter="20" style="margin-top: 10px;">
+              <el-col :span="6">
+                <el-statistic title="总记录数" :value="importResult.total" />
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="成功" :value="importResult.success">
+                  <template #suffix>
+                    <span style="color: #67c23a;">✓</span>
+                  </template>
+                </el-statistic>
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="失败" :value="importResult.failed">
+                  <template #suffix>
+                    <span style="color: #f56c6c;">✗</span>
+                  </template>
+                </el-statistic>
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="创建学校" :value="importResult.created_schools" />
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20" style="margin-top: 10px;">
+              <el-col :span="6">
+                <el-statistic title="创建区域" :value="importResult.created_regions" />
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="更新学校" :value="importResult.updated_schools" />
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="跳过" :value="importResult.skipped_schools" />
+              </el-col>
+            </el-row>
+
+            <div v-if="importResult.errors && importResult.errors.length > 0" style="margin-top: 20px;">
+              <h4>⚠️ 错误详情</h4>
+              <el-table :data="importResult.errors" max-height="300" size="small" style="margin-top: 10px;">
+                <el-table-column prop="row" label="行号" width="80" />
+                <el-table-column prop="field" label="字段" width="120" />
+                <el-table-column prop="message" label="错误信息" />
+              </el-table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button v-if="importStep < 2" @click="showSchoolImportDialog = false">取消</el-button>
+        <el-button
+          v-if="importStep === 2"
+          type="primary"
+          @click="closeSchoolImportDialog"
+        >
+          完成
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- 班级成员管理 -->
     <div v-if="activeTab === 'classrooms'" class="space-y-6">
@@ -1221,7 +1411,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useToast } from '@/composables/useToast'
-import adminService, { type Region, type School, type Classroom, type User } from '@/services/admin'
+import adminService, { type Region, type School, type Classroom, type User, type SchoolImportResponse } from '@/services/admin'
 import curriculumService from '@/services/curriculum'
 import { classroomAssistantService } from '@/services/classroomAssistant'
 import type { Grade } from '@/types/curriculum'
@@ -1231,6 +1421,8 @@ import type {
   ClassroomMembershipUpdate,
 } from '@/types/classroomAssistant'
 import { RoleInClass } from '@/types/classroomAssistant'
+import { Download, UploadFilled, Upload, ArrowRight, ArrowLeft } from '@element-plus/icons-vue'
+import type { UploadFile, UploadProps } from 'element-plus'
 
 const toast = useToast()
 
@@ -1276,6 +1468,36 @@ const schoolForm = ref({
   description: '',
   is_active: true
 })
+
+// 学校批量导入状态
+const showSchoolImportDialog = ref(false)
+const importStep = ref(0)
+const selectedFile = ref<File | null>(null)
+const uploadRef = ref()
+const importing = ref(false)
+const importForm = ref({
+  autoCreateRegion: true
+})
+const importResult = ref<SchoolImportResponse>({
+  total: 0,
+  success: 0,
+  failed: 0,
+  created_regions: 0,
+  created_schools: 0,
+  updated_schools: 0,
+  skipped_schools: 0,
+  errors: []
+})
+const templateFields = [
+  { field: '区域名称', required: '✅ 必填', description: '市或区名称，如：北京市、朝阳区', example: '北京市' },
+  { field: '学校名称', required: '✅ 必填', description: '学校全称', example: '北京市第一中学' },
+  { field: '学校代码', required: '⭕ 选填', description: '学校代码，用于精确匹配', example: '10001' },
+  { field: '学校类型', required: '⭕ 选填', description: '小学/初中/高中/大学', example: '高中' },
+  { field: '地址', required: '⭕ 选填', description: '学校地址', example: '北京市XX区XX路' },
+  { field: '联系电话', required: '⭕ 选填', description: '联系电话', example: '010-12345678' },
+  { field: '邮箱', required: '⭕ 选填', description: '邮箱地址', example: 'school@example.com' },
+  { field: '校长', required: '⭕ 选填', description: '校长姓名', example: '张校长' },
+]
 
 // 班级管理状态
 const showClassroomManager = ref(false)
@@ -1580,6 +1802,125 @@ async function deleteSchool(school: School) {
   } catch (error: any) {
     console.error('Failed to delete school:', error)
     toast.error(error.response?.data?.detail || '删除学校失败')
+  }
+}
+
+// 学校批量导入方法
+function openSchoolImportDialog() {
+  showSchoolImportDialog.value = true
+  importStep.value = 0
+  selectedFile.value = null
+  importForm.value = { autoCreateRegion: true }
+  importResult.value = {
+    total: 0,
+    success: 0,
+    failed: 0,
+    created_regions: 0,
+    created_schools: 0,
+    updated_schools: 0,
+    skipped_schools: 0,
+    errors: []
+  }
+  if (uploadRef.value) {
+    uploadRef.value.clearFiles()
+  }
+}
+
+function closeSchoolImportDialog() {
+  showSchoolImportDialog.value = false
+  importStep.value = 0
+  selectedFile.value = null
+  if (uploadRef.value) {
+    uploadRef.value.clearFiles()
+  }
+  // 刷新学校列表
+  loadSchools()
+}
+
+function downloadSchoolTemplate() {
+  // 创建CSV模板数据
+  const template = [
+    ['区域名称*', '学校名称*', '学校代码', '学校类型', '地址', '联系电话', '邮箱', '校长'],
+    ['北京市', '北京市第一中学', '10001', '高中', '北京市XX区XX路', '010-12345678', 'school1@example.com', '张校长'],
+    ['北京市', '北京市第二小学', '10002', '小学', '北京市XX区XX街', '010-87654321', 'school2@example.com', '李校长'],
+    ['', '', '', '', '', '', '', ''],
+  ]
+
+  // 创建CSV内容
+  const csvContent = template.map(row => row.join(',')).join('\n')
+
+  // 创建Blob并下载
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  link.setAttribute('href', url)
+  link.setAttribute('download', '学校信息导入模板.csv')
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+
+  toast.success('模板下载成功')
+}
+
+const handleFileChange: UploadProps['onChange'] = (uploadFile) => {
+  selectedFile.value = uploadFile.raw || null
+}
+
+const handleExceed: UploadProps['onExceed'] = () => {
+  toast.warning('只能上传一个文件')
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
+}
+
+async function startSchoolImport() {
+  if (!selectedFile.value) {
+    toast.warning('请先选择文件')
+    return
+  }
+
+  importing.value = true
+
+  try {
+    const result = await adminService.importSchools(
+      selectedFile.value,
+      importForm.value.autoCreateRegion
+    )
+
+    importResult.value = result
+    importStep.value = 2
+
+    if (result.success > 0) {
+      toast.success(`导入完成！成功 ${result.success} 条，失败 ${result.failed} 条`)
+    } else {
+      toast.error(`导入失败：${result.errors.length > 0 ? result.errors[0].message : '未知错误'}`)
+    }
+  } catch (error: any) {
+    console.error('导入失败:', error)
+    toast.error(error.response?.data?.detail || '导入失败')
+    importResult.value = {
+      total: 0,
+      success: 0,
+      failed: 1,
+      created_regions: 0,
+      created_schools: 0,
+      updated_schools: 0,
+      skipped_schools: 0,
+      errors: [{
+        row: 0,
+        field: null,
+        message: error.response?.data?.detail || '导入失败'
+      }]
+    }
+    importStep.value = 2
+  } finally {
+    importing.value = false
   }
 }
 

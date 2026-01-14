@@ -179,6 +179,23 @@ export interface SchoolListResponse {
   total_pages: number
 }
 
+export interface SchoolImportError {
+  row: number
+  field?: string | null
+  message: string
+}
+
+export interface SchoolImportResponse {
+  total: number
+  success: number
+  failed: number
+  created_regions: number
+  created_schools: number
+  updated_schools: number
+  skipped_schools: number
+  errors: SchoolImportError[]
+}
+
 export interface Classroom {
   id: number
   name: string
@@ -394,6 +411,21 @@ export const adminService = {
    */
   async getSchoolsByRegion(regionId: number): Promise<{ schools: School[] }> {
     return await api.get(`/admin/organization/schools/by-region/${regionId}`)
+  },
+
+  /**
+   * 批量导入学校
+   */
+  async importSchools(
+    file: File,
+    autoCreateRegion: boolean = true
+  ): Promise<SchoolImportResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+    // 注意：不要手动设置Content-Type，api.ts中的拦截器会自动处理FormData
+    return await api.post('/admin/organization/schools/import', formData, {
+      params: { auto_create_region: autoCreateRegion },
+    })
   },
 
   /**
