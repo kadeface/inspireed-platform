@@ -7,7 +7,7 @@ import logging
 from typing import Any, List, Optional, Dict
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, join
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
@@ -190,6 +190,26 @@ class ClassroomListResponse(BaseModel):
     page: int
     size: int
     total_pages: int
+
+
+class ClassroomImportError(BaseModel):
+    """班级导入错误"""
+
+    row: int
+    field: Optional[str] = None
+    message: str
+
+
+class ClassroomImportResponse(BaseModel):
+    """班级导入响应"""
+
+    total: int
+    success: int
+    failed: int
+    created: int
+    updated: int
+    skipped: int
+    errors: List[ClassroomImportError]
 
 
 # ==================== School Import Models ====================
@@ -753,39 +773,61 @@ async def get_classrooms(
     size: int = Query(10, ge=1, le=100, description="每页数量"),
     school_id: Optional[int] = Query(None, description="学校筛选"),
     grade_id: Optional[int] = Query(None, description="年级筛选"),
+    region_id: Optional[int] = Query(None, description="区域筛选"),
     is_active: Optional[bool] = Query(None, description="激活状态筛选"),
-    search: Optional[str] = Query(None, description="搜索关键词"),
+    search: Optional[str] = Query(None, description="搜索关键词（支持班级名称、班级编码、学校名称）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ) -> Any:
     """获取班级列表"""
 
-    query = select(Classroom)
+    # 如果需要搜索学校名称或按区域筛选，需要JOIN School表
+    needs_join = search is not None or region_id is not None
+    
+    if needs_join:
+        # 需要JOIN School表以支持搜索学校名称或区域筛选
+        query = select(Classroom).join(School, Classroom.school_id == School.id)
+        count_query = select(func.count(Classroom.id)).select_from(
+            join(Classroom, School, Classroom.school_id == School.id)
+        )
+    else:
+        query = select(Classroom)
+        count_query = select(func.count(Classroom.id))
 
     if school_id is not None:
         query = query.where(Classroom.school_id == school_id)
+        count_query = count_query.where(Classroom.school_id == school_id)
     if grade_id is not None:
         query = query.where(Classroom.grade_id == grade_id)
+        count_query = count_query.where(Classroom.grade_id == grade_id)
+    if region_id is not None:
+        # 通过School表筛选区域
+        if not needs_join:
+            # 如果还没有JOIN，需要JOIN School表
+            query = query.join(School, Classroom.school_id == School.id)
+            count_query = select(func.count(Classroom.id)).select_from(
+                join(Classroom, School, Classroom.school_id == School.id)
+            )
+            needs_join = True  # 标记已JOIN
+        query = query.where(School.region_id == region_id)
+        count_query = count_query.where(School.region_id == region_id)
     if is_active is not None:
         query = query.where(Classroom.is_active == is_active)
+        count_query = count_query.where(Classroom.is_active == is_active)
     if search:
+        if not needs_join:
+            # 如果还没有JOIN，需要JOIN School表
+            query = query.join(School, Classroom.school_id == School.id)
+            count_query = select(func.count(Classroom.id)).select_from(
+                join(Classroom, School, Classroom.school_id == School.id)
+            )
         search_filter = or_(
             Classroom.name.ilike(f"%{search}%"),
             Classroom.code.ilike(f"%{search}%"),
             Classroom.description.ilike(f"%{search}%"),
+            School.name.ilike(f"%{search}%"),  # 支持搜索学校名称
         )
         query = query.where(search_filter)
-    else:
-        search_filter = None
-
-    count_query = select(func.count()).select_from(Classroom)
-    if school_id is not None:
-        count_query = count_query.where(Classroom.school_id == school_id)
-    if grade_id is not None:
-        count_query = count_query.where(Classroom.grade_id == grade_id)
-    if is_active is not None:
-        count_query = count_query.where(Classroom.is_active == is_active)
-    if search_filter is not None:
         count_query = count_query.where(search_filter)
 
     total = (await db.execute(count_query)).scalar() or 0
@@ -890,6 +932,161 @@ async def update_classroom(
     await db.refresh(classroom)
 
     return ClassroomResponse.model_validate(classroom)
+
+
+@router.post("/classrooms/import", response_model=ClassroomImportResponse)
+async def import_classrooms(
+    file: UploadFile = File(...),
+    school_id: Optional[int] = Query(None, description="学校ID（学校管理员导入时必填，或从当前用户获取）"),
+    region_id: Optional[int] = Query(None, description="区域ID（县区管理员导入时可选，用于学校匹配）"),
+    update_existing: bool = Query(False, description="是否更新已存在的班级"),
+    enrollment_year: Optional[int] = Query(None, description="统一设置的入学年份（如果提供，覆盖Excel中的值）"),
+    capacity: Optional[int] = Query(None, description="统一设置的班级容量（如果提供，覆盖Excel中的值）"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """批量导入班级
+    
+    Excel格式要求：
+    - 县区管理员导入：必需列：学校名称、年级级别、班级编号
+    - 学校管理员导入：必需列：年级级别、班级编号（学校自动使用当前用户的学校）
+    - 可选列：学校代码、年级名称、班级名称、入学年份、班级容量、班级描述
+    - 支持格式：.xlsx, .xls
+    
+    注意：班主任信息不在导入模板中，请在班级创建后通过"班级成员管理"功能添加。
+    """
+    import tempfile
+    import os
+    from app.services.classroom_import_service import (
+        ClassroomImportService,
+        ClassroomImportServiceError,
+    )
+    from app.models import UserRole
+
+    # 验证文件类型
+    if not file.filename:
+        logger.error("文件上传失败: 文件名为空")
+        raise HTTPException(status_code=400, detail="必须上传文件")
+
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in [".xlsx", ".xls"]:
+        logger.error(f"文件上传失败: 不支持的文件格式 {file_ext}, 文件名: {file.filename}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"只支持Excel文件格式 (.xlsx, .xls)，当前文件格式: {file_ext}"
+        )
+
+    # 判断是否为学校管理员（通过用户角色和school_id）
+    # 如果用户有school_id且角色为TEACHER，则认为是学校管理员
+    is_school_admin = False
+    actual_school_id = school_id
+
+    if isinstance(current_user.role, UserRole):
+        if current_user.role == UserRole.TEACHER and current_user.school_id:
+            is_school_admin = True
+            actual_school_id = int(current_user.school_id)  # type: ignore
+            logger.info(f"学校管理员导入班级: user_id={current_user.id}, school_id={actual_school_id}")
+        elif current_user.role == UserRole.ADMIN:
+            is_school_admin = False
+            # 如果是管理员但指定了school_id，认为是学校级别的导入
+            if school_id:
+                actual_school_id = school_id
+                is_school_admin = True
+        else:
+            is_school_admin = False
+
+    # 学校管理员必须提供school_id
+    if is_school_admin and not actual_school_id:
+        raise HTTPException(
+            status_code=400,
+            detail="学校管理员导入时必须提供school_id或确保用户已关联学校"
+        )
+
+    # 保存文件到临时目录
+    temp_file_path = None
+    try:
+        # 创建临时文件
+        logger.info(f"开始处理班级导入文件: {file.filename}, 大小: {file.size if hasattr(file, 'size') else 'unknown'}, 学校管理员: {is_school_admin}, school_id: {actual_school_id}")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+            content = await file.read()
+            if not content:
+                logger.error("文件上传失败: 文件内容为空")
+                raise HTTPException(status_code=400, detail="上传的文件为空")
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+            logger.info(f"文件已保存到临时路径: {temp_file_path}, 大小: {len(content)} 字节")
+
+        # 解析Excel文件
+        try:
+            logger.info("开始解析Excel文件...")
+            records, parse_errors = await ClassroomImportService.parse_classroom_excel(
+                temp_file_path, is_school_admin=is_school_admin
+            )
+            logger.info(f"Excel解析完成: 记录数={len(records)}, 错误数={len(parse_errors)}")
+        except ClassroomImportServiceError as e:
+            logger.error(f"Excel解析失败: {str(e)}")
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error(f"Excel解析异常: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=400, detail=f"解析Excel文件失败: {str(e)}")
+
+        # 如果解析有错误，返回错误信息
+        if parse_errors:
+            return ClassroomImportResponse(
+                total=len(records) + len(parse_errors),
+                success=0,
+                failed=len(parse_errors),
+                created=0,
+                updated=0,
+                skipped=0,
+                errors=[ClassroomImportError(**err) for err in parse_errors]
+            )
+
+        if not records:
+            raise HTTPException(status_code=400, detail="Excel文件中没有有效的数据行")
+
+        # 导入班级
+        result = await ClassroomImportService.import_classrooms(
+            db=db,
+            records=records,
+            school_id=actual_school_id,
+            region_id=region_id,
+            update_existing=update_existing,
+            enrollment_year=enrollment_year,
+            capacity=capacity,
+        )
+
+        # 转换错误列表为ClassroomImportError对象
+        error_objects: List[ClassroomImportError] = [
+            ClassroomImportError(**err) for err in result["errors"]
+        ]
+
+        return ClassroomImportResponse(
+            total=result["total"],
+            success=result["success"],
+            failed=result["failed"],
+            created=result["created"],
+            updated=result["updated"],
+            skipped=result["skipped"],
+            errors=error_objects
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"导入班级失败: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"导入失败: {str(e)}"
+        )
+    finally:
+        # 清理临时文件
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+            except Exception as e:
+                logger.warning(f"删除临时文件失败: {str(e)}")
 
 
 @router.delete("/classrooms/{classroom_id}")

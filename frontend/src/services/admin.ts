@@ -196,6 +196,22 @@ export interface SchoolImportResponse {
   errors: SchoolImportError[]
 }
 
+export interface ClassroomImportError {
+  row: number
+  field?: string | null
+  message: string
+}
+
+export interface ClassroomImportResponse {
+  total: number
+  success: number
+  failed: number
+  created: number
+  updated: number
+  skipped: number
+  errors: ClassroomImportError[]
+}
+
 export interface Classroom {
   id: number
   name: string
@@ -436,6 +452,7 @@ export const adminService = {
     size?: number
     school_id?: number
     grade_id?: number
+    region_id?: number
     is_active?: boolean
     search?: string
   } = {}): Promise<ClassroomListResponse> {
@@ -461,6 +478,33 @@ export const adminService = {
    */
   async deleteClassroom(classroomId: number): Promise<void> {
     return await api.delete(`/admin/organization/classrooms/${classroomId}`)
+  },
+
+  /**
+   * 批量导入班级
+   */
+  async importClassrooms(
+    file: File,
+    schoolId?: number,
+    regionId?: number,
+    updateExisting: boolean = false,
+    enrollmentYear?: number,
+    capacity?: number
+  ): Promise<ClassroomImportResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+    // 注意：不要手动设置Content-Type，api.ts中的拦截器会自动处理FormData
+    const params: Record<string, any> = {
+      update_existing: updateExisting
+    }
+    if (schoolId) params.school_id = schoolId
+    if (regionId) params.region_id = regionId
+    if (enrollmentYear) params.enrollment_year = enrollmentYear
+    if (capacity) params.capacity = capacity
+    
+    return await api.post('/admin/organization/classrooms/import', formData, {
+      params
+    })
   }
 }
 

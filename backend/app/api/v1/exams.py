@@ -4,12 +4,16 @@
 提供考试的CRUD操作
 """
 
-from typing import Any, Optional
+import tempfile
+import os
+from pathlib import Path
+from typing import Any, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, and_
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
+from pydantic import BaseModel, Field
 
 from app.api.deps import get_db, get_current_active_user
 from app.models import User, Exam, UserRole, Semester
@@ -22,6 +26,28 @@ from app.schemas.evaluation import (
 )
 
 router = APIRouter()
+
+
+# ==================== 考生信息导入相关 Schema ====================
+
+class StudentImportError(BaseModel):
+    """学生导入错误"""
+
+    row: int = Field(..., description="行号")
+    field: Optional[str] = Field(None, description="字段名")
+    message: str = Field(..., description="错误信息")
+
+
+class StudentImportResponse(BaseModel):
+    """学生考生信息批量导入响应"""
+
+    total: int = Field(..., description="总记录数")
+    success: int = Field(..., description="成功数")
+    failed: int = Field(..., description="失败数")
+    created: int = Field(0, description="创建的映射数")
+    updated: int = Field(0, description="更新的映射数")
+    skipped: int = Field(0, description="跳过的映射数（已存在）")
+    errors: List[StudentImportError] = Field(default_factory=list, description="错误列表")
 
 
 @router.post("/", response_model=ExamResponse, status_code=status.HTTP_201_CREATED)
@@ -345,3 +371,137 @@ async def list_exam_subjects(
         response.append(subject_dict)
 
     return response
+
+
+# ==================== 考生信息导入 ====================
+
+@router.post("/{exam_id}/students/import", response_model=StudentImportResponse)
+async def import_student_exam_info(
+    exam_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    批量导入考生信息（考号映射）
+    
+    Excel格式要求：
+    - 必需列：市(区)、学校、姓名、身份证号、考生号、班级
+    - 可选列：学校代码
+    - 支持格式：.xlsx, .xls
+    
+    权限说明：
+    - 管理员、区县管理员、学校管理员可以导入考生信息
+    """
+    import logging
+    from app.services.student_import_service import (
+        StudentImportService,
+        StudentImportServiceError
+    )
+    
+    logger = logging.getLogger(__name__)
+    
+    # 权限检查
+    if current_user.role not in [UserRole.ADMIN, UserRole.DISTRICT_ADMIN, UserRole.SCHOOL_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有管理员可以导入考生信息"
+        )
+    
+    # 验证考试是否存在
+    exam_result = await db.execute(
+        select(Exam).where(Exam.id == exam_id)
+    )
+    exam = exam_result.scalar_one_or_none()
+    if not exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="考试不存在"
+        )
+    
+    # 验证文件类型
+    if not file.filename:
+        logger.error("文件上传失败: 文件名为空")
+        raise HTTPException(status_code=400, detail="必须上传文件")
+    
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in [".xlsx", ".xls"]:
+        logger.error(f"文件上传失败: 不支持的文件格式 {file_ext}, 文件名: {file.filename}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"只支持Excel文件格式 (.xlsx, .xls)，当前文件格式: {file_ext}"
+        )
+    
+    # 保存文件到临时目录
+    temp_file_path = None
+    try:
+        # 创建临时文件
+        logger.info(f"开始处理文件上传: {file.filename}, 大小: {file.size if hasattr(file, 'size') else 'unknown'}")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+            content = await file.read()
+            if not content:
+                logger.error("文件上传失败: 文件内容为空")
+                raise HTTPException(status_code=400, detail="上传的文件为空")
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+            logger.info(f"文件已保存到临时路径: {temp_file_path}, 大小: {len(content)} 字节")
+        
+        # 解析Excel文件
+        try:
+            logger.info("开始解析Excel文件...")
+            records, parse_errors = await StudentImportService.parse_student_excel(temp_file_path)
+            logger.info(f"Excel解析完成: 记录数={len(records)}, 错误数={len(parse_errors)}")
+        except StudentImportServiceError as e:
+            logger.error(f"Excel解析失败: {str(e)}")
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error(f"Excel解析异常: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=400, detail=f"解析Excel文件失败: {str(e)}")
+        
+        # 如果解析有错误，返回错误信息
+        if parse_errors:
+            return StudentImportResponse(
+                total=len(records) + len(parse_errors),
+                success=0,
+                failed=len(parse_errors),
+                created=0,
+                updated=0,
+                skipped=0,
+                errors=[StudentImportError(**err) for err in parse_errors]
+            )
+        
+        # 导入考生信息
+        result = await StudentImportService.import_student_exam_mappings(
+            db, exam_id, records
+        )
+        
+        # 提交事务
+        await db.commit()
+        
+        # 转换错误列表为StudentImportError对象
+        error_objects = [StudentImportError(**err) for err in result["errors"]]
+        
+        logger.info(
+            f"考生信息导入完成: 总计={result['total']}, "
+            f"成功={result['success']}, 失败={result['failed']}, "
+            f"创建={result['created']}, 更新={result['updated']}"
+        )
+        
+        return StudentImportResponse(
+            total=result["total"],
+            success=result["success"],
+            failed=result["failed"],
+            created=result["created"],
+            updated=result["updated"],
+            skipped=result["skipped"],
+            errors=error_objects
+        )
+    
+    finally:
+        # 清理临时文件
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+                logger.info(f"已删除临时文件: {temp_file_path}")
+            except Exception as e:
+                logger.warning(f"删除临时文件失败: {str(e)}")

@@ -75,6 +75,12 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // 如果是FormData，删除Content-Type让浏览器自动设置（包含boundary）
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+    
     return config;
   },
   (error) => {
@@ -220,6 +226,30 @@ export const examApi = {
   /** 获取考试科目 */
   getSubjects: async (examId: number): Promise<ExamSubject[]> => {
     return apiClient.get(`/exams/${examId}/subjects`);
+  },
+
+  /** 导入考生信息（考号映射） */
+  importStudents: async (
+    examId: number,
+    file: File
+  ): Promise<{
+    total: number;
+    success: number;
+    failed: number;
+    created: number;
+    updated: number;
+    skipped: number;
+    errors: Array<{
+      row: number;
+      field?: string | null;
+      message: string;
+    }>;
+  }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // 不需要手动设置 Content-Type，拦截器会自动处理 FormData
+    return apiClient.post(`/exams/${examId}/students/import`, formData);
   },
 };
 
@@ -449,11 +479,8 @@ export const importTaskApi = {
     formData.append('exam_id', examId.toString());
     formData.append('auto_process', autoProcess.toString());
 
-    return apiClient.post('/import-tasks/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    // 不需要手动设置 Content-Type，拦截器会自动处理 FormData
+    return apiClient.post('/import-tasks/', formData);
   },
 
   /** 获取任务详情 */

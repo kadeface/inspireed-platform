@@ -189,7 +189,13 @@
               @click="openSchoolImportDialog"
               class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
-              📥 批量导入
+              📥 批量导入学校
+            </button>
+            <button
+              @click="openDistrictClassroomImportDialog"
+              class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              📥 批量导入班级
             </button>
             <button
               @click="loadSchools"
@@ -480,6 +486,423 @@
       </template>
     </el-dialog>
 
+    <!-- 班级批量导入对话框（学校端） -->
+    <el-dialog
+      v-model="showClassroomImportDialog"
+      title="批量导入班级"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="classroom-import-content">
+        <!-- 步骤指示 -->
+        <el-steps :active="classroomImportStep" finish-status="success" style="margin-bottom: 20px;">
+          <el-step title="下载模板" />
+          <el-step title="上传文件" />
+          <el-step title="导入结果" />
+        </el-steps>
+
+        <!-- 步骤1: 下载模板 -->
+        <div v-if="classroomImportStep === 0" class="import-step">
+          <el-alert
+            title="导入说明"
+            type="info"
+            :closable="false"
+            style="margin-bottom: 20px;"
+          >
+            <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+              <li>请先下载Excel模板，按照模板格式填写班级信息</li>
+              <li>必需字段：年级级别、班级编号</li>
+              <li>可选字段：年级名称、班级名称、入学年份、班级容量、班级描述</li>
+              <li>支持格式：.xlsx, .xls</li>
+              <li><strong>注意：</strong>班主任信息不在导入模板中，请在班级创建后通过"班级成员管理"功能添加</li>
+            </ul>
+          </el-alert>
+
+          <div v-if="classroomSchool" class="school-info" style="margin-bottom: 20px; padding: 12px; background: #f5f7fa; border-radius: 4px;">
+            <strong>当前学校：</strong>{{ classroomSchool.name }}
+          </div>
+
+          <div class="template-fields">
+            <h4>模板字段说明</h4>
+            <el-table :data="classroomTemplateFields" border size="small" style="margin-top: 10px;">
+              <el-table-column prop="field" label="字段名" width="120" />
+              <el-table-column prop="required" label="是否必填" width="100" />
+              <el-table-column prop="description" label="说明" />
+              <el-table-column prop="example" label="示例" width="150" />
+            </el-table>
+          </div>
+
+          <div class="step-actions" style="margin-top: 20px; text-align: center;">
+            <el-button type="primary" @click="downloadClassroomTemplate">
+              <el-icon><Download /></el-icon>
+              <span style="margin-left: 8px;">下载Excel模板</span>
+            </el-button>
+            <el-button @click="classroomImportStep = 1">
+              已有模板，下一步
+              <el-icon style="margin-left: 8px;"><ArrowRight /></el-icon>
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 步骤2: 上传文件 -->
+        <div v-if="classroomImportStep === 1" class="import-step">
+          <el-form :model="classroomImportForm" label-width="140px">
+            <el-form-item label="统一设置入学年份">
+              <el-input-number
+                v-model="classroomImportForm.enrollmentYear"
+                :min="1900"
+                :max="2100"
+                placeholder="留空则使用Excel中的值"
+                style="width: 200px;"
+              />
+              <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+                如果设置，将覆盖Excel中的所有入学年份
+              </span>
+            </el-form-item>
+            <el-form-item label="统一设置班级容量">
+              <el-input-number
+                v-model="classroomImportForm.capacity"
+                :min="1"
+                :max="200"
+                placeholder="留空则使用Excel中的值"
+                style="width: 200px;"
+              />
+              <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+                如果设置，将覆盖Excel中的所有班级容量
+              </span>
+            </el-form-item>
+            <el-form-item label="更新已存在班级">
+              <el-switch
+                v-model="classroomImportForm.updateExisting"
+                active-text="是"
+                inactive-text="否"
+              />
+              <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+                如果班级已存在，是否更新
+              </span>
+            </el-form-item>
+          </el-form>
+
+          <el-upload
+            ref="classroomUploadRef"
+            class="upload-demo"
+            drag
+            action="#"
+            :auto-upload="false"
+            :limit="1"
+            :on-change="handleClassroomFileChange"
+            :on-exceed="handleClassroomExceed"
+            accept=".xlsx,.xls"
+          >
+            <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+            <div class="el-upload__text">
+              将文件拖到此处，或<em>点击上传</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip">
+                只能上传 xlsx/xls 文件，且不超过 10MB
+              </div>
+            </template>
+          </el-upload>
+
+          <div v-if="selectedClassroomFile" class="file-info" style="margin-top: 20px;">
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="文件名">{{ selectedClassroomFile.name }}</el-descriptions-item>
+              <el-descriptions-item label="文件大小">{{ formatFileSize(selectedClassroomFile.size) }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+
+          <div class="step-actions" style="margin-top: 20px; text-align: center;">
+            <el-button @click="classroomImportStep = 0">
+              <el-icon><ArrowLeft /></el-icon>
+              上一步
+            </el-button>
+            <el-button
+              type="primary"
+              @click="startClassroomImport"
+              :loading="classroomImporting"
+              :disabled="!selectedClassroomFile"
+            >
+              <el-icon><Upload /></el-icon>
+              <span style="margin-left: 8px;">开始导入</span>
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 步骤3: 导入结果 -->
+        <div v-if="classroomImportStep === 2" class="import-step">
+          <el-alert
+            :title="classroomImportResult.success > 0 ? '✅ 导入完成' : '❌ 导入失败'"
+            :type="classroomImportResult.success > 0 ? 'success' : 'error'"
+            :closable="false"
+            style="margin-bottom: 20px;"
+          />
+
+          <div v-if="classroomImportResult.total > 0">
+            <h4>📊 导入统计</h4>
+            <el-row :gutter="20" style="margin-top: 10px;">
+              <el-col :span="6">
+                <el-statistic title="总记录数" :value="classroomImportResult.total" />
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="成功" :value="classroomImportResult.success">
+                  <template #suffix>
+                    <span style="color: #67c23a;">✓</span>
+                  </template>
+                </el-statistic>
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="失败" :value="classroomImportResult.failed">
+                  <template #suffix>
+                    <span style="color: #f56c6c;">✗</span>
+                  </template>
+                </el-statistic>
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="创建" :value="classroomImportResult.created" />
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20" style="margin-top: 10px;">
+              <el-col :span="6">
+                <el-statistic title="更新" :value="classroomImportResult.updated" />
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="跳过" :value="classroomImportResult.skipped" />
+              </el-col>
+            </el-row>
+
+            <div v-if="classroomImportResult.errors && classroomImportResult.errors.length > 0" style="margin-top: 20px;">
+              <h4>⚠️ 错误详情</h4>
+              <el-table :data="classroomImportResult.errors" max-height="300" size="small" style="margin-top: 10px;">
+                <el-table-column prop="row" label="行号" width="80" />
+                <el-table-column prop="field" label="字段" width="120" />
+                <el-table-column prop="message" label="错误信息" />
+              </el-table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button v-if="classroomImportStep < 2" @click="showClassroomImportDialog = false">取消</el-button>
+        <el-button
+          v-if="classroomImportStep === 2"
+          type="primary"
+          @click="closeClassroomImportDialog"
+        >
+          完成
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 县区管理端班级批量导入对话框 -->
+    <el-dialog
+      v-model="showDistrictClassroomImportDialog"
+      title="批量导入班级（支持多个学校）"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="classroom-import-content">
+        <!-- 步骤指示 -->
+        <el-steps :active="districtClassroomImportStep" finish-status="success" style="margin-bottom: 20px;">
+          <el-step title="下载模板" />
+          <el-step title="上传文件" />
+          <el-step title="导入结果" />
+        </el-steps>
+
+        <!-- 步骤1: 下载模板 -->
+        <div v-if="districtClassroomImportStep === 0" class="import-step">
+          <el-alert
+            title="导入说明"
+            type="info"
+            :closable="false"
+            style="margin-bottom: 20px;"
+          >
+            <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+              <li>请先下载Excel模板，按照模板格式填写班级信息</li>
+              <li>必需字段：学校名称、年级级别、班级编号</li>
+              <li>可选字段：学校代码、年级名称、班级名称、入学年份、班级容量、班级描述</li>
+              <li>支持格式：.xlsx, .xls</li>
+              <li><strong>注意：</strong>可以一次导入多个学校的班级，Excel中需要包含学校信息</li>
+              <li><strong>注意：</strong>班主任信息不在导入模板中，请在班级创建后通过"班级成员管理"功能添加</li>
+            </ul>
+          </el-alert>
+
+          <div class="template-fields">
+            <h4>模板字段说明</h4>
+            <el-table :data="districtClassroomTemplateFields" border size="small" style="margin-top: 10px;">
+              <el-table-column prop="field" label="字段名" width="120" />
+              <el-table-column prop="required" label="是否必填" width="100" />
+              <el-table-column prop="description" label="说明" />
+              <el-table-column prop="example" label="示例" width="150" />
+            </el-table>
+          </div>
+
+          <div class="step-actions" style="margin-top: 20px; text-align: center;">
+            <el-button type="primary" @click="downloadDistrictClassroomTemplate">
+              <el-icon><Download /></el-icon>
+              <span style="margin-left: 8px;">下载Excel模板</span>
+            </el-button>
+            <el-button @click="districtClassroomImportStep = 1">
+              已有模板，下一步
+              <el-icon style="margin-left: 8px;"><ArrowRight /></el-icon>
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 步骤2: 上传文件 -->
+        <div v-if="districtClassroomImportStep === 1" class="import-step">
+          <el-form :model="districtClassroomImportForm" label-width="140px">
+            <el-form-item label="统一设置入学年份">
+              <el-input-number
+                v-model="districtClassroomImportForm.enrollmentYear"
+                :min="1900"
+                :max="2100"
+                placeholder="留空则使用Excel中的值"
+                style="width: 200px;"
+              />
+              <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+                如果设置，将覆盖Excel中的所有入学年份
+              </span>
+            </el-form-item>
+            <el-form-item label="统一设置班级容量">
+              <el-input-number
+                v-model="districtClassroomImportForm.capacity"
+                :min="1"
+                :max="200"
+                placeholder="留空则使用Excel中的值"
+                style="width: 200px;"
+              />
+              <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+                如果设置，将覆盖Excel中的所有班级容量
+              </span>
+            </el-form-item>
+            <el-form-item label="更新已存在班级">
+              <el-switch
+                v-model="districtClassroomImportForm.updateExisting"
+                active-text="是"
+                inactive-text="否"
+              />
+              <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+                如果班级已存在，是否更新
+              </span>
+            </el-form-item>
+          </el-form>
+
+          <el-upload
+            ref="districtClassroomUploadRef"
+            class="upload-demo"
+            drag
+            action="#"
+            :auto-upload="false"
+            :limit="1"
+            :on-change="handleDistrictClassroomFileChange"
+            :on-exceed="handleDistrictClassroomExceed"
+            accept=".xlsx,.xls"
+          >
+            <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+            <div class="el-upload__text">
+              将文件拖到此处，或<em>点击上传</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip">
+                只能上传 xlsx/xls 文件，且不超过 10MB
+              </div>
+            </template>
+          </el-upload>
+
+          <div v-if="selectedDistrictClassroomFile" class="file-info" style="margin-top: 20px;">
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="文件名">{{ selectedDistrictClassroomFile.name }}</el-descriptions-item>
+              <el-descriptions-item label="文件大小">{{ formatFileSize(selectedDistrictClassroomFile.size) }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+
+          <div class="step-actions" style="margin-top: 20px; text-align: center;">
+            <el-button @click="districtClassroomImportStep = 0">
+              <el-icon><ArrowLeft /></el-icon>
+              上一步
+            </el-button>
+            <el-button
+              type="primary"
+              @click="startDistrictClassroomImport"
+              :loading="districtClassroomImporting"
+              :disabled="!selectedDistrictClassroomFile"
+            >
+              <el-icon><Upload /></el-icon>
+              <span style="margin-left: 8px;">开始导入</span>
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 步骤3: 导入结果 -->
+        <div v-if="districtClassroomImportStep === 2" class="import-step">
+          <el-alert
+            :title="districtClassroomImportResult.success > 0 ? '✅ 导入完成' : '❌ 导入失败'"
+            :type="districtClassroomImportResult.success > 0 ? 'success' : 'error'"
+            :closable="false"
+            style="margin-bottom: 20px;"
+          />
+
+          <div v-if="districtClassroomImportResult.total > 0">
+            <h4>📊 导入统计</h4>
+            <el-row :gutter="20" style="margin-top: 10px;">
+              <el-col :span="6">
+                <el-statistic title="总记录数" :value="districtClassroomImportResult.total" />
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="成功" :value="districtClassroomImportResult.success">
+                  <template #suffix>
+                    <span style="color: #67c23a;">✓</span>
+                  </template>
+                </el-statistic>
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="失败" :value="districtClassroomImportResult.failed">
+                  <template #suffix>
+                    <span style="color: #f56c6c;">✗</span>
+                  </template>
+                </el-statistic>
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="创建" :value="districtClassroomImportResult.created" />
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20" style="margin-top: 10px;">
+              <el-col :span="6">
+                <el-statistic title="更新" :value="districtClassroomImportResult.updated" />
+              </el-col>
+              <el-col :span="6">
+                <el-statistic title="跳过" :value="districtClassroomImportResult.skipped" />
+              </el-col>
+            </el-row>
+
+            <div v-if="districtClassroomImportResult.errors && districtClassroomImportResult.errors.length > 0" style="margin-top: 20px;">
+              <h4>⚠️ 错误详情</h4>
+              <el-table :data="districtClassroomImportResult.errors" max-height="300" size="small" style="margin-top: 10px;">
+                <el-table-column prop="row" label="行号" width="80" />
+                <el-table-column prop="field" label="字段" width="120" />
+                <el-table-column prop="message" label="错误信息" />
+              </el-table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button v-if="districtClassroomImportStep < 2" @click="showDistrictClassroomImportDialog = false">取消</el-button>
+        <el-button
+          v-if="districtClassroomImportStep === 2"
+          type="primary"
+          @click="closeDistrictClassroomImportDialog"
+        >
+          完成
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- 班级成员管理 -->
     <div v-if="activeTab === 'classrooms'" class="space-y-6">
       <!-- 功能说明 -->
@@ -500,11 +923,41 @@
             </button>
           </div>
           <div class="flex gap-2">
+            <select
+              v-model="allClassroomRegionFilter"
+              @change="handleRegionFilterChange"
+              class="px-3 py-2 border rounded-lg"
+            >
+              <option value="">所有县区</option>
+              <option v-for="region in allRegions" :key="region.id" :value="region.id">
+                {{ region.name }}
+              </option>
+            </select>
+            <select
+              v-model="allClassroomSchoolFilter"
+              @change="loadAllClassrooms"
+              class="px-3 py-2 border rounded-lg"
+            >
+              <option value="">所有学校</option>
+              <option v-for="school in filteredSchoolsForClassroom" :key="school.id" :value="school.id">
+                {{ school.name }}
+              </option>
+            </select>
+            <select
+              v-model="allClassroomGradeFilter"
+              @change="handleGradeFilterChange"
+              class="px-3 py-2 border rounded-lg"
+            >
+              <option value="">所有年级</option>
+              <option v-for="grade in grades" :key="grade.id" :value="grade.id">
+                {{ grade.name }}
+              </option>
+            </select>
             <input
               v-model="allClassroomSearchQuery"
               @keyup.enter="loadAllClassrooms"
               type="text"
-              placeholder="搜索班级名称..."
+              placeholder="搜索学校或班级名称..."
               class="px-3 py-2 border rounded-lg w-64"
             />
           </div>
@@ -765,6 +1218,13 @@
             :disabled="!classroomSchool"
           >
             + 新增班级
+          </button>
+          <button
+            @click="openClassroomImportDialog"
+            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            :disabled="!classroomSchool"
+          >
+            📥 批量导入
           </button>
           <button
             @click="loadClassrooms"
@@ -1411,7 +1871,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useToast } from '@/composables/useToast'
-import adminService, { type Region, type School, type Classroom, type User, type SchoolImportResponse } from '@/services/admin'
+import adminService, { type Region, type School, type Classroom, type User, type SchoolImportResponse, type ClassroomImportResponse } from '@/services/admin'
 import curriculumService from '@/services/curriculum'
 import { classroomAssistantService } from '@/services/classroomAssistant'
 import type { Grade } from '@/types/curriculum'
@@ -1423,6 +1883,7 @@ import type {
 import { RoleInClass } from '@/types/classroomAssistant'
 import { Download, UploadFilled, Upload, ArrowRight, ArrowLeft } from '@element-plus/icons-vue'
 import type { UploadFile, UploadProps } from 'element-plus'
+import * as XLSX from 'xlsx'
 
 const toast = useToast()
 
@@ -1526,6 +1987,95 @@ const classroomNameError = ref('')
 const allClassrooms = ref<Classroom[]>([])
 const allClassroomsLoading = ref(false)
 const allClassroomSearchQuery = ref('')
+const allClassroomRegionFilter = ref<number | ''>('')
+const allClassroomSchoolFilter = ref<number | ''>('')
+const allClassroomGradeFilter = ref<number | ''>('')
+
+// 计算属性：根据县区和年级筛选过滤学校列表
+const filteredSchoolsForClassroom = computed(() => {
+  let filtered = schools.value
+
+  // 根据县区筛选
+  if (allClassroomRegionFilter.value) {
+    filtered = filtered.filter(school => school.region_id === Number(allClassroomRegionFilter.value))
+  }
+
+  // 根据年级筛选：只显示该年级下有班级的学校
+  if (allClassroomGradeFilter.value) {
+    // 从已加载的班级列表中提取该年级下的学校ID
+    const schoolIdsInGrade = new Set(
+      allClassrooms.value
+        .filter(c => c.grade_id === Number(allClassroomGradeFilter.value))
+        .map(c => c.school_id)
+    )
+    // 只保留这些学校
+    filtered = filtered.filter(school => schoolIdsInGrade.has(school.id))
+  }
+
+  return filtered
+})
+
+// 班级批量导入状态
+const showClassroomImportDialog = ref(false)
+const classroomImportStep = ref(0)
+const selectedClassroomFile = ref<File | null>(null)
+const classroomUploadRef = ref()
+const classroomImporting = ref(false)
+const classroomImportForm = ref({
+  enrollmentYear: undefined as number | undefined,
+  capacity: undefined as number | undefined,
+  updateExisting: false
+})
+const classroomImportResult = ref<ClassroomImportResponse>({
+  total: 0,
+  success: 0,
+  failed: 0,
+  created: 0,
+  updated: 0,
+  skipped: 0,
+  errors: []
+})
+const classroomTemplateFields = [
+  { field: '年级级别', required: '✅ 必填', description: '年级级别1-12（如：7表示七年级，10表示高一）', example: '7' },
+  { field: '年级名称', required: '⭕ 选填', description: '年级名称（如不填写，将根据年级级别自动获取）', example: '七年级' },
+  { field: '班级编号', required: '✅ 必填', description: '班级编码（唯一标识，如：701表示7年级1班）', example: '701' },
+  { field: '班级名称', required: '⭕ 选填', description: '班级名称（如不填写，将根据班级编号和年级名称自动生成）', example: '七年级1班' },
+  { field: '入学年份', required: '⭕ 选填', description: '入学年份/届别（可在导入界面统一设置）', example: '2024' },
+  { field: '班级容量', required: '⭕ 选填', description: '计划人数（可在导入界面统一设置）', example: '45' },
+  { field: '班级描述', required: '⭕ 选填', description: '班级描述信息', example: '重点班' },
+]
+
+// 县区管理端班级批量导入状态
+const showDistrictClassroomImportDialog = ref(false)
+const districtClassroomImportStep = ref(0)
+const selectedDistrictClassroomFile = ref<File | null>(null)
+const districtClassroomUploadRef = ref()
+const districtClassroomImporting = ref(false)
+const districtClassroomImportForm = ref({
+  enrollmentYear: undefined as number | undefined,
+  capacity: undefined as number | undefined,
+  updateExisting: false
+})
+const districtClassroomImportResult = ref<ClassroomImportResponse>({
+  total: 0,
+  success: 0,
+  failed: 0,
+  created: 0,
+  updated: 0,
+  skipped: 0,
+  errors: []
+})
+const districtClassroomTemplateFields = [
+  { field: '学校名称', required: '✅ 必填', description: '学校全称（用于匹配学校）', example: '开平市第一中学' },
+  { field: '学校代码', required: '⭕ 选填', description: '学校代码（用于精确匹配，优先于学校名称）', example: '10001' },
+  { field: '年级级别', required: '✅ 必填', description: '年级级别1-12（如：7表示七年级，10表示高一）', example: '7' },
+  { field: '年级名称', required: '⭕ 选填', description: '年级名称（如不填写，将根据年级级别自动获取）', example: '七年级' },
+  { field: '班级编号', required: '✅ 必填', description: '班级编码（唯一标识，如：701表示7年级1班）', example: '701' },
+  { field: '班级名称', required: '⭕ 选填', description: '班级名称（如不填写，将根据班级编号和年级名称自动生成）', example: '七年级1班' },
+  { field: '入学年份', required: '⭕ 选填', description: '入学年份/届别（可在导入界面统一设置）', example: '2024' },
+  { field: '班级容量', required: '⭕ 选填', description: '计划人数（可在导入界面统一设置）', example: '45' },
+  { field: '班级描述', required: '⭕ 选填', description: '班级描述信息', example: '重点班' },
+]
 
 // 成员管理状态
 const showMemberManager = ref(false)
@@ -1841,8 +2391,8 @@ function downloadSchoolTemplate() {
   // 创建CSV模板数据
   const template = [
     ['区域名称*', '学校名称*', '学校代码', '学校类型', '地址', '联系电话', '邮箱', '校长'],
-    ['北京市', '北京市第一中学', '10001', '高中', '北京市XX区XX路', '010-12345678', 'school1@example.com', '张校长'],
-    ['北京市', '北京市第二小学', '10002', '小学', '北京市XX区XX街', '010-87654321', 'school2@example.com', '李校长'],
+    ['开平市', '开平市第一中学', '10001', '高中', '开平市XX区XX路', '010-12345678', 'school1@example.com', '张校长'],
+    ['开平市', '开平市第二小学', '10002', '小学', '开平市XX区XX街', '010-87654321', 'school2@example.com', '李校长'],
     ['', '', '', '', '', '', '', ''],
   ]
 
@@ -1949,14 +2499,36 @@ function getSchoolNameById(schoolId: number): string {
   return school?.name || `学校${schoolId}`
 }
 
+// 处理县区筛选变化
+function handleRegionFilterChange() {
+  // 清空学校筛选，因为县区改变了
+  allClassroomSchoolFilter.value = ''
+  // 重新加载班级列表
+  loadAllClassrooms()
+}
+
+// 处理年级筛选变化
+function handleGradeFilterChange() {
+  // 清空学校筛选，因为年级改变了
+  allClassroomSchoolFilter.value = ''
+  // 重新加载班级列表（加载后会更新学校列表）
+  loadAllClassrooms()
+}
+
 async function loadAllClassrooms() {
   try {
     allClassroomsLoading.value = true
-    // 先加载所有学校，以便显示学校名称
-    if (schools.value.length === 0) {
-      await loadSchools()
+    // 先加载所有区域，以便显示区域名称和筛选
+    if (allRegions.value.length === 0) {
+      await loadAllRegions()
     }
-    // 加载所有年级，以便显示年级名称
+    // 先加载所有学校，以便显示学校名称和筛选
+    // 注意：这里需要加载所有学校，因为过滤是在前端通过computed属性完成的
+    if (schools.value.length === 0) {
+      const allSchoolsResponse = await adminService.getSchools({ page: 1, size: 1000 })
+      schools.value = allSchoolsResponse.schools
+    }
+    // 加载所有年级，以便显示年级名称和筛选
     if (grades.value.length === 0) {
       await loadGradesList()
     }
@@ -1964,10 +2536,13 @@ async function loadAllClassrooms() {
     const response = await adminService.getClassrooms({
       page: 1,
       size: 100, // 后端API限制最大值为100
+      region_id: allClassroomRegionFilter.value ? Number(allClassroomRegionFilter.value) : undefined,
+      school_id: allClassroomSchoolFilter.value ? Number(allClassroomSchoolFilter.value) : undefined,
+      grade_id: allClassroomGradeFilter.value ? Number(allClassroomGradeFilter.value) : undefined,
       search: allClassroomSearchQuery.value || undefined,
     })
     allClassrooms.value = response.classrooms
-    // 加载所有学校名称（如果需要）
+    // 确保学校列表包含所有需要的学校
     const schoolIds = [...new Set(response.classrooms.map(c => c.school_id))]
     const missingSchoolIds = schoolIds.filter(id => !schools.value.find(s => s.id === id))
     if (missingSchoolIds.length > 0) {
@@ -2496,6 +3071,259 @@ async function deleteClassroom(classroom: Classroom) {
   } catch (error: any) {
     console.error('Failed to delete classroom:', error)
     toast.error(error.response?.data?.detail || '删除班级失败')
+  }
+}
+
+// 班级批量导入方法
+function openClassroomImportDialog() {
+  if (!classroomSchool.value) {
+    toast.warning('请先选择学校')
+    return
+  }
+  showClassroomImportDialog.value = true
+  classroomImportStep.value = 0
+  selectedClassroomFile.value = null
+  classroomImportForm.value = {
+    enrollmentYear: undefined,
+    capacity: undefined,
+    updateExisting: false
+  }
+  classroomImportResult.value = {
+    total: 0,
+    success: 0,
+    failed: 0,
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    errors: []
+  }
+  if (classroomUploadRef.value) {
+    classroomUploadRef.value.clearFiles()
+  }
+}
+
+function closeClassroomImportDialog() {
+  showClassroomImportDialog.value = false
+  classroomImportStep.value = 0
+  selectedClassroomFile.value = null
+  if (classroomUploadRef.value) {
+    classroomUploadRef.value.clearFiles()
+  }
+  // 刷新班级列表
+  loadClassrooms()
+}
+
+function downloadClassroomTemplate() {
+  // 创建Excel模板数据（学校端简化版，不包含学校字段）
+  const template = [
+    ['年级级别*', '年级名称', '班级编号*', '班级名称', '入学年份', '班级容量', '班级描述'],
+    [7, '七年级', '701', '七年级1班', 2024, 45, '重点班'],
+    [7, '七年级', '702', '七年级2班', 2024, 45, '普通班'],
+    [8, '八年级', '801', '八年级1班', 2023, 48, ''],
+  ]
+
+  // 使用xlsx库生成Excel文件
+  const ws = XLSX.utils.aoa_to_sheet(template)
+
+  // 设置列宽
+  const colWidths = [
+    { wch: 12 }, // 年级级别
+    { wch: 12 }, // 年级名称
+    { wch: 12 }, // 班级编号
+    { wch: 15 }, // 班级名称
+    { wch: 12 }, // 入学年份
+    { wch: 12 }, // 班级容量
+    { wch: 15 }, // 班级描述
+  ]
+  ws['!cols'] = colWidths
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '班级信息')
+  XLSX.writeFile(wb, '班级信息导入模板.xlsx')
+  toast.success('模板下载成功')
+}
+
+const handleClassroomFileChange: UploadProps['onChange'] = (uploadFile) => {
+  selectedClassroomFile.value = uploadFile.raw || null
+}
+
+const handleClassroomExceed: UploadProps['onExceed'] = () => {
+  toast.warning('只能上传一个文件')
+}
+
+async function startClassroomImport() {
+  if (!selectedClassroomFile.value) {
+    toast.warning('请先选择文件')
+    return
+  }
+
+  if (!classroomSchool.value) {
+    toast.error('缺少学校信息')
+    return
+  }
+
+  classroomImporting.value = true
+
+  try {
+    const result = await adminService.importClassrooms(
+      selectedClassroomFile.value,
+      classroomSchool.value.id,
+      undefined, // region_id（学校端不需要）
+      classroomImportForm.value.updateExisting,
+      classroomImportForm.value.enrollmentYear,
+      classroomImportForm.value.capacity
+    )
+
+    classroomImportResult.value = result
+    classroomImportStep.value = 2
+
+    if (result.success > 0) {
+      toast.success(`导入完成！成功 ${result.success} 条，失败 ${result.failed} 条`)
+    } else {
+      toast.error(`导入失败：${result.errors.length > 0 ? result.errors[0].message : '未知错误'}`)
+    }
+  } catch (error: any) {
+    console.error('导入失败:', error)
+    toast.error(error.response?.data?.detail || '导入失败')
+    classroomImportResult.value = {
+      total: 0,
+      success: 0,
+      failed: 1,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [{
+        row: 0,
+        field: null,
+        message: error.response?.data?.detail || '导入失败'
+      }]
+    }
+    classroomImportStep.value = 2
+  } finally {
+    classroomImporting.value = false
+  }
+}
+
+// 县区管理端班级批量导入方法
+function openDistrictClassroomImportDialog() {
+  showDistrictClassroomImportDialog.value = true
+  districtClassroomImportStep.value = 0
+  selectedDistrictClassroomFile.value = null
+  districtClassroomImportForm.value = {
+    enrollmentYear: undefined,
+    capacity: undefined,
+    updateExisting: false
+  }
+  districtClassroomImportResult.value = {
+    total: 0,
+    success: 0,
+    failed: 0,
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    errors: []
+  }
+  if (districtClassroomUploadRef.value) {
+    districtClassroomUploadRef.value.clearFiles()
+  }
+}
+
+function closeDistrictClassroomImportDialog() {
+  showDistrictClassroomImportDialog.value = false
+  districtClassroomImportStep.value = 0
+  selectedDistrictClassroomFile.value = null
+  if (districtClassroomUploadRef.value) {
+    districtClassroomUploadRef.value.clearFiles()
+  }
+  // 刷新学校列表（可能需要刷新班级数据）
+  loadSchools()
+}
+
+function downloadDistrictClassroomTemplate() {
+  // 创建Excel模板数据（县区端完整版，包含学校字段）
+  const template = [
+    ['学校名称*', '学校代码', '年级级别*', '年级名称', '班级编号*', '班级名称', '入学年份', '班级容量', '班级描述'],
+    ['开平市第一中学', '10001', 7, '七年级', '701', '七年级1班', 2024, 45, '重点班'],
+    ['开平市第一中学', '10001', 7, '七年级', '702', '七年级2班', 2024, 45, '普通班'],
+    ['开平市第二中学', '10002', 7, '七年级', '701', '七年级1班', 2024, 50, ''],
+  ]
+
+  // 使用xlsx库生成Excel文件
+  const ws = XLSX.utils.aoa_to_sheet(template)
+
+  // 设置列宽
+  const colWidths = [
+    { wch: 20 }, // 学校名称
+    { wch: 12 }, // 学校代码
+    { wch: 12 }, // 年级级别
+    { wch: 12 }, // 年级名称
+    { wch: 12 }, // 班级编号
+    { wch: 15 }, // 班级名称
+    { wch: 12 }, // 入学年份
+    { wch: 12 }, // 班级容量
+    { wch: 15 }, // 班级描述
+  ]
+  ws['!cols'] = colWidths
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '班级信息')
+  XLSX.writeFile(wb, '班级信息导入模板（县区端）.xlsx')
+  toast.success('模板下载成功')
+}
+
+const handleDistrictClassroomFileChange: UploadProps['onChange'] = (uploadFile) => {
+  selectedDistrictClassroomFile.value = uploadFile.raw || null
+}
+
+const handleDistrictClassroomExceed: UploadProps['onExceed'] = () => {
+  toast.warning('只能上传一个文件')
+}
+
+async function startDistrictClassroomImport() {
+  if (!selectedDistrictClassroomFile.value) {
+    toast.warning('请先选择文件')
+    return
+  }
+
+  districtClassroomImporting.value = true
+
+  try {
+    const result = await adminService.importClassrooms(
+      selectedDistrictClassroomFile.value,
+      undefined, // school_id（县区端不需要，从Excel中读取）
+      undefined, // region_id（可选，如果需要可以添加）
+      districtClassroomImportForm.value.updateExisting,
+      districtClassroomImportForm.value.enrollmentYear,
+      districtClassroomImportForm.value.capacity
+    )
+
+    districtClassroomImportResult.value = result
+    districtClassroomImportStep.value = 2
+
+    if (result.success > 0) {
+      toast.success(`导入完成！成功 ${result.success} 条，失败 ${result.failed} 条`)
+    } else {
+      toast.error(`导入失败：${result.errors.length > 0 ? result.errors[0].message : '未知错误'}`)
+    }
+  } catch (error: any) {
+    console.error('导入失败:', error)
+    toast.error(error.response?.data?.detail || '导入失败')
+    districtClassroomImportResult.value = {
+      total: 0,
+      success: 0,
+      failed: 1,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [{
+        row: 0,
+        field: null,
+        message: error.response?.data?.detail || '导入失败'
+      }]
+    }
+    districtClassroomImportStep.value = 2
+  } finally {
+    districtClassroomImporting.value = false
   }
 }
 

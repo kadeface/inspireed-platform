@@ -195,7 +195,19 @@
           </div>
 
           <div v-else>
-            <p>{{ validationResult.message }}</p>
+            <div style="margin-bottom: 20px;">
+              <h4 style="margin: 0 0 10px 0; color: #f56c6c;">❌ 错误信息</h4>
+              <p style="color: #606266; margin: 0;">{{ validationResult.message }}</p>
+            </div>
+            
+            <div v-if="validationResult.errors && validationResult.errors.length > 0" style="margin-top: 20px;">
+              <h4 style="margin: 0 0 10px 0;">⚠️ 详细错误列表</h4>
+              <el-table :data="validationResult.errors" max-height="300" size="small" border>
+                <el-table-column prop="row" label="行号" width="80" />
+                <el-table-column prop="field" label="字段" width="120" />
+                <el-table-column prop="message" label="错误信息" />
+              </el-table>
+            </div>
           </div>
         </div>
 
@@ -269,12 +281,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import type { UploadFile, UploadProps } from 'element-plus';
+import { evaluationService } from '@/services/evaluation';
+import * as XLSX from 'xlsx';
 
 const router = useRouter();
+const route = useRoute();
+
+// 从路由参数获取 exam_id
+const examId = computed(() => {
+  const id = route.params.exam_id || route.query.exam_id;
+  return id ? Number(id) : null;
+});
 
 // 当前步骤
 const currentStep = ref(0);
@@ -321,31 +342,50 @@ const goBack = () => {
   router.push('/district-admin/exams');
 };
 
+// 页面加载时检查 exam_id
+onMounted(() => {
+  if (!examId.value) {
+    ElMessage.warning('缺少考试ID参数，请从考试管理页面进入');
+    // 可以选择跳转到考试列表或显示选择考试的界面
+    // 这里先显示警告，让用户知道需要从正确的入口进入
+  }
+});
+
 // 下载模板
 const downloadTemplate = () => {
-  // 创建CSV模板数据
-  const template = [
-    ['市(区)*', '学校*', '姓名*', '身份证号*', '考生号*', '学校代码', '班级*'],
-    ['北京市', '北京市第一中学', '张三', '110101200801011234', '202401001', '10001', '1001'],
-    ['北京市', '北京市第一中学', '李四', '110101200802021234', '202401002', '10001', '1002'],
-    ['', '', '', '', '', '', ''],
-  ];
+  try {
+    // 创建Excel模板数据
+    const template = [
+      ['市(区)*', '学校*', '姓名*', '身份证号*', '考生号*', '学校代码', '班级*'],
+      ['开平市', '开平市第一中学', '张三', '110101200801011234', '202401001', '10001', '1001'],
+      ['开平市', '开平市第一中学', '李四', '110101200802021234', '202401002', '10001', '1002'],
+    ];
 
-  // 创建CSV内容
-  const csvContent = template.map(row => row.join(',')).join('\n');
-
-  // 创建Blob并下载
-  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  link.setAttribute('href', url);
-  link.setAttribute('download', '考生信息导入模板.csv');
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  ElMessage.success('模板下载成功');
+    // 创建工作簿
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(template);
+    
+    // 设置列宽
+    ws['!cols'] = [
+      { wch: 15 }, // 市(区)
+      { wch: 20 }, // 学校
+      { wch: 12 }, // 姓名
+      { wch: 20 }, // 身份证号
+      { wch: 15 }, // 考生号
+      { wch: 12 }, // 学校代码
+      { wch: 12 }, // 班级
+    ];
+    
+    XLSX.utils.book_append_sheet(wb, ws, '考生信息');
+    
+    // 导出为Excel文件
+    XLSX.writeFile(wb, '考生信息导入模板.xlsx');
+    
+    ElMessage.success('模板下载成功');
+  } catch (error) {
+    console.error('下载模板失败:', error);
+    ElMessage.error('模板下载失败，请稍后重试');
+  }
 };
 
 // 文件选择
@@ -374,66 +414,103 @@ const validateFile = async () => {
     return;
   }
 
+  if (!examId.value) {
+    ElMessage.error('缺少考试ID，请从考试管理页面进入');
+    return;
+  }
+
   validating.value = true;
 
   try {
-    // 模拟文件验证（实际应该调用后端API）
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // 调用后端API进行导入（后端会先验证再导入）
+    const result = await evaluationService.exam.importStudents(
+      examId.value,
+      selectedFile.value
+    );
 
-    // 模拟验证结果
+    // 处理导入结果
     validationResult.value = {
-      valid: true,
-      totalRecords: 50,
-      validRecords: 48,
-      invalidRecords: 2,
-      errors: [
-        { row: 5, field: '学籍号', value: '', message: '学籍号不能为空' },
-        { row: 12, field: '性别', value: '未知', message: '性别必须是男或女' },
-      ],
+      valid: result.failed === 0,
+      totalRecords: result.total,
+      validRecords: result.success,
+      invalidRecords: result.failed,
+      errors: result.errors.map(err => ({
+        row: err.row,
+        field: err.field || '',
+        value: '',
+        message: err.message,
+      })),
     };
 
     showValidationResult.value = true;
-    currentStep.value = 3;
-  } catch (error) {
-    ElMessage.error('文件验证失败');
+    
+    // 如果有错误，停留在验证步骤；如果全部成功，进入导入完成步骤
+    if (result.failed > 0) {
+      currentStep.value = 2; // 回到上传步骤，显示错误
+    } else {
+      currentStep.value = 3; // 进入导入完成步骤
+      importProgress.value = 100;
+      importStatus.value = 'success';
+      importedCount.value = result.success;
+      errorCount.value = result.failed;
+      totalCount.value = result.total;
+    }
+  } catch (error: any) {
+    console.error('导入失败:', error);
+    
+    // 获取详细的错误信息
+    let errorMessage = '文件导入失败';
+    let errorDetails: any[] = [];
+    
+    if (error.response) {
+      // 如果是 HTTP 错误响应
+      const errorData = error.response.data;
+      if (errorData?.detail) {
+        // 如果 detail 是字符串，说明是解析错误（如缺少必需列）
+        if (typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+        } 
+        // 如果 detail 是对象或数组，可能是验证错误
+        else if (typeof errorData.detail === 'object') {
+          errorMessage = '文件验证失败，请查看详细信息';
+          if (Array.isArray(errorData.detail)) {
+            errorDetails = errorData.detail.map((err: any, idx: number) => ({
+              row: err.row || idx + 1,
+              field: err.field || '',
+              value: '',
+              message: err.message || err.msg || JSON.stringify(err),
+            }));
+          }
+        }
+      } else {
+        errorMessage = error.response.statusText || '请求失败';
+      }
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    ElMessage.error(errorMessage);
+    
+    validationResult.value = {
+      valid: false,
+      totalRecords: 0,
+      validRecords: 0,
+      invalidRecords: errorDetails.length || 1,
+      errors: errorDetails,
+      message: errorMessage,
+    };
+    showValidationResult.value = true;
   } finally {
     validating.value = false;
   }
 };
 
-// 确认导入
+// 确认导入（验证通过后，实际导入已在验证步骤完成）
 const confirmImport = () => {
   showValidationResult.value = false;
-  startImport();
-};
-
-// 开始导入
-const startImport = async () => {
-  importing.value = true;
-  importProgress.value = 0;
-  importStatus.value = '';
-  importedCount.value = 0;
-  errorCount.value = 0;
-  totalCount.value = validationResult.value.totalRecords;
-  importErrors.value = [];
-
-  try {
-    // 模拟导入过程
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      importProgress.value = i;
-      importedCount.value = Math.floor((i / 100) * totalCount.value * 0.96);
-      errorCount.value = Math.floor((i / 100) * totalCount.value * 0.04);
-    }
-
-    importProgress.value = 100;
-    importStatus.value = 'success';
-    ElMessage.success(`导入完成！成功 ${importedCount.value} 条，失败 ${errorCount.value} 条`);
-  } catch (error) {
-    importStatus.value = 'exception';
-    ElMessage.error('导入失败');
-  } finally {
-    importing.value = false;
+  // 导入已在 validateFile 中完成，这里只是关闭对话框
+  if (validationResult.value && validationResult.value.valid) {
+    ElMessage.success(`导入完成！成功 ${validationResult.value.validRecords} 条`);
   }
 };
 
