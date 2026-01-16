@@ -1,0 +1,22 @@
+<template>
+  <div class="bg-white rounded-lg shadow p-6">
+    <div class="text-center py-12">
+      <div class="text-6xl mb-4">🔐</div>
+      <h2 class="text-2xl font-bold text-gray-900 mb-2">权限管理</h2>
+      <p class="text-gray-600 mb-6">该功能正在开发中</p>
+      <div class="max-w-md mx-auto text-sm text-gray-500 space-y-2">
+        <p>计划功能：</p>
+        <ul class="list-disc list-inside">
+          <li>角色权限配置</li>
+          <li>访问控制列表</li>
+          <li>功能权限开关</li>
+          <li>数据权限范围</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+// 权限管理组件 - 待实现
+</script>
