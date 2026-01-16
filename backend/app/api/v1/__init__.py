@@ -10,6 +10,7 @@ from app.api.v1 import (
     activities,
     admin_dashboard,
     admin_organization,
+    admin_rooms,
     admin_users,
     auth,
     cells,
@@ -102,6 +103,9 @@ api_router.include_router(
 api_router.include_router(admin_users.router, prefix="/admin/users", tags=["管理员-用户管理"])
 api_router.include_router(
     admin_organization.router, prefix="/admin/organization", tags=["管理员-组织架构"]
+)
+api_router.include_router(
+    admin_rooms.router, prefix="/admin/organization/rooms", tags=["管理员-课室管理"]
 )
 
 # 课程导出导入路由

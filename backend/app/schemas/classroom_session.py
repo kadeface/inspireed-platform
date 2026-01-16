@@ -38,6 +38,7 @@ class ClassSessionBase(BaseModel):
 
     lesson_id: int
     classroom_id: int
+    room_id: Optional[int] = Field(None, description="Physical room ID")
     scheduled_start: Optional[datetime] = None
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
@@ -83,6 +84,8 @@ class ClassSessionWithDetails(ClassSessionResponse):
     lesson_title: Optional[str] = None
     classroom_name: Optional[str] = None
     teacher_name: Optional[str] = None
+    room_name: Optional[str] = None
+    room_code: Optional[str] = None
 
 
 # ========== 学生参与 Schemas ==========

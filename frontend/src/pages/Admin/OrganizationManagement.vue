@@ -21,7 +21,7 @@
     <!-- 功能卡片网格 -->
     <el-row :gutter="20" class="mb-6">
       <!-- 区域管理卡片 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+      <el-col :xs="24" :sm="12" :md="6" :lg="6">
         <el-card
           class="function-card"
           shadow="hover"
@@ -41,7 +41,7 @@
       </el-col>
 
       <!-- 学校管理卡片 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+      <el-col :xs="24" :sm="12" :md="6" :lg="6">
         <el-card
           class="function-card"
           shadow="hover"
@@ -61,7 +61,7 @@
       </el-col>
 
       <!-- 班级管理卡片 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+      <el-col :xs="24" :sm="12" :md="6" :lg="6">
         <el-card
           class="function-card"
           shadow="hover"
@@ -75,62 +75,51 @@
           </div>
           <div class="card-content">
             <h3>班级管理</h3>
-            <p>管理班级信息、批量导入班级、班级成员管理</p>
+            <p>管理班级信息、批量导入班级</p>
           </div>
         </el-card>
       </el-col>
 
-      <!-- 教师教学任务卡片 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+      <!-- 课室管理卡片 -->
+      <el-col :xs="24" :sm="12" :md="6" :lg="6">
         <el-card
           class="function-card"
           shadow="hover"
-          @click="activeTab = 'teacher-assignments'"
-          :class="{ 'active-card': activeTab === 'teacher-assignments' }"
-        >
-          <div class="card-icon">
-            <el-icon :size="40" color="#909399">
-              <component :is="'Document'" />
-            </el-icon>
-          </div>
-          <div class="card-content">
-            <h3>教师教学任务</h3>
-            <p>管理教师与班级、学科的关联关系，分配教学任务</p>
-          </div>
-        </el-card>
-      </el-col>
-
-      <!-- 职务类型管理卡片 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card
-          class="function-card"
-          shadow="hover"
-          @click="activeTab = 'position-types'"
-          :class="{ 'active-card': activeTab === 'position-types' }"
+          @click="activeTab = 'rooms'"
+          :class="{ 'active-card': activeTab === 'rooms' }"
         >
           <div class="card-icon">
             <el-icon :size="40" color="#f56c6c">
-              <component :is="'Setting'" />
+              <component :is="'House'" />
             </el-icon>
           </div>
           <div class="card-content">
-            <h3>职务类型管理</h3>
-            <p>自定义教师职务类型，如校长、教研室主任等</p>
+            <h3>课室管理</h3>
+            <p>管理物理课室、实验室、多媒体教室等教学空间</p>
+          </div>
+        </el-card>
+      </el-col>
+
+      <!-- 人员管理卡片 -->
+      <el-col :xs="24" :sm="12" :md="6" :lg="6">
+        <el-card
+          class="function-card"
+          shadow="hover"
+          @click="activeTab = 'personnel'"
+          :class="{ 'active-card': activeTab === 'personnel' }"
+        >
+          <div class="card-icon">
+            <el-icon :size="40" color="#909399">
+              <component :is="'User'" />
+            </el-icon>
+          </div>
+          <div class="card-content">
+            <h3>人员管理</h3>
+            <p>管理教师和学生档案、教学任务、职务类型配置</p>
           </div>
         </el-card>
       </el-col>
     </el-row>
-
-    <!-- 功能说明提示 -->
-    <div v-if="activeTab === 'position-types'" class="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-      <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-      </svg>
-      <div class="text-sm text-gray-700">
-        <p class="font-medium text-gray-900 mb-1">功能说明</p>
-        <p>管理教师职务类型，支持自定义职务（如：校长、教研室主任等）。系统预设的职务类型（班主任、学科教师）不能删除，只能停用。</p>
-      </div>
-    </div>
 
     <!-- 区域管理 -->
     <RegionManagementCard v-if="activeTab === 'regions'" />
@@ -138,14 +127,14 @@
     <!-- 学校管理 -->
     <SchoolManagementCard v-if="activeTab === 'schools'" />
 
-    <!-- 班级成员管理 -->
+    <!-- 班级管理 -->
     <ClassroomManagementCard v-if="activeTab === 'classrooms'" />
 
-    <!-- 教师教学任务 -->
-    <TeacherAssignmentCard v-if="activeTab === 'teacher-assignments'" />
+    <!-- 课室管理 -->
+    <RoomManagementCard v-if="activeTab === 'rooms'" />
 
-    <!-- 职务类型管理 -->
-    <PositionTypeCard v-if="activeTab === 'position-types'" />
+    <!-- 人员管理 -->
+    <PersonnelManagementCard v-if="activeTab === 'personnel'" />
   </div>
 </template>
 
@@ -154,11 +143,11 @@ import { ref } from 'vue'
 import RegionManagementCard from './OrganizationManagement/RegionManagementCard.vue'
 import SchoolManagementCard from './OrganizationManagement/SchoolManagementCard.vue'
 import ClassroomManagementCard from './OrganizationManagement/ClassroomManagementCard.vue'
-import TeacherAssignmentCard from './OrganizationManagement/TeacherAssignmentCard.vue'
-import PositionTypeCard from './OrganizationManagement/PositionTypeCard.vue'
+import RoomManagementCard from './OrganizationManagement/RoomManagementCard.vue'
+import PersonnelManagementCard from './OrganizationManagement/PersonnelManagementCard.vue'
 
 // 标签页状态
-const activeTab = ref<'regions' | 'schools' | 'classrooms' | 'teacher-assignments' | 'position-types'>('regions')
+const activeTab = ref<'regions' | 'schools' | 'classrooms' | 'rooms' | 'personnel'>('regions')
 </script>
 
 <style scoped>

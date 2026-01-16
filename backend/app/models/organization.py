@@ -73,6 +73,9 @@ class School(Base):
     classrooms = relationship(
         "Classroom", back_populates="school", cascade="all, delete-orphan"
     )
+    rooms = relationship(
+        "Room", back_populates="school", cascade="all, delete-orphan"
+    )
 
 
 class Classroom(Base):

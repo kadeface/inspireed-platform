@@ -235,6 +235,94 @@ export interface ClassroomListResponse {
   total_pages: number
 }
 
+// ==================== 课室管理 (物理教室) ====================
+
+export interface Room {
+  id: number
+  name: string
+  code?: string | null
+  school_id: number
+  building?: string | null
+  floor?: number | null
+  room_type: string
+  capacity?: number | null
+  equipment?: string[] | null
+  assigned_classroom_id?: number | null
+  is_active: boolean
+  description?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RoomCreate {
+  name: string
+  code?: string | null
+  school_id: number
+  building?: string | null
+  floor?: number | null
+  room_type: string
+  capacity?: number | null
+  equipment?: string[] | null
+  assigned_classroom_id?: number | null
+  is_active?: boolean
+  description?: string | null
+}
+
+export interface RoomUpdate {
+  name?: string
+  code?: string | null
+  school_id?: number
+  building?: string | null
+  floor?: number | null
+  room_type?: string
+  capacity?: number | null
+  equipment?: string[] | null
+  assigned_classroom_id?: number | null
+  is_active?: boolean
+  description?: string | null
+}
+
+export interface RoomResponse {
+  id: number
+  name: string
+  code?: string | null
+  school_id: number
+  building?: string | null
+  floor?: number | null
+  room_type: string
+  capacity?: number | null
+  equipment?: string[] | null
+  assigned_classroom_id?: number | null
+  is_active: boolean
+  description?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RoomListResponse {
+  rooms: RoomResponse[]
+  total: number
+  page: number
+  size: number
+  total_pages: number
+}
+
+export interface RoomImportError {
+  row: number
+  field?: string | null
+  message: string
+}
+
+export interface RoomImportResponse {
+  total: number
+  success: number
+  failed: number
+  created: number
+  updated: number
+  skipped: number
+  errors: RoomImportError[]
+}
+
 export const adminService = {
   /**
    * 获取数据看板概览
@@ -502,9 +590,67 @@ export const adminService = {
     if (regionId) params.region_id = regionId
     if (enrollmentYear) params.enrollment_year = enrollmentYear
     if (capacity) params.capacity = capacity
-    
+
     return await api.post('/admin/organization/classrooms/import', formData, {
       params
+    })
+  },
+
+  // ==================== 课室管理 (物理教室) ====================
+
+  /**
+   * 获取课室列表
+   */
+  async getRooms(params: {
+    page?: number
+    size?: number
+    school_id?: number
+    room_type?: string
+    building?: string
+    search?: string
+  } = {}): Promise<RoomListResponse> {
+    return await api.get('/admin/organization/rooms', { params })
+  },
+
+  /**
+   * 获取课室详情
+   */
+  async getRoom(roomId: number): Promise<RoomResponse> {
+    return await api.get(`/admin/organization/rooms/${roomId}`)
+  },
+
+  /**
+   * 创建课室
+   */
+  async createRoom(roomData: RoomCreate): Promise<RoomResponse> {
+    return await api.post('/admin/organization/rooms', roomData)
+  },
+
+  /**
+   * 更新课室
+   */
+  async updateRoom(roomId: number, roomData: RoomUpdate): Promise<RoomResponse> {
+    return await api.put(`/admin/organization/rooms/${roomId}`, roomData)
+  },
+
+  /**
+   * 删除课室
+   */
+  async deleteRoom(roomId: number): Promise<{ message: string }> {
+    return await api.delete(`/admin/organization/rooms/${roomId}`)
+  },
+
+  /**
+   * 批量导入课室
+   */
+  async importRooms(
+    file: File,
+    updateExisting: boolean = false
+  ): Promise<RoomImportResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return await api.post('/admin/organization/rooms/import', formData, {
+      params: { update_existing: updateExisting }
     })
   }
 }
