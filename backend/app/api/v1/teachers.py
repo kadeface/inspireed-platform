@@ -282,38 +282,62 @@ async def import_assignments(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ) -> Any:
-    """批量导入教师教学任务"""
+    """批量导入教师教学任务（代理到统一导入系统）"""
+    from pathlib import Path as PathLib
+    from app.services.import_orchestrator import ImportOrchestrator
+
     # 验证文件类型
     if not file.filename:
         raise HTTPException(status_code=400, detail="文件名为空")
-    
-    file_ext = Path(file.filename).suffix.lower()
+
+    file_ext = PathLib(file.filename).suffix.lower()
     if file_ext not in [".xlsx", ".xls"]:
         raise HTTPException(status_code=400, detail="只支持Excel文件（.xlsx, .xls）")
-    
+
     # 保存临时文件
-    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-        try:
-            # 读取上传的文件内容
+    tmp_file_path = None
+    try:
+        # 读取上传的文件内容
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
             content = await file.read()
             tmp_file.write(content)
-            tmp_file_path = Path(tmp_file.name)
-            
-            # 导入数据
-            try:
-                result = await TeacherAssignmentImportService.import_assignments(
-                    db=db,
-                    file_path=tmp_file_path,
-                    update_existing=update_existing,
-                    auto_create_teachers=auto_create_teachers,
-                    auto_create_semesters=auto_create_semesters,
-                )
-                return result
-            except TeacherAssignmentImportServiceError as e:
-                raise HTTPException(status_code=400, detail=str(e))
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"导入失败: {str(e)}")
-        finally:
-            # 清理临时文件
-            if tmp_file_path.exists():
-                tmp_file_path.unlink()
+            tmp_file_path = PathLib(tmp_file.name)
+
+        # 构建导入上下文
+        context = {
+            "update_existing": update_existing,
+            "auto_create": auto_create_teachers or auto_create_semesters,
+            "auto_create_teachers": auto_create_teachers,
+            "auto_create_semesters": auto_create_semesters,
+        }
+
+        # 使用统一导入系统
+        try:
+            orchestrator = ImportOrchestrator()
+            result = await orchestrator.execute_import(
+                db=db,
+                strategy_type="teacher",
+                file_path=tmp_file_path,
+                context=context
+            )
+
+            # 转换为响应格式（注意：新系统返回count，原schema期望list）
+            # created_teachers 和 created_semesters 返回空列表以保持兼容性
+            # 这些信息现在仅在日志中记录
+            return TeacherAssignmentImportResponse(
+                total=result["total"],
+                success=result["success"],
+                failed=result["failed"],
+                created=result.get("created", 0),
+                updated=result.get("updated", 0),
+                skipped=result.get("skipped", 0),
+                created_teachers=[],  # 新系统不再返回详细信息列表
+                created_semesters=[],  # 新系统不再返回详细信息列表
+                errors=result.get("errors", [])
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"导入失败: {str(e)}")
+    finally:
+        # 清理临时文件
+        if tmp_file_path and tmp_file_path.exists():
+            tmp_file_path.unlink()

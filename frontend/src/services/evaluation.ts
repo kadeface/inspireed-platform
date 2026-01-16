@@ -37,7 +37,7 @@ function getApiBaseUrl(): string {
   
   // 如果环境变量中配置了API地址，优先使用
   if (import.meta.env.VITE_API_BASE_URL) {
-    let envApiUrl = import.meta.env.VITE_API_BASE_URL
+    const envApiUrl = import.meta.env.VITE_API_BASE_URL
     // 如果环境变量已经包含完整路径，直接返回
     if (envApiUrl.startsWith('http://') || envApiUrl.startsWith('https://')) {
       return envApiUrl

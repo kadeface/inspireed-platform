@@ -1,21 +1,16 @@
 <template>
   <div class="space-y-6">
+    <!-- 功能说明 -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <p class="text-sm text-blue-800">
+        💡 <strong>功能说明：</strong>此页面专门用于管理所有班级的成员（添加教师、学生到班级）。班级信息的创建、编辑和删除请在"学校管理"标签页中的"班级管理"功能中操作。
+      </p>
+    </div>
+
     <!-- 操作栏 -->
     <div class="bg-white rounded-lg shadow p-4">
       <div class="flex justify-between items-center">
         <div class="flex gap-4">
-          <button
-            @click="openCreateClassroomModal"
-            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            + 创建班级
-          </button>
-          <button
-            @click="openClassroomImportDialog"
-            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            📥 批量导入班级
-          </button>
           <button
             @click="loadAllClassrooms"
             class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
@@ -79,7 +74,6 @@
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">班级名称</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学校</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">年级</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">入学年份</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
           </tr>
@@ -96,9 +90,6 @@
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ getGradeName(classroom.grade_id) }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ classroom.enrollment_year || '—' }}
-            </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span
                 class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
@@ -108,22 +99,17 @@
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-              <div class="flex gap-2">
-                <button @click="editClassroom(classroom)" class="text-blue-600 hover:text-blue-900">
-                  编辑
-                </button>
-                <button @click="openMemberManager(classroom)" class="text-indigo-600 hover:text-indigo-900">
-                  成员
-                </button>
-                <button @click="deleteClassroom(classroom)" class="text-red-600 hover:text-red-900">
-                  删除
-                </button>
-              </div>
+              <button
+                @click="openMemberManager(classroom)"
+                class="text-indigo-600 hover:text-indigo-900 font-medium"
+              >
+                成员管理
+              </button>
             </td>
           </tr>
         </tbody>
       </table>
-
+      
       <!-- 分页 -->
       <div class="flex justify-center mt-4 pb-4" v-if="classroomPagination.total > 0">
         <el-pagination
@@ -137,240 +123,6 @@
         />
       </div>
     </div>
-
-    <!-- 创建/编辑班级对话框 -->
-    <el-dialog
-      v-model="showClassroomModal"
-      :title="editingClassroom ? '编辑班级' : '创建班级'"
-      width="600px"
-      :close-on-click-modal="false"
-    >
-      <el-form :model="classroomForm" label-width="120px">
-        <el-form-item label="班级名称" required>
-          <el-input v-model="classroomForm.name" placeholder="如：三年级一班" />
-        </el-form-item>
-        <el-form-item label="班级编码">
-          <el-input v-model="classroomForm.code" placeholder="可选，如：301" />
-        </el-form-item>
-        <el-form-item label="所属学校" required>
-          <el-select v-model="classroomForm.school_id" placeholder="请选择学校" filterable class="w-full">
-            <el-option
-              v-for="school in schools"
-              :key="school.id"
-              :label="school.name"
-              :value="school.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="所属年级" required>
-          <el-select v-model="classroomForm.grade_id" placeholder="请选择年级" class="w-full">
-            <el-option
-              v-for="grade in grades"
-              :key="grade.id"
-              :label="grade.name"
-              :value="grade.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="入学年份">
-          <el-input-number
-            v-model="classroomForm.enrollment_year"
-            :min="1990"
-            :max="2100"
-            placeholder="如：2024"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="班级容量">
-          <el-input-number
-            v-model="classroomForm.capacity"
-            :min="1"
-            :max="200"
-            placeholder="物理教室容量"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="班级描述">
-          <el-input
-            v-model="classroomForm.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入班级描述"
-          />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-switch v-model="classroomForm.is_active" active-text="激活" inactive-text="停用" />
-        </el-form-item>
-        <div v-if="classroomNameError" class="text-red-600 text-sm mb-4">{{ classroomNameError }}</div>
-      </el-form>
-      <template #footer>
-        <el-button @click="closeClassroomModal">取消</el-button>
-        <el-button type="primary" @click="saveClassroom" :loading="classroomSaving">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 批量导入班级对话框 -->
-    <el-dialog
-      v-model="showClassroomImportDialog"
-      title="批量导入班级（支持多个学校）"
-      width="800px"
-      :close-on-click-modal="false"
-    >
-      <el-steps :active="classroomImportStep" finish-status="success" align-center class="mb-6">
-        <el-step title="下载模板" />
-        <el-step title="上传文件" />
-        <el-step title="导入结果" />
-      </el-steps>
-
-      <!-- 步骤1: 下载模板 -->
-      <div v-if="classroomImportStep === 0" class="space-y-4">
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p class="text-sm text-blue-800 mb-2"><strong>导入说明：</strong></p>
-          <ul class="text-sm text-blue-700 list-disc list-inside space-y-1">
-            <li>请先下载Excel模板，按照模板格式填写班级信息</li>
-            <li>必需字段：学校名称、年级级别、班级编号</li>
-            <li>可选字段：学校代码、年级名称、班级名称、入学年份、班级容量、班级描述</li>
-            <li>支持格式：.xlsx, .xls</li>
-            <li><strong>注意：</strong>可以一次导入多个学校的班级，Excel中需要包含学校信息</li>
-          </ul>
-        </div>
-        <div class="bg-gray-50 border rounded-lg p-4">
-          <h4 class="text-sm font-medium mb-2">模板字段说明</h4>
-          <el-table :data="classroomTemplateFields" border size="small">
-            <el-table-column prop="field" label="字段名" width="120" />
-            <el-table-column prop="required" label="是否必填" width="100" />
-            <el-table-column prop="description" label="说明" />
-            <el-table-column prop="example" label="示例" width="150" />
-          </el-table>
-        </div>
-        <div class="flex justify-center gap-4">
-          <el-button type="primary" @click="downloadClassroomTemplate" :icon="Download">
-            下载Excel模板
-          </el-button>
-          <el-button @click="classroomImportStep = 1">
-            已有模板，下一步
-            <el-icon class="ml-2"><ArrowRight /></el-icon>
-          </el-button>
-        </div>
-      </div>
-
-      <!-- 步骤2: 上传文件 -->
-      <div v-if="classroomImportStep === 1" class="space-y-4">
-        <el-form :model="classroomImportForm" label-width="140px">
-          <el-form-item label="统一设置入学年份">
-            <el-input-number
-              v-model="classroomImportForm.enrollmentYear"
-              :min="1900"
-              :max="2100"
-              placeholder="留空则使用Excel中的值"
-              style="width: 200px;"
-            />
-            <span class="ml-2 text-sm text-gray-500">如果设置，将覆盖Excel中的所有入学年份</span>
-          </el-form-item>
-          <el-form-item label="统一设置班级容量">
-            <el-input-number
-              v-model="classroomImportForm.capacity"
-              :min="1"
-              :max="200"
-              placeholder="留空则使用Excel中的值"
-              style="width: 200px;"
-            />
-            <span class="ml-2 text-sm text-gray-500">如果设置，将覆盖Excel中的所有班级容量</span>
-          </el-form-item>
-          <el-form-item label="更新已存在班级">
-            <el-switch
-              v-model="classroomImportForm.updateExisting"
-              active-text="是"
-              inactive-text="否"
-            />
-            <span class="ml-2 text-sm text-gray-500">如果班级已存在，是否更新</span>
-          </el-form-item>
-        </el-form>
-        <el-upload
-          ref="classroomUploadRef"
-          class="upload-demo"
-          drag
-          :auto-upload="false"
-          :limit="1"
-          :on-change="handleClassroomFileChange"
-          :on-exceed="handleClassroomExceed"
-          accept=".xlsx,.xls"
-        >
-          <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-          <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
-          <template #tip>
-            <div class="el-upload__tip">只能上传 xlsx/xls 文件，且不超过 10MB</div>
-          </template>
-        </el-upload>
-        <div v-if="selectedClassroomFile" class="mt-4 p-3 bg-gray-50 rounded-lg">
-          <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="文件名">{{ selectedClassroomFile.name }}</el-descriptions-item>
-            <el-descriptions-item label="文件大小">{{ formatFileSize(selectedClassroomFile.size) }}</el-descriptions-item>
-          </el-descriptions>
-        </div>
-        <div class="flex justify-center gap-4">
-          <el-button @click="classroomImportStep = 0">
-            <el-icon><ArrowLeft /></el-icon>
-            上一步
-          </el-button>
-          <el-button
-            type="primary"
-            @click="startClassroomImport"
-            :loading="classroomImporting"
-            :disabled="!selectedClassroomFile"
-          >
-            <el-icon><Upload /></el-icon>
-            <span class="ml-2">开始导入</span>
-          </el-button>
-        </div>
-      </div>
-
-      <!-- 步骤3: 导入结果 -->
-      <div v-if="classroomImportStep === 2" class="space-y-4">
-        <el-alert
-          :title="classroomImportResult.success > 0 ? '✅ 导入完成' : '❌ 导入失败'"
-          :type="classroomImportResult.success > 0 ? 'success' : 'error'"
-          :closable="false"
-        />
-        <div v-if="classroomImportResult.total > 0">
-          <h4 class="text-sm font-medium mb-2">📊 导入统计</h4>
-          <el-row :gutter="20">
-            <el-col :span="6">
-              <el-statistic title="总记录数" :value="classroomImportResult.total" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="成功" :value="classroomImportResult.success" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="失败" :value="classroomImportResult.failed" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="创建" :value="classroomImportResult.created" />
-            </el-col>
-          </el-row>
-          <el-row :gutter="20" class="mt-4">
-            <el-col :span="6">
-              <el-statistic title="更新" :value="classroomImportResult.updated" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="跳过" :value="classroomImportResult.skipped" />
-            </el-col>
-          </el-row>
-          <div v-if="classroomImportResult.errors && classroomImportResult.errors.length > 0" class="mt-4">
-            <h4 class="text-sm font-medium mb-2">⚠️ 错误详情</h4>
-            <el-table :data="classroomImportResult.errors" max-height="300" size="small">
-              <el-table-column prop="row" label="行号" width="80" />
-              <el-table-column prop="field" label="字段" width="120" />
-              <el-table-column prop="message" label="错误信息" />
-            </el-table>
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <el-button v-if="classroomImportStep < 2" @click="showClassroomImportDialog = false">取消</el-button>
-        <el-button v-if="classroomImportStep === 2" type="primary" @click="closeClassroomImportDialog">完成</el-button>
-      </template>
-    </el-dialog>
 
     <!-- 成员管理对话框 -->
     <el-dialog
@@ -610,7 +362,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, Upload, ArrowRight, UploadFilled } from '@element-plus/icons-vue'
 import { useToast } from '@/composables/useToast'
 import adminService, { type Region, type School, type Classroom, type User } from '@/services/admin'
 import curriculumService from '@/services/curriculum'
@@ -622,12 +373,10 @@ import type {
   ClassroomMembershipUpdate,
 } from '@/types/classroomAssistant'
 import { RoleInClass } from '@/types/classroomAssistant'
-import type { UploadProps } from 'element-plus'
-import * as XLSX from 'xlsx'
 
 const toast = useToast()
 
-// ==================== 班级管理状态 ====================
+// 状态管理
 const allClassrooms = ref<Classroom[]>([])
 const allClassroomsLoading = ref(false)
 const allClassroomSearchQuery = ref('')
@@ -644,57 +393,7 @@ const classroomPagination = ref({
   totalPages: 0,
 })
 
-// 班级CRUD状态
-const showClassroomModal = ref(false)
-const editingClassroom = ref<Classroom | null>(null)
-const classroomSaving = ref(false)
-const classroomNameError = ref('')
-const classroomForm = ref<Partial<Classroom>>({
-  name: '',
-  code: '',
-  school_id: undefined,
-  grade_id: undefined,
-  enrollment_year: undefined,
-  capacity: undefined,
-  description: '',
-  is_active: true,
-})
-
-// 批量导入班级状态
-const showClassroomImportDialog = ref(false)
-const classroomImportStep = ref(0)
-const selectedClassroomFile = ref<File | null>(null)
-const classroomImporting = ref(false)
-const classroomImportForm = ref({
-  enrollmentYear: undefined as number | undefined,
-  capacity: undefined as number | undefined,
-  updateExisting: false
-})
-const classroomImportResult = ref({
-  total: 0,
-  success: 0,
-  failed: 0,
-  created: 0,
-  updated: 0,
-  skipped: 0,
-  errors: [] as any[]
-})
-const classroomUploadRef = ref()
-
-// 模板字段说明
-const classroomTemplateFields = [
-  { field: '学校名称*', required: '是', description: '学校全称', example: '开平市第一中学' },
-  { field: '学校代码', required: '否', description: '学校编码（可选，用于匹配）', example: '10001' },
-  { field: '年级级别*', required: '是', description: '年级级别（1-12）', example: '7' },
-  { field: '年级名称', required: '否', description: '年级名称（可选）', example: '七年级' },
-  { field: '班级编号*', required: '是', description: '班级编号', example: '701' },
-  { field: '班级名称', required: '否', description: '班级名称（可选）', example: '七年级1班' },
-  { field: '入学年份', required: '否', description: '入学年份', example: '2024' },
-  { field: '班级容量', required: '否', description: '物理教室容量', example: '45' },
-  { field: '班级描述', required: '否', description: '班级描述', example: '重点班' },
-]
-
-// ==================== 成员管理状态 ====================
+// 成员管理状态
 const showMemberManager = ref(false)
 const selectedClassroom = ref<Classroom | null>(null)
 const members = ref<ClassroomMembership[]>([])
@@ -733,7 +432,7 @@ const sourceClassroomStudents = ref<ClassroomMembership[]>([])
 const sourceStudentsLoading = ref(false)
 const selectedStudentIds = ref<Set<number>>(new Set())
 
-// ==================== 计算属性 ====================
+// 计算属性
 const filteredSchoolsForClassroom = computed(() => {
   let filtered = schools.value
   if (allClassroomRegionFilter.value) {
@@ -750,7 +449,7 @@ const filteredSchoolsForClassroom = computed(() => {
   return filtered
 })
 
-// ==================== 班级管理方法 ====================
+// 方法
 async function loadAllRegions() {
   try {
     const response = await adminService.getRegions({ size: 1000 })
@@ -766,6 +465,29 @@ async function loadGradesList() {
   } catch (error: any) {
     console.error('Failed to load grades:', error)
   }
+}
+
+function getGradeName(gradeId?: number | null): string {
+  if (!gradeId) return '—'
+  const grade = grades.value.find(g => g.id === gradeId)
+  return grade ? grade.name : `年级 #${gradeId}`
+}
+
+function getSchoolNameById(schoolId: number): string {
+  const school = schools.value.find((s) => s.id === schoolId)
+  return school?.name || `学校${schoolId}`
+}
+
+function handleRegionFilterChange() {
+  allClassroomSchoolFilter.value = ''
+  classroomPagination.value.page = 1
+  loadAllClassrooms()
+}
+
+function handleGradeFilterChange() {
+  allClassroomSchoolFilter.value = ''
+  classroomPagination.value.page = 1
+  loadAllClassrooms()
 }
 
 async function loadAllClassrooms() {
@@ -817,237 +539,6 @@ function handleClassroomPageSizeChange(size: number) {
   loadAllClassrooms()
 }
 
-function handleRegionFilterChange() {
-  allClassroomSchoolFilter.value = ''
-  classroomPagination.value.page = 1
-  loadAllClassrooms()
-}
-
-function handleGradeFilterChange() {
-  allClassroomSchoolFilter.value = ''
-  classroomPagination.value.page = 1
-  loadAllClassrooms()
-}
-
-function getGradeName(gradeId?: number | null): string {
-  if (!gradeId) return '—'
-  const grade = grades.value.find(g => g.id === gradeId)
-  return grade ? grade.name : `年级 #${gradeId}`
-}
-
-function getSchoolNameById(schoolId: number): string {
-  const school = schools.value.find((s) => s.id === schoolId)
-  return school?.name || `学校${schoolId}`
-}
-
-function openCreateClassroomModal() {
-  editingClassroom.value = null
-  classroomNameError.value = ''
-  classroomForm.value = {
-    name: '',
-    code: '',
-    school_id: undefined,
-    grade_id: undefined,
-    enrollment_year: undefined,
-    capacity: undefined,
-    description: '',
-    is_active: true,
-  }
-  showClassroomModal.value = true
-}
-
-function editClassroom(classroom: Classroom) {
-  editingClassroom.value = classroom
-  classroomNameError.value = ''
-  classroomForm.value = {
-    name: classroom.name,
-    code: classroom.code || '',
-    school_id: classroom.school_id,
-    grade_id: classroom.grade_id,
-    enrollment_year: classroom.enrollment_year || undefined,
-    capacity: (classroom as any).capacity || undefined,
-    description: classroom.description || '',
-    is_active: classroom.is_active,
-  }
-  showClassroomModal.value = true
-}
-
-async function saveClassroom() {
-  if (!classroomForm.value.name || !classroomForm.value.school_id || !classroomForm.value.grade_id) {
-    classroomNameError.value = '请填写必填字段'
-    return
-  }
-
-  try {
-    classroomSaving.value = true
-    classroomNameError.value = ''
-
-    if (editingClassroom.value) {
-      await adminService.updateClassroom(editingClassroom.value.id, classroomForm.value)
-      ElMessage.success('班级更新成功')
-    } else {
-      await adminService.createClassroom(classroomForm.value)
-      ElMessage.success('班级创建成功')
-    }
-
-    closeClassroomModal()
-    await loadAllClassrooms()
-  } catch (error: any) {
-    console.error('保存班级失败:', error)
-    classroomNameError.value = error.response?.data?.detail || '保存失败，请重试'
-  } finally {
-    classroomSaving.value = false
-  }
-}
-
-async function deleteClassroom(classroom: Classroom) {
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除班级 "${classroom.name}" 吗？`,
-      '确认删除',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      }
-    )
-    await adminService.deleteClassroom(classroom.id)
-    ElMessage.success('班级删除成功')
-    await loadAllClassrooms()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      console.error('删除班级失败:', error)
-      ElMessage.error(error.response?.data?.detail || '删除失败，请重试')
-    }
-  }
-}
-
-function closeClassroomModal() {
-  showClassroomModal.value = false
-  editingClassroom.value = null
-  classroomNameError.value = ''
-}
-
-// ==================== 批量导入班级方法 ====================
-function openClassroomImportDialog() {
-  showClassroomImportDialog.value = true
-  classroomImportStep.value = 0
-  selectedClassroomFile.value = null
-  classroomImportForm.value = {
-    enrollmentYear: undefined,
-    capacity: undefined,
-    updateExisting: false
-  }
-  classroomImportResult.value = {
-    total: 0,
-    success: 0,
-    failed: 0,
-    created: 0,
-    updated: 0,
-    skipped: 0,
-    errors: []
-  }
-  if (classroomUploadRef.value) {
-    classroomUploadRef.value.clearFiles()
-  }
-}
-
-function closeClassroomImportDialog() {
-  showClassroomImportDialog.value = false
-  classroomImportStep.value = 0
-  selectedClassroomFile.value = null
-  if (classroomUploadRef.value) {
-    classroomUploadRef.value.clearFiles()
-  }
-  loadAllClassrooms()
-}
-
-function downloadClassroomTemplate() {
-  const template = [
-    ['学校名称*', '学校代码', '年级级别*', '年级名称', '班级编号*', '班级名称', '入学年份', '班级容量', '班级描述'],
-    ['开平市第一中学', '10001', 7, '七年级', '701', '七年级1班', 2024, 45, '重点班'],
-    ['开平市第一中学', '10001', 7, '七年级', '702', '七年级2班', 2024, 45, '普通班'],
-    ['开平市第二中学', '10002', 7, '七年级', '701', '七年级1班', 2024, 50, ''],
-  ]
-
-  const ws = XLSX.utils.aoa_to_sheet(template)
-  const colWidths = [
-    { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-    { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 15 }
-  ]
-  ws['!cols'] = colWidths
-
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, '班级信息')
-  XLSX.writeFile(wb, '班级信息导入模板.xlsx')
-  ElMessage.success('模板下载成功')
-}
-
-const handleClassroomFileChange: UploadProps['onChange'] = (uploadFile) => {
-  selectedClassroomFile.value = uploadFile.raw || null
-}
-
-const handleClassroomExceed: UploadProps['onExceed'] = () => {
-  ElMessage.warning('只能上传一个文件')
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-async function startClassroomImport() {
-  if (!selectedClassroomFile.value) {
-    ElMessage.warning('请先选择文件')
-    return
-  }
-
-  classroomImporting.value = true
-
-  try {
-    const result = await adminService.importClassrooms(
-      selectedClassroomFile.value,
-      undefined, // school_id（县区端不需要，从Excel中读取）
-      undefined, // region_id（可选）
-      classroomImportForm.value.updateExisting,
-      classroomImportForm.value.enrollmentYear,
-      classroomImportForm.value.capacity
-    )
-
-    classroomImportResult.value = result
-    classroomImportStep.value = 2
-
-    if (result.success > 0) {
-      ElMessage.success(`导入完成！成功 ${result.success} 条，失败 ${result.failed} 条`)
-    } else {
-      ElMessage.error(`导入失败：${result.errors.length > 0 ? result.errors[0].message : '未知错误'}`)
-    }
-  } catch (error: any) {
-    console.error('导入失败:', error)
-    ElMessage.error(error.response?.data?.detail || '导入失败')
-    classroomImportResult.value = {
-      total: 0,
-      success: 0,
-      failed: 1,
-      created: 0,
-      updated: 0,
-      skipped: 0,
-      errors: [{
-        row: 0,
-        field: null,
-        message: error.response?.data?.detail || '导入失败'
-      }]
-    }
-    classroomImportStep.value = 2
-  } finally {
-    classroomImporting.value = false
-  }
-}
-
-// ==================== 成员管理方法 ====================
 async function openMemberManager(classroom: Classroom) {
   selectedClassroom.value = classroom
   showMemberManager.value = true
@@ -1149,7 +640,7 @@ async function searchUsersForMember() {
     searchedUsers.value = []
     return
   }
-
+  
   try {
     userSearchLoading.value = true
     const response = await adminService.getUsers({
@@ -1192,11 +683,11 @@ function autoSetRoleFromUser(user: User) {
 
 async function onUserIdInput() {
   const userId = memberForm.value.userId
-
+  
   if (selectedUserInfo.value && selectedUserInfo.value.id !== userId) {
     selectedUserInfo.value = null
   }
-
+  
   if (userId && userId > 0 && !selectedUserInfo.value) {
     try {
       const user = await adminService.getUser(userId)
@@ -1240,11 +731,11 @@ function closeMemberModal() {
 
 async function saveMember() {
   if (!selectedClassroom.value) return
-
+  
   try {
     memberSaving.value = true
     memberError.value = ''
-
+    
     if (editingMember.value) {
       const updateData: ClassroomMembershipUpdate = {
         roleInClass: memberForm.value.roleInClass,
@@ -1272,7 +763,7 @@ async function saveMember() {
       await classroomAssistantService.addClassroomMember(selectedClassroom.value.id, createData)
       ElMessage.success('成员添加成功')
     }
-
+    
     closeMemberModal()
     await loadMembers()
   } catch (error: any) {
@@ -1343,19 +834,19 @@ function toggleSelectAllStudents() {
 
 async function batchAddMembers() {
   if (!selectedClassroom.value || selectedStudentIds.value.size === 0) return
-
+  
   try {
     memberSaving.value = true
     memberError.value = ''
-
+    
     const errors: string[] = []
     let successCount = 0
-
+    
     for (const userId of selectedStudentIds.value) {
       try {
         const student = sourceClassroomStudents.value.find(s => s.userId === userId)
         if (!student) continue
-
+        
         const createData: ClassroomMembershipCreate = {
           classroomId: selectedClassroom.value.id,
           userId: userId,
@@ -1365,7 +856,7 @@ async function batchAddMembers() {
           cadreTitle: null,
           isPrimaryClass: false,
         }
-
+        
         await classroomAssistantService.addClassroomMember(selectedClassroom.value.id, createData)
         successCount++
       } catch (error: any) {
@@ -1375,16 +866,16 @@ async function batchAddMembers() {
         console.error(`添加成员失败 (userId: ${userId}):`, error)
       }
     }
-
+    
     if (successCount > 0) {
       ElMessage.success(`成功添加 ${successCount} 个成员${errors.length > 0 ? `，${errors.length} 个失败` : ''}`)
     }
-
+    
     if (errors.length > 0 && successCount === 0) {
       memberError.value = errors.join('\n')
       ElMessage.error('批量添加失败')
     }
-
+    
     if (successCount > 0) {
       closeMemberModal()
       await loadMembers()
@@ -1400,7 +891,7 @@ async function batchAddMembers() {
 
 async function removeMember(member: ClassroomMembership) {
   if (!selectedClassroom.value) return
-
+  
   try {
     await ElMessageBox.confirm(
       `确定要移除用户 ${member.userFullName || member.userName || `ID: ${member.userId}`} 吗？`,
@@ -1422,7 +913,7 @@ async function removeMember(member: ClassroomMembership) {
   }
 }
 
-// ==================== 初始化 ====================
+// 初始化
 onMounted(async () => {
   await Promise.all([
     loadAllRegions(),

@@ -2622,7 +2622,7 @@ onMounted(async () => {
               ? [...(pending as any).value]
               : []
             if ((pending as any)?.value) {
-              ;(pending as any).value = []
+              (pending as any).value = []
             }
             return items as LessonRelatedMaterial[]
           }

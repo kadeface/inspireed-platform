@@ -43,6 +43,7 @@ from app.api.v1 import (
     total_scores,
     upload,
     users,
+    unified_import as unified_import_module,
 )
 
 api_router = APIRouter()
@@ -110,6 +111,9 @@ api_router.include_router(
 
 # 文件上传路由
 api_router.include_router(upload.router, prefix="/upload", tags=["文件上传"])
+
+# 统一导入路由
+api_router.include_router(unified_import_module.router, tags=["统一导入"])
 
 # 资源库路由
 api_router.include_router(library_assets.router, prefix="/library/assets", tags=["资源库"])

@@ -220,6 +220,7 @@ export interface Classroom {
   code?: string | null
   enrollment_year?: number | null
   head_teacher_id?: number | null
+  capacity?: number | null
   is_active: boolean
   description?: string | null
   created_at: string

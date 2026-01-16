@@ -15,7 +15,7 @@
 
     <div class="header mb-6">
       <h1 class="text-3xl font-bold text-gray-900">组织架构管理</h1>
-      <p class="text-gray-600 mt-2">管理区域、学校和班级成员信息</p>
+      <p class="text-gray-600 mt-2">管理区域、学校、班级和教师相关信息</p>
     </div>
 
     <!-- 功能卡片网格 -->
@@ -60,7 +60,7 @@
         </el-card>
       </el-col>
 
-      <!-- 班级成员管理卡片 -->
+      <!-- 班级管理卡片 -->
       <el-col :xs="24" :sm="12" :md="8" :lg="6">
         <el-card
           class="function-card"
@@ -74,8 +74,8 @@
             </el-icon>
           </div>
           <div class="card-content">
-            <h3>班级成员管理</h3>
-            <p>添加教师和学生到班级，管理班级成员关系</p>
+            <h3>班级管理</h3>
+            <p>管理班级信息、批量导入班级、班级成员管理</p>
           </div>
         </el-card>
       </el-col>

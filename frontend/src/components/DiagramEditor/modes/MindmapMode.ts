@@ -140,7 +140,7 @@ export class MindmapMode {
 
     // 垂直排列子节点
     const totalHeight = (children.length - 1) * spacing
-    let startY = rootPos.y + rootSize.height / 2 - totalHeight / 2
+    const startY = rootPos.y + rootSize.height / 2 - totalHeight / 2
 
     children.forEach((child, index) => {
       const childSize = child.size()

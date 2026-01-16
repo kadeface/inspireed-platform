@@ -6,6 +6,7 @@ import type {
   ClassroomMembership,
   ClassroomMembershipCreate,
   ClassroomMembershipUpdate,
+  ClassroomMembershipListResponse,
   ClassroomMemberBatchImportRequest,
   ClassroomMemberBatchImportResponse,
   AttendanceSessionCreate,
@@ -42,11 +43,17 @@ export const classroomAssistantService = {
   },
 
   /**
-   * 获取班级所有成员列表
+   * 获取班级成员列表（分页）
    */
-  async getClassroomMembers(classroomId: number): Promise<ClassroomMembership[]> {
-    const data = await api.get<any[]>(`/classroom-assistant/classrooms/${classroomId}/members`)
-    return snakeToCamel<ClassroomMembership[]>(data)
+  async getClassroomMembers(
+    classroomId: number,
+    page: number = 1,
+    size: number = 10
+  ): Promise<ClassroomMembershipListResponse> {
+    const data = await api.get<any>(`/classroom-assistant/classrooms/${classroomId}/members`, {
+      params: { page, size }
+    })
+    return snakeToCamel<ClassroomMembershipListResponse>(data)
   },
 
   /**

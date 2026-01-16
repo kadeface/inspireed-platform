@@ -656,26 +656,23 @@ async def import_schools(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ) -> Any:
-    """批量导入学校
-    
+    """批量导入学校（代理到统一导入系统）
+
     Excel格式要求：
     - 必需列：区域名称、学校名称
     - 可选列：学校代码、学校类型、地址、联系电话、邮箱、校长
     - 支持格式：.xlsx, .xls
     """
     import tempfile
-    import os
-    from app.services.school_import_service import (
-        SchoolImportService,
-        SchoolImportServiceError
-    )
+    from pathlib import Path as PathLib
+    from app.services.import_orchestrator import ImportOrchestrator
 
     # 验证文件类型
     if not file.filename:
         logger.error("文件上传失败: 文件名为空")
         raise HTTPException(status_code=400, detail="必须上传文件")
 
-    file_ext = Path(file.filename).suffix.lower()
+    file_ext = PathLib(file.filename).suffix.lower()
     if file_ext not in [".xlsx", ".xls"]:
         logger.error(f"文件上传失败: 不支持的文件格式 {file_ext}, 文件名: {file.filename}")
         raise HTTPException(
@@ -694,55 +691,38 @@ async def import_schools(
                 logger.error("文件上传失败: 文件内容为空")
                 raise HTTPException(status_code=400, detail="上传的文件为空")
             temp_file.write(content)
-            temp_file_path = temp_file.name
+            temp_file_path = PathLib(temp_file.name)
             logger.info(f"文件已保存到临时路径: {temp_file_path}, 大小: {len(content)} 字节")
 
-        # 解析Excel文件
-        try:
-            logger.info("开始解析Excel文件...")
-            records, parse_errors = await SchoolImportService.parse_school_excel(temp_file_path)
-            logger.info(f"Excel解析完成: 记录数={len(records)}, 错误数={len(parse_errors)}")
-        except SchoolImportServiceError as e:
-            logger.error(f"Excel解析失败: {str(e)}")
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            logger.error(f"Excel解析异常: {str(e)}", exc_info=True)
-            raise HTTPException(status_code=400, detail=f"解析Excel文件失败: {str(e)}")
+        # 构建导入上下文
+        context = {
+            "auto_create": auto_create_region,
+            "auto_create_region": auto_create_region,
+            "update_existing": False,
+        }
 
-        # 如果解析有错误，返回错误信息
-        if parse_errors:
-            return SchoolImportResponse(
-                total=len(records) + len(parse_errors),
-                success=0,
-                failed=len(parse_errors),
-                created_regions=0,
-                created_schools=0,
-                updated_schools=0,
-                skipped_schools=0,
-                errors=[SchoolImportError(**err) for err in parse_errors]
-            )
-
-        # 导入学校
-        result = await SchoolImportService.import_schools(
-            db, records, auto_create_region
+        # 使用统一导入系统
+        orchestrator = ImportOrchestrator()
+        result = await orchestrator.execute_import(
+            db=db,
+            strategy_type="school",
+            file_path=temp_file_path,
+            context=context
         )
-
-        # 提交事务
-        await db.commit()
 
         # 转换错误列表为SchoolImportError对象
         error_objects: List[SchoolImportError] = [
-            SchoolImportError(**err) for err in result["errors"]
+            SchoolImportError(**err) for err in result.get("errors", [])
         ]
 
         return SchoolImportResponse(
             total=result["total"],
             success=result["success"],
             failed=result["failed"],
-            created_regions=result["created_regions"],
-            created_schools=result["created_schools"],
-            updated_schools=result["updated_schools"],
-            skipped_schools=result["skipped_schools"],
+            created_regions=result.get("created_regions", 0),
+            created_schools=result.get("created", 0),
+            updated_schools=result.get("updated", 0),
+            skipped_schools=result.get("skipped", 0),
             errors=error_objects
         )
 
@@ -757,9 +737,9 @@ async def import_schools(
         )
     finally:
         # 清理临时文件
-        if temp_file_path and os.path.exists(temp_file_path):
+        if temp_file_path and temp_file_path.exists():
             try:
-                os.unlink(temp_file_path)
+                temp_file_path.unlink()
             except Exception as e:
                 logger.warning(f"删除临时文件失败: {str(e)}")
 
@@ -945,22 +925,19 @@ async def import_classrooms(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ) -> Any:
-    """批量导入班级
-    
+    """批量导入班级（代理到统一导入系统）
+
     Excel格式要求：
     - 县区管理员导入：必需列：学校名称、年级级别、班级编号
     - 学校管理员导入：必需列：年级级别、班级编号（学校自动使用当前用户的学校）
     - 可选列：学校代码、年级名称、班级名称、入学年份、班级容量、班级描述
     - 支持格式：.xlsx, .xls
-    
+
     注意：班主任信息不在导入模板中，请在班级创建后通过"班级成员管理"功能添加。
     """
     import tempfile
-    import os
-    from app.services.classroom_import_service import (
-        ClassroomImportService,
-        ClassroomImportServiceError,
-    )
+    from pathlib import Path as PathLib
+    from app.services.import_orchestrator import ImportOrchestrator
     from app.models import UserRole
 
     # 验证文件类型
@@ -968,7 +945,7 @@ async def import_classrooms(
         logger.error("文件上传失败: 文件名为空")
         raise HTTPException(status_code=400, detail="必须上传文件")
 
-    file_ext = Path(file.filename).suffix.lower()
+    file_ext = PathLib(file.filename).suffix.lower()
     if file_ext not in [".xlsx", ".xls"]:
         logger.error(f"文件上传失败: 不支持的文件格式 {file_ext}, 文件名: {file.filename}")
         raise HTTPException(
@@ -1013,61 +990,39 @@ async def import_classrooms(
                 logger.error("文件上传失败: 文件内容为空")
                 raise HTTPException(status_code=400, detail="上传的文件为空")
             temp_file.write(content)
-            temp_file_path = temp_file.name
+            temp_file_path = PathLib(temp_file.name)
             logger.info(f"文件已保存到临时路径: {temp_file_path}, 大小: {len(content)} 字节")
 
-        # 解析Excel文件
-        try:
-            logger.info("开始解析Excel文件...")
-            records, parse_errors = await ClassroomImportService.parse_classroom_excel(
-                temp_file_path, is_school_admin=is_school_admin
-            )
-            logger.info(f"Excel解析完成: 记录数={len(records)}, 错误数={len(parse_errors)}")
-        except ClassroomImportServiceError as e:
-            logger.error(f"Excel解析失败: {str(e)}")
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            logger.error(f"Excel解析异常: {str(e)}", exc_info=True)
-            raise HTTPException(status_code=400, detail=f"解析Excel文件失败: {str(e)}")
+        # 构建导入上下文
+        context = {
+            "school_id": actual_school_id,
+            "region_id": region_id,
+            "is_school_admin": is_school_admin,
+            "update_existing": update_existing,
+            "auto_create": True,
+        }
 
-        # 如果解析有错误，返回错误信息
-        if parse_errors:
-            return ClassroomImportResponse(
-                total=len(records) + len(parse_errors),
-                success=0,
-                failed=len(parse_errors),
-                created=0,
-                updated=0,
-                skipped=0,
-                errors=[ClassroomImportError(**err) for err in parse_errors]
-            )
-
-        if not records:
-            raise HTTPException(status_code=400, detail="Excel文件中没有有效的数据行")
-
-        # 导入班级
-        result = await ClassroomImportService.import_classrooms(
+        # 使用统一导入系统
+        orchestrator = ImportOrchestrator()
+        result = await orchestrator.execute_import(
             db=db,
-            records=records,
-            school_id=actual_school_id,
-            region_id=region_id,
-            update_existing=update_existing,
-            enrollment_year=enrollment_year,
-            capacity=capacity,
+            strategy_type="classroom",
+            file_path=temp_file_path,
+            context=context
         )
 
         # 转换错误列表为ClassroomImportError对象
         error_objects: List[ClassroomImportError] = [
-            ClassroomImportError(**err) for err in result["errors"]
+            ClassroomImportError(**err) for err in result.get("errors", [])
         ]
 
         return ClassroomImportResponse(
             total=result["total"],
             success=result["success"],
             failed=result["failed"],
-            created=result["created"],
-            updated=result["updated"],
-            skipped=result["skipped"],
+            created=result.get("created", 0),
+            updated=result.get("updated", 0),
+            skipped=result.get("skipped", 0),
             errors=error_objects
         )
 
@@ -1082,9 +1037,9 @@ async def import_classrooms(
         )
     finally:
         # 清理临时文件
-        if temp_file_path and os.path.exists(temp_file_path):
+        if temp_file_path and temp_file_path.exists():
             try:
-                os.unlink(temp_file_path)
+                temp_file_path.unlink()
             except Exception as e:
                 logger.warning(f"删除临时文件失败: {str(e)}")
 
