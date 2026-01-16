@@ -15,28 +15,28 @@
     <!-- 快捷导航 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
       <router-link
-        to="/admin/users"
-        class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white hover:shadow-lg transition-shadow"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-semibold mb-2">用户管理</h3>
-            <p class="text-sm text-blue-100">管理平台用户账号</p>
-          </div>
-          <div class="text-4xl">👥</div>
-        </div>
-      </router-link>
-
-      <router-link
         to="/admin/organization"
         class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white hover:shadow-lg transition-shadow"
       >
         <div class="flex items-center justify-between">
           <div>
             <h3 class="text-lg font-semibold mb-2">组织架构</h3>
-            <p class="text-sm text-green-100">管理区域和学校</p>
+            <p class="text-sm text-green-100">管理区域、学校、班级和人员</p>
           </div>
           <div class="text-4xl">🏢</div>
+        </div>
+      </router-link>
+
+      <router-link
+        to="/admin/settings"
+        class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white hover:shadow-lg transition-shadow"
+      >
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold mb-2">系统设置</h3>
+            <p class="text-sm text-blue-100">管理员和权限配置</p>
+          </div>
+          <div class="text-4xl">⚙️</div>
         </div>
       </router-link>
 
@@ -49,7 +49,7 @@
             <h3 class="text-lg font-semibold mb-2">考试管理</h3>
             <p class="text-sm text-purple-100">考试管理和增值评价</p>
           </div>
-          <div class="text-4xl">⚙️</div>
+          <div class="text-4xl">📊</div>
         </div>
       </router-link>
     </div>

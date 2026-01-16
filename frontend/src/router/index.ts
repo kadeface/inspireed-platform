@@ -211,10 +211,16 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'admin', title: '课程管理 - InspireEd' },
   },
   {
+    path: '/admin/settings',
+    name: 'AdminSettings',
+    component: () => import('../pages/Admin/SystemSettings.vue'),
+    meta: { requiresAuth: true, role: 'admin', title: '系统设置 - InspireEd' },
+  },
+  // TODO: 废弃路由，保留向后兼容，未来版本将移除
+  {
     path: '/admin/users',
-    name: 'AdminUsers',
-    component: () => import('../pages/Admin/UserManagement.vue'),
-    meta: { requiresAuth: true, role: 'admin', title: '用户管理 - InspireEd' },
+    redirect: '/admin/settings',
+    meta: { requiresAuth: true, role: 'admin' },
   },
   {
     path: '/admin/organization',

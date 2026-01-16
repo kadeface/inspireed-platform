@@ -1,3 +1,15 @@
+<!--
+  ⚠️ DEPRECATED - 此文件已废弃
+
+  用户管理功能已拆分到以下模块：
+  - 教师/学生管理 → 组织架构管理 (/admin/organization)
+  - 管理员/教研员管理 → 系统设置 (/admin/settings)
+
+  此文件保留仅为向后兼容，未来版本将移除。
+  路由 /admin/users 已重定向到 /admin/settings
+
+  迁移时间：2026-01-16
+-->
 <template>
   <div class="user-management p-6">
     <!-- 面包屑导航 -->
