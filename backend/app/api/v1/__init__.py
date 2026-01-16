@@ -38,6 +38,8 @@ from app.api.v1 import (
     subject_groups,
     student_ai_assistant,
     teacher_ai_assistant,
+    teacher_positions,
+    teachers,
     total_scores,
     upload,
     users,
@@ -141,4 +143,10 @@ api_router.include_router(
 )
 api_router.include_router(
     import_tasks.router, prefix="/import-tasks", tags=["评价-导入任务"]
+)
+api_router.include_router(
+    teachers.router, tags=["教师-教学任务管理"]
+)
+api_router.include_router(
+    teacher_positions.router, tags=["教师-职务类型管理"]
 )

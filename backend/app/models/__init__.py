@@ -81,6 +81,11 @@ from app.models.evaluation import (
     ImportTask,
     ImportStatus,
 )
+from app.models.teacher import (
+    TeacherTeachingAssignment,
+    TeachingAssignmentType,
+)
+from app.models.teacher_position import TeacherPositionType
 
 __all__ = [
     "User",
@@ -166,4 +171,9 @@ __all__ = [
     "EvaluationDetail",
     "ImportTask",
     "ImportStatus",
+    # 教师教学任务
+    "TeacherTeachingAssignment",
+    "TeachingAssignmentType",
+    # 教师职务类型
+    "TeacherPositionType",
 ]

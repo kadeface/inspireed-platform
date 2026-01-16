@@ -18,45 +18,117 @@
       <p class="text-gray-600 mt-2">管理区域、学校和班级成员信息</p>
     </div>
 
-    <!-- 标签页切换 -->
-    <div class="bg-white rounded-lg shadow mb-6">
-      <div class="border-b border-gray-200">
-        <nav class="flex -mb-px">
-          <button
-            @click="activeTab = 'regions'"
-            :class="[
-              'px-6 py-3 text-sm font-medium border-b-2',
-              activeTab === 'regions'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            ]"
-          >
-            区域管理
-          </button>
-          <button
-            @click="activeTab = 'schools'"
-            :class="[
-              'px-6 py-3 text-sm font-medium border-b-2',
-              activeTab === 'schools'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            ]"
-          >
-            学校管理
-          </button>
-          <button
-            @click="activeTab = 'classrooms'"
-            :class="[
-              'px-6 py-3 text-sm font-medium border-b-2',
-              activeTab === 'classrooms'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            ]"
-          >
-            班级成员管理
-            <span class="ml-1 text-xs text-gray-400">(添加教师/学生到班级)</span>
-          </button>
-        </nav>
+    <!-- 功能卡片网格 -->
+    <el-row :gutter="20" class="mb-6">
+      <!-- 区域管理卡片 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card 
+          class="function-card" 
+          shadow="hover" 
+          @click="activeTab = 'regions'"
+          :class="{ 'active-card': activeTab === 'regions' }"
+        >
+          <div class="card-icon">
+            <el-icon :size="40" color="#409eff">
+              <component :is="'Location'" />
+            </el-icon>
+          </div>
+          <div class="card-content">
+            <h3>区域管理</h3>
+            <p>管理省、市、区等区域层级信息，建立完整的区域组织架构</p>
+          </div>
+        </el-card>
+      </el-col>
+
+      <!-- 学校管理卡片 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card 
+          class="function-card" 
+          shadow="hover" 
+          @click="activeTab = 'schools'"
+          :class="{ 'active-card': activeTab === 'schools' }"
+        >
+          <div class="card-icon">
+            <el-icon :size="40" color="#67c23a">
+              <component :is="'OfficeBuilding'" />
+            </el-icon>
+          </div>
+          <div class="card-content">
+            <h3>学校管理</h3>
+            <p>管理学校基本信息，包括学校名称、代码、所属区域等</p>
+          </div>
+        </el-card>
+      </el-col>
+
+      <!-- 班级成员管理卡片 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card 
+          class="function-card" 
+          shadow="hover" 
+          @click="activeTab = 'classrooms'"
+          :class="{ 'active-card': activeTab === 'classrooms' }"
+        >
+          <div class="card-icon">
+            <el-icon :size="40" color="#e6a23c">
+              <component :is="'UserFilled'" />
+            </el-icon>
+          </div>
+          <div class="card-content">
+            <h3>班级成员管理</h3>
+            <p>添加教师和学生到班级，管理班级成员关系</p>
+          </div>
+        </el-card>
+      </el-col>
+
+      <!-- 教师教学任务卡片 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card 
+          class="function-card" 
+          shadow="hover" 
+          @click="activeTab = 'teacher-assignments'"
+          :class="{ 'active-card': activeTab === 'teacher-assignments' }"
+        >
+          <div class="card-icon">
+            <el-icon :size="40" color="#909399">
+              <component :is="'Document'" />
+            </el-icon>
+          </div>
+          <div class="card-content">
+            <h3>教师教学任务</h3>
+            <p>管理教师与班级、学科的关联关系，分配教学任务</p>
+          </div>
+        </el-card>
+      </el-col>
+
+      <!-- 职务类型管理卡片 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card 
+          class="function-card" 
+          shadow="hover" 
+          @click="activeTab = 'position-types'"
+          :class="{ 'active-card': activeTab === 'position-types' }"
+        >
+          <div class="card-icon">
+            <el-icon :size="40" color="#f56c6c">
+              <component :is="'Setting'" />
+            </el-icon>
+          </div>
+          <div class="card-content">
+            <h3>职务类型管理</h3>
+            <p>自定义教师职务类型，如校长、教研室主任等</p>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 功能说明提示 -->
+    <div v-if="activeTab === 'position-types'" class="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+      <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+      </svg>
+      <div class="text-sm text-gray-700">
+        <p class="font-medium text-gray-900 mb-1">功能说明</p>
+        <p>管理教师职务类型，支持自定义职务（如：校长、教研室主任等）。系统预设的职务类型（班主任、学科教师）不能删除，只能停用。</p>
       </div>
     </div>
 
@@ -205,7 +277,13 @@
             </button>
           </div>
           <div class="flex gap-2">
-            <select v-model="schoolTypeFilter" @change="loadSchools" class="px-3 py-2 border rounded-lg">
+            <select v-model="schoolRegionFilter" @change="handleSchoolRegionFilterChange" class="px-3 py-2 border rounded-lg">
+              <option value="">所有县区</option>
+              <option v-for="region in allRegions" :key="region.id" :value="region.id">
+                {{ region.name }}
+              </option>
+            </select>
+            <select v-model="schoolTypeFilter" @change="handleSchoolTypeFilterChange" class="px-3 py-2 border rounded-lg">
               <option value="">所有类型</option>
               <option value="小学">小学</option>
               <option value="初中">初中</option>
@@ -1765,6 +1843,659 @@
       </div>
     </div>
 
+    <!-- 教师教学任务管理 -->
+    <div v-if="activeTab === 'teacher-assignments'" class="space-y-6">
+      <!-- 功能说明 -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p class="text-sm text-blue-800">
+          💡 <strong>功能说明：</strong>管理教师在各学校、年级、班级、学科的教学任务分配，支持班主任和学科教师两种任务类型。
+        </p>
+      </div>
+
+      <!-- 筛选和操作栏 -->
+      <div class="bg-white rounded-lg shadow p-4">
+        <div class="flex flex-wrap items-center gap-4 mb-4">
+          <!-- 筛选器 -->
+          <!-- 县区 -->
+          <select
+            v-model="assignmentFilters.region_id"
+            @change="handleAssignmentRegionChange"
+            class="px-3 py-2 border rounded-lg"
+          >
+            <option :value="undefined">所有县区</option>
+            <option v-for="region in allRegions" :key="region.id" :value="region.id">
+              {{ region.name }}
+            </option>
+          </select>
+          <!-- 学期 -->
+          <select
+            v-model="assignmentFilters.semester_id"
+            @change="loadTeacherAssignments"
+            class="px-3 py-2 border rounded-lg"
+          >
+            <option :value="undefined">所有学期</option>
+            <option v-for="semester in semesters" :key="semester.id" :value="semester.id">
+              {{ semester.name }}
+            </option>
+          </select>
+          <!-- 年级 -->
+          <select
+            v-model="assignmentFilters.grade_id"
+            @change="loadTeacherAssignments"
+            class="px-3 py-2 border rounded-lg"
+          >
+            <option :value="undefined">所有年级</option>
+            <option v-for="grade in grades" :key="grade.id" :value="grade.id">
+              {{ grade.name }}
+            </option>
+          </select>
+          <!-- 科目 -->
+          <select
+            v-model="assignmentFilters.subject_id"
+            @change="loadTeacherAssignments"
+            class="px-3 py-2 border rounded-lg"
+          >
+            <option :value="undefined">所有学科</option>
+            <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+              {{ subject.name }}
+            </option>
+          </select>
+          <!-- 学校 -->
+          <select
+            v-model="assignmentFilters.school_id"
+            @change="loadTeacherAssignments"
+            class="px-3 py-2 border rounded-lg"
+          >
+            <option :value="undefined">所有学校</option>
+            <option v-for="school in filteredAssignmentSchools" :key="school.id" :value="school.id">
+              {{ school.name }}
+            </option>
+          </select>
+          <!-- 教师名字 -->
+          <select
+            v-model="assignmentFilters.teacher_id"
+            @change="loadTeacherAssignments"
+            class="px-3 py-2 border rounded-lg"
+          >
+            <option :value="undefined">所有教师</option>
+            <option v-for="teacher in teachers" :key="teacher.id" :value="teacher.id">
+              {{ teacher.full_name || teacher.username }}
+            </option>
+          </select>
+          <!-- 状态 -->
+          <select
+            v-model="assignmentFilters.is_active"
+            @change="loadTeacherAssignments"
+            class="px-3 py-2 border rounded-lg"
+          >
+            <option :value="undefined">全部状态</option>
+            <option :value="true">激活</option>
+            <option :value="false">停用</option>
+          </select>
+          <button
+            @click="loadTeacherAssignments"
+            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          >
+            🔄 刷新
+          </button>
+          <button
+            @click="openCreateAssignmentDialog"
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            + 添加教学任务
+          </button>
+          <button
+            @click="openAssignmentImportDialog"
+            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          >
+            📥 批量导入
+          </button>
+        </div>
+      </div>
+
+      <!-- 教学任务列表 -->
+      <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div v-if="assignmentLoading" class="p-6 text-center text-gray-500">加载中...</div>
+        <div v-else-if="teacherAssignments.length === 0" class="p-6 text-center text-gray-500">暂无教学任务</div>
+        <table v-else class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">教师</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学校</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">年级</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">班级</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学科</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学期/学年</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">任务类型</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr v-for="assignment in teacherAssignments" :key="assignment.id" class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                {{ assignment.teacher?.full_name || '未知' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ assignment.school?.name || '未知' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ assignment.grade?.name || '未知' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ assignment.classroom?.name || '未知' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ assignment.subject?.name || '未知' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ assignment.semester?.name || '未知' }} ({{ assignment.academic_year }})
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span
+                  :class="[
+                    'px-2 inline-flex text-xs leading-5 font-semibold rounded-full',
+                    assignment.assignment_type === 'head_teacher'
+                      ? 'bg-purple-100 text-purple-800'
+                      : 'bg-blue-100 text-blue-800'
+                  ]"
+                >
+                  {{ getAssignmentTypeName(assignment.assignment_type) }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span
+                  :class="[
+                    'px-2 inline-flex text-xs leading-5 font-semibold rounded-full',
+                    assignment.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  ]"
+                >
+                  {{ assignment.is_active ? '激活' : '非激活' }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <div class="flex gap-2">
+                  <button
+                    @click="editTeacherAssignment(assignment)"
+                    class="text-blue-600 hover:text-blue-900"
+                  >
+                    编辑
+                  </button>
+                  <button
+                    @click="deleteTeacherAssignment(assignment)"
+                    class="text-red-600 hover:text-red-900"
+                  >
+                    删除
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 分页 -->
+      <div class="flex justify-between items-center">
+        <div class="text-sm text-gray-700">
+          显示 {{ (assignmentPage - 1) * assignmentSize + (teacherAssignments.length ? 1 : 0) }} -
+          {{ Math.min(assignmentPage * assignmentSize, assignmentTotal) }} 条，共 {{ assignmentTotal }} 条
+        </div>
+        <div class="flex gap-2">
+          <button
+            @click="assignmentPage--; loadTeacherAssignments()"
+            :disabled="assignmentPage === 1"
+            class="px-3 py-2 border rounded-lg disabled:opacity-50"
+          >
+            上一页
+          </button>
+          <span class="px-3 py-2 text-sm text-gray-600">
+            {{ assignmentPage }} / {{ assignmentTotalPages || 1 }}
+          </span>
+          <button
+            @click="assignmentPage++; loadTeacherAssignments()"
+            :disabled="assignmentPage === assignmentTotalPages || assignmentTotalPages === 0"
+            class="px-3 py-2 border rounded-lg disabled:opacity-50"
+          >
+            下一页
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 添加/编辑教学任务对话框 -->
+    <el-dialog
+      v-model="showAssignmentDialog"
+      :title="editingAssignment ? '编辑教学任务' : '添加教学任务'"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <el-form :model="assignmentForm" label-width="120px">
+        <el-form-item label="教师*" required>
+          <el-select
+            v-model="assignmentForm.teacher_id"
+            placeholder="请选择教师"
+            filterable
+            class="w-full"
+          >
+            <el-option
+              v-for="teacher in teachers"
+              :key="teacher.id"
+              :label="teacher.full_name || teacher.username"
+              :value="teacher.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="学校*" required>
+          <el-select
+            v-model="assignmentForm.school_id"
+            @change="handleAssignmentSchoolChange"
+            placeholder="请选择学校"
+            filterable
+            class="w-full"
+          >
+            <el-option
+              v-for="school in schools"
+              :key="school.id"
+              :label="school.name"
+              :value="school.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="年级*" required>
+          <el-select
+            v-model="assignmentForm.grade_id"
+            @change="handleAssignmentGradeChange"
+            placeholder="请选择年级"
+            class="w-full"
+          >
+            <el-option
+              v-for="grade in grades"
+              :key="grade.id"
+              :label="grade.name"
+              :value="grade.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="班级*" required>
+          <el-select
+            v-model="assignmentForm.classroom_id"
+            placeholder="请选择班级"
+            :disabled="!assignmentForm.school_id || !assignmentForm.grade_id"
+            filterable
+            class="w-full"
+          >
+            <el-option
+              v-for="classroom in filteredAssignmentClassrooms"
+              :key="classroom.id"
+              :label="classroom.name"
+              :value="classroom.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="学科*" required>
+          <el-select
+            v-model="assignmentForm.subject_id"
+            placeholder="请选择学科"
+            filterable
+            class="w-full"
+          >
+            <el-option
+              v-for="subject in subjects"
+              :key="subject.id"
+              :label="subject.name"
+              :value="subject.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="学期*" required>
+          <el-select
+            v-model="assignmentForm.semester_id"
+            placeholder="请选择学期"
+            class="w-full"
+          >
+            <el-option
+              v-for="semester in semesters"
+              :key="semester.id"
+              :label="semester.name"
+              :value="semester.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="学年*" required>
+          <el-input
+            v-model="assignmentForm.academic_year"
+            placeholder="如：2023-2024"
+            maxlength="20"
+          />
+        </el-form-item>
+        <el-form-item label="任务类型*" required>
+          <el-select
+            v-model="assignmentForm.assignment_type"
+            placeholder="请选择任务类型"
+            class="w-full"
+          >
+            <el-option label="班主任" value="head_teacher" />
+            <el-option label="学科教师" value="subject_teacher" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-switch
+            v-model="assignmentForm.is_active"
+            active-text="激活"
+            inactive-text="停用"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAssignmentDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveTeacherAssignment" :loading="assignmentSaving">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量导入教学任务对话框 -->
+    <el-dialog
+      v-model="showAssignmentImportDialog"
+      title="批量导入教师教学任务"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <el-steps :active="assignmentImportStep" finish-status="success" align-center class="mb-6">
+        <el-step title="下载模板" />
+        <el-step title="填写数据" />
+        <el-step title="上传文件" />
+        <el-step title="导入结果" />
+      </el-steps>
+
+      <!-- 步骤1: 下载模板 -->
+      <div v-if="assignmentImportStep === 0" class="space-y-4">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p class="text-sm text-blue-800 mb-2">
+            <strong>使用说明：</strong>
+          </p>
+          <ul class="text-sm text-blue-700 list-disc list-inside space-y-1">
+            <li>如果您已有模板，可以直接点击"下一步"；如果没有，请先下载Excel模板</li>
+            <li>必填字段：教师姓名、学校名称、年级级别、班级编码、学科名称、学期编号、学年、任务类型</li>
+            <li>年级级别：填写数字（如7表示七年级，8表示八年级）</li>
+            <li>班级编码：填写班级编码（如701表示七年级1班，前1-2位是年级，后2位是班级序号）</li>
+            <li>学期编号：填写1（上学期）或2（下学期）</li>
+            <li>任务类型：填写职务名称（如"班主任"、"学科教师"、"校长"、"教研室主任"等），支持自定义职务类型</li>
+            <li>是否激活：填写"是"或"否"（默认为"是"）</li>
+            <li>如果任务已存在，可以选择"更新已存在的任务"来覆盖</li>
+            <li>💡 提示：可在"职务类型管理"标签页中查看和创建自定义职务类型</li>
+            <li>💡 <strong>重要提示</strong>：如果系统中没有对应的学期或教师，请在上传文件步骤中勾选"自动创建"选项</li>
+          </ul>
+        </div>
+        <div class="flex justify-center gap-4">
+          <el-button type="primary" @click="downloadAssignmentTemplate" :icon="Download">
+            下载导入模板
+          </el-button>
+          <el-button @click="assignmentImportStep = 1">
+            下一步
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 步骤2: 填写数据说明 -->
+      <div v-if="assignmentImportStep === 1" class="space-y-4">
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p class="text-sm text-yellow-800">
+            <strong>填写提示：</strong>
+          </p>
+          <ul class="text-sm text-yellow-700 list-disc list-inside space-y-1 mt-2">
+            <li>年级级别：填写1-12的数字（1-6为小学，7-9为初中，10-12为高中）</li>
+            <li>班级编码：格式为"年级级别+班级序号"，如701（7年级1班）、1001（10年级1班）</li>
+            <li>学期编号：填写1（上学期）或2（下学期）</li>
+            <li>学年格式：如 2024-2025</li>
+            <li>任务类型：填写系统中已存在的职务名称（支持自定义职务，如"校长"、"教研室主任"等）</li>
+            <li>填写完成后，请保存Excel文件</li>
+            <li><strong>💡 重要提示</strong>：如果教师或学期在系统中不存在，请在上传文件步骤中勾选相应的"自动创建"选项</li>
+          </ul>
+        </div>
+        
+        <!-- 可用职务类型列表 -->
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+          <p class="text-sm text-green-800 font-semibold mb-2">
+            📋 当前可用的职务类型：
+          </p>
+          <div v-if="availablePositionTypes.length > 0" class="flex flex-wrap gap-2">
+            <span
+              v-for="pt in availablePositionTypes"
+              :key="pt.id"
+              class="px-3 py-1 text-xs font-medium rounded-full"
+              :class="pt.is_system ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'"
+            >
+              {{ pt.name }}
+              <span v-if="pt.is_system" class="ml-1 text-purple-600">(系统)</span>
+            </span>
+          </div>
+          <p v-else class="text-sm text-green-700">正在加载职务类型列表...</p>
+          <p class="text-xs text-green-600 mt-2">
+            💡 如需添加新的职务类型，请前往"职务类型管理"标签页
+          </p>
+        </div>
+        
+        <div class="flex justify-center gap-4">
+          <el-button @click="assignmentImportStep = 0">上一步</el-button>
+          <el-button type="primary" @click="assignmentImportStep = 2">下一步：上传文件</el-button>
+        </div>
+      </div>
+
+      <!-- 步骤3: 上传文件 -->
+      <div v-if="assignmentImportStep === 2" class="space-y-4">
+        <div class="flex flex-col gap-3 mb-4">
+          <label class="flex items-center">
+            <input
+              v-model="assignmentImportForm.updateExisting"
+              type="checkbox"
+              class="mr-2"
+            />
+            <span class="text-sm text-gray-700">更新已存在的任务</span>
+          </label>
+          <label class="flex items-center">
+            <input
+              v-model="assignmentImportForm.autoCreateTeachers"
+              type="checkbox"
+              class="mr-2"
+            />
+            <span class="text-sm text-gray-700">如果教师不存在，自动创建</span>
+          </label>
+          <div v-if="assignmentImportForm.autoCreateTeachers" class="ml-6 text-xs text-blue-600">
+            💡 提示：自动创建的教师账号信息将在导入结果中显示，可导出Excel分发给教师
+          </div>
+          <label class="flex items-center">
+            <input
+              v-model="assignmentImportForm.autoCreateSemesters"
+              type="checkbox"
+              class="mr-2"
+            />
+            <span class="text-sm text-gray-700">如果学期不存在，自动创建</span>
+          </label>
+          <div v-if="assignmentImportForm.autoCreateSemesters" class="ml-6 text-xs text-blue-600">
+            💡 提示：学期编号1对应上学期（up），2对应下学期（down）。系统会根据学年自动计算学期日期
+          </div>
+        </div>
+        <el-upload
+          ref="assignmentImportUploadRef"
+          :auto-upload="false"
+          :on-change="handleAssignmentFileChange"
+          :on-exceed="handleAssignmentExceed"
+          :limit="1"
+          accept=".xlsx,.xls"
+          drag
+        >
+          <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+          <div class="el-upload__text">
+            将文件拖到此处，或<em>点击上传</em>
+          </div>
+          <template #tip>
+            <div class="el-upload__tip">
+              只能上传Excel文件（.xlsx, .xls），且不超过10MB
+            </div>
+          </template>
+        </el-upload>
+        <div v-if="selectedAssignmentFile" class="mt-4 p-3 bg-gray-50 rounded-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-gray-700">{{ selectedAssignmentFile.name }}</p>
+              <p class="text-xs text-gray-500">{{ formatFileSize(selectedAssignmentFile.size) }}</p>
+            </div>
+            <el-button
+              type="danger"
+              size="small"
+              @click="selectedAssignmentFile = null; assignmentImportUploadRef?.clearFiles()"
+            >
+              移除
+            </el-button>
+          </div>
+        </div>
+        <div class="flex justify-center gap-4">
+          <el-button @click="assignmentImportStep = 1">上一步</el-button>
+          <el-button
+            type="primary"
+            @click="startAssignmentImport"
+            :loading="assignmentImporting"
+            :disabled="!selectedAssignmentFile"
+          >
+            {{ assignmentImporting ? '导入中...' : '开始导入' }}
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 步骤4: 导入结果 -->
+      <div v-if="assignmentImportStep === 3" class="space-y-4">
+        <div
+          :class="[
+            'p-4 rounded-lg',
+            assignmentImportResult.success > 0
+              ? 'bg-green-50 border border-green-200'
+              : 'bg-red-50 border border-red-200'
+          ]"
+        >
+          <p class="text-sm font-medium mb-2">
+            {{ assignmentImportResult.success > 0 ? '✅ 导入完成' : '❌ 导入失败' }}
+          </p>
+          <div class="text-sm space-y-1">
+            <p>总记录数：{{ assignmentImportResult.total }}</p>
+            <p>成功：{{ assignmentImportResult.success }} 条</p>
+            <p>失败：{{ assignmentImportResult.failed }} 条</p>
+            <p v-if="assignmentImportResult.created > 0">创建：{{ assignmentImportResult.created }} 条</p>
+            <p v-if="assignmentImportResult.updated > 0">更新：{{ assignmentImportResult.updated }} 条</p>
+            <p v-if="assignmentImportResult.skipped > 0">跳过：{{ assignmentImportResult.skipped }} 条</p>
+          </div>
+        </div>
+
+        <!-- 新创建的教师列表 -->
+        <div v-if="assignmentImportResult.created_teachers && assignmentImportResult.created_teachers.length > 0" class="mt-4">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-sm font-medium text-blue-700">
+              ✅ 新创建的教师账号（共 {{ assignmentImportResult.created_teachers.length }} 个）
+            </p>
+            <el-button
+              type="primary"
+              size="small"
+              @click="exportCreatedTeachers"
+            >
+              导出账号信息
+            </el-button>
+          </div>
+          <div class="max-h-60 overflow-y-auto border rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-blue-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">教师姓名</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">用户名</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">邮箱</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">初始密码</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">学校</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="(teacher, index) in assignmentImportResult.created_teachers" :key="index">
+                  <td class="px-4 py-2 text-sm text-gray-900">{{ teacher.teacher_name }}</td>
+                  <td class="px-4 py-2 text-sm text-gray-700 font-mono">{{ teacher.username }}</td>
+                  <td class="px-4 py-2 text-sm text-gray-700 font-mono">{{ teacher.email }}</td>
+                  <td class="px-4 py-2 text-sm text-gray-700 font-mono">{{ teacher.password }}</td>
+                  <td class="px-4 py-2 text-sm text-gray-600">{{ teacher.school_name }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-2 text-xs text-blue-600">
+            💡 提示：请导出账号信息Excel文件，分发给新创建的教师。首次登录需要修改密码。
+          </p>
+        </div>
+
+        <!-- 新创建的学期列表 -->
+        <div v-if="assignmentImportResult.created_semesters && assignmentImportResult.created_semesters.length > 0" class="mt-4">
+          <p class="text-sm font-medium text-green-700 mb-2">
+            ✅ 新创建的学期（共 {{ assignmentImportResult.created_semesters.length }} 个）
+          </p>
+          <div class="max-h-60 overflow-y-auto border rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-green-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">学期名称</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">学年</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">学期类型</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">开始日期</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">结束日期</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="(semester, index) in assignmentImportResult.created_semesters" :key="index">
+                  <td class="px-4 py-2 text-sm text-gray-900">{{ semester.semester_name }}</td>
+                  <td class="px-4 py-2 text-sm text-gray-700">{{ semester.academic_year }}</td>
+                  <td class="px-4 py-2 text-sm text-gray-700">
+                    <span class="px-2 py-1 text-xs rounded-full"
+                          :class="semester.semester_type === 'up' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'">
+                      {{ semester.semester_type === 'up' ? '上学期' : '下学期' }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-2 text-sm text-gray-600">{{ semester.start_date ? new Date(semester.start_date).toLocaleDateString('zh-CN') : '—' }}</td>
+                  <td class="px-4 py-2 text-sm text-gray-600">{{ semester.end_date ? new Date(semester.end_date).toLocaleDateString('zh-CN') : '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div v-if="assignmentImportResult.errors.length > 0" class="mt-4">
+          <p class="text-sm font-medium text-gray-700 mb-2">错误详情：</p>
+          <div class="max-h-60 overflow-y-auto border rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">行号</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">字段</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">错误信息</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="(error, index) in assignmentImportResult.errors" :key="index">
+                  <td class="px-4 py-2 text-sm text-gray-900">{{ error.row }}</td>
+                  <td class="px-4 py-2 text-sm text-gray-500">{{ error.field || '—' }}</td>
+                  <td class="px-4 py-2 text-sm text-red-600">{{ error.message }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="flex justify-center gap-4 mt-4">
+          <el-button @click="closeAssignmentImportDialog">关闭</el-button>
+          <el-button
+            v-if="assignmentImportResult.success > 0"
+            type="primary"
+            @click="closeAssignmentImportDialog(); loadTeacherAssignments()"
+          >
+            查看结果
+          </el-button>
+        </div>
+      </div>
+    </el-dialog>
+
     <!-- 班级编辑模态框 -->
     <div v-if="showClassroomModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg p-6 w-full max-w-lg">
@@ -1865,6 +2596,186 @@
       </div>
     </div>
 
+    <!-- 职务类型管理 -->
+    <div v-if="activeTab === 'position-types'" class="space-y-6">
+      <!-- 功能说明 -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p class="text-sm text-blue-800">
+          💡 <strong>功能说明：</strong>管理教师职务类型，支持自定义职务（如：校长、教研室主任等）。系统预设的职务类型（班主任、学科教师）不能删除，只能停用。
+        </p>
+      </div>
+
+      <!-- 操作栏 -->
+      <div class="bg-white rounded-lg shadow p-4">
+        <div class="flex justify-between items-center mb-4">
+          <div class="flex gap-4">
+            <button
+              @click="openCreatePositionTypeDialog"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              + 创建职务类型
+            </button>
+            <button
+              @click="loadPositionTypes"
+              class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+            >
+              🔄 刷新
+            </button>
+          </div>
+          <div class="flex gap-2">
+            <select
+              v-model="positionTypeCategoryFilter"
+              @change="loadPositionTypes"
+              class="px-3 py-2 border rounded-lg"
+            >
+              <option value="">所有分类</option>
+              <option value="教学类">教学类</option>
+              <option value="管理类">管理类</option>
+              <option value="行政类">行政类</option>
+            </select>
+            <select
+              v-model="positionTypeActiveFilter"
+              @change="loadPositionTypes"
+              class="px-3 py-2 border rounded-lg"
+            >
+              <option value="">全部状态</option>
+              <option value="true">激活</option>
+              <option value="false">停用</option>
+            </select>
+            <input
+              v-model="positionTypeSearch"
+              @input="loadPositionTypes"
+              type="text"
+              placeholder="搜索职务名称、代码..."
+              class="px-3 py-2 border rounded-lg w-64"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- 职务类型列表 -->
+      <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">职务名称</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">职务代码</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分类</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">排序</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">系统预设</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">描述</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr v-for="positionType in positionTypes" :key="positionType.id">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ positionType.id }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ positionType.name }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ positionType.code || '-' }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ positionType.category || '-' }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ positionType.sort_order }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <span v-if="positionType.is_system" class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">系统</span>
+                <span v-else class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">自定义</span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <span v-if="positionType.is_active" class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">激活</span>
+                <span v-else class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">停用</span>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-500">{{ positionType.description || '-' }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <button
+                  @click="openEditPositionTypeDialog(positionType)"
+                  class="text-blue-600 hover:text-blue-900 mr-3"
+                >
+                  编辑
+                </button>
+                <button
+                  v-if="!positionType.is_system"
+                  @click="handleDeletePositionType(positionType)"
+                  class="text-red-600 hover:text-red-900"
+                >
+                  删除
+                </button>
+                <span v-else class="text-gray-400 text-xs">系统预设不可删除</span>
+              </td>
+            </tr>
+            <tr v-if="positionTypes.length === 0">
+              <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500">
+                暂无职务类型数据
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 职务类型创建/编辑对话框 -->
+    <el-dialog
+      v-model="showPositionTypeDialog"
+      :title="editingPositionType ? '编辑职务类型' : '创建职务类型'"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <el-form :model="positionTypeForm" label-width="120px">
+        <el-form-item label="职务名称*" required>
+          <el-input
+            v-model="positionTypeForm.name"
+            placeholder="如：校长、教研室主任"
+            :disabled="editingPositionType?.is_system"
+          />
+        </el-form-item>
+        <el-form-item label="职务代码">
+          <el-input
+            v-model="positionTypeForm.code"
+            placeholder="如：principal、research_director（可选）"
+            :disabled="editingPositionType?.is_system"
+          />
+        </el-form-item>
+        <el-form-item label="职务分类">
+          <el-select v-model="positionTypeForm.category" placeholder="选择分类" clearable>
+            <el-option label="教学类" value="教学类" />
+            <el-option label="管理类" value="管理类" />
+            <el-option label="行政类" value="行政类" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="排序权重">
+          <el-input-number
+            v-model="positionTypeForm.sort_order"
+            :min="0"
+            :max="999"
+            placeholder="数字越小越靠前"
+          />
+        </el-form-item>
+        <el-form-item label="职务描述">
+          <el-input
+            v-model="positionTypeForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="描述该职务的职责和特点"
+          />
+        </el-form-item>
+        <el-form-item label="是否激活">
+          <el-switch v-model="positionTypeForm.is_active" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <el-button @click="showPositionTypeDialog = false">取消</el-button>
+          <el-button
+            type="primary"
+            @click="savePositionType"
+            :loading="positionTypeSaving"
+            :disabled="!positionTypeForm.name"
+          >
+            {{ editingPositionType ? '更新' : '创建' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -1874,21 +2785,37 @@ import { useToast } from '@/composables/useToast'
 import adminService, { type Region, type School, type Classroom, type User, type SchoolImportResponse, type ClassroomImportResponse } from '@/services/admin'
 import curriculumService from '@/services/curriculum'
 import { classroomAssistantService } from '@/services/classroomAssistant'
-import type { Grade } from '@/types/curriculum'
+import teacherApi from '@/services/teacher'
+import { semesterApi } from '@/services/evaluation'
+import { teacherPositionApi } from '@/services/teacher_position'
+import type {
+  TeacherPositionTypeResponse as TeacherPositionType,
+  TeacherPositionTypeCreate,
+  TeacherPositionTypeUpdate,
+} from '@/types/teacher_position'
+import type { Grade, Subject } from '@/types/curriculum'
+import type {
+  TeacherTeachingAssignment,
+  TeacherTeachingAssignmentCreate,
+  TeacherTeachingAssignmentUpdate,
+} from '@/types/teacher'
+import { TeachingAssignmentType } from '@/types/teacher'
+import type { Semester } from '@/types/evaluation'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type {
   ClassroomMembership,
   ClassroomMembershipCreate,
   ClassroomMembershipUpdate,
 } from '@/types/classroomAssistant'
 import { RoleInClass } from '@/types/classroomAssistant'
-import { Download, UploadFilled, Upload, ArrowRight, ArrowLeft } from '@element-plus/icons-vue'
+import { Download, UploadFilled, Upload, ArrowRight, ArrowLeft, Location, UserFilled, Document, Setting } from '@element-plus/icons-vue'
 import type { UploadFile, UploadProps } from 'element-plus'
 import * as XLSX from 'xlsx'
 
 const toast = useToast()
 
 // 标签页状态
-const activeTab = ref<'regions' | 'schools' | 'classrooms'>('regions')
+const activeTab = ref<'regions' | 'schools' | 'classrooms' | 'teacher-assignments' | 'position-types'>('regions')
 
 // 区域管理状态
 const regions = ref<Region[]>([])
@@ -1912,6 +2839,7 @@ const schools = ref<School[]>([])
 const schoolPage = ref(1)
 const schoolPageSize = ref(10)
 const schoolTotal = ref(0)
+const schoolRegionFilter = ref<number | ''>('')
 const schoolTypeFilter = ref('')
 const schoolSearchQuery = ref('')
 const showSchoolModal = ref(false)
@@ -1966,7 +2894,7 @@ const classroomSchool = ref<School | null>(null)
 const classrooms = ref<Classroom[]>([])
 const classroomLoading = ref(false)
 const classroomPage = ref(1)
-const classroomPageSize = ref(50)
+const classroomPageSize = ref(10)
 const classroomTotal = ref(0)
 const grades = ref<Grade[]>([])
 const classroomSearchQuery = ref('')
@@ -2109,6 +3037,89 @@ const sourceClassroomFilter = ref<number | ''>('') // 筛选来源班级
 const sourceClassroomStudents = ref<ClassroomMembership[]>([])
 const sourceStudentsLoading = ref(false)
 const selectedStudentIds = ref<Set<number>>(new Set()) // 选中的学生ID集合
+
+// 教师教学任务管理状态
+const teacherAssignments = ref<TeacherTeachingAssignment[]>([])
+const teachers = ref<User[]>([])
+const subjects = ref<Subject[]>([])
+const semesters = ref<Semester[]>([])
+const assignmentPage = ref(1)
+const assignmentSize = ref(10)
+const assignmentTotal = ref(0)
+const assignmentLoading = ref(false)
+const assignmentFilters = ref({
+  region_id: undefined as number | undefined,
+  semester_id: undefined as number | undefined,
+  grade_id: undefined as number | undefined,
+  subject_id: undefined as number | undefined,
+  school_id: undefined as number | undefined,
+  teacher_id: undefined as number | undefined,
+  classroom_id: undefined as number | undefined,
+  is_active: undefined as boolean | undefined,
+})
+const assignmentTotalPages = computed(() => Math.ceil(assignmentTotal.value / assignmentSize.value))
+
+// 教师教学任务对话框状态
+const showAssignmentDialog = ref(false)
+const editingAssignment = ref<TeacherTeachingAssignment | null>(null)
+const assignmentSaving = ref(false)
+const assignmentForm = ref<TeacherTeachingAssignmentCreate>({
+  teacher_id: 0,
+  school_id: 0,
+  grade_id: 0,
+  classroom_id: 0,
+  subject_id: 0,
+  semester_id: 0,
+  academic_year: '',
+  assignment_type: TeachingAssignmentType.SUBJECT_TEACHER,
+  is_active: true,
+})
+
+// 批量导入教学任务状态
+const showAssignmentImportDialog = ref(false)
+const assignmentImportStep = ref(0)
+const selectedAssignmentFile = ref<File | null>(null)
+const assignmentImportUploadRef = ref<any>(null)
+const assignmentImporting = ref(false)
+const assignmentImportForm = ref({
+  updateExisting: false,
+  autoCreateTeachers: false,
+  autoCreateSemesters: false,
+})
+import type { TeacherAssignmentImportResponse } from '@/types/teacher'
+
+const assignmentImportResult = ref<TeacherAssignmentImportResponse>({
+  total: 0,
+  success: 0,
+  failed: 0,
+  created: 0,
+  updated: 0,
+  skipped: 0,
+  errors: [],
+  created_teachers: [],
+  created_semesters: [],
+})
+const availablePositionTypes = ref<TeacherPositionType[]>([])
+
+// 计算属性：过滤后的学校列表（用于教学任务筛选）
+const filteredAssignmentSchools = computed(() => {
+  if (!assignmentFilters.value.region_id) {
+    return schools.value
+  }
+  return schools.value.filter(
+    (s) => s.region_id === assignmentFilters.value.region_id
+  )
+})
+
+// 计算属性：过滤后的班级列表（用于教学任务表单）
+const filteredAssignmentClassrooms = computed(() => {
+  if (!assignmentForm.value.school_id || !assignmentForm.value.grade_id) {
+    return []
+  }
+  return allClassrooms.value.filter(
+    (c) => c.school_id === assignmentForm.value.school_id && c.grade_id === assignmentForm.value.grade_id
+  )
+})
 
 // 计算属性
 const regionTotalPages = computed(() => Math.ceil(regionTotal.value / regionPageSize.value))
@@ -2259,6 +3270,7 @@ async function loadSchools() {
     const response = await adminService.getSchools({
       page: schoolPage.value,
       size: schoolPageSize.value,
+      region_id: schoolRegionFilter.value || undefined,
       school_type: schoolTypeFilter.value || undefined,
       search: schoolSearchQuery.value || undefined
     })
@@ -2271,6 +3283,16 @@ async function loadSchools() {
 }
 
 function searchSchools() {
+  schoolPage.value = 1
+  loadSchools()
+}
+
+function handleSchoolRegionFilterChange() {
+  schoolPage.value = 1
+  loadSchools()
+}
+
+function handleSchoolTypeFilterChange() {
   schoolPage.value = 1
   loadSchools()
 }
@@ -3327,10 +4349,485 @@ async function startDistrictClassroomImport() {
   }
 }
 
+// 教师教学任务管理方法
+function getAssignmentTypeName(type: string): string {
+  return type === 'head_teacher' ? '班主任' : '学科教师'
+}
+
+async function loadTeachers() {
+  try {
+    const response = await adminService.getUsers({ role: 'teacher', size: 1000 })
+    teachers.value = response.users
+  } catch (error: any) {
+    console.error('Failed to load teachers:', error)
+  }
+}
+
+async function loadSubjects() {
+  try {
+    subjects.value = await curriculumService.getSubjects(true)
+  } catch (error: any) {
+    console.error('Failed to load subjects:', error)
+  }
+}
+
+async function loadSemesters() {
+  try {
+    semesters.value = await semesterApi.list()
+  } catch (error: any) {
+    console.error('Failed to load semesters:', error)
+  }
+}
+
+function handleAssignmentRegionChange() {
+  // 当县区改变时，清空学校筛选，因为学校列表会根据县区过滤
+  assignmentFilters.value.school_id = undefined
+  loadTeacherAssignments()
+}
+
+async function loadTeacherAssignments() {
+  assignmentLoading.value = true
+  try {
+    const response = await teacherApi.getAssignments({
+      ...assignmentFilters.value,
+      page: assignmentPage.value,
+      size: assignmentSize.value,
+    })
+    teacherAssignments.value = response.assignments
+    assignmentTotal.value = response.total
+  } catch (error: any) {
+    console.error('Failed to load assignments:', error)
+    ElMessage.error(error.response?.data?.detail || '加载教学任务列表失败')
+  } finally {
+    assignmentLoading.value = false
+  }
+}
+
+function openCreateAssignmentDialog() {
+  editingAssignment.value = null
+  assignmentForm.value = {
+    teacher_id: 0,
+    school_id: 0,
+    grade_id: 0,
+    classroom_id: 0,
+    subject_id: 0,
+    semester_id: 0,
+    academic_year: '',
+    assignment_type: TeachingAssignmentType.SUBJECT_TEACHER,
+    is_active: true,
+  }
+  showAssignmentDialog.value = true
+}
+
+function editTeacherAssignment(assignment: TeacherTeachingAssignment) {
+  editingAssignment.value = assignment
+  assignmentForm.value = {
+    teacher_id: assignment.teacher_id,
+    school_id: assignment.school_id,
+    grade_id: assignment.grade_id,
+    classroom_id: assignment.classroom_id,
+    subject_id: assignment.subject_id,
+    semester_id: assignment.semester_id,
+    academic_year: assignment.academic_year,
+    assignment_type: assignment.assignment_type,
+    is_active: assignment.is_active,
+  }
+  showAssignmentDialog.value = true
+}
+
+function handleAssignmentSchoolChange() {
+  assignmentForm.value.grade_id = 0
+  assignmentForm.value.classroom_id = 0
+}
+
+function handleAssignmentGradeChange() {
+  assignmentForm.value.classroom_id = 0
+}
+
+async function saveTeacherAssignment() {
+  if (!assignmentForm.value.teacher_id || !assignmentForm.value.school_id || !assignmentForm.value.grade_id ||
+      !assignmentForm.value.classroom_id || !assignmentForm.value.subject_id || !assignmentForm.value.semester_id ||
+      !assignmentForm.value.academic_year || !assignmentForm.value.assignment_type) {
+    ElMessage.warning('请填写所有必填字段')
+    return
+  }
+
+  assignmentSaving.value = true
+  try {
+    if (editingAssignment.value) {
+      // 更新
+      const updateData: TeacherTeachingAssignmentUpdate = {
+        teacher_id: assignmentForm.value.teacher_id,
+        school_id: assignmentForm.value.school_id,
+        grade_id: assignmentForm.value.grade_id,
+        classroom_id: assignmentForm.value.classroom_id,
+        subject_id: assignmentForm.value.subject_id,
+        semester_id: assignmentForm.value.semester_id,
+        academic_year: assignmentForm.value.academic_year,
+        assignment_type: assignmentForm.value.assignment_type,
+        is_active: assignmentForm.value.is_active,
+      }
+      await teacherApi.updateAssignment(editingAssignment.value.id, updateData)
+      ElMessage.success('教学任务更新成功')
+    } else {
+      // 创建
+      await teacherApi.createAssignment(assignmentForm.value as TeacherTeachingAssignmentCreate)
+      ElMessage.success('教学任务创建成功')
+    }
+    showAssignmentDialog.value = false
+    editingAssignment.value = null
+    loadTeacherAssignments()
+  } catch (error: any) {
+    console.error('Failed to save assignment:', error)
+    ElMessage.error(error.response?.data?.detail || '保存失败')
+  } finally {
+    assignmentSaving.value = false
+  }
+}
+
+async function deleteTeacherAssignment(assignment: TeacherTeachingAssignment) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除该教学任务吗？`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    await teacherApi.deleteAssignment(assignment.id)
+    ElMessage.success('删除成功')
+    loadTeacherAssignments()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('Failed to delete assignment:', error)
+      ElMessage.error(error.response?.data?.detail || '删除失败')
+    }
+  }
+}
+
+// ==================== 职务类型管理 ====================
+const positionTypes = ref<TeacherPositionType[]>([])
+const positionTypeCategoryFilter = ref('')
+const positionTypeActiveFilter = ref('')
+const positionTypeSearch = ref('')
+const showPositionTypeDialog = ref(false)
+const editingPositionType = ref<TeacherPositionType | null>(null)
+const positionTypeForm = ref<TeacherPositionTypeCreate>({
+  name: '',
+  code: '',
+  description: '',
+  category: '',
+  sort_order: 0,
+  is_active: true,
+})
+const positionTypeSaving = ref(false)
+
+// 加载职务类型列表
+async function loadPositionTypes() {
+  try {
+    const params: any = {}
+    if (positionTypeCategoryFilter.value) {
+      params.category = positionTypeCategoryFilter.value
+    }
+    if (positionTypeActiveFilter.value !== '') {
+      params.is_active = positionTypeActiveFilter.value === 'true'
+    }
+    if (positionTypeSearch.value) {
+      params.search = positionTypeSearch.value
+    }
+    const response = await teacherPositionApi.getPositionTypes(params)
+    positionTypes.value = response.position_types
+  } catch (error: any) {
+    console.error('Failed to load position types:', error)
+    ElMessage.error('加载职务类型列表失败')
+  }
+}
+
+// 打开创建职务类型对话框
+function openCreatePositionTypeDialog() {
+  editingPositionType.value = null
+  positionTypeForm.value = {
+    name: '',
+    code: '',
+    description: '',
+    category: '',
+    sort_order: 0,
+    is_active: true,
+  }
+  showPositionTypeDialog.value = true
+}
+
+// 打开编辑职务类型对话框
+function openEditPositionTypeDialog(positionType: TeacherPositionType) {
+  editingPositionType.value = positionType
+  positionTypeForm.value = {
+    name: positionType.name,
+    code: positionType.code || '',
+    description: positionType.description || '',
+    category: positionType.category || '',
+    sort_order: positionType.sort_order,
+    is_active: positionType.is_active,
+  }
+  showPositionTypeDialog.value = true
+}
+
+// 保存职务类型
+async function savePositionType() {
+  try {
+    positionTypeSaving.value = true
+    if (editingPositionType.value) {
+      // 更新
+      await teacherPositionApi.updatePositionType(
+        editingPositionType.value.id,
+        positionTypeForm.value as TeacherPositionTypeUpdate
+      )
+      ElMessage.success('更新成功')
+    } else {
+      // 创建
+      await teacherPositionApi.createPositionType(positionTypeForm.value)
+      ElMessage.success('创建成功')
+    }
+    showPositionTypeDialog.value = false
+    loadPositionTypes()
+  } catch (error: any) {
+    console.error('Failed to save position type:', error)
+    ElMessage.error(error.response?.data?.detail || '保存失败')
+  } finally {
+    positionTypeSaving.value = false
+  }
+}
+
+// 删除职务类型
+async function handleDeletePositionType(positionType: TeacherPositionType) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除职务类型"${positionType.name}"吗？`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    await teacherPositionApi.deletePositionType(positionType.id)
+    ElMessage.success('删除成功')
+    loadPositionTypes()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('Failed to delete position type:', error)
+      ElMessage.error(error.response?.data?.detail || '删除失败')
+    }
+  }
+}
+
+// 监听标签页切换，加载职务类型列表
+watch(activeTab, (newTab) => {
+  if (newTab === 'position-types') {
+    loadPositionTypes()
+  }
+})
+
+// 批量导入教学任务方法
+// 加载可用职务类型列表（用于导入对话框显示）
+async function loadAvailablePositionTypes() {
+  try {
+    const response = await teacherPositionApi.getPositionTypes({ is_active: true })
+    availablePositionTypes.value = response.position_types
+  } catch (error: any) {
+    console.error('Failed to load available position types:', error)
+    // 不显示错误，静默失败
+  }
+}
+
+function openAssignmentImportDialog() {
+  showAssignmentImportDialog.value = true
+  assignmentImportStep.value = 0
+  selectedAssignmentFile.value = null
+  assignmentImportForm.value = {
+    updateExisting: false,
+    autoCreateTeachers: false,
+    autoCreateSemesters: false,
+  }
+  assignmentImportResult.value = {
+    total: 0,
+    success: 0,
+    failed: 0,
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    errors: [],
+    created_teachers: [],
+    created_semesters: [],
+  }
+  if (assignmentImportUploadRef.value) {
+    assignmentImportUploadRef.value.clearFiles()
+  }
+  // 加载可用职务类型列表
+  loadAvailablePositionTypes()
+}
+
+function closeAssignmentImportDialog() {
+  showAssignmentImportDialog.value = false
+  assignmentImportStep.value = 0
+  selectedAssignmentFile.value = null
+  if (assignmentImportUploadRef.value) {
+    assignmentImportUploadRef.value.clearFiles()
+  }
+  // 刷新教学任务列表
+  loadTeacherAssignments()
+}
+
+function downloadAssignmentTemplate() {
+  // 创建Excel模板数据（使用简化格式）
+  const template = [
+    ['教师姓名*', '学校名称*', '年级级别*', '班级编码*', '学科名称*', '学期编号*', '学年*', '任务类型*', '是否激活'],
+    ['张老师', '开平市第一中学', 7, '701', '语文', 1, '2024-2025', '学科教师', '是'],
+    ['李老师', '开平市第一中学', 7, '701', '数学', 1, '2024-2025', '学科教师', '是'],
+    ['王老师', '开平市第一中学', 7, '701', '英语', 1, '2024-2025', '班主任', '是'],
+  ]
+
+  // 使用xlsx库生成Excel文件
+  const ws = XLSX.utils.aoa_to_sheet(template)
+
+  // 设置列宽
+  const colWidths = [
+    { wch: 15 }, // 教师姓名
+    { wch: 20 }, // 学校名称
+    { wch: 12 }, // 年级级别
+    { wch: 12 }, // 班级编码
+    { wch: 12 }, // 学科名称
+    { wch: 12 }, // 学期编号
+    { wch: 12 }, // 学年
+    { wch: 12 }, // 任务类型
+    { wch: 12 }, // 是否激活
+  ]
+  ws['!cols'] = colWidths
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '教师教学任务')
+  XLSX.writeFile(wb, '教师教学任务导入模板.xlsx')
+  ElMessage.success('模板下载成功')
+  // 下载后不自动进入下一步，让用户自己选择
+}
+
+// 导出新创建的教师账号信息
+function exportCreatedTeachers() {
+  if (!assignmentImportResult.value.created_teachers || assignmentImportResult.value.created_teachers.length === 0) {
+    ElMessage.warning('没有可导出的教师账号信息')
+    return
+  }
+
+  // 创建Excel数据
+  const headers = ['教师姓名', '用户名', '邮箱', '初始密码', '学校名称', '学校编码', '年级名称', '班级编码', '班级名称', 'Excel行号']
+  const data = [
+    headers,
+    ...assignmentImportResult.value.created_teachers.map(teacher => [
+      teacher.teacher_name,
+      teacher.username,
+      teacher.email,
+      teacher.password,
+      teacher.school_name,
+      teacher.school_code,
+      teacher.grade_name || '',
+      teacher.classroom_code || '',
+      teacher.classroom_name || '',
+      teacher.row_number,
+    ])
+  ]
+
+  // 使用xlsx库生成Excel文件
+  const ws = XLSX.utils.aoa_to_sheet(data)
+
+  // 设置列宽
+  const colWidths = [
+    { wch: 12 }, // 教师姓名
+    { wch: 25 }, // 用户名
+    { wch: 30 }, // 邮箱
+    { wch: 15 }, // 初始密码
+    { wch: 20 }, // 学校名称
+    { wch: 15 }, // 学校编码
+    { wch: 12 }, // 年级名称
+    { wch: 12 }, // 班级编码
+    { wch: 15 }, // 班级名称
+    { wch: 10 }, // Excel行号
+  ]
+  ws['!cols'] = colWidths
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '新创建教师账号')
+  XLSX.writeFile(wb, `新创建教师账号_${new Date().toISOString().split('T')[0]}.xlsx`)
+  ElMessage.success('账号信息导出成功')
+}
+
+const handleAssignmentFileChange: UploadProps['onChange'] = (uploadFile) => {
+  selectedAssignmentFile.value = uploadFile.raw || null
+}
+
+const handleAssignmentExceed: UploadProps['onExceed'] = () => {
+  ElMessage.warning('只能上传一个文件')
+}
+
+async function startAssignmentImport() {
+  if (!selectedAssignmentFile.value) {
+    ElMessage.warning('请先选择文件')
+    return
+  }
+
+  assignmentImporting.value = true
+
+  try {
+    const result = await teacherApi.importAssignments(
+      selectedAssignmentFile.value,
+      assignmentImportForm.value.updateExisting,
+      assignmentImportForm.value.autoCreateTeachers,
+      assignmentImportForm.value.autoCreateSemesters
+    )
+
+    assignmentImportResult.value = result
+    assignmentImportStep.value = 3
+
+    if (result.success > 0) {
+      ElMessage.success(`导入完成！成功 ${result.success} 条，失败 ${result.failed} 条`)
+    } else {
+      ElMessage.error(`导入失败：${result.errors.length > 0 ? result.errors[0].message : '未知错误'}`)
+    }
+  } catch (error: any) {
+    console.error('导入失败:', error)
+    ElMessage.error(error.response?.data?.detail || '导入失败')
+  assignmentImportResult.value = {
+    total: 0,
+    success: 0,
+    failed: 1,
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    errors: [{
+      row: 0,
+      field: null,
+      message: error.response?.data?.detail || '导入失败'
+    }],
+    created_teachers: [],
+    created_semesters: [],
+  }
+    assignmentImportStep.value = 3
+  } finally {
+    assignmentImporting.value = false
+  }
+}
+
 // 监听标签页切换，切换到班级成员管理时自动加载
 watch(activeTab, (newTab) => {
   if (newTab === 'classrooms' && allClassrooms.value.length === 0) {
     loadAllClassrooms()
+  }
+  if (newTab === 'teacher-assignments') {
+    // 切换到教师教学任务标签页时，加载必要的数据
+    if (teachers.value.length === 0) loadTeachers()
+    if (subjects.value.length === 0) loadSubjects()
+    if (semesters.value.length === 0) loadSemesters()
+    if (teacherAssignments.value.length === 0) loadTeacherAssignments()
   }
 })
 
@@ -3346,3 +4843,74 @@ onMounted(() => {
 })
 </script>
 
+<style scoped>
+.organization-management {
+  padding: 20px;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.function-card {
+  cursor: pointer;
+  transition: all 0.3s;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.function-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.function-card.active-card {
+  border: 2px solid #409eff;
+}
+
+.function-card :deep(.el-card__body) {
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.card-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: #f5f7fa;
+}
+
+.card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-content h3 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.card-content p {
+  margin: 0;
+  font-size: 14px;
+  color: #909399;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .function-card :deep(.el-card__body) {
+    padding: 16px;
+  }
+
+  .card-icon {
+    width: 48px;
+    height: 48px;
+  }
+}
+</style>
