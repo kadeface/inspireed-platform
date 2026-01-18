@@ -2,66 +2,36 @@
   <div class="space-y-6">
     <!-- 操作栏 -->
     <div class="bg-white rounded-lg shadow p-4">
-      <div class="flex justify-between items-center">
-        <div class="flex gap-4">
-          <button
-            @click="openCreateClassroomModal"
-            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            + 创建班级
-          </button>
-          <button
-            @click="openClassroomImportDialog"
-            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            📥 批量导入班级
-          </button>
-          <button
-            @click="loadAllClassrooms"
-            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-          >
-            🔄 刷新
-          </button>
-        </div>
-        <div class="flex gap-2">
-          <select
-            v-model="allClassroomRegionFilter"
-            @change="handleRegionFilterChange"
-            class="px-3 py-2 border rounded-lg"
-          >
-            <option value="">所有县区</option>
-            <option v-for="region in allRegions" :key="region.id" :value="region.id">
-              {{ region.name }}
-            </option>
-          </select>
-          <select
-            v-model="allClassroomSchoolFilter"
-            @change="loadAllClassrooms"
-            class="px-3 py-2 border rounded-lg"
-          >
-            <option value="">所有学校</option>
-            <option v-for="school in filteredSchoolsForClassroom" :key="school.id" :value="school.id">
-              {{ school.name }}
-            </option>
-          </select>
-          <select
-            v-model="allClassroomGradeFilter"
-            @change="handleGradeFilterChange"
-            class="px-3 py-2 border rounded-lg"
-          >
-            <option value="">所有年级</option>
-            <option v-for="grade in grades" :key="grade.id" :value="grade.id">
-              {{ grade.name }}
-            </option>
-          </select>
-          <input
-            v-model="allClassroomSearchQuery"
-            @keyup.enter="() => { classroomPagination.page = 1; loadAllClassrooms(); }"
-            type="text"
-            placeholder="搜索学校或班级名称..."
-            class="px-3 py-2 border rounded-lg w-64"
-          />
-        </div>
+      <div class="flex items-center gap-3 flex-nowrap overflow-x-auto">
+        <button
+          @click="openCreateClassroomModal"
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap flex-shrink-0"
+        >
+          + 创建班级
+        </button>
+        <button
+          @click="openClassroomImportDialog"
+          class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 whitespace-nowrap flex-shrink-0"
+        >
+          📥 批量导入班级
+        </button>
+        <FilterBar
+          :filters="classroomFilterConfigs"
+          :search-config="classroomSearchConfig"
+          v-model="classroomFilters"
+          v-model:search-model-value="classroomSearchQuery"
+          @filter-change="handleClassroomFilterChange"
+          @search-enter="handleClassroomSearchEnter"
+        >
+          <template #extra>
+            <button
+              @click="loadAllClassrooms"
+              class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 whitespace-nowrap flex-shrink-0"
+            >
+              🔄 刷新
+            </button>
+          </template>
+        </FilterBar>
       </div>
     </div>
 
@@ -376,10 +346,11 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Upload, ArrowRight, UploadFilled } from '@element-plus/icons-vue'
 import { useToast } from '@/composables/useToast'
-import adminService, { type Region, type School, type Classroom, type User } from '@/services/admin'
+import adminService, { type Region, type School, type Classroom, type User, type SchoolType } from '@/services/admin'
 import curriculumService from '@/services/curriculum'
 import { classroomAssistantService } from '@/services/classroomAssistant'
 import type { Grade } from '@/types/curriculum'
+import FilterBar, { type FilterConfig, type SearchConfig } from '@/components/Common/FilterBar.vue'
 import type {
   ClassroomMembership,
   ClassroomMembershipCreate,
@@ -394,19 +365,25 @@ const toast = useToast()
 // ==================== 班级管理状态 ====================
 const allClassrooms = ref<Classroom[]>([])
 const allClassroomsLoading = ref(false)
-const allClassroomSearchQuery = ref('')
-const allClassroomRegionFilter = ref<number | ''>('')
-const allClassroomSchoolFilter = ref<number | ''>('')
-const allClassroomGradeFilter = ref<number | ''>('')
 const allRegions = ref<Region[]>([])
 const schools = ref<School[]>([])
 const grades = ref<Grade[]>([])
+const schoolTypes = ref<SchoolType[]>([])
 const classroomPagination = ref({
   page: 1,
   size: 10,
   total: 0,
   totalPages: 0,
 })
+
+// 筛选状态（使用统一的 filters 对象）
+const classroomFilters = ref({
+  region_id: undefined as number | undefined,
+  school_type: '' as string,
+  school_id: undefined as number | undefined,
+  grade_id: undefined as number | undefined,
+})
+const classroomSearchQuery = ref('')
 
 // 班级CRUD状态
 const showClassroomModal = ref(false)
@@ -498,21 +475,88 @@ const sourceStudentsLoading = ref(false)
 const selectedStudentIds = ref<Set<number>>(new Set())
 
 // ==================== 计算属性 ====================
+// 学校筛选：根据区域、学段和年级筛选
+// 如果选择了年级，只显示有该年级班级的学校
 const filteredSchoolsForClassroom = computed(() => {
-  let filtered = schools.value
-  if (allClassroomRegionFilter.value) {
-    filtered = filtered.filter(school => school.region_id === Number(allClassroomRegionFilter.value))
+  let result = schools.value
+
+  // 先根据区域筛选
+  if (classroomFilters.value.region_id) {
+    result = result.filter(school => school.region_id === classroomFilters.value.region_id)
   }
-  if (allClassroomGradeFilter.value) {
-    const schoolIdsInGrade = new Set(
+
+  // 根据学段筛选（通过 school_type 匹配）
+  if (classroomFilters.value.school_type) {
+    result = result.filter(school => school.school_type === classroomFilters.value.school_type)
+  }
+
+  // 如果选择了年级，只显示有该年级班级的学校
+  if (classroomFilters.value.grade_id) {
+    const schoolIdsWithGrade = new Set(
       allClassrooms.value
-        .filter(c => c.grade_id === Number(allClassroomGradeFilter.value))
+        .filter(c => c.grade_id === classroomFilters.value.grade_id)
         .map(c => c.school_id)
     )
-    filtered = filtered.filter(school => schoolIdsInGrade.has(school.id))
+    result = result.filter(school => schoolIdsWithGrade.has(school.id))
   }
-  return filtered
+
+  return result
 })
+
+// 筛选配置
+const classroomFilterConfigs = computed<FilterConfig[]>(() => [
+  {
+    key: 'region_id',
+    label: '县区',
+    placeholder: '所有县区',
+    options: allRegions.value,
+    type: 'number',
+    style: { width: '120px', minWidth: '110px', maxWidth: '150px' },
+  },
+  {
+    key: 'school_type',
+    label: '学段',
+    placeholder: '所有学段',
+    computedOptions: () => {
+      if (!schoolTypes.value || schoolTypes.value.length === 0) {
+        return []
+      }
+      return schoolTypes.value.map(st => ({
+        id: st.name || '',
+        name: st.name || ''
+      })).filter(opt => opt.name)
+    },
+    valueKey: 'id',
+    labelKey: 'name',
+    type: 'string',
+    style: { width: '110px', minWidth: '100px', maxWidth: '130px' },
+  },
+  {
+    key: 'grade_id',
+    label: '年级',
+    placeholder: '所有年级',
+    options: grades.value,
+    type: 'number',
+    style: { width: '110px', minWidth: '100px', maxWidth: '130px' },
+  },
+  {
+    key: 'school_id',
+    label: '学校',
+    placeholder: '所有学校',
+    computedOptions: () => filteredSchoolsForClassroom.value,
+    dependsOn: 'region_id',
+    type: 'number',
+    style: { width: '160px', minWidth: '140px', maxWidth: '220px' },
+  },
+])
+
+// 搜索配置
+const classroomSearchConfig: SearchConfig = {
+  placeholder: '搜索学校或班级名称...',
+  debounce: false,
+  enterToSearch: true,
+  style: { width: '260px', minWidth: '220px', maxWidth: '300px' },
+}
 
 // ==================== 班级管理方法 ====================
 async function loadAllRegions() {
@@ -524,6 +568,21 @@ async function loadAllRegions() {
   }
 }
 
+async function loadAllSchools() {
+  try {
+    // 根据区域筛选加载学校列表
+    const params: any = { page: 1, size: 1000 }
+    if (classroomFilters.value.region_id) {
+      params.region_id = classroomFilters.value.region_id
+    }
+    const response = await adminService.getSchools(params)
+    schools.value = response.schools
+  } catch (error: any) {
+    console.error('Failed to load schools:', error)
+    toast.error(error.response?.data?.detail || '加载学校列表失败')
+  }
+}
+
 async function loadGradesList() {
   try {
     grades.value = await curriculumService.getGrades(true)
@@ -532,35 +591,61 @@ async function loadGradesList() {
   }
 }
 
+async function loadSchoolTypes() {
+  try {
+    const response = await adminService.getSchoolTypes()
+    schoolTypes.value = response.school_types
+  } catch (error: any) {
+    console.error('Failed to load school types:', error)
+    toast.error(error.response?.data?.detail || '加载学段列表失败')
+  }
+}
+
 async function loadAllClassrooms() {
   try {
     allClassroomsLoading.value = true
+
+    // 确保基础数据已加载
     if (allRegions.value.length === 0) {
       await loadAllRegions()
     }
-    if (schools.value.length === 0) {
-      const allSchoolsResponse = await adminService.getSchools({ page: 1, size: 1000 })
-      schools.value = allSchoolsResponse.schools
+    if (schoolTypes.value.length === 0) {
+      await loadSchoolTypes()
     }
     if (grades.value.length === 0) {
       await loadGradesList()
     }
+
+    // 根据区域筛选加载学校列表
+    await loadAllSchools()
+    
+    // 加载班级列表
     const response = await adminService.getClassrooms({
       page: classroomPagination.value.page,
       size: classroomPagination.value.size,
-      region_id: allClassroomRegionFilter.value ? Number(allClassroomRegionFilter.value) : undefined,
-      school_id: allClassroomSchoolFilter.value ? Number(allClassroomSchoolFilter.value) : undefined,
-      grade_id: allClassroomGradeFilter.value ? Number(allClassroomGradeFilter.value) : undefined,
-      search: allClassroomSearchQuery.value || undefined,
+      region_id: classroomFilters.value.region_id,
+      school_type: classroomFilters.value.school_type,
+      school_id: classroomFilters.value.school_id,
+      grade_id: classroomFilters.value.grade_id,
+      search: classroomSearchQuery.value || undefined,
     })
     allClassrooms.value = response.classrooms
     classroomPagination.value.total = response.total || 0
     classroomPagination.value.totalPages = response.total_pages || 0
+    
+    // 确保返回结果中的学校都在列表中（处理边缘情况）
     const schoolIds = [...new Set(response.classrooms.map(c => c.school_id))]
     const missingSchoolIds = schoolIds.filter(id => !schools.value.find(s => s.id === id))
     if (missingSchoolIds.length > 0) {
-      const allSchoolsResponse = await adminService.getSchools({ page: 1, size: 1000 })
-      schools.value = allSchoolsResponse.schools
+      // 补充缺失的学校信息
+      for (const schoolId of missingSchoolIds) {
+        try {
+          const school = await adminService.getSchool(schoolId)
+          schools.value.push(school)
+        } catch (error) {
+          console.warn(`Failed to load school ${schoolId}:`, error)
+        }
+      }
     }
   } catch (error: any) {
     console.error('Failed to load all classrooms:', error)
@@ -581,14 +666,31 @@ function handleClassroomPageSizeChange(size: number) {
   loadAllClassrooms()
 }
 
-function handleRegionFilterChange() {
-  allClassroomSchoolFilter.value = ''
-  classroomPagination.value.page = 1
-  loadAllClassrooms()
+// 处理筛选变化
+async function handleClassroomFilterChange(key: string, value: any) {
+  if (key === 'region_id') {
+    // 区域改变时，重新加载学校列表（FilterBar 会自动清空 school_id）
+    classroomPagination.value.page = 1
+    await loadAllSchools()
+    await loadAllClassrooms()
+  } else if (key === 'stage_id') {
+    // 学段改变时，重置页码并加载班级列表
+    classroomPagination.value.page = 1
+    loadAllClassrooms()
+  } else if (key === 'grade_id') {
+    // 年级改变时，需要先加载班级列表以获取有该年级的学校，然后更新学校筛选列表
+    classroomPagination.value.page = 1
+    await loadAllClassrooms()
+    // 加载完成后，filteredSchoolsForClassroom 会自动根据新的班级列表更新
+  } else {
+    // 学校筛选改变时，重置页码并加载班级列表
+    classroomPagination.value.page = 1
+    loadAllClassrooms()
+  }
 }
 
-function handleGradeFilterChange() {
-  allClassroomSchoolFilter.value = ''
+// 处理搜索 Enter 键
+function handleClassroomSearchEnter(value: string) {
   classroomPagination.value.page = 1
   loadAllClassrooms()
 }
@@ -1190,6 +1292,7 @@ async function removeMember(member: ClassroomMembership) {
 onMounted(async () => {
   await Promise.all([
     loadAllRegions(),
+    loadSchoolTypes(),
     loadGradesList(),
     loadAllClassrooms(),
   ])

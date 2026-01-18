@@ -24,7 +24,7 @@
 
         <select
           v-model="filters.school_id"
-          @change="loadTeachers"
+          @change="() => loadTeachers()"
           class="px-3 py-2 border rounded-lg"
         >
           <option :value="undefined">所有学校</option>
@@ -42,8 +42,8 @@
         />
 
         <button
-          @click="loadTeachers"
-          class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          @click="() => loadTeachers()"
+          class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 whitespace-nowrap"
         >
           🔄 刷新
         </button>

@@ -43,6 +43,7 @@ export interface User {
   username: string
   email: string
   full_name?: string | null
+  student_id_number?: string | null
   role: string
   is_active: boolean
   created_at: string
@@ -68,6 +69,7 @@ export interface UserListResponse {
 export interface UserCreate {
   username: string
   full_name?: string | null
+  student_id_number?: string | null
   email: string
   password: string
   role: string
@@ -82,6 +84,7 @@ export interface UserUpdate {
   username?: string
   email?: string
   full_name?: string | null
+  student_id_number?: string | null
   role?: string
   is_active?: boolean
   region_id?: number | null
@@ -177,6 +180,15 @@ export interface SchoolListResponse {
   page: number
   size: number
   total_pages: number
+}
+
+export interface SchoolType {
+  name: string
+  school_count: number
+}
+
+export interface SchoolTypeListResponse {
+  school_types: SchoolType[]
 }
 
 export interface SchoolImportError {
@@ -519,6 +531,14 @@ export const adminService = {
   },
 
   /**
+   * 获取所有学校类型（学段）
+   * 从数据库动态获取所有不重复的 school_type 值
+   */
+  async getSchoolTypes(): Promise<SchoolTypeListResponse> {
+    return await api.get('/admin/organization/school-types')
+  },
+
+  /**
    * 批量导入学校
    */
   async importSchools(
@@ -542,6 +562,7 @@ export const adminService = {
     school_id?: number
     grade_id?: number
     region_id?: number
+    school_type?: string
     is_active?: boolean
     search?: string
   } = {}): Promise<ClassroomListResponse> {

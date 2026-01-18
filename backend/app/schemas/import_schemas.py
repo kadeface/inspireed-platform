@@ -14,7 +14,9 @@ class ImportStrategyType(str, Enum):
     SCHOOL = "school"
     CLASSROOM = "classroom"
     STUDENT = "student"
+    STUDENT_ACCOUNT = "student_account"
     TEACHER = "teacher"
+    CITY_EXAM_NUMBER = "city_exam_number"
 
 
 class ImportError(BaseModel):

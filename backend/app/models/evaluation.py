@@ -55,6 +55,13 @@ class ExamStatus(str, Enum):
     CANCELLED = "cancelled"          # 已取消
 
 
+class ExamLevel(str, Enum):
+    """考试级别枚举"""
+    SCHOOL = "school"                # 学校级考试
+    DISTRICT = "district"            # 区县统考
+    CITY = "city"                    # 市级考试
+
+
 class MetricType(str, Enum):
     """指标类型枚举"""
     GROWTH = "growth"                # 成长型指标（增值）
@@ -124,6 +131,12 @@ class Exam(Base):
         nullable=False,
         comment="考试类型"
     )
+    exam_level = Column(
+        String(20),
+        default="school",
+        nullable=False,
+        comment="考试级别：school/district/city"
+    )
     status = Column(
         SQLEnum(ExamStatus, native_enum=False, values_callable=lambda x: [e.value for e in x]),
         default=ExamStatus.DRAFT,
@@ -157,6 +170,7 @@ class Exam(Base):
     exam_subjects = relationship("ExamSubject", back_populates="exam", cascade="all, delete-orphan")
     scores = relationship("Score", back_populates="exam", cascade="all, delete-orphan")
     exam_number_mappings = relationship("ExamNumberMapping", back_populates="exam", cascade="all, delete-orphan")
+    exam_rooms = relationship("ExamRoom", back_populates="exam", cascade="all, delete-orphan")
 
 
 class ExamSubject(Base):

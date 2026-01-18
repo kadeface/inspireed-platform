@@ -398,3 +398,68 @@ export interface ApiResponse<T = any> {
   message: string;
   data?: T;
 }
+
+// ============================================================================
+// 考场安排
+// ============================================================================
+
+export interface ExamRoom {
+  id: number;
+  exam_id: number;
+  name: string;
+  school_id: number;
+  room_id?: number;
+  capacity: number;
+  seat_count: number;
+  exam_number_start?: string;
+  exam_number_end?: string;
+  arrangement_type: 'by_class' | 'mixed';
+  seat_pattern: 'sequential' | 's_shape';
+  students: ExamRoomStudent[];
+  proctors: ExamProctor[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExamRoomStudent {
+  id: number;
+  room_id: number;
+  student_id: number;
+  exam_number: string;
+  seat_number: number;
+  table_number?: number;
+  student_id_number?: string;
+  student_name?: string;
+  school_id?: number;
+  classroom_id?: number;
+  created_at: string;
+}
+
+export interface ExamProctor {
+  id: number;
+  room_id: number;
+  user_id: number;
+  proctor_type: 'primary' | 'assistant';
+  responsibilities?: string[];
+  created_at: string;
+}
+
+export interface AutoAssignRoomsRequest {
+  capacity_per_room: number;
+  arrangement_type: 'by_class' | 'mixed';
+  seat_pattern: 'sequential' | 's_shape';
+  use_existing_rooms: boolean;
+}
+
+export interface AutoAssignProctorsRequest {
+  auto_assign: boolean;
+  avoid_own_class: boolean;
+  same_school_only: boolean;
+}
+
+export interface ProctorAssignmentResponse {
+  message: string;
+  total_proctors: number;
+  rooms_assigned: number;
+}
+

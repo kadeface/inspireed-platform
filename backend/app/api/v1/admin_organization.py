@@ -137,6 +137,19 @@ class SchoolListResponse(BaseModel):
     total_pages: int
 
 
+class SchoolTypeResponse(BaseModel):
+    """学校类型（学段）响应"""
+
+    name: str
+    school_count: int
+
+
+class SchoolTypeListResponse(BaseModel):
+    """学校类型列表响应"""
+
+    school_types: List[SchoolTypeResponse]
+
+
 class ClassroomCreate(BaseModel):
     """创建班级请求"""
 
@@ -528,6 +541,35 @@ async def get_school(
     return SchoolResponse.model_validate(school)
 
 
+@router.get("/school-types", response_model=SchoolTypeListResponse)
+async def get_school_types(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """获取所有学校类型（学段）列表
+
+    从数据库中动态获取所有不重复的 school_type 值，
+    用于班级管理的学段筛选功能。
+    """
+
+    # 查询所有不重复的 school_type 及其学校数量
+    result = await db.execute(
+        select(School.school_type, func.count(School.id).label("count"))
+        .group_by(School.school_type)
+        .order_by(School.school_type)
+    )
+
+    school_types_data = result.all()
+
+    # 构建响应数据
+    school_types = [
+        SchoolTypeResponse(name=row.school_type, school_count=row.count)
+        for row in school_types_data
+    ]
+
+    return SchoolTypeListResponse(school_types=school_types)
+
+
 @router.post("/schools", response_model=SchoolResponse)
 async def create_school(
     school_data: SchoolCreate,
@@ -754,6 +796,7 @@ async def get_classrooms(
     school_id: Optional[int] = Query(None, description="学校筛选"),
     grade_id: Optional[int] = Query(None, description="年级筛选"),
     region_id: Optional[int] = Query(None, description="区域筛选"),
+    school_type: Optional[str] = Query(None, description="学段筛选（小学/初中/高中）"),
     is_active: Optional[bool] = Query(None, description="激活状态筛选"),
     search: Optional[str] = Query(None, description="搜索关键词（支持班级名称、班级编码、学校名称）"),
     db: AsyncSession = Depends(get_db),
@@ -761,8 +804,8 @@ async def get_classrooms(
 ) -> Any:
     """获取班级列表"""
 
-    # 如果需要搜索学校名称或按区域筛选，需要JOIN School表
-    needs_join = search is not None or region_id is not None
+    # 如果需要搜索学校名称或按区域/学段筛选，需要JOIN School表
+    needs_join = search is not None or region_id is not None or school_type is not None
     
     if needs_join:
         # 需要JOIN School表以支持搜索学校名称或区域筛选
@@ -791,6 +834,17 @@ async def get_classrooms(
             needs_join = True  # 标记已JOIN
         query = query.where(School.region_id == region_id)
         count_query = count_query.where(School.region_id == region_id)
+    if school_type is not None:
+        # 通过School表筛选学段
+        if not needs_join:
+            # 如果还没有JOIN，需要JOIN School表
+            query = query.join(School, Classroom.school_id == School.id)
+            count_query = select(func.count(Classroom.id)).select_from(
+                join(Classroom, School, Classroom.school_id == School.id)
+            )
+            needs_join = True  # 标记已JOIN
+        query = query.where(School.school_type == school_type)
+        count_query = count_query.where(School.school_type == school_type)
     if is_active is not None:
         query = query.where(Classroom.is_active == is_active)
         count_query = count_query.where(Classroom.is_active == is_active)

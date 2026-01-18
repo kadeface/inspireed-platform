@@ -14,7 +14,9 @@ from .import_strategies.base_strategy import BaseImportStrategy
 from .import_strategies.school_import_strategy import SchoolImportStrategy
 from .import_strategies.classroom_import_strategy import ClassroomImportStrategy
 from .import_strategies.student_import_strategy import StudentImportStrategy
+from .import_strategies.student_account_import_strategy import StudentAccountImportStrategy
 from .import_strategies.teacher_import_strategy import TeacherImportStrategy
+from .import_strategies.city_exam_number_import_strategy import CityExamNumberImportStrategy
 
 
 logger = logging.getLogger(__name__)
@@ -34,7 +36,9 @@ class ImportOrchestrator:
             "school": SchoolImportStrategy,
             "classroom": ClassroomImportStrategy,
             "student": StudentImportStrategy,
+            "student_account": StudentAccountImportStrategy,
             "teacher": TeacherImportStrategy,
+            "city_exam_number": CityExamNumberImportStrategy,
         }
 
     def get_strategy(self, strategy_type: str) -> BaseImportStrategy:

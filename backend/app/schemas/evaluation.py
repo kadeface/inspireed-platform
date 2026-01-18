@@ -42,6 +42,17 @@ class ExamStatusEnum(str, Enum):
     CANCELLED = "cancelled"       # 已取消
 
 
+class ExamLevelEnum(str, Enum):
+    """考试级别"""
+    SCHOOL = "school"             # 学校级考试
+    DISTRICT = "district"         # 区县统考
+    CITY = "city"                 # 市级考试
+
+
+# 考试级别的字面量类型（用于验证）
+EXAM_LEVEL_VALUES = {"school", "district", "city"}
+
+
 class MetricTypeEnum(str, Enum):
     """指标类型"""
     RATE = "rate"                 # 率指标（优秀率、及格率等）
@@ -122,6 +133,7 @@ class ExamBase(BaseModel):
     """考试基础模型"""
     name: str = Field(..., description="考试名称", max_length=200)
     exam_type: ExamTypeEnum = Field(..., description="考试类型")
+    exam_level: str = Field(default="school", description="考试级别：school/district/city")
     exam_date: datetime = Field(..., description="考试日期")
     semester_id: int = Field(..., description="学期ID")
     grade_id: int = Field(..., description="年级ID")
@@ -129,6 +141,14 @@ class ExamBase(BaseModel):
     school_id: Optional[int] = Field(None, description="学校ID")
     status: ExamStatusEnum = Field(default=ExamStatusEnum.DRAFT, description="考试状态")
     statistics: Optional[Dict[str, Any]] = Field(None, description="考试统计信息（JSON）")
+
+    @field_validator('exam_level')
+    @classmethod
+    def validate_exam_level(cls, v: str) -> str:
+        """验证考试级别"""
+        if v not in EXAM_LEVEL_VALUES:
+            raise ValueError(f"exam_level 必须是以下值之一: {EXAM_LEVEL_VALUES}")
+        return v
 
 
 class ExamCreate(ExamBase):
@@ -140,6 +160,7 @@ class ExamUpdate(BaseModel):
     """更新考试"""
     name: Optional[str] = Field(None, max_length=200)
     exam_type: Optional[ExamTypeEnum] = None
+    exam_level: Optional[ExamLevelEnum] = None
     exam_date: Optional[datetime] = None
     semester_id: Optional[int] = None
     grade_id: Optional[int] = None

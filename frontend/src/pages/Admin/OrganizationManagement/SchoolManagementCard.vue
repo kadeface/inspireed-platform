@@ -22,14 +22,8 @@
           >
             📥 批量导入班级
           </button>
-          <button
-            @click="loadSchools"
-            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-          >
-            🔄 刷新
-          </button>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
           <select v-model="schoolRegionFilter" @change="handleSchoolRegionFilterChange" class="px-3 py-2 border rounded-lg">
             <option value="">所有县区</option>
             <option v-for="region in allRegions" :key="region.id" :value="region.id">
@@ -50,6 +44,12 @@
             placeholder="搜索学校..."
             class="px-3 py-2 border rounded-lg w-64"
           />
+          <button
+            @click="loadSchools"
+            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 whitespace-nowrap"
+          >
+            🔄 刷新
+          </button>
         </div>
       </div>
     </div>

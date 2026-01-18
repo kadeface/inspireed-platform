@@ -21,6 +21,7 @@ from app.api.v1 import (
     curriculum,
     daily_performance,
     evaluations,
+    exam_rooms,
     exams,
     favorites,
     import_tasks,
@@ -136,6 +137,9 @@ api_router.include_router(
 )
 api_router.include_router(
     exams.router, prefix="/exams", tags=["评价-考试管理"]
+)
+api_router.include_router(
+    exam_rooms.router, prefix="/exams/{exam_id}/rooms", tags=["评价-考场安排"]
 )
 api_router.include_router(
     scores.router, prefix="/scores", tags=["评价-成绩查询"]

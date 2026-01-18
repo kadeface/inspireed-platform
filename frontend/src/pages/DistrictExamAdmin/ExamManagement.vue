@@ -60,6 +60,24 @@
           <el-tag>{{ getExamTypeName(row.exam_type) }}</el-tag>
         </template>
       </el-table-column>
+      <el-table-column prop="exam_level" label="级别" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag :type="getExamLevelType(row.exam_level)">
+            {{ getExamLevelName(row.exam_level) }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="region" label="区县/学校" width="150" align="center">
+        <template #default="{ row }">
+          <span v-if="row.exam_level === 'district' || row.exam_level === 'city'">
+            {{ row.region?.name || '-' }}
+          </span>
+          <span v-else-if="row.exam_level === 'school'">
+            {{ row.school?.name || '-' }}
+          </span>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="status" label="状态" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="getStatusType(row.status)">
@@ -73,10 +91,13 @@
         </template>
       </el-table-column>
       <el-table-column prop="description" label="说明" width="350" align="center" show-overflow-tooltip />
-      <el-table-column label="操作" width="200" fixed="right" align="center">
+      <el-table-column label="操作" width="280" fixed="right" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="viewExam(row)">查看</el-button>
           <el-button size="small" type="primary" @click="editExam(row)">编辑</el-button>
+          <el-button size="small" type="success" @click="goToRooms(row)">
+            🏫 考场安排
+          </el-button>
           <el-button size="small" type="danger" @click="deleteExam(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -116,6 +137,55 @@
             <el-option label="模拟考试" value="mock" />
             <el-option label="区县统考" value="district_unified" />
             <el-option label="中考/高考" value="entrance" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="考试级别" prop="exam_level">
+          <el-select v-model="form.exam_level" placeholder="选择级别" @change="onExamLevelChange">
+            <el-option value="school">
+              <span>校级考试</span>
+              <span style="font-size: 12px; color: #999; margin-left: 8px;">使用校级8位考号</span>
+            </el-option>
+            <el-option value="district">
+              <span>区县统考</span>
+              <span style="font-size: 12px; color: #999; margin-left: 8px;">使用区县考号编排</span>
+            </el-option>
+            <el-option value="city">
+              <span>市级考试</span>
+              <span style="font-size: 12px; color: #999; margin-left: 8px;">需要导入市级考号（10位）</span>
+            </el-option>
+          </el-select>
+        </el-form-item>
+
+        <!-- 区县选择（仅区县统考和市级考试显示） -->
+        <el-form-item
+          v-if="form.exam_level === 'district' || form.exam_level === 'city'"
+          label="区县"
+          prop="region_id"
+        >
+          <el-select v-model="form.region_id" placeholder="选择区县" clearable filterable>
+            <el-option
+              v-for="region in regions"
+              :key="region.id"
+              :label="region.name"
+              :value="region.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <!-- 学校选择（仅校级考试显示） -->
+        <el-form-item
+          v-if="form.exam_level === 'school'"
+          label="学校"
+          prop="school_id"
+        >
+          <el-select v-model="form.school_id" placeholder="选择学校" clearable filterable>
+            <el-option
+              v-for="school in schools"
+              :key="school.id"
+              :label="school.name"
+              :value="school.id"
+            />
           </el-select>
         </el-form-item>
 
@@ -172,14 +242,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance } from 'element-plus';
 import { examApi, semesterApi } from '@/services/evaluation';
 import { curriculumService } from '@/services/curriculum';
+import { adminApi } from '@/services/admin';
 import type { Exam, Semester } from '@/types/evaluation';
 import type { Grade } from '@/types/curriculum';
+import type { Region, School } from '@/types/admin';
 
 const router = useRouter();
 
@@ -188,6 +260,8 @@ const loading = ref(false);
 const exams = ref<Exam[]>([]);
 const semesters = ref<Semester[]>([]);
 const grades = ref<Grade[]>([]);
+const regions = ref<Region[]>([]);
+const schools = ref<School[]>([]);
 const showCreateDialog = ref(false);
 const editingExam = ref<Exam | null>(null);
 
@@ -195,6 +269,12 @@ const editingExam = ref<Exam | null>(null);
 const goBack = () => {
   router.push('/district-admin/exams');
 };
+
+// 进入考场管理
+const goToRooms = (exam: Exam) => {
+  router.push(`/district-admin/exam-list/${exam.id}/rooms`);
+};
+
 const submitting = ref(false);
 
 // 筛选条件
@@ -215,20 +295,35 @@ const pagination = reactive({
 const form = reactive({
   name: '',
   exam_type: '',
+  exam_level: 'school',
+  region_id: undefined,
+  school_id: undefined,
   grade_id: undefined,
   semester_id: undefined,
   exam_date: '',
   description: '',
 });
 
-// 表单验证规则
-const formRules = {
-  name: [{ required: true, message: '请输入考试名称', trigger: 'blur' }],
-  exam_type: [{ required: true, message: '请选择考试类型', trigger: 'change' }],
-  semester_id: [{ required: true, message: '请选择学期', trigger: 'change' }],
-  grade_id: [{ required: true, message: '请选择年级', trigger: 'change' }],
-  exam_date: [{ required: true, message: '请选择考试日期', trigger: 'change' }],
-};
+// 表单验证规则（动态计算）
+const formRules = computed(() => {
+  const rules: any = {
+    name: [{ required: true, message: '请输入考试名称', trigger: 'blur' }],
+    exam_type: [{ required: true, message: '请选择考试类型', trigger: 'change' }],
+    exam_level: [{ required: true, message: '请选择考试级别', trigger: 'change' }],
+    semester_id: [{ required: true, message: '请选择学期', trigger: 'change' }],
+    grade_id: [{ required: true, message: '请选择年级', trigger: 'change' }],
+    exam_date: [{ required: true, message: '请选择考试日期', trigger: 'change' }],
+  };
+
+  // 根据考试级别添加区县或学校验证
+  if (form.exam_level === 'district' || form.exam_level === 'city') {
+    rules.region_id = [{ required: true, message: '请选择区县', trigger: 'change' }];
+  } else if (form.exam_level === 'school') {
+    rules.school_id = [{ required: true, message: '请选择学校', trigger: 'change' }];
+  }
+
+  return rules;
+});
 
 const formRef = ref<FormInstance>();
 
@@ -281,6 +376,33 @@ const loadGrades = async () => {
   }
 };
 
+// 加载区县列表
+const loadRegions = async () => {
+  try {
+    const result = await adminApi.getRegions({ size: 100 });
+    regions.value = result.regions || [];
+  } catch (error: any) {
+    ElMessage.error('加载区县列表失败');
+  }
+};
+
+// 加载学校列表
+const loadSchools = async () => {
+  try {
+    const result = await adminApi.getSchools({ size: 1000 });
+    schools.value = result.schools || [];
+  } catch (error: any) {
+    ElMessage.error('加载学校列表失败');
+  }
+};
+
+// 考试级别切换时的处理
+const onExamLevelChange = () => {
+  // 清空区县和学校选择
+  form.region_id = undefined;
+  form.school_id = undefined;
+};
+
 // 重置筛选
 const resetFilters = () => {
   filters.semester_id = undefined;
@@ -301,6 +423,9 @@ const editExam = (exam: Exam) => {
   Object.assign(form, {
     name: exam.name,
     exam_type: exam.exam_type,
+    exam_level: exam.exam_level || 'school',
+    region_id: exam.region_id || undefined,
+    school_id: exam.school_id || undefined,
     grade_id: exam.grade_id,
     semester_id: exam.semester_id,
     exam_date: exam.exam_date.split('T')[0],
@@ -339,24 +464,29 @@ const submitForm = async () => {
 
   submitting.value = true;
   try {
+    const examData: any = {
+      name: form.name,
+      exam_type: form.exam_type as any,
+      exam_level: form.exam_level as any,
+      grade_id: form.grade_id!,
+      semester_id: form.semester_id!,
+      exam_date: form.exam_date + 'T00:00:00', // 转换为完整的 datetime 格式
+    };
+
+    // 根据考试级别添加区县或学校ID
+    if (form.exam_level === 'district' || form.exam_level === 'city') {
+      examData.region_id = form.region_id;
+    } else if (form.exam_level === 'school') {
+      examData.school_id = form.school_id;
+    }
+
     if (editingExam.value) {
       // 更新
-      await examApi.update(editingExam.value.id, {
-        name: form.name,
-        exam_type: form.exam_type as any,
-        grade_id: form.grade_id!,
-        exam_date: form.exam_date + 'T00:00:00', // 转换为完整的 datetime 格式
-      });
+      await examApi.update(editingExam.value.id, examData);
       ElMessage.success('更新成功');
     } else {
       // 创建
-      await examApi.create({
-        name: form.name,
-        exam_type: form.exam_type as any,
-        grade_id: form.grade_id!,
-        semester_id: form.semester_id!,
-        exam_date: form.exam_date + 'T00:00:00', // 转换为完整的 datetime 格式
-      });
+      await examApi.create(examData);
       ElMessage.success('创建成功');
     }
 
@@ -386,6 +516,9 @@ const resetForm = () => {
   Object.assign(form, {
     name: '',
     exam_type: '',
+    exam_level: 'school',
+    region_id: undefined,
+    school_id: undefined,
     grade_id: undefined,
     semester_id: undefined,
     exam_date: '',
@@ -432,10 +565,32 @@ const getStatusType = (status: string) => {
   return typeMap[status] || '';
 };
 
+// 获取考试级别名称
+const getExamLevelName = (level: string) => {
+  const levelMap: Record<string, string> = {
+    school: '校级',
+    district: '区县',
+    city: '市级',
+  };
+  return levelMap[level] || level;
+};
+
+// 获取考试级别标签类型
+const getExamLevelType = (level: string) => {
+  const typeMap: Record<string, any> = {
+    school: 'info',
+    district: 'warning',
+    city: 'success',
+  };
+  return typeMap[level] || '';
+};
+
 // 组件挂载
 onMounted(() => {
   loadGrades();
   loadSemesters();
+  loadRegions();
+  loadSchools();
   loadExams();
 });
 </script>

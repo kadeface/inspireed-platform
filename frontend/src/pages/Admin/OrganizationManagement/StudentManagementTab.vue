@@ -35,7 +35,7 @@
 
         <select
           v-model="filters.grade_id"
-          @change="loadStudents"
+          @change="() => loadStudents()"
           class="px-3 py-2 border rounded-lg"
         >
           <option :value="undefined">所有年级</option>
@@ -46,7 +46,7 @@
 
         <select
           v-model="filters.classroom_id"
-          @change="loadStudents"
+          @change="() => loadStudents()"
           class="px-3 py-2 border rounded-lg"
         >
           <option :value="undefined">所有班级</option>
@@ -63,13 +63,6 @@
           class="px-3 py-2 border rounded-lg w-64"
         />
 
-        <button
-          @click="loadStudents"
-          class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-        >
-          🔄 刷新
-        </button>
-
         <div class="ml-auto flex gap-2">
           <button
             @click="openCreateStudentModal"
@@ -82,6 +75,12 @@
             class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             📥 批量导入
+          </button>
+          <button
+            @click="() => loadStudents()"
+            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 whitespace-nowrap"
+          >
+            🔄 刷新
           </button>
         </div>
       </div>
@@ -270,7 +269,15 @@
           :closable="false"
           show-icon
         >
-          <p>请按照模板格式填写学生信息。支持导入的字段：学号、姓名、学籍号、邮箱、所属学校、年级、班级。</p>
+          <p>请按照模板格式填写学生信息。支持导入的字段：学号、姓名、学籍号、邮箱、学校名称、学校代码、年级级别、班级编号。</p>
+          <p class="mt-2 text-sm text-gray-600">
+            <strong>注意：</strong>
+            <br>- 学校名称*：学生所属学校（必填）
+            <br>- 学校代码：学校编码（可选，用于辅助验证）
+            <br>- 年级级别使用数字（1-12），如：7表示七年级，10表示高一
+            <br>- 班级编号格式：年级+班级序号，如：701表示七年级1班，1001表示高一1班
+            <br>- 学生必须指定学籍号，作为唯一标识
+          </p>
         </el-alert>
 
         <el-button type="primary" @click="downloadTemplate">
@@ -299,11 +306,14 @@
         <div v-if="importPreview.length > 0" class="border rounded p-4">
           <h4 class="font-medium mb-2">导入预览（共 {{ importPreview.length }} 条）</h4>
           <el-table :data="importPreview" max-height="300" size="small">
-            <el-table-column prop="username" label="学号" width="120" />
-            <el-table-column prop="full_name" label="姓名" width="120" />
-            <el-table-column prop="student_id_number" label="学籍号" width="150" />
-            <el-table-column prop="email" label="邮箱" width="180" />
-            <el-table-column prop="classroom_name" label="所属班级" />
+            <el-table-column prop="学号*" label="学号" width="120" />
+            <el-table-column prop="姓名*" label="姓名" width="100" />
+            <el-table-column prop="学籍号*" label="学籍号" width="150" />
+            <el-table-column prop="邮箱" label="邮箱" width="150" />
+            <el-table-column prop="学校名称*" label="学校名称" width="120" />
+            <el-table-column prop="学校代码" label="学校代码" width="100" />
+            <el-table-column prop="年级级别*" label="年级" width="80" />
+            <el-table-column prop="班级编号*" label="班级编号" width="100" />
           </el-table>
         </div>
       </div>
@@ -638,60 +648,153 @@ const openImportDialog = () => {
 
 const downloadTemplate = () => {
   const template = [
-    ['学号*', '姓名*', '学籍号', '邮箱*', '所属学校*', '年级*', '班级*'],
-    ['S001', '张同学', '123456789012345678', 'zhang@example.com', '示例学校', '七年级', '七年级1班'],
-    ['S002', '李同学', '987654321098765432', 'li@example.com', '示例学校', '七年级', '七年级2班']
+    ['学号*', '姓名*', '学籍号*', '邮箱', '学校名称*', '学校代码', '年级级别*', '班级编号*'],
+    ['2024100001', '张三', '123456789012345678', 'zhang@example.com', '示例学校', '10001', 7, '701'],
+    ['2024100002', '李四', '987654321098765432', 'li@example.com', '示例学校', '10001', 7, '702'],
+    ['2024100003', '王五', '111111111111111111', 'wang@example.com', '示例学校', '10001', 10, '1001']
   ]
+
   const ws = XLSX.utils.aoa_to_sheet(template)
+  // 设置列宽
+  const colWidths = [
+    { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+    { wch: 12 }, { wch: 12 }, { wch: 12 }
+  ]
+  ws['!cols'] = colWidths
+
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '学生导入模板')
   XLSX.writeFile(wb, '学生导入模板.xlsx')
+  ElMessage.success('模板下载成功')
 }
 
 const handleFileChange = (file: UploadFile) => {
-  importFile.value = file.raw as File
+  console.log('📁 [学生导入] 文件变更事件触发:', file)
+
+  // 获取文件对象（兼容不同版本的 Element Plus）
+  let rawFile: File | null = null
+
+  if (file.raw) {
+    rawFile = file.raw as File
+  } else if (file instanceof File) {
+    rawFile = file
+  } else {
+    console.error('❌ [学生导入] 无法获取文件对象:', file)
+    ElMessage.error('文件获取失败，请重试')
+    return
+  }
+
+  console.log('✅ [学生导入] 获取到文件:', rawFile.name, rawFile.size, rawFile.type)
+
+  importFile.value = rawFile
+
+  // 读取文件预览
   const reader = new FileReader()
   reader.onload = (e) => {
-    const data = new Uint8Array(e.target?.result as ArrayBuffer)
-    const workbook = XLSX.read(data, { type: 'array' })
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-    const json = XLSX.utils.sheet_to_json(worksheet) as any[]
-    importPreview.value = json
+    try {
+      const data = new Uint8Array(e.target?.result as ArrayBuffer)
+      const workbook = XLSX.read(data, { type: 'array' })
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const json = XLSX.utils.sheet_to_json(worksheet) as any[]
+      importPreview.value = json
+      console.log('📊 [学生导入] 解析成功，共', json.length, '条数据')
+    } catch (error) {
+      console.error('❌ [学生导入] 文件解析失败:', error)
+      ElMessage.error('文件解析失败，请检查文件格式')
+    }
   }
-  reader.readAsArrayBuffer(file.raw as File)
+  reader.readAsArrayBuffer(rawFile)
 }
 
 const startImport = async () => {
+  console.log('🚀 [学生导入] 开始导入，当前文件状态:', importFile.value)
+
   if (!importFile.value) {
+    console.error('❌ [学生导入] 文件对象为空')
     ElMessage.warning('请选择文件')
     return
   }
 
+  console.log('✅ [学生导入] 文件已选择:', importFile.value.name, importFile.value.size)
+
   importing.value = true
   try {
-    // 调用批量导入API
-    const users = importPreview.value.map(row => {
-      // 查找对应的班级ID
-      const classroom = allClassrooms.value.find(c => c.name === row['班级*'])
-      return {
-        username: row['学号*'],
-        full_name: row['姓名*'],
-        student_id_number: row['学籍号'],
-        email: row['邮箱*'],
-        password: '123456', // 默认密码
-        role: 'student' as const,
-        is_active: true,
-        school_id: classroom?.school_id,
-        grade_id: classroom?.grade_id,
-        classroom_id: classroom?.id
+    // 获取正确的API基础URL
+    const hostname = window.location.hostname
+    const protocol = window.location.protocol
+    let apiBaseUrl = '/api/v1'
+
+    // 检测 CloudStudio 环境
+    if (hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) {
+      if (hostname.includes('--')) {
+        const backendHostname = hostname.replace(/--\d+/, '--8000')
+        apiBaseUrl = `https://${backendHostname}/api/v1`
+      } else {
+        apiBaseUrl = `${protocol}//${hostname}:8000/api/v1`
       }
+    } else if (import.meta.env.VITE_API_BASE_URL) {
+      // 使用环境变量（如果配置了）
+      apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+    } else {
+      // 本地开发环境
+      apiBaseUrl = `${protocol}//${hostname}:8000/api/v1`
+    }
+
+    console.log('🚀 [学生导入] API基础地址:', apiBaseUrl)
+
+    // 调用统一导入API
+    const token = localStorage.getItem('access_token')
+
+    // 创建FormData（只包含文件）
+    const formData = new FormData()
+    formData.append('file', importFile.value)
+
+    // 构建URL（strategy_type 作为查询参数）
+    const url = new URL(`${apiBaseUrl}/import`)
+    url.searchParams.append('strategy_type', 'student_account')
+    url.searchParams.append('update_existing', 'false')
+
+    console.log('📤 [学生导入] 请求URL:', url.toString())
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+        // 不要设置 Content-Type，让浏览器自动设置 multipart/form-data
+      },
+      body: formData
     })
 
-    const result = await adminService.batchImportUsers(users)
-    ElMessage.success(`成功导入 ${result.success_count} 位学生`)
+    console.log('📥 [学生导入] 响应状态:', response.status)
+
+    if (!response.ok) {
+      let errorMessage = '导入失败'
+      try {
+        const error = await response.json()
+        errorMessage = error.detail || error.message || errorMessage
+      } catch (e) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText}`
+      }
+      throw new Error(errorMessage)
+    }
+
+    const result = await response.json()
+    console.log('✅ [学生导入] 导入结果:', result)
+
+    // 显示导入结果
+    if (result.failed > 0) {
+      ElMessage.warning(
+        `导入完成：成功 ${result.success} 条，失败 ${result.failed} 条` +
+        (result.errors?.length > 0 ? `\n错误：${result.errors[0].message}` : '')
+      )
+    } else {
+      ElMessage.success(`成功导入 ${result.success} 位学生`)
+    }
+
     showImportDialog.value = false
     loadStudents()
   } catch (error: any) {
+    console.error('❌ [学生导入] 错误:', error)
     ElMessage.error(error.message || '导入失败')
   } finally {
     importing.value = false

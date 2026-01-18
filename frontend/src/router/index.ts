@@ -228,17 +228,14 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/Admin/OrganizationManagement.vue'),
     meta: { requiresAuth: true, role: 'admin', title: '组织管理 - InspireEd' },
   },
-  // 增值评价系统 - 区县考试管理员
+  // 考试管理与增值评价系统 - 区县考试管理员
+
+  // === 考试管理（操作环节） ===
   {
-    path: '/district-admin',
-    name: 'DistrictAdmin',
-    redirect: '/district-admin/exams',
-  },
-  {
-    path: '/district-admin/exams',
-    name: 'DistrictExamManagement',
+    path: '/district-admin/exam-management',
+    name: 'DistrictExamManagementPage',
     component: () => import('../pages/DistrictExamAdmin/Dashboard.vue'),
-    meta: { requiresAuth: true, role: 'district_admin', title: '增值评价管理 - InspireEd' },
+    meta: { requiresAuth: true, role: 'district_admin', title: '考试管理 - InspireEd' },
   },
   {
     path: '/district-admin/semesters',
@@ -247,10 +244,16 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'district_admin', title: '学期管理 - InspireEd' },
   },
   {
-    path: '/district-admin/exam-management',
-    name: 'DistrictExamManagementPage',
+    path: '/district-admin/exam-list',
+    name: 'DistrictExamList',
     component: () => import('../pages/DistrictExamAdmin/ExamManagement.vue'),
-    meta: { requiresAuth: true, role: 'district_admin', title: '考试管理 - InspireEd' },
+    meta: { requiresAuth: true, role: 'district_admin', title: '考试列表 - InspireEd' },
+  },
+  {
+    path: '/district-admin/exam-list/:examId/rooms',
+    name: 'DistrictExamRoomManagement',
+    component: () => import('../pages/DistrictExamAdmin/ExamRoomManagement.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '考场管理 - InspireEd' },
   },
   {
     path: '/district-admin/student-import',
@@ -263,6 +266,14 @@ const routes: RouteRecordRaw[] = [
     name: 'DistrictScoreImport',
     component: () => import('../pages/DistrictExamAdmin/ScoreImport.vue'),
     meta: { requiresAuth: true, role: 'district_admin', title: '导入成绩 - InspireEd' },
+  },
+
+  // === 增值评价（分析环节） ===
+  {
+    path: '/district-admin/value-added',
+    name: 'ValueAddedEvaluation',
+    component: () => import('../pages/DistrictExamAdmin/ValueAddedEvaluation.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '增值评价 - InspireEd' },
   },
   {
     path: '/district-admin/evaluation-report',
