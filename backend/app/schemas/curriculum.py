@@ -35,6 +35,21 @@ class SubjectToggle(BaseModel):
     is_active: bool
 
 
+class SubjectCreate(SubjectBase):
+    """创建学科模型"""
+
+    pass
+
+
+class SubjectUpdate(BaseModel):
+    """更新学科模型"""
+
+    name: Optional[str] = Field(None, max_length=100, description="学科名称")
+    code: Optional[str] = Field(None, max_length=50, description="学科代码")
+    description: Optional[str] = Field(None, description="学科描述")
+    display_order: Optional[int] = Field(None, description="显示顺序")
+
+
 # Grade Schemas
 class GradeBase(BaseModel):
     """年级基础模型"""
@@ -59,6 +74,19 @@ class GradeToggle(BaseModel):
     """年级启用/禁用模型"""
 
     is_active: bool
+
+
+class GradeCreate(GradeBase):
+    """创建年级模型"""
+
+    pass
+
+
+class GradeUpdate(BaseModel):
+    """更新年级模型"""
+
+    name: Optional[str] = Field(None, max_length=50, description="年级名称")
+    level: Optional[int] = Field(None, ge=0, le=99, description="年级级别")
 
 
 # Course Schemas

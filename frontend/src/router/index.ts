@@ -290,6 +290,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/DistrictExamAdmin/SemesterPerformance.vue'),
     meta: { requiresAuth: true, role: 'district_admin', title: '学期表现 - InspireEd' },
   },
+  {
+    path: '/district-admin/exam-subject-config',
+    name: 'DistrictExamSubjectConfig',
+    component: () => import('../pages/DistrictExamAdmin/ExamSubjectConfig.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '考试科目配置 - InspireEd' },
+  },
 ]
 
 const router = createRouter({

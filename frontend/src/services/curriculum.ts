@@ -19,7 +19,7 @@ import type {
 
 export const curriculumService = {
   // ==================== Subject APIs ====================
-  
+
   /**
    * 获取学科列表
    */
@@ -27,6 +27,40 @@ export const curriculumService = {
     return await api.get('/curriculum/subjects', {
       params: { include_inactive: includeInactive }
     })
+  },
+
+  /**
+   * 创建学科
+   */
+  async createSubject(data: {
+    name: string
+    code: string
+    description?: string
+    display_order?: number
+  }): Promise<Subject> {
+    return await api.post('/curriculum/subjects', data)
+  },
+
+  /**
+   * 更新学科
+   */
+  async updateSubject(
+    subjectId: number,
+    data: {
+      name?: string
+      code?: string
+      description?: string
+      display_order?: number
+    }
+  ): Promise<Subject> {
+    return await api.put(`/curriculum/subjects/${subjectId}`, data)
+  },
+
+  /**
+   * 删除学科
+   */
+  async deleteSubject(subjectId: number): Promise<void> {
+    return await api.delete(`/curriculum/subjects/${subjectId}`)
   },
 
   /**
@@ -39,7 +73,7 @@ export const curriculumService = {
   },
 
   // ==================== Grade APIs ====================
-  
+
   /**
    * 获取年级列表
    */
@@ -47,6 +81,36 @@ export const curriculumService = {
     return await api.get('/curriculum/grades', {
       params: { include_inactive: includeInactive }
     })
+  },
+
+  /**
+   * 创建年级
+   */
+  async createGrade(data: {
+    name: string
+    level: number
+  }): Promise<Grade> {
+    return await api.post('/curriculum/grades', data)
+  },
+
+  /**
+   * 更新年级
+   */
+  async updateGrade(
+    gradeId: number,
+    data: {
+      name?: string
+      level?: number
+    }
+  ): Promise<Grade> {
+    return await api.put(`/curriculum/grades/${gradeId}`, data)
+  },
+
+  /**
+   * 删除年级
+   */
+  async deleteGrade(gradeId: number): Promise<void> {
+    return await api.delete(`/curriculum/grades/${gradeId}`)
   },
 
   /**

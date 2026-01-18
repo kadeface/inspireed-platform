@@ -256,6 +256,24 @@
         </el-card>
       </el-col>
 
+      <!-- 科目配置 -->
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <el-card class="function-card" shadow="hover" @click="goToExamSubjectConfig">
+          <div class="card-icon">
+            <el-icon :size="40" color="#67c23a">
+              <component :is="'Setting'" />
+            </el-icon>
+          </div>
+          <div class="card-content">
+            <h3>科目配置</h3>
+            <p>配置考试科目及分数</p>
+            <div class="card-stats">
+              <span>年级科目设置</span>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+
       <!-- 评价报告 -->
       <el-col :xs="24" :sm="12" :md="8" :lg="6">
         <el-card class="function-card" shadow="hover" @click="openEvaluationDialog">
@@ -269,24 +287,6 @@
             <p>生成增值评价报告</p>
             <div class="card-stats">
               <span>{{ evaluations.length }} 个评价</span>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-
-      <!-- 学期表现 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="function-card" shadow="hover" @click="openPerformanceDialog">
-          <div class="card-icon">
-            <el-icon :size="40" color="#909399">
-              <component :is="'TrendCharts'" />
-            </el-icon>
-          </div>
-          <div class="card-content">
-            <h3>学期表现</h3>
-            <p>查看学期统计</p>
-            <div class="card-stats">
-              <span>数据分析</span>
             </div>
           </div>
         </el-card>
@@ -2553,6 +2553,10 @@ const openEvaluationDialog = () => {
 
 const openPerformanceDialog = () => {
   router.push('/district-admin/semester-performance');
+};
+
+const goToExamSubjectConfig = () => {
+  router.push('/district-admin/exam-subject-config');
 };
 
 const viewImportTasks = () => {

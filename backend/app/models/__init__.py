@@ -7,6 +7,7 @@ from app.models.lesson import Lesson, LessonStatus, DifficultyLevel, LessonClass
 from app.models.cell import Cell, CellType, CognitiveLevel
 from app.models.logs import ExecutionLog, QARecord, ExecutionStatus
 from app.models.curriculum import Subject, Grade, Course, Chapter, Resource
+from app.models.exam_subjects import GradeSubjectConfig
 from app.models.organization import Region, School, Classroom
 from app.models.room import Room
 from app.models.library_asset import LibraryAsset, LibraryAssetVersion
@@ -107,6 +108,7 @@ __all__ = [
     "Course",
     "Chapter",
     "Resource",
+    "GradeSubjectConfig",
     "LibraryAsset",
     "LibraryAssetVersion",
     "Region",
