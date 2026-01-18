@@ -231,13 +231,16 @@ class ExamNumberMapping(Base):
 
 
 class Score(Base):
-    """成绩表（窄字段设计）"""
+    """成绩表（双键冗余设计）"""
     __tablename__ = "scores"
 
     id = Column(Integer, primary_key=True, index=True)
     exam_id = Column(Integer, ForeignKey("exams.id", ondelete="CASCADE"), nullable=False)
     subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=False)
-    student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # 双键设计：临时ID + 永久学籍号
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="学生ID（临时关联）")
+    student_id_number = Column(String(50), nullable=False, comment="学籍号/身份证号（永久关联）")
 
     # 原始分
     raw_score = Column(Integer, nullable=False, comment="原始分")
@@ -267,8 +270,13 @@ class Score(Base):
     # 约束和索引
     __table_args__ = (
         UniqueConstraint('exam_id', 'subject_id', 'student_id', name='uq_exam_subject_student'),
+        # 原有索引
         Index('idx_exam_subject_score', 'exam_id', 'subject_id'),
         Index('idx_student_scores', 'student_id'),
+        # 新增索引
+        Index('idx_scores_student_id_number', 'student_id_number'),
+        Index('idx_scores_exam_student_number', 'exam_id', 'student_id_number'),
+        Index('idx_scores_student_subject_number', 'student_id_number', 'subject_id'),
     )
 
 

@@ -269,6 +269,7 @@ class ExcelImportService:
             "exam_id": exam_id,
             "subject_id": exam_subject.subject_id,  # 使用ExamSubject中的subject_id
             "student_id": student.id,
+            "student_id_number": student.student_id_number,  # 冗余字段，确保永久关联
             "raw_score": record["raw_score"],
             "is_absent": record["is_absent"],
             "is_cheated": record["is_cheated"],

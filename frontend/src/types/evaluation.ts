@@ -159,6 +159,7 @@ export interface Score {
   exam_id: number;
   subject_id: number;
   student_id: number;
+  student_id_number: string;  // 冗余字段，确保永久关联
   raw_score: number;
   standard_score?: number;
   percentile?: number;

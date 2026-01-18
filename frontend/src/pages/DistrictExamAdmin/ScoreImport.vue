@@ -5,69 +5,210 @@
       <el-button @click="goBack">返回</el-button>
     </div>
 
-    <!-- 导入流程 -->
-    <el-row :gutter="20">
-      <!-- 左侧：上传区域 -->
-      <el-col :span="14">
-        <el-card class="upload-section">
-          <template #header>
-            <div class="card-header">
-              <span>📤 上传成绩单</span>
-            </div>
-          </template>
+    <!-- 步骤条 -->
+    <div class="steps-container">
+      <el-steps :active="currentStep" finish-status="success" align-center>
+        <el-step title="选择考试" />
+        <el-step title="下载模板" />
+        <el-step title="准备数据" />
+        <el-step title="上传文件" />
+        <el-step title="确认导入" />
+      </el-steps>
+    </div>
 
-          <!-- 选择考试 -->
-          <el-form :model="importForm" label-width="100px" style="margin-bottom: 20px;">
-            <el-form-item label="选择考试" required>
-              <el-select
-                v-model="importForm.exam_id"
-                placeholder="请选择考试"
-                style="width: 100%;"
-                @change="loadExamSubjects"
+    <!-- 主内容区域：导入流程 -->
+    <el-row>
+      <el-col :span="24">
+        <!-- 步骤0: 选择考试 -->
+        <div v-if="currentStep === 0" class="step-content">
+          <el-card class="exam-select-card">
+            <template #header>
+              <div class="card-header">
+                <span>📋 第零步：选择考试</span>
+              </div>
+            </template>
+
+            <div class="exam-select-content">
+              <p class="step-description">请先选择要导入成绩的考试，系统会根据考试信息生成对应的导入模板。</p>
+
+              <el-form :model="importForm" label-width="100px" style="margin-top: 20px;">
+                <el-form-item label="选择考试" required>
+                  <el-select
+                    v-model="importForm.exam_id"
+                    placeholder="请选择考试"
+                    style="width: 100%;"
+                    @change="loadExamSubjects"
+                  >
+                    <el-option
+                      v-for="exam in exams"
+                      :key="exam.id"
+                      :label="`${exam.name} (${exam.exam_date.split('T')[0]})`"
+                      :value="exam.id"
+                    />
+                  </el-select>
+                </el-form-item>
+              </el-form>
+
+              <el-alert
+                v-if="importForm.exam_id && subjects.length > 0"
+                title="考试科目信息"
+                type="info"
+                :closable="false"
+                style="margin-top: 20px;"
               >
-                <el-option
-                  v-for="exam in exams"
-                  :key="exam.id"
-                  :label="`${exam.name} (${exam.exam_date.split('T')[0]})`"
-                  :value="exam.id"
-                />
-              </el-select>
-            </el-form-item>
-            
-            <el-alert
-              v-if="importForm.exam_id && subjects.length > 0"
-              type="info"
-              :closable="false"
-              style="margin-bottom: 20px;"
-            >
-              <template #title>
-                <span>该考试包含以下科目：{{ subjects.map(s => s.subject_name || `科目ID:${s.subject_id}`).join('、') }}</span>
-              </template>
-              <template #default>
-                <p style="margin: 8px 0 0 0; font-size: 12px;">
-                  成绩Excel中的科目列必须与上述科目名称完全匹配，不存在的科目将提示错误。
-                </p>
-              </template>
-            </el-alert>
-          </el-form>
+                <template #default>
+                  <p style="margin: 8px 0;">
+                    <strong>该考试包含以下科目：</strong>{{ subjects.map(s => s.subject_name || `科目ID:${s.subject_id}`).join('、') }}
+                  </p>
+                  <p style="margin: 8px 0; font-size: 12px; color: #909399;">
+                    注意：成绩Excel中的科目列必须与上述科目名称完全匹配，不存在的科目将提示错误。
+                  </p>
+                </template>
+              </el-alert>
 
-          <!-- 上传区域 -->
-          <div v-if="importForm.exam_id">
-            <el-divider />
+              <div class="step-actions">
+                <el-button
+                  type="primary"
+                  size="large"
+                  @click="currentStep = 1"
+                  :disabled="!importForm.exam_id"
+                >
+                  下一步：下载模板
+                  <el-icon style="margin-left: 8px;"><ArrowRight /></el-icon>
+                </el-button>
+              </div>
+            </div>
+          </el-card>
+        </div>
 
-            <div class="template-download">
-              <h4>📥 第一步：下载Excel模板</h4>
-              <p>请先下载成绩导入模板，按照模板格式填写成绩数据。</p>
-              <el-button type="primary" @click="downloadTemplate">
+        <!-- 步骤1: 下载模板 -->
+        <div v-if="currentStep === 1" class="step-content">
+          <el-card class="template-card">
+            <template #header>
+              <div class="card-header">
+                <span>📥 第一步：下载Excel模板</span>
+              </div>
+            </template>
+
+            <div class="template-info">
+              <h3>Excel导入模板说明</h3>
+              <p>请先下载Excel模板文件，按照模板格式填写成绩数据后再上传。</p>
+
+              <el-table :data="templateFields" border style="width: 100%; margin-top: 20px;">
+                <el-table-column prop="field" label="字段名" width="120" />
+                <el-table-column prop="required" label="是否必填" width="100" />
+                <el-table-column prop="description" label="说明" />
+                <el-table-column prop="example" label="示例" width="150" />
+              </el-table>
+
+              <el-alert
+                v-if="importForm.exam_id && subjects.length > 0"
+                title="当前考试科目"
+                type="info"
+                :closable="false"
+                style="margin-top: 20px;"
+              >
+                <template #default>
+                  <p style="margin: 8px 0;">
+                    <strong>该考试包含以下科目：</strong>{{ subjects.map(s => s.subject_name || `科目ID:${s.subject_id}`).join('、') }}
+                  </p>
+                  <p style="margin: 8px 0; font-size: 12px; color: #909399;">
+                    Excel中的"科目"列必须是上述科目名称之一。
+                  </p>
+                </template>
+              </el-alert>
+            </div>
+
+            <div class="step-actions">
+              <el-button size="large" @click="currentStep = 0">
+                <el-icon><ArrowLeft /></el-icon>
+                <span style="margin-left: 8px;">上一步</span>
+              </el-button>
+              <el-button type="primary" size="large" @click="downloadTemplate">
                 <el-icon><Download /></el-icon>
                 <span style="margin-left: 8px;">下载Excel模板</span>
               </el-button>
+              <el-button type="success" size="large" @click="currentStep = 2">
+                已下载模板，下一步
+                <el-icon style="margin-left: 8px;"><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+          </el-card>
+        </div>
+
+        <!-- 步骤2: 准备数据 -->
+        <div v-if="currentStep === 2" class="step-content">
+          <el-card class="data-prep-card">
+            <template #header>
+              <div class="card-header">
+                <span>📝 第二步：准备数据</span>
+              </div>
+            </template>
+
+            <div class="prep-info">
+              <el-alert
+                title="数据准备注意事项"
+                type="warning"
+                :closable="false"
+                style="margin-bottom: 20px;"
+              >
+                <ul>
+                  <li>请按照模板格式填写数据，<strong>不要修改列名</strong></li>
+                  <li>所有带 <code>*</code> 的字段都是必填项</li>
+                  <li><strong>考号</strong>必须是在系统中已分配的考号</li>
+                  <li><strong>学籍号</strong>必须与系统中的学生学籍号一致</li>
+                  <li><strong>科目名称</strong>必须与考试包含的科目名称完全匹配</li>
+                  <li>原始分必须是数字，不能为空（缺考标记为0）</li>
+                  <li>同一学生在同一科目只能有一条成绩记录</li>
+                  <li>建议单次导入不超过 <strong>1000条</strong> 记录</li>
+                </ul>
+              </el-alert>
+
+              <el-descriptions title="数据格式示例" :column="1" border style="margin-top: 20px;">
+                <el-descriptions-item label="考号">
+                  <code>202401001</code> - 必须是该考试已分配的考号
+                </el-descriptions-item>
+                <el-descriptions-item label="学籍号">
+                  <code>110101200501011234</code> - 学生身份证号或学籍号
+                </el-descriptions-item>
+                <el-descriptions-item label="姓名">
+                  <code>张三</code> - 学生姓名（用于核对）
+                </el-descriptions-item>
+                <el-descriptions-item label="科目">
+                  <code>数学</code> - 必须是考试包含的科目之一
+                </el-descriptions-item>
+                <el-descriptions-item label="原始分">
+                  <code>95</code> - 数字，缺考填0
+                </el-descriptions-item>
+                <el-descriptions-item label="缺考">
+                  <code>是/否</code> - 缺考填"是"，否则留空
+                </el-descriptions-item>
+              </el-descriptions>
             </div>
 
-            <el-divider />
+            <div class="step-actions">
+              <el-button size="large" @click="currentStep = 1">
+                <el-icon><ArrowLeft /></el-icon>
+                <span style="margin-left: 8px;">上一步</span>
+              </el-button>
+              <el-button type="primary" size="large" @click="currentStep = 3">
+                数据已准备好，下一步
+                <el-icon style="margin-left: 8px;"><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+          </el-card>
+        </div>
+
+        <!-- 步骤3: 上传文件 -->
+        <div v-if="currentStep === 3" class="step-content">
+          <el-card class="upload-card">
+            <template #header>
+              <div class="card-header">
+                <span>📤 第三步：上传文件</span>
+              </div>
+            </template>
 
             <div class="upload-area">
-              <h4>📤 第二步：上传成绩单</h4>
               <el-upload
                 ref="uploadRef"
                 class="upload-demo"
@@ -77,7 +218,7 @@
                 :limit="1"
                 :on-change="handleFileChange"
                 :on-exceed="handleExceed"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
               >
                 <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
                 <div class="el-upload__text">
@@ -85,20 +226,24 @@
                 </div>
                 <template #tip>
                   <div class="el-upload__tip">
-                    只能上传 xlsx/xls 文件，且不超过 10MB
+                    支持 xlsx/xls/csv 文件，且不超过 10MB
                   </div>
                 </template>
               </el-upload>
 
               <div v-if="selectedFile" class="file-info">
-                <el-descriptions :column="1" border size="small">
+                <el-descriptions :column="2" border size="small">
                   <el-descriptions-item label="文件名">{{ selectedFile.name }}</el-descriptions-item>
                   <el-descriptions-item label="文件大小">{{ formatFileSize(selectedFile.size) }}</el-descriptions-item>
                 </el-descriptions>
               </div>
             </div>
 
-            <div class="upload-actions">
+            <div class="step-actions">
+              <el-button size="large" @click="currentStep = 2">
+                <el-icon><ArrowLeft /></el-icon>
+                <span style="margin-left: 8px;">上一步</span>
+              </el-button>
               <el-button
                 type="primary"
                 size="large"
@@ -110,85 +255,141 @@
                 <span style="margin-left: 8px;">开始导入</span>
               </el-button>
             </div>
-          </div>
+          </el-card>
+        </div>
 
-          <el-empty v-else description="请先选择考试" />
-        </el-card>
-      </el-col>
+        <!-- 步骤4: 确认导入 -->
+        <div v-if="currentStep === 4" class="step-content">
+          <el-card class="result-card">
+            <template #header>
+              <div class="card-header">
+                <span>✅ 第四步：导入完成</span>
+              </div>
+            </template>
 
-      <!-- 右侧：导入任务列表 -->
-      <el-col :span="10">
-        <el-card class="tasks-section">
-          <template #header>
-            <div class="card-header">
-              <span>📋 导入记录</span>
-              <el-button size="small" @click="loadImportTasks" :loading="loadingTasks">
-                <el-icon><Refresh /></el-icon>
-                刷新
-              </el-button>
+            <div class="result-info">
+              <el-result
+                :icon="importResult.success ? 'success' : 'error'"
+                :title="importResult.title"
+                :sub-title="importResult.message"
+              >
+                <template #extra>
+                  <div class="result-actions">
+                    <el-button type="primary" @click="currentStep = 0; importForm.exam_id = undefined;">
+                      导入更多成绩
+                    </el-button>
+                    <el-button @click="goBack">返回考试列表</el-button>
+                  </div>
+                </template>
+              </el-result>
+
+              <div v-if="importResult.task" class="task-detail">
+                <el-divider />
+                <h4>导入任务详情</h4>
+                <el-descriptions :column="2" border style="margin-top: 15px;">
+                  <el-descriptions-item label="任务名称">{{ importResult.task.task_name }}</el-descriptions-item>
+                  <el-descriptions-item label="状态">
+                    <el-tag :type="getTaskStatusType(importResult.task.status)">
+                      {{ getTaskStatusText(importResult.task.status) }}
+                    </el-tag>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="总行数">{{ importResult.task.total_rows || 0 }}</el-descriptions-item>
+                  <el-descriptions-item label="已处理">{{ importResult.task.processed_rows || 0 }}</el-descriptions-item>
+                  <el-descriptions-item label="成功">{{ (importResult.task.processed_rows || 0) - (importResult.task.failed_rows || 0) }}</el-descriptions-item>
+                  <el-descriptions-item label="失败">{{ importResult.task.failed_rows || 0 }}</el-descriptions-item>
+                </el-descriptions>
+
+                <div v-if="importResult.errors.length > 0" style="margin-top: 20px;">
+                  <h4>错误详情</h4>
+                  <el-table :data="importResult.errors" max-height="300" size="small" style="margin-top: 10px;">
+                    <el-table-column prop="row" label="行号" width="80" />
+                    <el-table-column prop="exam_number" label="考号" width="120" />
+                    <el-table-column prop="error" label="错误信息" />
+                  </el-table>
+                </div>
+              </div>
             </div>
-          </template>
+          </el-card>
+        </div>
+      </el-col>
+    </el-row>
 
-          <el-table :data="importTasks" v-loading="loadingTasks" stripe size="small">
-            <el-table-column prop="task_name" label="任务名称" width="150" show-overflow-tooltip />
-            <el-table-column prop="file_name" label="文件名" width="120" show-overflow-tooltip />
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getTaskStatusType(row.status)" size="small">
-                  {{ getTaskStatusText(row.status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="progress" label="进度" width="120">
-              <template #default="{ row }">
-                <el-progress :percentage="row.progress" :status="row.progress === 100 ? 'success' : ''" :stroke-width="6" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="150">
-              <template #default="{ row }">
-                <el-button size="small" link @click="viewTaskDetail(row)">详情</el-button>
-                <el-button
-                  v-if="row.status === 'failed'"
-                  size="small"
-                  link
-                  type="primary"
-                  @click="retryTask(row)"
-                >
-                  重试
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+    <!-- 导入记录区域（底部独立区域） -->
+    <div v-if="importForm.exam_id" class="tasks-section">
+      <el-card class="tasks-card">
+        <template #header>
+          <div class="card-header">
+            <span>📋 导入记录</span>
+            <el-button size="small" @click="loadImportTasks" :loading="loadingTasks">
+              <el-icon><Refresh /></el-icon>
+              刷新
+            </el-button>
+          </div>
+        </template>
+
+        <el-table :data="importTasks" v-loading="loadingTasks" stripe size="small" max-height="500">
+          <el-table-column prop="task_name" label="任务名称" width="200" show-overflow-tooltip />
+          <el-table-column prop="file_name" label="文件名" width="180" show-overflow-tooltip />
+          <el-table-column prop="status" label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getTaskStatusType(row.status)" size="small">
+                {{ getTaskStatusText(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="progress" label="进度" width="150">
+            <template #default="{ row }">
+              <el-progress :percentage="row.progress" :status="row.progress === 100 ? 'success' : ''" :stroke-width="8" />
+            </template>
+          </el-table-column>
+          <el-table-column prop="total_rows" label="总行数" width="100" />
+          <el-table-column prop="processed_rows" label="已处理" width="100" />
+          <el-table-column prop="failed_rows" label="失败" width="80" />
+          <el-table-column label="创建时间" width="180">
+            <template #default="{ row }">
+              {{ formatTime(row.created_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="80" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" link @click="viewTaskDetail(row)">详情</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
 
         <!-- 导入统计 -->
-        <el-card class="stats-card" style="margin-top: 20px;">
-          <template #header>
-            <span>📊 导入统计</span>
-          </template>
-
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-statistic title="总任务数" :value="stats.total" />
+        <div class="stats-section">
+          <el-divider />
+          <h4>📊 导入统计</h4>
+          <el-row :gutter="15" style="margin-top: 10px;">
+            <el-col :span="6">
+              <el-statistic title="总任务" :value="stats.total" />
             </el-col>
-            <el-col :span="8">
+            <el-col :span="6">
               <el-statistic title="成功" :value="stats.completed">
                 <template #suffix>
                   <span style="color: #67c23a;">✓</span>
                 </template>
               </el-statistic>
             </el-col>
-            <el-col :span="8">
+            <el-col :span="6">
               <el-statistic title="失败" :value="stats.failed">
                 <template #suffix>
                   <span style="color: #f56c6c;">✗</span>
                 </template>
               </el-statistic>
             </el-col>
+            <el-col :span="6">
+              <el-statistic title="处理中" :value="stats.total - stats.completed - stats.failed">
+                <template #suffix>
+                  <span style="color: #e6a23c;">⏳</span>
+                </template>
+              </el-statistic>
+            </el-col>
           </el-row>
-        </el-card>
-      </el-col>
-    </el-row>
+        </div>
+      </el-card>
+    </div>
 
     <!-- 任务详情对话框 -->
     <el-dialog v-model="taskDetailVisible" title="导入任务详情" width="800px">
@@ -236,12 +437,16 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { ArrowRight, ArrowLeft, Download, Upload, UploadFilled, Refresh } from '@element-plus/icons-vue';
 import type { UploadFile } from 'element-plus';
 import { examApi, importTaskApi } from '@/services/evaluation';
 import type { Exam, ExamSubject } from '@/types/evaluation';
 import type { ImportTask } from '@/types/evaluation';
 
 const router = useRouter();
+
+// 当前步骤
+const currentStep = ref(0);
 
 // 响应式数据
 const loadingTasks = ref(false);
@@ -253,13 +458,32 @@ const importing = ref(false);
 
 // 表单数据
 const importForm = reactive({
-  exam_id: undefined,
+  exam_id: undefined as number | undefined,
+});
+
+// 导入结果
+const importResult = reactive({
+  success: false,
+  title: '',
+  message: '',
+  task: null as ImportTask | null,
+  errors: [] as any[],
 });
 
 // 任务详情
 const taskDetailVisible = ref(false);
 const currentTask = ref<ImportTask | null>(null);
 const taskErrors = ref<any[]>([]);
+
+// 模板字段说明
+const templateFields = [
+  { field: '考号*', required: '是', description: '考试分配的考号（准考证号）', example: '202401001' },
+  { field: '学籍号*', required: '是', description: '学生身份证号或学籍号', example: '110101200501011234' },
+  { field: '姓名', required: '否', description: '学生姓名（用于核对）', example: '张三' },
+  { field: '科目*', required: '是', description: '科目名称（必须与考试科目一致）', example: '数学' },
+  { field: '原始分', required: '是', description: '成绩分数（数字，缺考填0）', example: '95' },
+  { field: '缺考', required: '否', description: '是否缺考（是/否，留空表示正常）', example: '否' },
+];
 
 // 统计数据
 const stats = computed(() => {
@@ -277,7 +501,8 @@ const goBack = () => {
 // 加载考试列表
 const loadExams = async () => {
   try {
-    exams.value = await examApi.list({ status: 'scheduled,in_progress,completed' });
+    // 不过滤状态，加载所有考试（包括草稿状态）
+    exams.value = await examApi.list();
   } catch (error: any) {
     ElMessage.error('加载考试列表失败');
   }
@@ -293,6 +518,8 @@ const loadExamSubjects = async () => {
   try {
     // 获取考试的科目列表
     subjects.value = await examApi.getSubjects(importForm.exam_id);
+    // 同时加载导入任务列表
+    await loadImportTasks();
   } catch (error: any) {
     console.error('加载科目列表失败:', error);
     subjects.value = [];
@@ -321,7 +548,7 @@ const downloadTemplate = () => {
   }
 
   const exam = exams.value.find(e => e.id === importForm.exam_id);
-  
+
   if (!exam) {
     ElMessage.error('考试信息不存在');
     return;
@@ -331,10 +558,10 @@ const downloadTemplate = () => {
   const template = [
     [`${exam.name}_成绩单`],
     ['考号*', '学籍号*', '姓名', '科目*', '原始分', '缺考'],
-    ['202401001', '11010120200101', '张三', '数学', '95', ''],
-    ['202401001', '11010120200101', '张三', '语文', '88', ''],
-    ['202401002', '11010120200102', '李四', '数学', '87', ''],
-    ['202401002', '11010120200102', '李四', '语文', '92', ''],
+    ['202401001', '110101200501011234', '张三', '数学', '95', ''],
+    ['202401001', '110101200501011234', '张三', '语文', '88', ''],
+    ['202401002', '110101200501011235', '李四', '数学', '87', ''],
+    ['202401002', '110101200501011235', '李四', '语文', '92', ''],
     ['', '', '', '', '', ''],
   ];
 
@@ -401,9 +628,14 @@ const startImport = async () => {
     await loadImportTasks();
 
     // 开始轮询任务状态
-    pollTaskStatus(task.id);
+    await pollTaskStatus(task.id);
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || '创建导入任务失败');
+    importResult.success = false;
+    importResult.title = '导入失败';
+    importResult.message = error.response?.data?.detail || '创建导入任务失败';
+    importResult.task = null;
+    importResult.errors = [];
+    currentStep.value = 4;
   } finally {
     importing.value = false;
   }
@@ -426,10 +658,34 @@ const pollTaskStatus = async (taskId: number) => {
         clearInterval(interval);
 
         if (task.status === 'completed') {
+          importResult.success = true;
+          importResult.title = '导入成功';
+          importResult.message = `成功导入 ${task.processed_rows} 条成绩记录`;
+          importResult.task = task;
+          importResult.errors = [];
           ElMessage.success(`成绩导入完成！成功: ${task.processed_rows} 条`);
         } else {
-          ElMessage.error(`成绩导入失败：${task.error_message || '未知错误'}`);
+          // 获取错误详情
+          try {
+            const errorDetail = await importTaskApi.getErrors(task.id);
+            importResult.success = false;
+            importResult.title = '导入失败';
+            importResult.message = task.error_message || '导入过程中出现错误';
+            importResult.task = task;
+            importResult.errors = errorDetail.errors || [];
+            ElMessage.error(`成绩导入失败：${task.error_message || '未知错误'}`);
+          } catch (err) {
+            importResult.success = false;
+            importResult.title = '导入失败';
+            importResult.message = task.error_message || '导入过程中出现错误';
+            importResult.task = task;
+            importResult.errors = [];
+            ElMessage.error(`成绩导入失败：${task.error_message || '未知错误'}`);
+          }
         }
+
+        // 进入结果页面
+        currentStep.value = 4;
 
         // 刷新任务列表
         await loadImportTasks();
@@ -458,17 +714,6 @@ const viewTaskDetail = async (task: ImportTask) => {
   }
 
   taskDetailVisible.value = true;
-};
-
-// 重试任务
-const retryTask = async (task: ImportTask) => {
-  try {
-    await importTaskApi.retry(task.id);
-    ElMessage.success('已重新开始处理任务');
-    await loadImportTasks();
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || '重试失败');
-  }
 };
 
 // 获取任务状态类型
@@ -505,28 +750,39 @@ const formatTime = (time: string) => {
 // 组件挂载
 onMounted(() => {
   loadExams();
-  if (importForm.exam_id) {
-    loadImportTasks();
-  }
 });
 </script>
 
 <style scoped>
 .score-import {
   padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
 }
 
 .header h1 {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
+}
+
+.steps-container {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.step-content {
+  margin-bottom: 30px;
 }
 
 .card-header {
@@ -537,16 +793,27 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.template-download,
-.upload-area {
+.step-description {
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.6;
+}
+
+.exam-select-content,
+.template-info,
+.prep-info,
+.upload-area,
+.result-info {
   padding: 20px 0;
 }
 
-.template-download h4,
-.upload-area h4 {
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  font-weight: 600;
+.step-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #EBEEF5;
 }
 
 .upload-demo {
@@ -573,21 +840,33 @@ onMounted(() => {
   margin-top: 20px;
 }
 
-.upload-actions {
+.tasks-section {
+  margin-top: 30px;
+}
+
+.tasks-card {
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.stats-section {
+  padding: 15px 0;
+}
+
+.result-actions {
   display: flex;
   justify-content: center;
-  margin-top: 20px;
+  gap: 15px;
 }
 
-.tasks-section {
-  height: 100%;
+.task-detail {
+  margin-top: 30px;
 }
 
-.tasks-section .el-card__body {
-  padding: 0;
-}
-
-.tasks-section .el-table {
-  margin: 0;
+code {
+  background: #F5F7FA;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #E6A23C;
+  font-family: 'Courier New', monospace;
 }
 </style>
