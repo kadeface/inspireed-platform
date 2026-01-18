@@ -74,10 +74,40 @@
 
     <!-- 用户列表 -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
+      <!-- 批量操作栏 -->
+      <div v-if="selectedUsers.length > 0" class="bg-blue-50 border-b border-blue-200 px-6 py-3 flex items-center justify-between">
+        <div class="text-sm text-blue-800">
+          已选择 <span class="font-bold">{{ selectedUsers.length }}</span> 个用户
+        </div>
+        <div class="flex gap-2">
+          <button
+            @click="batchDeleteUsers"
+            class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+          >
+            批量删除
+          </button>
+          <button
+            @click="clearSelection"
+            class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm"
+          >
+            取消选择
+          </button>
+        </div>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                <input
+                  type="checkbox"
+                  :checked="isAllSelected"
+                  :indeterminate="isSomeSelected"
+                  @change="toggleSelectAll"
+                  class="h-4 w-4 text-blue-600 rounded"
+                />
+              </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 用户信息
               </th>
@@ -111,7 +141,15 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="user in users" :key="user.id" class="hover:bg-gray-50">
+            <tr v-for="user in users" :key="user.id" class="hover:bg-gray-50" :class="{ 'bg-blue-50': selectedUsers.includes(user.id) }">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  :checked="selectedUsers.includes(user.id)"
+                  @change="toggleUserSelection(user.id)"
+                  class="h-4 w-4 text-blue-600 rounded"
+                />
+              </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
                   <div class="flex-shrink-0 h-10 w-10">
@@ -410,6 +448,9 @@ const schools = ref<School[]>([])
 const grades = ref<Grade[]>([])
 const classrooms = ref<Classroom[]>([])
 const classroomLoading = ref(false)
+
+// 批量选择
+const selectedUsers = ref<number[]>([])
 
 // 模态框状态
 const showUserModal = ref(false)
@@ -728,7 +769,7 @@ async function deleteUser(user: User) {
   if (!confirm(`确定要删除用户 ${user.username} 吗？此操作不可撤销。`)) {
     return
   }
-  
+
   try {
     await adminService.deleteUser(user.id)
     users.value = users.value.filter(u => u.id !== user.id)
@@ -737,6 +778,76 @@ async function deleteUser(user: User) {
   } catch (error: any) {
     console.error('Failed to delete user:', error)
     toast.error(error.response?.data?.detail || '删除用户失败')
+  }
+}
+
+// 批量选择相关函数
+const isAllSelected = computed(() => {
+  return users.value.length > 0 && selectedUsers.value.length === users.value.length
+})
+
+const isSomeSelected = computed(() => {
+  return selectedUsers.value.length > 0 && selectedUsers.value.length < users.value.length
+})
+
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    selectedUsers.value = []
+  } else {
+    selectedUsers.value = users.value.map(u => u.id)
+  }
+}
+
+function toggleUserSelection(userId: number) {
+  const index = selectedUsers.value.indexOf(userId)
+  if (index > -1) {
+    selectedUsers.value.splice(index, 1)
+  } else {
+    selectedUsers.value.push(userId)
+  }
+}
+
+function clearSelection() {
+  selectedUsers.value = []
+}
+
+async function batchDeleteUsers() {
+  if (selectedUsers.value.length === 0) {
+    toast.warning('请先选择要删除的用户')
+    return
+  }
+
+  const userNames = users.value
+    .filter(u => selectedUsers.value.includes(u.id))
+    .map(u => u.username)
+    .join(', ')
+
+  if (!confirm(`确定要删除以下 ${selectedUsers.value.length} 个用户吗？\n\n${userNames}\n\n此操作不可撤销。`)) {
+    return
+  }
+
+  try {
+    const result = await adminService.batchDeleteUsers(selectedUsers.value)
+
+    // 从列表中移除已删除的用户
+    users.value = users.value.filter(u => !selectedUsers.value.includes(u.id))
+    totalUsers.value -= result.deleted_count
+
+    toast.success(
+      `成功删除 ${result.deleted_count} 个用户` +
+      (result.failed_count ? `，失败 ${result.failed_count} 个` : '')
+    )
+
+    // 清空选择
+    clearSelection()
+
+    // 如果有失败的用户，显示详情
+    if (result.failed_users && result.failed_users.length > 0) {
+      console.warn('部分用户删除失败:', result.failed_users)
+    }
+  } catch (error: any) {
+    console.error('Failed to batch delete users:', error)
+    toast.error(error.response?.data?.detail || '批量删除用户失败')
   }
 }
 

@@ -118,6 +118,25 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+def get_current_admin_or_staff(current_user: User = Depends(get_current_user)) -> User:
+    """验证当前用户是否为管理员、区县管理员或学校管理员"""
+    if not isinstance(current_user.role, UserRole):
+        raise HTTPException(status_code=403, detail="无效的用户角色")
+
+    allowed_roles = [
+        UserRole.ADMIN,
+        UserRole.DISTRICT_ADMIN,
+        UserRole.SCHOOL_ADMIN,
+    ]
+
+    if cast(UserRole, current_user.role) not in allowed_roles:
+        raise HTTPException(
+            status_code=403, detail="需要管理员、区县管理员或学校管理员权限"
+        )
+
+    return current_user
+
+
 def get_current_teacher(current_user: User = Depends(get_current_user)) -> User:
     """验证当前用户是否为教师"""
     if not isinstance(current_user.role, UserRole) or cast(

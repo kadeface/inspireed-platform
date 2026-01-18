@@ -5,14 +5,17 @@
 
 from typing import Any, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
+import logging
 
 from app.core.database import get_db
 from app.core.validators import normalize_user_role
 from app.models import User, UserRole, Region, School, Grade, Classroom
+from app.models.evaluation import ExamNumberMapping
+from app.models.exam_room import ExamRoom, ExamRoomStudent
 from app.api.deps import get_current_admin
 from app.core.security import get_password_hash
 from app.core.config import settings
@@ -22,6 +25,7 @@ from sqlalchemy.orm import selectinload
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ==================== Request/Response Models ====================
@@ -114,6 +118,17 @@ class BatchImportRequest(BaseModel):
     """批量导入请求"""
 
     users: List[UserCreate]
+
+
+class BatchDeleteByFilterRequest(BaseModel):
+    """按条件批量删除请求"""
+
+    role: UserRole = Field(..., description="用户角色（student/teacher）")
+    region_id: Optional[int] = Field(None, description="区域ID（可选，不填则删除所有区域的）")
+    school_id: Optional[int] = Field(None, description="学校ID（可选，不填则删除所有学校的）")
+    grade_id: Optional[int] = Field(None, description="年级ID（可选，不填则删除所有年级的）")
+    classroom_id: Optional[int] = Field(None, description="班级ID（可选，不填则删除所有班级的）")
+    confirm: bool = Field(False, description="确认删除（需要先调用预览接口确认）")
 
 
 class UnifiedImportItem(BaseModel):
@@ -466,6 +481,268 @@ async def delete_user(
     await db.commit()
 
     return {"message": "用户删除成功"}
+
+
+@router.post("/batch-delete")
+async def batch_delete_users(
+    user_ids: List[int],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """批量删除用户
+
+    Args:
+        user_ids: 要删除的用户ID列表
+
+    Returns:
+        删除结果统计
+    """
+
+    if not user_ids:
+        raise HTTPException(status_code=400, detail="用户ID列表不能为空")
+
+    # 不能删除自己
+    if current_user.id in user_ids:
+        raise HTTPException(status_code=400, detail="不能删除自己的账号")
+
+    # 查询用户
+    result = await db.execute(
+        select(User).where(User.id.in_(user_ids))
+    )
+    users = result.scalars().all()
+
+    if not users:
+        raise HTTPException(status_code=404, detail="未找到任何用户")
+
+    # 统计删除结果
+    deleted_count = 0
+    failed_users = []
+
+    try:
+        # 第一步：删除考号映射记录（批量删除）
+        delete_mappings_result = await db.execute(
+            delete(ExamNumberMapping).where(
+                ExamNumberMapping.student_id.in_(user_ids)
+            )
+        )
+        mappings_deleted = delete_mappings_result.rowcount
+        logger.info(f"Deleted {mappings_deleted} exam number mappings for users: {user_ids}")
+
+        # 第二步：删除考场学生关联记录（批量删除）
+        delete_room_students_result = await db.execute(
+            delete(ExamRoomStudent).where(
+                ExamRoomStudent.student_id.in_(user_ids)
+            )
+        )
+        room_students_deleted = delete_room_students_result.rowcount
+        logger.info(f"Deleted {room_students_deleted} exam room student assignments for users: {user_ids}")
+
+        # 使用flush确保操作执行但保持事务
+        await db.flush()
+        logger.info("Flushed exam mapping and room student deletions")
+
+        # 第三步：删除用户
+        for user in users:
+            try:
+                await db.delete(user)
+                deleted_count += 1
+                logger.info(f"Deleted user {user.id}: {user.username}")
+            except Exception as e:
+                logger.error(f"Failed to delete user {user.id}: {str(e)}")
+                failed_users.append({
+                    "id": user.id,
+                    "username": user.username,
+                    "error": str(e)
+                })
+
+        # 提交所有删除操作
+        await db.commit()
+        logger.info(f"Successfully deleted {deleted_count} users")
+
+    except Exception as e:
+        logger.error(f"Batch delete failed: {str(e)}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"批量删除失败: {str(e)}"
+        )
+
+    response_data = {
+        "message": f"成功删除 {deleted_count} 个用户",
+        "deleted_count": deleted_count,
+        "total_requested": len(user_ids)
+    }
+
+    if failed_users:
+        response_data["failed_users"] = failed_users
+        response_data["failed_count"] = len(failed_users)
+
+    return response_data
+
+
+@router.post("/batch-delete-by-filter/preview")
+async def preview_batch_delete_by_filter(
+    filters: BatchDeleteByFilterRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """预览按条件批量删除的用户数量
+
+    Args:
+        filters: 删除条件
+
+    Returns:
+        将要删除的用户统计信息
+    """
+    # 构建查询条件
+    conditions = [User.role == filters.role]
+
+    if filters.region_id:
+        conditions.append(User.region_id == filters.region_id)
+    if filters.school_id:
+        conditions.append(User.school_id == filters.school_id)
+    if filters.grade_id:
+        conditions.append(User.grade_id == filters.grade_id)
+    if filters.classroom_id:
+        conditions.append(User.classroom_id == filters.classroom_id)
+
+    # 查询符合条件的用户数量
+    count_result = await db.execute(
+        select(func.count(User.id)).where(*conditions)
+    )
+    total_count = count_result.scalar() or 0
+
+    if total_count == 0:
+        return {
+            "total_count": 0,
+            "message": "没有找到符合条件的用户"
+        }
+
+    # 查询部分用户详情用于显示（最多返回前100个）
+    users_result = await db.execute(
+        select(User).where(*conditions).limit(100)
+    )
+    users = users_result.scalars().all()
+
+    return {
+        "total_count": total_count,
+        "preview_users": [
+            {
+                "id": u.id,
+                "username": u.username,
+                "full_name": u.full_name,
+                "email": u.email,
+                "school_name": getattr(u, "school_name", None),
+                "grade_name": getattr(u, "grade_name", None),
+                "classroom_name": getattr(u, "classroom_name", None),
+            }
+            for u in users
+        ],
+        "showing": min(100, total_count),
+        "message": f"将删除 {total_count} 个用户" + (
+            f"（显示前{min(100, total_count)}个）" if total_count > 100 else ""
+        )
+    }
+
+
+@router.post("/batch-delete-by-filter")
+async def batch_delete_by_filter(
+    filters: BatchDeleteByFilterRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """按条件批量删除用户（支持大规模删除）
+
+    Args:
+        filters: 删除条件
+
+    Returns:
+        删除结果统计
+    """
+    # 要求必须先确认
+    if not filters.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="请先调用预览接口确认删除操作，设置 confirm=true"
+        )
+
+    # 构建查询条件
+    conditions = [User.role == filters.role]
+
+    if filters.region_id:
+        conditions.append(User.region_id == filters.region_id)
+    if filters.school_id:
+        conditions.append(User.school_id == filters.school_id)
+    if filters.grade_id:
+        conditions.append(User.grade_id == filters.grade_id)
+    if filters.classroom_id:
+        conditions.append(User.classroom_id == filters.classroom_id)
+
+    # 查询符合条件的用户ID
+    result = await db.execute(
+        select(User.id).where(*conditions)
+    )
+    user_ids = [row[0] for row in result.all()]
+
+    if not user_ids:
+        raise HTTPException(status_code=404, detail="未找到符合条件的用户")
+
+    logger.info(f"Batch delete by filter: {len(user_ids)} users matched criteria")
+
+    # 不能删除自己
+    if current_user.id in user_ids:
+        raise HTTPException(status_code=400, detail="删除条件包含当前登录用户，不能删除自己的账号")
+
+    deleted_count = 0
+
+    try:
+        # 第一步：删除考号映射记录（批量删除）
+        delete_mappings_result = await db.execute(
+            delete(ExamNumberMapping).where(
+                ExamNumberMapping.student_id.in_(user_ids)
+            )
+        )
+        mappings_deleted = delete_mappings_result.rowcount
+        logger.info(f"Deleted {mappings_deleted} exam number mappings")
+
+        # 第二步：删除考场学生关联记录（批量删除）
+        delete_room_students_result = await db.execute(
+            delete(ExamRoomStudent).where(
+                ExamRoomStudent.student_id.in_(user_ids)
+            )
+        )
+        room_students_deleted = delete_room_students_result.rowcount
+        logger.info(f"Deleted {room_students_deleted} exam room student assignments")
+
+        # 使用flush确保操作执行但保持事务
+        await db.flush()
+        logger.info("Flushed exam mapping and room student deletions")
+
+        # 第三步：批量删除用户（使用批量删除更高效）
+        delete_users_result = await db.execute(
+            delete(User).where(User.id.in_(user_ids))
+        )
+        deleted_count = delete_users_result.rowcount
+        logger.info(f"Deleted {deleted_count} users")
+
+        # 提交所有删除操作
+        await db.commit()
+        logger.info(f"Successfully committed batch delete of {deleted_count} users")
+
+    except Exception as e:
+        logger.error(f"Batch delete by filter failed: {str(e)}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"批量删除失败: {str(e)}"
+        )
+
+    return {
+        "message": f"成功删除 {deleted_count} 个用户",
+        "deleted_count": deleted_count,
+        "exam_mappings_deleted": mappings_deleted,
+        "exam_room_students_deleted": room_students_deleted
+    }
 
 
 @router.patch("/{user_id}/toggle-status")

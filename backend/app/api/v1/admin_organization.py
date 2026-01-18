@@ -14,8 +14,8 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from app.core.database import get_db
-from app.models import User, Region, School, Grade, Classroom
-from app.api.deps import get_current_admin
+from app.models import User, Region, School, Grade, Classroom, UserRole
+from app.api.deps import get_current_admin, get_current_admin_or_staff
 
 logger = logging.getLogger(__name__)
 
@@ -280,12 +280,25 @@ async def get_regions(
     parent_id: Optional[int] = Query(None, description="父级区域筛选"),
     search: Optional[str] = Query(None, description="搜索关键词"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_admin_or_staff),
 ) -> Any:
-    """获取区域列表"""
+    """获取区域列表（根据用户角色过滤数据）"""
 
     # 构建查询
     query = select(Region)
+
+    # 根据用户角色添加数据过滤
+    if current_user.role == UserRole.DISTRICT_ADMIN:
+        # 区县管理员：只能看到自己所属的区县
+        if current_user.region_id:
+            query = query.where(Region.id == current_user.region_id)
+            # 忽略其他筛选条件
+            level = None  # type: ignore
+            parent_id = None  # type: ignore
+        else:
+            # 区县管理员没有设置区县，返回空列表
+            return RegionListResponse(regions=[], total=0, page=page, size=size, total_pages=0)
+    # SCHOOL_ADMIN 和 ADMIN 不过滤区县（虽然SCHOOL_ADMIN一般不需要查看区县列表）
 
     # 级别筛选
     if level is not None:
@@ -466,14 +479,36 @@ async def get_schools(
     school_type: Optional[str] = Query(None, description="学校类型筛选"),
     search: Optional[str] = Query(None, description="搜索关键词"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_admin_or_staff),
 ) -> Any:
-    """获取学校列表"""
+    """获取学校列表（根据用户角色过滤数据）"""
 
     # 构建查询，使用selectinload预加载region关系
     query = select(School).options(selectinload(School.region))
 
-    # 区域筛选
+    # 根据用户角色添加数据过滤
+    if current_user.role == UserRole.DISTRICT_ADMIN:
+        # 区县管理员：只能看到自己区县的学校
+        if current_user.region_id:
+            query = query.where(School.region_id == current_user.region_id)
+            # 如果用户同时传递了region_id参数，必须和自己的区县一致
+            if region_id and region_id != current_user.region_id:
+                raise HTTPException(status_code=403, detail="只能查看自己区县的学校")
+        else:
+            # 区县管理员没有设置区县，返回空列表
+            return SchoolListResponse(schools=[], total=0, page=page, size=size, total_pages=0)
+    elif current_user.role == UserRole.SCHOOL_ADMIN:
+        # 学校管理员：只能看到自己的学校
+        if current_user.school_id:
+            query = query.where(School.id == current_user.school_id)
+            # 忽略其他筛选条件，因为只能看到一所学校
+            region_id = None  # type: ignore
+        else:
+            # 学校管理员没有设置学校，返回空列表
+            return SchoolListResponse(schools=[], total=0, page=page, size=size, total_pages=0)
+    # ADMIN 不过滤，可以看到所有学校
+
+    # 区域筛选（仅ADMIN可以使用）
     if region_id:
         query = query.where(School.region_id == region_id)
 
@@ -491,9 +526,16 @@ async def get_schools(
         )
         query = query.where(search_filter)
 
-    # 获取总数
+    # 获取总数（应用相同的过滤条件）
     count_query = select(func.count()).select_from(School)
-    if region_id:
+
+    # 应用角色过滤到count查询
+    if current_user.role == UserRole.DISTRICT_ADMIN and current_user.region_id:
+        count_query = count_query.where(School.region_id == current_user.region_id)
+    elif current_user.role == UserRole.SCHOOL_ADMIN and current_user.school_id:
+        count_query = count_query.where(School.id == current_user.school_id)
+
+    if region_id and current_user.role == UserRole.ADMIN:
         count_query = count_query.where(School.region_id == region_id)
     if school_type:
         count_query = count_query.where(School.school_type == school_type)
@@ -792,7 +834,7 @@ async def import_schools(
 @router.get("/classrooms", response_model=ClassroomListResponse)
 async def get_classrooms(
     page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    size: int = Query(10, ge=1, le=1000, description="每页数量"),
     school_id: Optional[int] = Query(None, description="学校筛选"),
     grade_id: Optional[int] = Query(None, description="年级筛选"),
     region_id: Optional[int] = Query(None, description="区域筛选"),

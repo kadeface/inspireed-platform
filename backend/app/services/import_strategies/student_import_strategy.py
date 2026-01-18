@@ -339,9 +339,10 @@ class StudentImportStrategy(BaseImportStrategy):
         Parse classroom code to extract grade level and class sequence
 
         Examples:
-            - 501 -> 5年级1班 (grade_level=5, class_seq=1)
-            - 1001 -> 10年级1班 (grade_level=10, class_seq=1)
-            - 1203 -> 12年级3班 (grade_level=12, class_seq=3)
+            - 701 -> 7年级1班 (grade_level=7, class_seq=1) - 初一1班
+            - 802 -> 8年级2班 (grade_level=8, class_seq=2) - 初二2班
+            - 1001 -> 10年级1班 (grade_level=10, class_seq=1) - 高一1班
+            - 1203 -> 12年级3班 (grade_level=12, class_seq=3) - 高三3班
 
         Args:
             classroom_code: Classroom code string
@@ -354,13 +355,19 @@ class StudentImportStrategy(BaseImportStrategy):
 
         code = str(classroom_code).strip()
 
-        # Match: N digits + M digits (grade + class)
-        match = re.match(r'^(\d+)(\d{1,2})$', code)
-        if not match:
+        # 根据数字长度决定如何分割：
+        # - 3位数字（如701）：第1位是年级，后2位是班级
+        # - 4位数字（如1001）：前2位是年级，后2位是班级
+        if len(code) == 3:
+            # 3位数字：年级1位 + 班级2位
+            grade_part = code[0]      # 第1位
+            class_part = code[1:3]    # 后2位
+        elif len(code) >= 4:
+            # 4位及以上：前2位是年级，后2位是班级
+            grade_part = code[0:2]    # 前2位
+            class_part = code[-2:]    # 后2位
+        else:
             return None, None
-
-        grade_part = match.group(1)
-        class_part = match.group(2)
 
         try:
             grade_level = int(grade_part)

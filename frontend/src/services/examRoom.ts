@@ -196,5 +196,12 @@ export const examRoomService = {
     link.click()
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
+  },
+
+  /**
+   * 清空考试的所有考场编排
+   */
+  async clearAllRooms(examId: number): Promise<void> {
+    await apiClient.delete(`/exams/${examId}/rooms/clear-all`)
   }
 }

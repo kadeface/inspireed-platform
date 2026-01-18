@@ -126,30 +126,42 @@ class ExamDocumentGenerator:
         doc = SimpleDocTemplate(
             buffer,
             pagesize=landscape(A4),
-            rightMargin=1*cm,
-            leftMargin=1*cm,
-            topMargin=1*cm,
-            bottomMargin=1*cm
+            rightMargin=0.5*cm,
+            leftMargin=0.5*cm,
+            topMargin=0.8*cm,
+            bottomMargin=0.5*cm
         )
 
         story = []
 
-        # 标题
+        # 标题 - 减小字体
         story.append(Paragraph(
             f"{exam.name} - {exam_room.name} 座位表",
-            self.styles['ChineseTitle']
+            ParagraphStyle(
+                'ChineseTitleSmall',
+                parent=self.styles['Heading1'],
+                fontName='Chinese' if 'Chinese' in pdfmetrics.getRegisteredFontNames() else 'Helvetica-Bold',
+                fontSize=14,
+                alignment=1,
+                spaceAfter=6,
+            )
         ))
 
-        # 考试信息
-        exam_info = f"""
-        考试日期：{exam.exam_date.strftime('%Y年%m月%d日')}<br/>
-        考场容量：{exam_room.seat_count}/{exam_room.capacity}人<br/>
-        考号范围：{exam_room.exam_number_start} - {exam_room.exam_number_end}<br/>
-        """
-        story.append(Paragraph(exam_info, self.styles['ChineseNormal']))
-        story.append(Spacer(1, 0.5*cm))
+        # 考试信息 - 压缩为一行
+        exam_info = f"考试日期：{exam.exam_date.strftime('%Y年%m月%d日')}  |  考场容量：{exam_room.seat_count}/{exam_room.capacity}人  |  考号范围：{exam_room.exam_number_start} - {exam_room.exam_number_end}"
+        story.append(Paragraph(
+            exam_info,
+            ParagraphStyle(
+                'ChineseInfoSmall',
+                parent=self.styles['Normal'],
+                fontName='Chinese' if 'Chinese' in pdfmetrics.getRegisteredFontNames() else 'Helvetica',
+                fontSize=8,
+                alignment=1,
+                spaceAfter=6,
+            )
+        ))
 
-        # 座位表
+        # 座位表 - 双列布局
         # 获取学生信息
         result = await db.execute(
             select(ExamRoomStudent)
@@ -158,43 +170,87 @@ class ExamDocumentGenerator:
         )
         students = result.scalars().all()
 
-        # 计算列数（6列：座位号、考号、姓名、学号、班级、签名）
-        data = [['座位号', '考号', '姓名', '学号', '班级', '签名']]
+        # 将学生分为两组：左列1-15，右列16-30
+        mid_point = (len(students) + 1) // 2
+        left_students = students[:mid_point]
+        right_students = students[mid_point:]
 
-        for student in students:
+        # 创建左列数据
+        left_data = [['座位号', '考号', '姓名', '班级']]
+        for student in left_students:
             row = [
                 str(student.seat_number),
                 student.exam_number,
                 student.student_name or '',
-                student.student_id_number or '',
-                f"班级{student.classroom_id}" if student.classroom_id else '',
-                ''  # 签名栏
+                f"{student.classroom_id}" if student.classroom_id else ''
             ]
-            data.append(row)
+            left_data.append(row)
 
-        # 创建表格
-        table = Table(data, colWidths=[2*cm, 3*cm, 3*cm, 3*cm, 2.5*cm, 2.5*cm])
-        table.setStyle(TableStyle([
+        # 创建右列数据
+        right_data = [['座位号', '考号', '姓名', '班级']]
+        for student in right_students:
+            row = [
+                str(student.seat_number),
+                student.exam_number,
+                student.student_name or '',
+                f"{student.classroom_id}" if student.classroom_id else ''
+            ]
+            right_data.append(row)
+
+        # 创建左右两个表格
+        left_table = Table(left_data, colWidths=[1.5*cm, 5*cm, 4*cm, 1.5*cm])
+        left_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Chinese-Bold' if 'Chinese' in pdfmetrics.getRegisteredFontNames() else 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Chinese' if 'Chinese' in pdfmetrics.getRegisteredFontNames() else 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('FONTNAME', (0, 1), (-1, -1), 'Chinese' if 'Chinese' in pdfmetrics.getRegisteredFontNames() else 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
         ]))
 
-        story.append(table)
+        right_table = Table(right_data, colWidths=[1.5*cm, 5*cm, 4*cm, 1.5*cm])
+        right_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Chinese' if 'Chinese' in pdfmetrics.getRegisteredFontNames() else 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('FONTNAME', (0, 1), (-1, -1), 'Chinese' if 'Chinese' in pdfmetrics.getRegisteredFontNames() else 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+        ]))
 
-        # 页脚
-        story.append(Spacer(1, 1*cm))
+        # 将两个表格并排显示
+        two_column_table = Table([[left_table, right_table]], colWidths=[12*cm, 12*cm])
+        two_column_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+
+        story.append(two_column_table)
+
+        # 页脚 - 更小的字体
+        story.append(Spacer(1, 0.3*cm))
         story.append(Paragraph(
-            f"打印时间：{datetime.now().strftime('%Y年%m月%d日 %H:%M')}",
-            self.styles['ChineseNormal']
+            f"打印时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            ParagraphStyle(
+                'ChineseFooterSmall',
+                parent=self.styles['Normal'],
+                fontName='Chinese' if 'Chinese' in pdfmetrics.getRegisteredFontNames() else 'Helvetica',
+                fontSize=7,
+                alignment=1,
+            )
         ))
 
         # 生成PDF
@@ -385,7 +441,7 @@ class ExamDocumentGenerator:
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Chinese-Bold' if 'Chinese' in pdfmetrics.getRegisteredFontNames() else 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Chinese' if 'Chinese' in pdfmetrics.getRegisteredFontNames() else 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),

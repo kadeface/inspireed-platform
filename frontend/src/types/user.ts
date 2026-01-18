@@ -3,6 +3,8 @@ export enum UserRole {
   TEACHER = 'teacher',
   STUDENT = 'student',
   RESEARCHER = 'researcher',
+  DISTRICT_ADMIN = 'district_admin',
+  SCHOOL_ADMIN = 'school_admin',
 }
 
 export interface User {

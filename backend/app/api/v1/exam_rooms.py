@@ -278,6 +278,52 @@ async def delete_exam_room(
     await db.commit()
 
 
+@router.delete("/clear-all", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_all_exam_rooms(
+    exam_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> None:
+    """
+    清空考试的所有考场编排
+
+    权限说明：
+    - 管理员、区县管理员、学校管理员可以清空考场
+
+    注意：
+    - 将删除该考试的所有考场、学生分配和监考分配
+    - 此操作不可恢复，请谨慎使用
+    """
+    # 权限检查
+    if current_user.role not in [
+        UserRole.ADMIN,
+        UserRole.DISTRICT_ADMIN,
+        UserRole.SCHOOL_ADMIN,
+    ]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="权限不足")
+
+    # 检查考试是否存在
+    exam = await db.get(Exam, exam_id)
+    if not exam:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="考试不存在")
+
+    # 获取所有考场
+    result = await db.execute(
+        select(ExamRoom).where(ExamRoom.exam_id == exam_id)
+    )
+    rooms = result.scalars().all()
+
+    # 删除所有考场（级联删除学生和监考）
+    count = 0
+    for room in rooms:
+        await db.delete(room)
+        count += 1
+
+    await db.commit()
+
+    logger.info(f"Cleared {count} exam rooms for exam {exam_id}")
+
+
 @router.get("/{room_id}/students", response_model=List[ExamRoomStudentResponse])
 async def list_room_students(
     exam_id: int,
@@ -374,13 +420,15 @@ async def export_seating_chart(
         pdf_bytes = await generator.generate_seating_chart(room, exam, db)
 
         # 返回文件
+        from urllib.parse import quote
         filename = f"{exam.name}_{room.name}_座位表_{datetime.now().strftime('%Y%m%d')}.pdf"
         filename = filename.replace(" ", "_")
+        encoded_filename = quote(filename.encode('utf-8'))
 
         return StreamingResponse(
             iter([pdf_bytes]),
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
         )
     except Exception as e:
         logger.error(f"Failed to generate seating chart PDF: {str(e)}")
@@ -427,13 +475,15 @@ async def export_exam_tickets(
         pdf_bytes = await generator.generate_exam_tickets(room, exam, db)
 
         # 返回文件
+        from urllib.parse import quote
         filename = f"{exam.name}_{room.name}_准考证_{datetime.now().strftime('%Y%m%d')}.pdf"
         filename = filename.replace(" ", "_")
+        encoded_filename = quote(filename.encode('utf-8'))
 
         return StreamingResponse(
             iter([pdf_bytes]),
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
         )
     except Exception as e:
         logger.error(f"Failed to generate exam tickets PDF: {str(e)}")
@@ -480,13 +530,15 @@ async def export_proctor_handbook(
         pdf_bytes = await generator.generate_proctor_handbook(room, exam, db)
 
         # 返回文件
+        from urllib.parse import quote
         filename = f"{exam.name}_{room.name}_监考手册_{datetime.now().strftime('%Y%m%d')}.pdf"
         filename = filename.replace(" ", "_")
+        encoded_filename = quote(filename.encode('utf-8'))
 
         return StreamingResponse(
             iter([pdf_bytes]),
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
         )
     except Exception as e:
         logger.error(f"Failed to generate proctor handbook PDF: {str(e)}")

@@ -248,7 +248,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance } from 'element-plus';
 import { examApi, semesterApi } from '@/services/evaluation';
 import { curriculumService } from '@/services/curriculum';
-import { adminApi } from '@/services/admin';
+import adminService from '@/services/admin';
 import type { Exam, Semester } from '@/types/evaluation';
 import type { Grade } from '@/types/curriculum';
 import type { Region, School } from '@/types/admin';
@@ -379,7 +379,7 @@ const loadGrades = async () => {
 // 加载区县列表
 const loadRegions = async () => {
   try {
-    const result = await adminApi.getRegions({ size: 100 });
+    const result = await adminService.getRegions({ size: 100 });
     regions.value = result.regions || [];
   } catch (error: any) {
     ElMessage.error('加载区县列表失败');
@@ -389,7 +389,7 @@ const loadRegions = async () => {
 // 加载学校列表
 const loadSchools = async () => {
   try {
-    const result = await adminApi.getSchools({ size: 1000 });
+    const result = await adminService.getSchools({ size: 1000 });
     schools.value = result.schools || [];
   } catch (error: any) {
     ElMessage.error('加载学校列表失败');

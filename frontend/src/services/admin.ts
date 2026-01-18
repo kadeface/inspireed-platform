@@ -391,6 +391,65 @@ export const adminService = {
   },
 
   /**
+   * 批量删除用户
+   */
+  async batchDeleteUsers(userIds: number[]): Promise<{
+    message: string
+    deleted_count: number
+    total_requested: number
+    failed_count?: number
+    failed_users?: Array<{ id: number; username: string; error: string }>
+  }> {
+    return await api.post('/admin/users/batch-delete', userIds)
+  },
+
+  /**
+   * 预览按条件批量删除的用户
+   */
+  async previewBatchDeleteByFilter(filters: {
+    role: string
+    region_id?: number
+    school_id?: number
+    grade_id?: number
+    classroom_id?: number
+    confirm?: boolean
+  }): Promise<{
+    total_count: number
+    preview_users: Array<{
+      id: number
+      username: string
+      full_name?: string
+      email: string
+      school_name?: string
+      grade_name?: string
+      classroom_name?: string
+    }>
+    showing: number
+    message: string
+  }> {
+    return await api.post('/admin/users/batch-delete-by-filter/preview', filters)
+  },
+
+  /**
+   * 按条件批量删除用户（支持大规模删除）
+   */
+  async batchDeleteByFilter(filters: {
+    role: string
+    region_id?: number
+    school_id?: number
+    grade_id?: number
+    classroom_id?: number
+    confirm: boolean
+  }): Promise<{
+    message: string
+    deleted_count: number
+    exam_mappings_deleted: number
+    exam_room_students_deleted: number
+  }> {
+    return await api.post('/admin/users/batch-delete-by-filter', filters)
+  },
+
+  /**
    * 切换用户状态
    */
   async toggleUserStatus(userId: number): Promise<{ message: string; is_active: boolean }> {

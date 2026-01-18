@@ -61,7 +61,34 @@
           >
             📥 批量导入
           </button>
+          <button
+            @click="openBatchDeleteByFilterDialog"
+            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            🗑️ 批量删除（按区域/学校）
+          </button>
         </div>
+      </div>
+    </div>
+
+    <!-- 批量选择工具栏 -->
+    <div v-if="selectedTeachers.length > 0" class="bg-blue-50 border-b border-blue-200 px-6 py-3 flex items-center justify-between">
+      <div class="text-sm text-blue-800">
+        已选择 <span class="font-bold">{{ selectedTeachers.length }}</span> 位教师
+      </div>
+      <div class="flex gap-2">
+        <button
+          @click="batchDeleteTeachers"
+          class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+        >
+          批量删除
+        </button>
+        <button
+          @click="clearSelection"
+          class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm"
+        >
+          取消选择
+        </button>
       </div>
     </div>
 
@@ -70,6 +97,15 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase w-12">
+              <input
+                type="checkbox"
+                :checked="isAllSelected"
+                :indeterminate="isSomeSelected"
+                @change="toggleSelectAll"
+                class="h-4 w-4 text-blue-600 rounded"
+              />
+            </th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">姓名</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">工号/用户名</th>
@@ -82,16 +118,24 @@
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <tr v-if="loading">
-            <td :colspan="8" class="px-6 py-4 text-center text-gray-500">
+            <td :colspan="9" class="px-6 py-4 text-center text-gray-500">
               加载中...
             </td>
           </tr>
           <tr v-else-if="teachers.length === 0">
-            <td :colspan="8" class="px-6 py-4 text-center text-gray-500">
+            <td :colspan="9" class="px-6 py-4 text-center text-gray-500">
               暂无教师数据
             </td>
           </tr>
-          <tr v-else v-for="teacher in teachers" :key="teacher.id">
+          <tr v-else v-for="teacher in teachers" :key="teacher.id" :class="{ 'bg-blue-50': selectedTeachers.includes(teacher.id) }">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <input
+                type="checkbox"
+                :checked="selectedTeachers.includes(teacher.id)"
+                @change="toggleTeacherSelection(teacher.id)"
+                class="h-4 w-4 text-blue-600 rounded"
+              />
+            </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ teacher.id }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               {{ teacher.full_name || '-' }}
@@ -184,7 +228,7 @@
           <el-input v-model="teacherForm.password" type="password" placeholder="请输入初始密码" />
         </el-form-item>
         <el-form-item label="所属学校">
-          <el-select v-model="teacherForm.school_id" placeholder="请选择学校" class="w-full">
+          <el-select v-model="teacherForm.school_id" placeholder="输入学校名称搜索或选择学校" class="w-full" filterable>
             <el-option
               v-for="school in filteredSchools"
               :key="school.id"
@@ -259,6 +303,104 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 批量删除（按区域/学校）对话框 -->
+    <el-dialog
+      v-model="showBatchDeleteByFilterDialog"
+      title="批量删除教师（按区域/学校）"
+      width="700px"
+    >
+      <div class="space-y-4">
+        <el-alert
+          title="危险操作"
+          type="error"
+          :closable="false"
+          show-icon
+        >
+          <p>此操作将批量删除符合条件的教师及其相关数据，不可撤销！</p>
+          <p class="mt-2 text-sm">
+            将同时删除：
+            <br>- 教师账号
+            <br>- 相关教学任务
+            <br>- 考场监考安排
+          </p>
+        </el-alert>
+
+        <el-form :model="batchDeleteForm" label-width="100px">
+          <el-form-item label="所属区域">
+            <el-select
+              v-model="batchDeleteForm.region_id"
+              @change="handleBatchDeleteRegionChange"
+              placeholder="选择区域（不选则删除所有区域）"
+              clearable
+              class="w-full"
+            >
+              <el-option
+                v-for="region in allRegions"
+                :key="region.id"
+                :label="region.name"
+                :value="region.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="所属学校">
+            <el-select
+              v-model="batchDeleteForm.school_id"
+              placeholder="输入学校名称搜索或选择学校（不选则删除所有学校）"
+              clearable
+              filterable
+              class="w-full"
+              :disabled="!batchDeleteForm.region_id"
+            >
+              <el-option
+                v-for="school in filteredSchoolsForBatchDelete"
+                :key="school.id"
+                :label="school.name"
+                :value="school.id"
+              />
+            </el-select>
+          </el-form-item>
+        </el-form>
+
+        <div v-if="previewResult" class="border rounded p-4 bg-gray-50">
+          <h4 class="font-medium mb-2">删除预览</h4>
+          <p class="text-lg font-bold text-red-600">{{ previewResult.message }}</p>
+          <div v-if="previewResult.preview_users && previewResult.preview_users.length > 0" class="mt-3">
+            <p class="text-sm text-gray-600 mb-2">部分教师列表（显示前{{ previewResult.showing }}个）：</p>
+            <el-table :data="previewResult.preview_users" max-height="200" size="small">
+              <el-table-column prop="username" label="工号" width="100" />
+              <el-table-column prop="full_name" label="姓名" width="100" />
+              <el-table-column prop="email" label="邮箱" />
+              <el-table-column prop="school_name" label="学校" />
+            </el-table>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <el-button
+            type="warning"
+            @click="previewBatchDelete"
+            :loading="previewing"
+            :disabled="deleting"
+          >
+            🔍 预览删除范围
+          </el-button>
+          <el-button
+            v-if="previewResult"
+            type="danger"
+            @click="confirmBatchDelete"
+            :loading="deleting"
+            :disabled="!previewResult || previewResult.total_count === 0"
+          >
+            ⚠️ 确认删除
+          </el-button>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showBatchDeleteByFilterDialog = false" :disabled="deleting">取消</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -278,6 +420,8 @@ const allSchools = ref<School[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const importing = ref(false)
+const selectedTeachers = ref<number[]>([])
+const showBatchDeleteByFilterDialog = ref(false)
 
 // 分页
 const currentPage = ref(1)
@@ -299,10 +443,40 @@ const filteredSchools = computed(() => {
   return allSchools.value
 })
 
+// 批量删除对话框中使用的学校筛选（根据选择的区域过滤）
+const filteredSchoolsForBatchDelete = computed(() => {
+  if (batchDeleteForm.value.region_id) {
+    return allSchools.value.filter(s => s.region_id === batchDeleteForm.value.region_id)
+  }
+  return allSchools.value
+})
+
+// 批量选择相关
+const isAllSelected = computed(() => {
+  return teachers.value.length > 0 && selectedTeachers.value.length === teachers.value.length
+})
+
+const isSomeSelected = computed(() => {
+  return selectedTeachers.value.length > 0 && selectedTeachers.value.length < teachers.value.length
+})
+
 // 对话框状态
 const showTeacherModal = ref(false)
 const showImportDialog = ref(false)
 const editingTeacher = ref<User | null>(null)
+
+// 批量删除相关
+const batchDeleteForm = ref<{
+  region_id?: number
+  school_id?: number
+}>({
+  region_id: undefined,
+  school_id: undefined
+})
+
+const previewResult = ref<any>(null)
+const previewing = ref(false)
+const deleting = ref(false)
 
 // 表单数据
 const teacherForm = ref({
@@ -488,6 +662,58 @@ const resetForm = () => {
   }
 }
 
+// 批量选择和删除
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedTeachers.value = []
+  } else {
+    selectedTeachers.value = teachers.value.map(t => t.id)
+  }
+}
+
+const toggleTeacherSelection = (teacherId: number) => {
+  const index = selectedTeachers.value.indexOf(teacherId)
+  if (index > -1) {
+    selectedTeachers.value.splice(index, 1)
+  } else {
+    selectedTeachers.value.push(teacherId)
+  }
+}
+
+const clearSelection = () => {
+  selectedTeachers.value = []
+}
+
+const batchDeleteTeachers = async () => {
+  if (selectedTeachers.value.length === 0) {
+    toast.warning('请先选择要删除的教师')
+    return
+  }
+
+  const teacherNames = teachers.value
+    .filter(t => selectedTeachers.value.includes(t.id))
+    .map(t => t.full_name || t.username)
+    .join(', ')
+
+  if (!confirm(`确定要删除以下 ${selectedTeachers.value.length} 位教师吗？\n\n${teacherNames}\n\n此操作不可撤销。`)) {
+    return
+  }
+
+  try {
+    const result = await adminService.batchDeleteUsers(selectedTeachers.value)
+    teachers.value = teachers.value.filter(t => !selectedTeachers.value.includes(t.id))
+    total.value -= result.deleted_count
+    toast.success(
+      `成功删除 ${result.deleted_count} 位教师` +
+      (result.failed_count ? `，失败 ${result.failed_count} 位` : '')
+    )
+    clearSelection()
+  } catch (error: any) {
+    console.error('Failed to batch delete teachers:', error)
+    toast.error(error.response?.data?.detail || '批量删除教师失败')
+  }
+}
+
 // 导入相关
 const openImportDialog = () => {
   importFile.value = null
@@ -547,6 +773,73 @@ const startImport = async () => {
     ElMessage.error(error.message || '导入失败')
   } finally {
     importing.value = false
+  }
+}
+
+// 批量删除（按条件）相关
+const openBatchDeleteByFilterDialog = () => {
+  batchDeleteForm.value = {
+    region_id: filters.value.region_id,
+    school_id: filters.value.school_id
+  }
+  previewResult.value = null
+  showBatchDeleteByFilterDialog.value = true
+}
+
+const handleBatchDeleteRegionChange = () => {
+  // 区域变化时，清空学校选择
+  batchDeleteForm.value.school_id = undefined
+}
+
+const previewBatchDelete = async () => {
+  previewing.value = true
+  previewResult.value = null
+  try {
+    const result = await adminService.previewBatchDeleteByFilter({
+      role: 'teacher',
+      region_id: batchDeleteForm.value.region_id,
+      school_id: batchDeleteForm.value.school_id
+    })
+    previewResult.value = result
+    toast.success(`找到 ${result.total_count} 位教师`)
+  } catch (error: any) {
+    console.error('Failed to preview batch delete:', error)
+    toast.error(error.response?.data?.detail || '预览失败')
+  } finally {
+    previewing.value = false
+  }
+}
+
+const confirmBatchDelete = async () => {
+  if (!previewResult.value || previewResult.value.total_count === 0) {
+    toast.warning('没有要删除的教师')
+    return
+  }
+
+  if (!confirm(`确定要删除 ${previewResult.value.total_count} 位教师吗？\n\n此操作不可撤销，将同时删除：\n- 教师账号\n- 相关教学任务\n- 考场监考安排`)) {
+    return
+  }
+
+  deleting.value = true
+  try {
+    const result = await adminService.batchDeleteByFilter({
+      role: 'teacher',
+      region_id: batchDeleteForm.value.region_id,
+      school_id: batchDeleteForm.value.school_id,
+      confirm: true
+    })
+    toast.success(
+      `成功删除 ${result.deleted_count} 位教师\n` +
+      `同时删除了 ${result.exam_mappings_deleted} 条考号映射\n` +
+      `和 ${result.exam_room_students_deleted} 条考场安排记录`
+    )
+    showBatchDeleteByFilterDialog.value = false
+    loadTeachers() // 刷新列表
+  } catch (error: any) {
+    console.error('Failed to batch delete by filter:', error)
+    toast.error(error.response?.data?.detail || '批量删除失败')
+  } finally {
+    deleting.value = false
   }
 }
 

@@ -175,6 +175,13 @@
             <el-tag size="small">{{ getExamTypeName(row.exam_type) }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="exam_level" label="级别" width="90">
+          <template #default="{ row }">
+            <el-tag :type="getExamLevelType(row.exam_level)" size="small">
+              {{ getExamLevelName(row.exam_level) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="exam_date" label="考试日期" width="120" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
@@ -502,6 +509,13 @@
               <el-tag size="small">{{ getExamTypeName(row.exam_type) }}</el-tag>
             </template>
           </el-table-column>
+          <el-table-column prop="exam_level" label="级别" width="80">
+            <template #default="{ row }">
+              <el-tag :type="getExamLevelType(row.exam_level)" size="small">
+                {{ getExamLevelName(row.exam_level) }}
+              </el-tag>
+            </template>
+          </el-table-column>
           <el-table-column prop="status" label="状态" width="90">
             <template #default="{ row }">
               <el-tag :type="getStatusType(row.status)" size="small">
@@ -640,7 +654,26 @@
           <el-form-item label="考试名称">
             <el-input v-model="schoolExamForm.name" placeholder="例如：2024年春季期末统考" />
           </el-form-item>
-          <el-form-item label="选择区县">
+          <el-form-item label="考试级别">
+            <el-select v-model="schoolExamForm.exam_level" placeholder="选择考试级别" style="width: 100%;">
+              <el-option label="校级考试" value="school">
+                <span>校级考试</span>
+                <span style="font-size: 12px; color: #999; margin-left: 8px;">本校考试，使用班级选择</span>
+              </el-option>
+              <el-option label="区县统考" value="district">
+                <span>区县统考</span>
+                <span style="font-size: 12px; color: #999; margin-left: 8px;">区县统一考试，选择区县和学校</span>
+              </el-option>
+              <el-option label="市级考试" value="city">
+                <span>市级考试</span>
+                <span style="font-size: 12px; color: #999; margin-left: 8px;">市级统一考试，需导入市级考号</span>
+              </el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item
+            v-if="schoolExamForm.exam_level === 'district' || schoolExamForm.exam_level === 'city'"
+            label="选择区县"
+          >
             <el-select
               v-model="schoolExamForm.region_id"
               placeholder="请选择区县"
@@ -656,15 +689,56 @@
               />
             </el-select>
           </el-form-item>
-          <el-form-item label="选择学校">
+          <el-form-item
+            v-if="schoolExamForm.exam_level === 'district' || schoolExamForm.exam_level === 'city'"
+            label="选择学段"
+          >
+            <el-select
+              v-model="schoolExamForm.study_level"
+              placeholder="请先选择区县"
+              style="width: 100%;"
+              :disabled="!schoolExamForm.region_id"
+              @change="onStudyLevelChange"
+            >
+              <el-option
+                v-for="studyLevel in availableStudyLevels"
+                :key="studyLevel"
+                :label="studyLevel"
+                :value="studyLevel"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item
+            v-if="schoolExamForm.exam_level === 'district' || schoolExamForm.exam_level === 'city'"
+            label="选择年级"
+          >
+            <el-select
+              v-model="schoolExamForm.grade_id"
+              placeholder="请先选择学段"
+              style="width: 100%;"
+              :disabled="!schoolExamForm.study_level"
+              @change="onGradeChange"
+            >
+              <el-option
+                v-for="grade in filteredGrades"
+                :key="grade.id"
+                :label="grade.name"
+                :value="grade.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item
+            v-if="schoolExamForm.exam_level === 'district' || schoolExamForm.exam_level === 'city'"
+            label="选择学校"
+          >
             <el-select
               v-model="schoolExamForm.school_ids"
               multiple
               collapse-tags
               collapse-tags-tooltip
-              placeholder="请先选择区县，可多选学校"
+              placeholder="请先选择年级，可多选学校"
               style="width: 100%;"
-              :disabled="!schoolExamForm.region_id"
+              :disabled="!schoolExamForm.grade_id"
               @change="onSchoolsChange"
             >
               <el-option
@@ -680,7 +754,7 @@
                 :value="school.id"
               />
             </el-select>
-            <div v-if="schoolExamForm.region_id && filteredSchools.length > 0" style="margin-top: 8px;">
+            <div v-if="schoolExamForm.grade_id && filteredSchools.length > 0" style="margin-top: 8px;">
               <el-link type="primary" @click="selectAllSchools" style="font-size: 13px;">
                 全选{{ filteredSchools.length }}所学校
               </el-link>
@@ -689,22 +763,6 @@
                 清空选择
               </el-link>
             </div>
-          </el-form-item>
-          <el-form-item label="选择年级">
-            <el-select
-              v-model="schoolExamForm.grade_id"
-              placeholder="请先选择学校"
-              style="width: 100%;"
-              :disabled="schoolExamForm.school_ids.length === 0"
-              @change="onGradeChange"
-            >
-              <el-option
-                v-for="grade in availableGrades"
-                :key="grade.id"
-                :label="grade.name"
-                :value="grade.id"
-              />
-            </el-select>
           </el-form-item>
           <el-form-item label="选择学期">
             <el-select
@@ -754,6 +812,22 @@
           <el-form-item label="考试名称">
             <el-input v-model="schoolExamForm.name" placeholder="例如：2024年春季期末考试" />
           </el-form-item>
+          <el-form-item label="考试级别">
+            <el-select v-model="schoolExamForm.exam_level" placeholder="选择考试级别" style="width: 100%;">
+              <el-option label="校级考试" value="school">
+                <span>校级考试</span>
+                <span style="font-size: 12px; color: #999; margin-left: 8px;">本校考试，使用班级选择</span>
+              </el-option>
+              <el-option label="区县统考" value="district">
+                <span>区县统考</span>
+                <span style="font-size: 12px; color: #999; margin-left: 8px;">区县统一考试，选择区县和学校</span>
+              </el-option>
+              <el-option label="市级考试" value="city">
+                <span>市级考试</span>
+                <span style="font-size: 12px; color: #999; margin-left: 8px;">市级统一考试，需导入市级考号</span>
+              </el-option>
+            </el-select>
+          </el-form-item>
           <el-form-item label="所属学校">
             <el-input :value="currentUser?.school_name" disabled style="width: 100%;" />
             <div style="margin-top: 8px;">
@@ -798,7 +872,10 @@
               />
             </el-select>
           </el-form-item>
-          <el-form-item label="选择班级">
+          <el-form-item
+            v-if="schoolExamForm.exam_level === 'school'"
+            label="选择班级"
+          >
             <el-select
               v-model="schoolExamForm.class_ids"
               multiple
@@ -1121,6 +1198,13 @@
           >
             分配监考教师
           </el-button>
+          <el-button
+            v-if="examRooms.length > 0"
+            type="danger"
+            @click="clearAllExamRooms"
+          >
+            清空考场
+          </el-button>
         </div>
 
         <!-- 考场列表 -->
@@ -1303,12 +1387,69 @@ const roomArrangementForm = reactive({
   useExistingRooms: true
 });
 
+// 计算属性：动态获取当前区县的学段（学校类型）列表
+const availableStudyLevels = computed(() => {
+  let schools = availableSchools.value;
+
+  // 先根据区县过滤
+  if (schoolExamForm.region_id) {
+    schools = schools.filter(s => s.region_id === schoolExamForm.region_id);
+  }
+
+  // 提取学校类型（去重、排序）
+  const studyLevels = [...new Set(schools.map(s => s.school_type))].filter(Boolean);
+
+  // 按照常见顺序排序（小学、初中、高中）
+  const order = { '小学': 1, '初中': 2, '高中': 3 };
+  studyLevels.sort((a, b) => {
+    const orderA = order[a as keyof typeof order] || 999;
+    const orderB = order[b as keyof typeof order] || 999;
+    return orderA - orderB;
+  });
+
+  return studyLevels;
+});
+
 // 计算属性：根据选择的区县过滤学校
 const filteredSchools = computed(() => {
-  if (!schoolExamForm.region_id) {
-    return availableSchools.value;
+  let result = availableSchools.value;
+
+  // 先根据区县过滤
+  if (schoolExamForm.region_id) {
+    result = result.filter(s => s.region_id === schoolExamForm.region_id);
   }
-  return availableSchools.value.filter(s => s.region_id === schoolExamForm.region_id);
+
+  // 再根据学段过滤（只显示该学段的学校）
+  if (schoolExamForm.study_level) {
+    result = result.filter(s => s.school_type === schoolExamForm.study_level);
+  }
+
+  return result;
+});
+
+// 计算属性：根据选择的学段过滤年级（使用 Grade 的 level 字段）
+const filteredGrades = computed(() => {
+  if (!schoolExamForm.study_level) {
+    return [];
+  }
+
+  // 根据学段使用 level 字段过滤
+  return availableGrades.value.filter(grade => {
+    const level = grade.level;
+
+    if (schoolExamForm.study_level === '小学') {
+      // 小学：1-6年级
+      return level >= 1 && level <= 6;
+    } else if (schoolExamForm.study_level === '初中') {
+      // 初中：7-9年级
+      return level >= 7 && level <= 9;
+    } else if (schoolExamForm.study_level === '高中') {
+      // 高中：10-12年级
+      return level >= 10 && level <= 12;
+    }
+
+    return false;
+  });
 });
 
 // 学校端考试表单
@@ -1319,15 +1460,19 @@ interface Subject {
 
 const schoolExamForm = reactive({
   name: '',
-  // 区县管理员字段
+  exam_type: '',
+  // 考试级别：school（校级）/ district（区级）/ city（市级）
+  exam_level: 'school',
+  // 区县管理员字段（用于 district/city 级别）
   region_id: undefined as number | undefined,
+  study_level: undefined as string | undefined,  // 学段：小学/初中/高中
+  grade_id: undefined as number | undefined,  // 年级
   school_ids: [] as number[],  // 多选学校
-  // 学校管理员字段
+  // 学校管理员字段（用于 school 级别）
   isJointExam: false,
   additional_school_ids: [] as number[],  // 联考时额外的学校
   // 通用字段
   school_id: undefined as number | undefined,
-  grade_id: undefined as number | undefined,
   class_ids: [] as number[],
   semester_id: undefined as number | undefined,  // 学期ID
   exam_date: '',
@@ -1399,7 +1544,7 @@ const loadData = async () => {
   try {
     semesters.value = await semesterApi.list();
     const examsList = await examApi.list({ skip: 0, limit: 100 });
-    
+
     // 为每个考试添加数据准备状态（这里需要调用API获取实际状态）
     // 暂时使用模拟数据，实际应该从后端获取
     exams.value = examsList.map((exam: Exam) => ({
@@ -1407,13 +1552,16 @@ const loadData = async () => {
       hasStudents: false, // TODO: 从API获取是否有考生映射
       hasScores: false, // TODO: 从API获取是否有成绩数据
     })) as ExamWithStatus[];
-    
+
+    // 加载年级数据
     grades.value = await curriculumService.getGrades();
+    availableGrades.value = grades.value;  // 同时赋值给 availableGrades
 
     // 查找当前学期
     currentSemester.value = semesters.value.find(s => s.is_current) || null;
   } catch (error: any) {
     console.error('加载数据失败:', error);
+    ElMessage.error(error.response?.data?.detail || '加载数据失败');
   } finally {
     loading.value = false;
   }
@@ -1754,11 +1902,11 @@ const onGradeChange = async (gradeId: number | undefined) => {
 
 // 区县管理员：区县变化时的处理
 const onRegionChange = (regionId: number | undefined) => {
-  // 清空已选择的学校和年级
+  // 清空已选择的学段、年级和学校
+  schoolExamForm.study_level = undefined;
   schoolExamForm.school_ids = [];
   schoolExamForm.grade_id = undefined;
   schoolExamForm.class_ids = [];
-  availableGrades.value = [];
   availableClassrooms.value = [];
 
   if (regionId) {
@@ -1768,22 +1916,29 @@ const onRegionChange = (regionId: number | undefined) => {
   }
 };
 
-// 区县管理员：学校列表变化时的处理
-const onSchoolsChange = () => {
-  // 清空已选择的年级和班级
+// 区县管理员：学段变化时的处理
+const onStudyLevelChange = (studyLevel: string | undefined) => {
+  // 清空已选择的年级和学校
   schoolExamForm.grade_id = undefined;
+  schoolExamForm.school_ids = [];
   schoolExamForm.class_ids = [];
-  availableGrades.value = [];
   availableClassrooms.value = [];
 
-  // 根据选中的学校加载年级（使用第一个选中学校的类型）
-  if (schoolExamForm.school_ids.length > 0) {
-    const firstSchool = availableSchools.value.find(s => s.id === schoolExamForm.school_ids[0]);
-    if (firstSchool) {
-      // 复用onSchoolChange逻辑加载年级
-      loadGradesBySchoolType(firstSchool);
-    }
+  if (studyLevel) {
+    // 根据学段过滤年级
+    const gradeCount = filteredGrades.value.length;
+    const schoolCount = filteredSchools.value.length;
+    ElMessage.success(`${studyLevel} - 共${schoolCount}所学校，${gradeCount}个年级`);
   }
+};
+
+// 区县管理员：学校列表变化时的处理
+const onSchoolsChange = () => {
+  // 清空已选择的班级
+  schoolExamForm.class_ids = [];
+  availableClassrooms.value = [];
+
+  // 注意：年级已经通过学段选择了，这里不需要再加载年级
 };
 
 // 学校管理员：联考模式变化
@@ -2044,15 +2199,30 @@ const createSchoolExamForRooms = async () => {
     const examDateTime = `${year}-${month}-${day} 12:00:00`;
 
     // 构建请求数据
-    const requestData = {
+    const requestData: any = {
       name: schoolExamForm.name,
-      exam_type: 'final' as any,  // 考试类型
+      exam_type: schoolExamForm.exam_type || 'final',  // 考试类型
+      exam_level: schoolExamForm.exam_level,  // 考试级别：school/district/city
       semester_id: schoolExamForm.semester_id!,
       grade_id: schoolExamForm.grade_id!,
       exam_date: examDateTime,  // 格式：YYYY-MM-DD HH:mm:ss
-      school_id: isSchoolAdmin.value ? currentUser.value?.school_id : schoolExamForm.school_id,
-      region_id: isDistrictAdmin.value ? schoolExamForm.region_id : undefined,
     };
+
+    // 根据考试级别和用户角色添加不同的字段
+    if (schoolExamForm.exam_level === 'school') {
+      // 校级考试：使用 school_id 和 class_ids
+      requestData.school_id = isSchoolAdmin.value ? currentUser.value?.school_id : schoolExamForm.school_id;
+      if (schoolExamForm.class_ids.length > 0) {
+        requestData.class_ids = schoolExamForm.class_ids;
+      }
+    } else if (schoolExamForm.exam_level === 'district' || schoolExamForm.exam_level === 'city') {
+      // 区级/市级考试：使用 region_id 和 school_ids
+      requestData.region_id = schoolExamForm.region_id;
+      if (schoolExamForm.school_ids.length > 0) {
+        requestData.school_ids = schoolExamForm.school_ids;
+      }
+      // study_level 仅用于前端过滤，不发送到后端
+    }
 
     console.log('创建考试请求:', requestData);
 
@@ -2142,6 +2312,38 @@ const autoAssignProctors = async () => {
     ElMessage.error(error.response?.data?.detail || '分配监考失败');
   } finally {
     assigningProctors.value = false;
+  }
+};
+
+// 清空所有考场
+const clearAllExamRooms = async () => {
+  if (!createdExamId.value) {
+    ElMessage.error('考试ID不存在，请先创建考试');
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      '确定要清空所有考场编排吗？此操作将删除所有考场、学生分配和监考分配，且不可恢复。',
+      '确认清空',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+
+    await examRoomService.clearAllRooms(createdExamId.value);
+    ElMessage.success('已清空所有考场');
+    // 清空本地数据
+    examRooms.value = [];
+    // 刷新数据
+    await loadExamRooms();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('清空考场失败:', error);
+      ElMessage.error(error.response?.data?.detail || '清空考场失败');
+    }
   }
 };
 
@@ -2282,8 +2484,11 @@ const closeSchoolQuickExamDialog = () => {
 const resetSchoolExamForm = () => {
   schoolExamStep.value = 0;
   schoolExamForm.name = '';
+  schoolExamForm.exam_type = '';
+  schoolExamForm.exam_level = 'school';  // 重置为默认值
   // 重置区县管理员字段
   schoolExamForm.region_id = undefined;
+  schoolExamForm.study_level = undefined;
   schoolExamForm.school_ids = [];
   // 重置学校管理员字段
   schoolExamForm.isJointExam = false;
@@ -2301,7 +2506,8 @@ const resetSchoolExamForm = () => {
   ];
   availableSchools.value = [];
   availableRegions.value = [];
-  availableGrades.value = [];
+  // 注意：availableGrades 是全局数据，不应在重置表单时清空
+  // availableGrades.value = [];  // ← 移除这行
   availableClassrooms.value = [];
   availableSubjects.value = [];
   confirmedStudents.value = [];
@@ -2536,6 +2742,24 @@ const getStatusType = (status: string) => {
     completed: 'success',
   };
   return typeMap[status] || '';
+};
+
+const getExamLevelName = (level: string) => {
+  const levelMap: Record<string, string> = {
+    school: '校级',
+    district: '区级',
+    city: '市级',
+  };
+  return levelMap[level] || level;
+};
+
+const getExamLevelType = (level: string) => {
+  const typeMap: Record<string, any> = {
+    school: 'info',
+    district: 'warning',
+    city: 'danger',
+  };
+  return typeMap[level] || 'info';
 };
 
 // 组件挂载

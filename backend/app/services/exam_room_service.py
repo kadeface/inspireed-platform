@@ -15,10 +15,9 @@ from sqlalchemy.orm import selectinload
 from app.models.evaluation import Exam
 from app.models.exam_room import ExamRoom, ExamRoomStudent, ExamProctor
 from app.models.user import User, UserRole
-from app.models.organization import Classroom, School
+from app.models.organization import Classroom
 from app.models.room import Room
 from app.schemas.exam_room import AutoAssignRoomsRequest, AutoAssignProctorsRequest
-from app.services.exam_number_service import ExamNumberService
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +73,10 @@ class ExamRoomService:
         # 4. 创建考场
         exam_rooms = []
         for i in range(num_rooms):
+            # 区县/市级考试：只创建逻辑考场，不分配物理教室
+            # 校级考试：可以使用物理教室
+            is_logical_only = exam.exam_level in ["district", "city"]
+
             room = ExamRoom(
                 exam_id=exam_id,
                 name=f"第{i+1}考场",
@@ -82,9 +85,11 @@ class ExamRoomService:
                 arrangement_type=request.arrangement_type,
                 seat_pattern=request.seat_pattern,
                 seat_count=0,  # 将在分配学生后更新
+                room_id=None if is_logical_only else None,  # 逻辑编排不分配物理教室
             )
 
-            if request.use_existing_rooms:
+            # 只有校级考试且用户选择使用现有教室时，才分配物理教室
+            if not is_logical_only and request.use_existing_rooms:
                 # 尝试找到可用的教室
                 assigned_room = await self._find_available_room(
                     exam.school_id or 1, capacity_per_room, db
@@ -216,16 +221,8 @@ class ExamRoomService:
         room = exam_rooms[room_index]
         current_seat = 1
 
-        # 获取学校代码（用于市级考号转换）
-        school = None
-        if exam.exam_level in ["district", "city"]:
-            if exam.school_id:
-                result = await db.execute(select(School).where(School.id == exam.school_id))
-                school = result.scalar_one_or_none()
-            elif students and students[0].school_id:
-                # 使用第一个学生的学校
-                result = await db.execute(select(School).where(School.id == students[0].school_id))
-                school = result.scalar_one_or_none()
+        # 用于追踪已使用的考号，避免重复
+        used_exam_numbers = set()
 
         for student in students:
             # 检查考场是否已满
@@ -236,28 +233,52 @@ class ExamRoomService:
                 room = exam_rooms[room_index]
                 current_seat = 1
 
-            # 根据考试级别选择考号格式
-            if exam.exam_level == "school":
-                # 学校级考试：直接使用校级考号（username）
-                exam_number = student.username
-            elif exam.exam_level in ["district", "city"]:
-                # 区县/市级考试：转换为市级考号格式
-                if school and school.code:
-                    try:
-                        exam_number = ExamNumberService.school_to_city_exam_number(
-                            school_exam_number=student.username,
-                            school_code=school.code,
-                            exam_date=exam.exam_date
-                        )
-                    except ValueError as e:
-                        logger.warning(f"考号转换失败，使用校级考号: {e}")
-                        exam_number = student.username
-                else:
-                    logger.warning(f"学校代码不存在，使用校级考号")
-                    exam_number = student.username
-            else:
-                # 默认使用校级考号
-                exam_number = student.username
+            # 直接使用 username 作为考号（校级、区级、市级考试都使用相同格式）
+            base_exam_number = student.username
+
+            # 检查该学生是否已有考号映射
+            result = await db.execute(
+                select(ExamNumberMapping).where(
+                    and_(
+                        ExamNumberMapping.exam_id == exam_id,
+                        ExamNumberMapping.student_id == student.id
+                    )
+                )
+            )
+            existing_mapping = result.scalar_one_or_none()
+
+            if existing_mapping:
+                # 如果已存在，更新座位分配但跳过考号映射插入
+                logger.info(f"Student {student.id} already has exam number mapping, skipping")
+                seat = ExamRoomStudent(
+                    room_id=room.id,
+                    student_id=student.id,
+                    exam_number=existing_mapping.exam_number,  # 使用已存在的考号
+                    seat_number=current_seat,
+                    student_id_number=student.student_id_number,
+                    student_name=student.full_name,
+                    school_id=student.school_id,
+                    classroom_id=student.classroom_id,
+                )
+                db.add(seat)
+                current_seat += 1
+                continue
+
+            # 确保考号唯一性：如果考号已被使用，添加序号后缀
+            exam_number = base_exam_number
+            suffix = 0
+            while exam_number in used_exam_numbers:
+                suffix += 1
+                # 在考号末尾添加字母序号（A, B, C...）
+                exam_number = f"{base_exam_number}{chr(64 + suffix)}"
+
+            used_exam_numbers.add(exam_number)
+
+            if suffix > 0:
+                logger.warning(
+                    f"Student {student.id} ({student.username}) has duplicate exam number, "
+                    f"using {exam_number} instead of {base_exam_number}"
+                )
 
             # 创建座位分配
             seat = ExamRoomStudent(
@@ -323,16 +344,8 @@ class ExamRoomService:
         """
         from app.models.evaluation import ExamNumberMapping
 
-        # 获取学校代码（用于市级考号转换）
-        school = None
-        if exam.exam_level in ["district", "city"]:
-            if exam.school_id:
-                result = await db.execute(select(School).where(School.id == exam.school_id))
-                school = result.scalar_one_or_none()
-            elif students and students[0].school_id:
-                # 使用第一个学生的学校
-                result = await db.execute(select(School).where(School.id == students[0].school_id))
-                school = result.scalar_one_or_none()
+        # 用于追踪已使用的考号，避免重复
+        used_exam_numbers = set()
 
         # 简单轮询混排
         for i, student in enumerate(students):
@@ -343,28 +356,51 @@ class ExamRoomService:
             if seat_number > capacity:
                 break
 
-            # 根据考试级别选择考号格式
-            if exam.exam_level == "school":
-                # 学校级考试：直接使用校级考号（username）
-                exam_number = student.username
-            elif exam.exam_level in ["district", "city"]:
-                # 区县/市级考试：转换为市级考号格式
-                if school and school.code:
-                    try:
-                        exam_number = ExamNumberService.school_to_city_exam_number(
-                            school_exam_number=student.username,
-                            school_code=school.code,
-                            exam_date=exam.exam_date
-                        )
-                    except ValueError as e:
-                        logger.warning(f"考号转换失败，使用校级考号: {e}")
-                        exam_number = student.username
-                else:
-                    logger.warning(f"学校代码不存在，使用校级考号")
-                    exam_number = student.username
-            else:
-                # 默认使用校级考号
-                exam_number = student.username
+            # 直接使用 username 作为考号（校级、区级、市级考试都使用相同格式）
+            base_exam_number = student.username
+
+            # 检查该学生是否已有考号映射
+            result = await db.execute(
+                select(ExamNumberMapping).where(
+                    and_(
+                        ExamNumberMapping.exam_id == exam_id,
+                        ExamNumberMapping.student_id == student.id
+                    )
+                )
+            )
+            existing_mapping = result.scalar_one_or_none()
+
+            if existing_mapping:
+                # 如果已存在，更新座位分配但跳过考号映射插入
+                logger.info(f"Student {student.id} already has exam number mapping, skipping")
+                seat = ExamRoomStudent(
+                    room_id=room.id,
+                    student_id=student.id,
+                    exam_number=existing_mapping.exam_number,  # 使用已存在的考号
+                    seat_number=seat_number,
+                    student_id_number=student.student_id_number,
+                    student_name=student.full_name,
+                    school_id=student.school_id,
+                    classroom_id=student.classroom_id,
+                )
+                db.add(seat)
+                continue
+
+            # 确保考号唯一性：如果考号已被使用，添加序号后缀
+            exam_number = base_exam_number
+            suffix = 0
+            while exam_number in used_exam_numbers:
+                suffix += 1
+                # 在考号末尾添加字母序号（A, B, C...）
+                exam_number = f"{base_exam_number}{chr(64 + suffix)}"
+
+            used_exam_numbers.add(exam_number)
+
+            if suffix > 0:
+                logger.warning(
+                    f"Student {student.id} ({student.username}) has duplicate exam number, "
+                    f"using {exam_number} instead of {base_exam_number}"
+                )
 
             seat = ExamRoomStudent(
                 room_id=room.id,

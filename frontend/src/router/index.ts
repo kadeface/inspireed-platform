@@ -229,7 +229,10 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'admin', title: '组织管理 - InspireEd' },
   },
   // 考试管理与增值评价系统 - 区县考试管理员
-
+  {
+    path: '/district-admin',
+    redirect: '/district-admin/exam-management',
+  },
   // === 考试管理（操作环节） ===
   {
     path: '/district-admin/exam-management',
