@@ -23,6 +23,9 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <el-button type="success" @click="exportAllDocuments" :loading="exporting" v-if="hasRooms">
+          📦 批量导出所有文档
+        </el-button>
         <el-button type="success" @click="loadExamRooms" :loading="loading">
           刷新
         </el-button>
@@ -284,6 +287,7 @@ const examInfo = ref<any>(null)
 const examName = ref('')
 const rooms = ref<any[]>([])
 const loading = ref(false)
+const exporting = ref(false)
 const showAssignDialog = ref(false)
 const showStudentsDialog = ref(false)
 const showImportDialog = ref(false)
@@ -498,6 +502,31 @@ const exportProctorHandbook = async (room: any) => {
   } catch (error: any) {
     console.error('导出监考手册失败:', error)
     ElMessage.error('导出监考手册失败')
+  }
+}
+
+// 批量导出所有文档
+const exportAllDocuments = async () => {
+  if (!examId.value) {
+    ElMessage.error('考试ID不存在')
+    return
+  }
+
+  exporting.value = true
+  try {
+    ElMessage.info({
+      message: '正在生成所有文档，请稍候...',
+      duration: 2000
+    })
+
+    await examRoomService.exportAllDocuments(examId.value)
+
+    ElMessage.success('批量导出成功！')
+  } catch (error: any) {
+    console.error('批量导出失败:', error)
+    ElMessage.error(error.response?.data?.detail || '批量导出失败')
+  } finally {
+    exporting.value = false
   }
 }
 

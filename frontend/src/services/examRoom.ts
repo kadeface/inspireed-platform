@@ -203,5 +203,26 @@ export const examRoomService = {
    */
   async clearAllRooms(examId: number): Promise<void> {
     await apiClient.delete(`/exams/${examId}/rooms/clear-all`)
+  },
+
+  /**
+   * 批量导出所有文档（座位表、准考证、监考手册）
+   */
+  async exportAllDocuments(examId: number): Promise<void> {
+    const response = await apiClient.get(
+      `/exams/${examId}/rooms/export/all-documents.zip`,
+      { responseType: 'blob' }
+    )
+
+    // 创建下载链接
+    const blob = new Blob([response], { type: 'application/zip' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `全部文档_${new Date().getTime()}.zip`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
   }
 }

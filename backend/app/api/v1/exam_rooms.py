@@ -5,6 +5,8 @@
 """
 
 import logging
+import zipfile
+import io
 from typing import Any, List
 from datetime import datetime
 
@@ -544,4 +546,100 @@ async def export_proctor_handbook(
         logger.error(f"Failed to generate proctor handbook PDF: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"生成监考手册失败: {str(e)}"
+        )
+
+
+@router.get("/export/all-documents.zip")
+async def export_all_documents(
+    exam_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    批量导出考试所有文档（座位表、准考证、监考手册）
+    
+    权限说明：
+    - 所有登录用户可以批量导出文档
+    
+    返回：
+    - ZIP文件包含所有考场的座位表、准考证、监考手册
+    """
+    from app.models.exam_room import ExamRoom, ExamRoomStudent
+    
+    # 获取考试信息
+    exam = await db.get(Exam, exam_id)
+    if not exam:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="考试不存在")
+    
+    # 获取所有考场
+    result = await db.execute(
+        select(ExamRoom).where(ExamRoom.exam_id == exam_id)
+        .options(selectinload(ExamRoom.students))
+    )
+    rooms = result.scalars().all()
+    
+    if not rooms:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="暂无考场")
+    
+    # 创建ZIP文件
+    zip_buffer = io.BytesIO()
+    
+    try:
+        generator = ExamDocumentGenerator()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # 为每个考场生成文档
+            for room in rooms:
+                room_name_safe = room.name.replace(" ", "_")
+                
+                # 1. 生成座位表
+                try:
+                    seating_chart_bytes = await generator.generate_seating_chart(room, exam, db)
+                    seating_chart_filename = f"{room_name_safe}_座位表.pdf"
+                    zip_file.writestr(seating_chart_filename, seating_chart_bytes)
+                    logger.info(f"Generated seating chart for room {room.id}")
+                except Exception as e:
+                    logger.error(f"Failed to generate seating chart for room {room.id}: {str(e)}")
+                
+                # 2. 生成准考证
+                try:
+                    exam_tickets_bytes = await generator.generate_exam_tickets(room, exam, db)
+                    exam_tickets_filename = f"{room_name_safe}_准考证.pdf"
+                    zip_file.writestr(exam_tickets_filename, exam_tickets_bytes)
+                    logger.info(f"Generated exam tickets for room {room.id}")
+                except Exception as e:
+                    logger.error(f"Failed to generate exam tickets for room {room.id}: {str(e)}")
+                
+                # 3. 生成监考手册
+                try:
+                    proctor_handbook_bytes = await generator.generate_proctor_handbook(room, exam, db)
+                    proctor_handbook_filename = f"{room_name_safe}_监考手册.pdf"
+                    zip_file.writestr(proctor_handbook_filename, proctor_handbook_bytes)
+                    logger.info(f"Generated proctor handbook for room {room.id}")
+                except Exception as e:
+                    logger.error(f"Failed to generate proctor handbook for room {room.id}: {str(e)}")
+        
+        # 准备ZIP文件下载
+        zip_buffer.seek(0)
+        zip_bytes = zip_buffer.getvalue()
+        
+        # 生成ZIP文件名
+        from urllib.parse import quote
+        zip_filename = f"{exam.name}_全部文档_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        zip_filename = zip_filename.replace(" ", "_")
+        encoded_zip_filename = quote(zip_filename.encode('utf-8'))
+        
+        return StreamingResponse(
+            iter([zip_bytes]),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_zip_filename}"
+            },
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to generate ZIP file: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"批量导出失败: {str(e)}"
         )
