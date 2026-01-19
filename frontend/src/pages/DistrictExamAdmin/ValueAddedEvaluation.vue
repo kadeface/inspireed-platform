@@ -1,10 +1,15 @@
 <template>
   <div class="value-added-evaluation">
     <!-- 页面头部 -->
-    <div class="page-header">
-      <div>
-        <h1>增值评价</h1>
-        <p class="subtitle">教学效果分析与评价报告</p>
+    <div class="page-header flex items-center gap-4 mb-8">
+      <div class="flex items-center gap-4">
+        <el-button @click="router.back()" circle>
+          <el-icon><ArrowLeft /></el-icon>
+        </el-button>
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900">增值评价</h1>
+          <p class="text-gray-600 mt-2">教学效果分析与评价报告</p>
+        </div>
       </div>
       <div class="current-semester">
         <el-tag v-if="currentSemester" type="success" size="large">
@@ -146,7 +151,7 @@
       <el-row :gutter="20" v-loading="loading">
         <el-col :span="6">
           <div class="stat-card">
-            <div class="stat-icon" style="background: #ECF5FF;">
+            <div class="stat-icon" style="background: #ecf5ff">
               <el-icon :size="32" color="#409EFF"><Document /></el-icon>
             </div>
             <div class="stat-info">
@@ -157,7 +162,7 @@
         </el-col>
         <el-col :span="6">
           <div class="stat-card">
-            <div class="stat-icon" style="background: #F0F9FF;">
+            <div class="stat-icon" style="background: #f0f9ff">
               <el-icon :size="32" color="#67C23A"><School /></el-icon>
             </div>
             <div class="stat-info">
@@ -168,7 +173,7 @@
         </el-col>
         <el-col :span="6">
           <div class="stat-card">
-            <div class="stat-icon" style="background: #FEF0F0;">
+            <div class="stat-icon" style="background: #fef0f0">
               <el-icon :size="32" color="#F56C6C"><UserFilled /></el-icon>
             </div>
             <div class="stat-info">
@@ -179,7 +184,7 @@
         </el-col>
         <el-col :span="6">
           <div class="stat-card">
-            <div class="stat-icon" style="background: #FDF6EC;">
+            <div class="stat-icon" style="background: #fdf6ec">
               <el-icon :size="32" color="#E6A23C"><TrendCharts /></el-icon>
             </div>
             <div class="stat-info">
@@ -198,7 +203,7 @@
       type="warning"
       description="请先在系统中设置当前学期，以便进行增值评价分析"
       :closable="false"
-      style="margin-top: 20px;"
+      style="margin-top: 20px"
     />
   </div>
 </template>
@@ -207,6 +212,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  ArrowLeft,
   Document,
   TrendCharts,
   School,
@@ -214,9 +220,10 @@ import {
   Reading,
   DataAnalysis,
   ArrowRight,
-  Refresh
+  Refresh,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { semesterApi } from '@/services/evaluation'
 
 const router = useRouter()
 const loading = ref(false)
@@ -230,8 +237,18 @@ const stats = ref({
   totalStudents: 0,
   totalSemesters: 0,
   totalSubjects: 0,
-  avgProgress: 0
+  avgProgress: 0,
 })
+
+// 加载当前学期
+async function loadCurrentSemester() {
+  try {
+    currentSemester.value = await semesterApi.getCurrent()
+  } catch (error: any) {
+    console.error('Failed to load current semester:', error)
+    // 不显示错误提示，因为可能没有设置当前学期
+  }
+}
 
 // 加载数据
 async function loadData() {
@@ -246,11 +263,11 @@ async function loadData() {
       totalStudents: 4500,
       totalSemesters: 4,
       totalSubjects: 9,
-      avgProgress: 8.5
+      avgProgress: 8.5,
     }
 
     // 获取当前学期
-    // currentSemester.value = await getCurrentSemester()
+    await loadCurrentSemester()
   } catch (error) {
     console.error('Failed to load data:', error)
     ElMessage.error('加载数据失败')
@@ -393,7 +410,7 @@ onMounted(() => {
   display: flex;
   gap: 16px;
   padding: 16px;
-  background: #F5F7FA;
+  background: #f5f7fa;
   border-radius: 8px;
 }
 
