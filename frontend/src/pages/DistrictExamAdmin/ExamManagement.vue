@@ -90,8 +90,8 @@
           {{ row.exam_date ? row.exam_date.split('T')[0] : '' }}
         </template>
       </el-table-column>
-      <el-table-column prop="description" label="说明" width="350" align="center" show-overflow-tooltip />
-      <el-table-column label="操作" width="280" fixed="right" align="center">
+      <el-table-column prop="description" label="说明" min-width="150" align="center" show-overflow-tooltip />
+      <el-table-column label="操作" width="380" fixed="right" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="viewExam(row)">查看</el-button>
           <el-button size="small" type="primary" @click="editExam(row)">编辑</el-button>
@@ -248,10 +248,9 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance } from 'element-plus';
 import { examApi, semesterApi } from '@/services/evaluation';
 import { curriculumService } from '@/services/curriculum';
-import adminService from '@/services/admin';
+import adminService, { type Region, type School } from '@/services/admin';
 import type { Exam, Semester } from '@/types/evaluation';
 import type { Grade } from '@/types/curriculum';
-import type { Region, School } from '@/types/admin';
 
 const router = useRouter();
 
@@ -343,7 +342,18 @@ const loadExams = async () => {
     const result = await examApi.list(params);
     // 确保返回的是数组
     if (Array.isArray(result)) {
-      exams.value = result;
+      // 关联学校和区县信息
+      exams.value = result.map((exam: any) => {
+        // 根据 school_id 查找学校对象
+        if (exam.school_id && schools.value.length > 0) {
+          exam.school = schools.value.find((s: School) => s.id === exam.school_id);
+        }
+        // 根据 region_id 查找区县对象
+        if (exam.region_id && regions.value.length > 0) {
+          exam.region = regions.value.find((r: Region) => r.id === exam.region_id);
+        }
+        return exam;
+      });
     } else {
       console.error('API返回的数据不是数组:', result);
       exams.value = [];
@@ -586,11 +596,15 @@ const getExamLevelType = (level: string) => {
 };
 
 // 组件挂载
-onMounted(() => {
-  loadGrades();
-  loadSemesters();
-  loadRegions();
-  loadSchools();
+onMounted(async () => {
+  // 先加载基础数据（学校和区县）
+  await Promise.all([
+    loadGrades(),
+    loadSemesters(),
+    loadRegions(),
+    loadSchools(),
+  ]);
+  // 然后加载考试列表（这样才能正确关联学校和区县）
   loadExams();
 });
 </script>

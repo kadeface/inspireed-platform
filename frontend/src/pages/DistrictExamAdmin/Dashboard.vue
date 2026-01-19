@@ -1,3144 +1,910 @@
 <template>
-  <div class="district-admin-dashboard">
+  <div class="district-admin-dashboard p-6 bg-gray-50 min-h-screen">
     <!-- 页面头部 -->
-    <div class="page-header">
+    <div class="page-header flex justify-between items-center mb-8 text-left">
       <div>
-        <h1>考试管理</h1>
-        <p class="subtitle">区县考试管理员工作台</p>
+        <h1 class="text-3xl font-bold text-gray-900">考试管理看板</h1>
+        <p class="text-gray-600 mt-2">智能闭环考务系统：从标准设定到成绩分析的全流程管理</p>
       </div>
-      <div class="current-semester">
-        <el-tag v-if="currentSemester" type="success" size="large">
-          {{ currentSemester.name }}
-        </el-tag>
-        <el-tag v-else type="info" size="large">未设置当前学期</el-tag>
-      </div>
-    </div>
-
-    <!-- 快速入口 -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-      <!-- 快速创建考试 -->
-      <div class="quick-action-card" @click="openQuickExamDialog">
-        <el-card shadow="hover">
-          <div class="card-content">
-            <div class="card-icon">
-              <el-icon :size="48" color="#409EFF"><Document /></el-icon>
-            </div>
-            <div class="card-info">
-              <h3>快速创建考试</h3>
-              <p class="description">3步完成考试创建，自动获取学生信息</p>
-              <div class="steps">
-                <span class="step">1.选择</span>
-                <span class="arrow">→</span>
-                <span class="step">2.设置</span>
-                <span class="arrow">→</span>
-                <span class="step">3.完成</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-arrow">
-            <el-icon><ArrowRight /></el-icon>
-          </div>
-        </el-card>
-      </div>
-
-      <!-- 批量导入 -->
-      <div class="quick-action-card" @click="openBatchImportDialog">
-        <el-card shadow="hover">
-          <div class="card-content">
-            <div class="card-icon">
-              <el-icon :size="48" color="#67C23A"><Upload /></el-icon>
-            </div>
-            <div class="card-info">
-              <h3>批量导入成绩</h3>
-              <p class="description">支持Excel批量导入多个学校成绩</p>
-              <div class="feature-tags">
-                <el-tag size="small" type="success">高效</el-tag>
-                <el-tag size="small" type="info">模板化</el-tag>
-              </div>
-            </div>
-          </div>
-          <div class="card-arrow">
-            <el-icon><ArrowRight /></el-icon>
-          </div>
-        </el-card>
-      </div>
-
-      <!-- 考试模板 -->
-      <div class="quick-action-card" @click="openExamTemplateDialog">
-        <el-card shadow="hover">
-          <div class="card-content">
-            <div class="card-icon">
-              <el-icon :size="48" color="#E6A23C"><CopyDocument /></el-icon>
-            </div>
-            <div class="card-info">
-              <h3>使用考试模板</h3>
-              <p class="description">从历史考试快速创建新考试</p>
-              <div class="stats">
-                <span class="stat-item">{{ examTemplates }} 个模板</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-arrow">
-            <el-icon><ArrowRight /></el-icon>
-          </div>
-        </el-card>
+      <div class="current-semester flex items-center gap-4">
+        <el-badge :value="runningTasks.length" :hidden="runningTasks.length === 0" class="mr-4">
+          <el-popover placement="bottom" :width="300" trigger="click">
+            <template #reference><el-button circle><el-icon :class="{ 'animate-spin': runningTasks.length > 0 }"><Refresh v-if="runningTasks.length > 0"/><Bell v-else/></el-icon></el-button></template>
+            <div class="task-center text-sm text-left"><h4 class="font-bold mb-2 border-b pb-2">后台任务中心</h4><div v-if="runningTasks.length === 0" class="text-center py-4 text-gray-400">暂无运行任务</div><div v-else class="space-y-4"><div v-for="task in runningTasks" :key="task.id" class="task-item"><div class="flex justify-between text-xs mb-1"><span>{{ task.name }}</span><span>{{ task.progress }}%</span></div><el-progress :percentage="task.progress" :stroke-width="3" :show-text="false" /></div></div></div>
+          </el-popover>
+        </el-badge>
+        <el-tag v-if="currentSemester" type="success" size="large" effect="dark">{{ currentSemester.name }}</el-tag>
       </div>
     </div>
 
-    <!-- 考试工作流指南 -->
-    <el-card class="workflow-guide-section" shadow="never">
+    <!-- 核心功能卡片 -->
+    <el-row :gutter="20" class="mb-10 text-left">
+      <el-col :xs="24" :sm="12" :md="6">
+        <el-dropdown trigger="click" style="width: 100%" @command="handleConfigCommand">
+          <AdminFunctionCard title="基础配置" description="管理学期时间线与科目标准" icon="Setting" icon-color="#409eff" is-business />
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="semester"><el-icon><Calendar /></el-icon> 学期时间线管理</el-dropdown-item>
+              <el-dropdown-item command="subject"><el-icon><Reading /></el-icon> 各年级科目标准</el-dropdown-item>
+              <el-dropdown-item command="school-profile"><el-icon><OfficeBuilding /></el-icon> 学校基础资料配置</el-dropdown-item>
+              <el-dropdown-item command="organization" divided><el-icon><User /></el-icon> 组织架构管理</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </el-col>
+      <el-col :xs="24" :sm="12" :md="6"><AdminFunctionCard title="校级考试" description="一键组织校内考、月考与模考" icon="UserFilled" icon-color="#67c23a" icon-bg-color="#f0f9eb" is-business @click="startSchoolWorkflow" /></el-col>
+      <el-col :xs="24" :sm="12" :md="6"><AdminFunctionCard title="全区统考" description="多校联考创建与全域考务协同" icon="OfficeBuilding" icon-color="#a855f7" icon-bg-color="#f5f3ff" is-business @click="startDistrictWorkflow" /></el-col>
+      <el-col :xs="24" :sm="12" :md="6"><AdminFunctionCard title="数据中心" description="成绩批量导入与评价分析报告" icon="DataLine" icon-color="#f56c6c" @click="openEvaluationDialog" /></el-col>
+    </el-row>
+
+    <!-- 流程引导 (优化绑定学校显示) -->
+    <el-card class="workflow-section mb-10 text-left" shadow="sm">
       <template #header>
-        <div class="workflow-header">
-          <h2>📋 考试组织流程</h2>
-          <p class="workflow-subtitle">根据您的角色选择合适的流程</p>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <el-icon color="#409eff"><Operation /></el-icon>
+            <h2 class="text-xl font-bold text-gray-800">{{ activeWorkflowTab === 'school' ? '校级考试组织流程' : '全区统考组织流程' }}</h2>
+            <div v-if="activeWorkflowTab === 'school' && configuredSchoolName" class="flex items-center gap-1 ml-4 px-3 py-1 bg-green-50 text-green-700 rounded-full border border-green-200">
+              <el-icon size="14"><CircleCheckFilled /></el-icon>
+              <span class="text-xs font-bold">{{ configuredSchoolName }}</span>
+            </div>
+          </div>
+          <el-radio-group v-model="activeWorkflowTab" size="small">
+            <el-radio-button label="school">学校模式</el-radio-button>
+            <el-radio-button label="district">区县模式</el-radio-button>
+          </el-radio-group>
         </div>
       </template>
-
-      <!-- 流程选项卡 -->
-      <el-tabs v-model="activeWorkflowTab" type="border-card">
-        <!-- 区县管理员流程 -->
-        <el-tab-pane label="区县管理员" name="district">
-          <div class="workflow-content">
-            <div class="workflow-steps">
-              <el-steps :active="districtWorkflowStep" finish-status="success" align-center>
-                <el-step title="创建考试" description="设置考试基本信息和参与学校" />
-                <el-step title="分配考号" description="为考生分配考号（可选）" />
-                <el-step title="导入成绩" description="批量导入各学校考试成绩" />
-                <el-step title="生成报告" description="自动生成评价报告" />
-              </el-steps>
-            </div>
-            <div class="workflow-description">
-              <h4>📝 操作说明</h4>
-              <ul class="instruction-list">
-                <li><strong>创建考试：</strong>设置考试名称、类型、日期、参与学校</li>
-                <li><strong>分配考号：</strong>系统自动或手动为考生分配考号（可选）</li>
-                <li><strong>导入成绩：</strong>下载Excel模板，填写成绩后批量导入</li>
-                <li><strong>生成报告：</strong>系统自动生成增值评价报告和对比分析</li>
-              </ul>
-            </div>
-            <div class="workflow-actions">
-              <el-button type="primary" size="large" @click="startDistrictWorkflow">
-                <el-icon><Plus /></el-icon>
-                <span style="margin-left: 8px;">开始创建考试</span>
-              </el-button>
-            </div>
-          </div>
-        </el-tab-pane>
-
-        <!-- 学校管理员流程 -->
-        <el-tab-pane label="学校管理员" name="school">
-          <div class="workflow-content">
-            <div class="workflow-steps">
-              <el-steps :active="schoolWorkflowStep" finish-status="success" align-center>
-                <el-step title="选择班级" description="选择参与考试的年级和班级" />
-                <el-step title="设置科目" description="设置考试科目和分值" />
-                <el-step title="确认学生" description="系统自动获取班级学生名单" />
-                <el-step title="录入成绩" description="在线录入或导入成绩" />
-              </el-steps>
-            </div>
-            <div class="workflow-description">
-              <h4>📝 操作说明</h4>
-              <ul class="instruction-list">
-                <li><strong>选择班级：</strong>选择参与考试的年级和班级，可多选</li>
-                <li><strong>设置科目：</strong>设置考试科目、满分值、考试时长</li>
-                <li><strong>确认学生：</strong>系统自动获取选定班级的学生信息</li>
-                <li><strong>录入成绩：</strong>在线录入、Excel导入、或批量上传</li>
-              </ul>
-            </div>
-            <div class="workflow-actions">
-              <el-button type="primary" size="large" @click="startSchoolWorkflow">
-                <el-icon><Plus /></el-icon>
-                <span style="margin-left: 8px;">开始组织考试</span>
-              </el-button>
-            </div>
-          </div>
-        </el-tab-pane>
-      </el-tabs>
+      <div class="py-4 text-center">
+        <el-steps :active="activeWorkflowTab === 'school' ? schoolWorkflowStep : districtWorkflowStep" align-center class="interactive-steps">
+          <el-step v-for="(step, idx) in (activeWorkflowTab === 'school' ? schoolSteps : districtSteps)" :key="idx" :title="step.title" :description="step.desc" class="cursor-pointer" @click="step.action()"><template #icon><el-icon><component :is="step.icon" /></el-icon></template></el-step>
+        </el-steps>
+      </div>
+      <div class="workflow-footer bg-blue-50 p-4 rounded-lg mt-4 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-blue-700"><el-icon><InfoFilled /></el-icon><span class="text-sm font-medium">当前操作：{{ (activeWorkflowTab === 'school' ? schoolSteps : districtSteps)[activeWorkflowTab === 'school' ? schoolWorkflowStep : districtWorkflowStep]?.title }}</span></div>
+        <el-button type="primary" @click="(activeWorkflowTab === 'school' ? schoolSteps : districtSteps)[activeWorkflowTab === 'school' ? schoolWorkflowStep : districtWorkflowStep]?.action()">立即去处理</el-button>
+      </div>
     </el-card>
 
-    <!-- 考试列表和状态 -->
-    <el-card class="exam-list-section" shadow="never" style="margin-top: 20px;">
-      <template #header>
-        <div class="section-header">
-          <h3>📊 考试列表</h3>
-          <el-button size="small" @click="loadData">
-            <el-icon><Refresh /></el-icon>
-            刷新
-          </el-button>
-        </div>
-      </template>
-
-      <el-table :data="exams" v-loading="loading" stripe>
-        <el-table-column prop="name" label="考试名称" width="200" />
-        <el-table-column prop="exam_type" label="类型" width="100">
+    <!-- 列表 -->
+    <el-card shadow="sm" class="text-left">
+      <template #header><div class="flex justify-between items-center"><h3 class="text-lg font-bold">考试档案列表</h3><el-input v-model="searchQuery" placeholder="搜索考试..." size="small" style="width: 240px;"><template #prefix><el-icon><Search /></el-icon></template></el-input></div></template>
+      <el-table :data="filteredExams" v-loading="loading" stripe border>
+        <el-table-column prop="name" label="考试名称" min-width="200" />
+        <el-table-column label="考试类型" width="100">
           <template #default="{ row }">
             <el-tag size="small">{{ getExamTypeName(row.exam_type) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="exam_level" label="级别" width="90">
+        <el-table-column prop="exam_date" label="日期" width="120" />
+        <el-table-column label="进度" width="180">
           <template #default="{ row }">
-            <el-tag :type="getExamLevelType(row.exam_level)" size="small">
-              {{ getExamLevelName(row.exam_level) }}
-            </el-tag>
+            <el-progress :percentage="getExamProgress(row)" :status="getExamProgressStatus(row)" :stroke-width="6" :show-text="false" />
           </template>
         </el-table-column>
-        <el-table-column prop="exam_date" label="考试日期" width="120" />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)" size="small">
-              {{ getStatusName(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="数据准备进度" width="200">
-          <template #default="{ row }">
-            <div class="progress-info">
-              <el-progress
-                :percentage="getExamProgress(row)"
-                :status="getExamProgressStatus(row)"
-                :stroke-width="8"
-                :show-text="false"
-              />
-              <div class="progress-steps">
-                <el-tag
-                  :type="row.hasStudents ? 'success' : 'info'"
-                  size="small"
-                  style="margin-right: 8px;"
-                >
-                  {{ row.hasStudents ? '✓' : '○' }} 考生信息
-                </el-tag>
-                <el-tag
-                  :type="row.hasScores ? 'success' : 'info'"
-                  size="small"
-                >
-                  {{ row.hasScores ? '✓' : '○' }} 成绩数据
-                </el-tag>
-              </div>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" link @click="importStudentsForExam(row)">
-              <el-icon><User /></el-icon>
-              导入考生
-            </el-button>
-            <el-button size="small" link @click="importScoresForExam(row)">
-              <el-icon><Upload /></el-icon>
-              导入成绩
-            </el-button>
-            <el-button size="small" link type="danger" @click="deleteExam(row)">
-              <el-icon><Delete /></el-icon>
-              删除
-            </el-button>
+            <el-button link type="primary" size="small" @click="viewExamDetail(row)">详情</el-button>
+            <el-button link type="success" size="small" @click="viewExamRooms(row)">座位表</el-button>
+            <el-button link type="primary" size="small" @click="importStudentsForExam(row)">考生</el-button>
+            <el-button link type="primary" size="small" @click="importScoresForExam(row)">成绩</el-button>
+            <el-button link type="danger" size="small" @click="deleteExam(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <!-- 其他功能区域 -->
-    <el-row :gutter="20" style="margin-top: 20px;">
-      <!-- 学期管理 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="function-card" shadow="hover" @click="openSemesterDialog">
-          <div class="card-icon">
-            <el-icon :size="40" color="#409eff">
-              <component :is="'Calendar'" />
-            </el-icon>
-          </div>
-          <div class="card-content">
-            <h3>学期管理</h3>
-            <p>创建和管理学期</p>
-            <div class="card-stats">
-              <span>{{ semesters.length }} 个学期</span>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-
-      <!-- 科目配置 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="function-card" shadow="hover" @click="goToExamSubjectConfig">
-          <div class="card-icon">
-            <el-icon :size="40" color="#67c23a">
-              <component :is="'Setting'" />
-            </el-icon>
-          </div>
-          <div class="card-content">
-            <h3>科目配置</h3>
-            <p>配置考试科目及分数</p>
-            <div class="card-stats">
-              <span>年级科目设置</span>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-
-      <!-- 评价报告 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="function-card" shadow="hover" @click="openEvaluationDialog">
-          <div class="card-icon">
-            <el-icon :size="40" color="#909399">
-              <component :is="'DataAnalysis'" />
-            </el-icon>
-          </div>
-          <div class="card-content">
-            <h3>评价报告</h3>
-            <p>生成增值评价报告</p>
-            <div class="card-stats">
-              <span>{{ evaluations.length }} 个评价</span>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-
-      <!-- 导入任务 -->
-      <el-col :xs="24" :sm="12" :md="8" :lg="6">
-        <el-card class="function-card" shadow="hover" @click="viewImportTasks">
-          <div class="card-icon">
-            <el-icon :size="40" color="#e6a23c">
-              <component :is="'List'" />
-            </el-icon>
-          </div>
-          <div class="card-content">
-            <h3>导入任务</h3>
-            <p>查看导入历史</p>
-            <div class="card-stats">
-              <span>{{ importTasks.length }} 个任务</span>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 学期管理对话框 -->
-    <el-dialog
-      v-model="semesterDialogVisible"
-      title="学期管理"
-      width="900px"
-      @close="resetSemesterForm"
-    >
-      <!-- 快速创建学期表单 -->
-      <div class="quick-create-section">
-        <h4>快速创建学期</h4>
-        <el-form :model="semesterForm" :rules="semesterRules" ref="semesterFormRef" label-width="100px">
+    <!-- 弹窗集 -->
+    <el-dialog v-model="schoolProfileDialogVisible" title="学校基础资料配置" width="800px" @open="openSchoolProfileDialog">
+      <div class="p-6 text-left">
+        <el-form :model="schoolProfileForm" label-width="120px" label-position="left">
+          <div class="mb-4 font-bold border-b pb-2 text-blue-600">本校基本信息</div>
           <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="学年" prop="year">
-                <el-input
-                  v-model="semesterForm.year"
-                  placeholder="请输入学年，格式：2023-2024"
-                  maxlength="9"
-                />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="学期类型" prop="semester_type">
-                <el-radio-group v-model="semesterForm.semester_type">
-                  <el-radio value="up">上学期</el-radio>
-                  <el-radio value="down">下学期</el-radio>
-                </el-radio-group>
-              </el-form-item>
-            </el-col>
+            <el-col :span="12"><el-form-item label="学校全称" required><el-autocomplete v-model="schoolProfileForm.name" :fetch-suggestions="querySearchSchools" @select="handleSchoolSelect" style="width: 100%" /></el-form-item></el-col>
+            <el-col :span="12"><el-form-item label="学校代码"><el-input v-model="schoolProfileForm.code" disabled /></el-form-item></el-col>
           </el-row>
+          <el-form-item label="详细地址"><el-input v-model="schoolProfileForm.address" type="textarea" :rows="2" /></el-form-item>
+        </el-form>
+      </div>
+      <template #footer><el-button @click="schoolProfileDialogVisible = false">取消</el-button><el-button type="primary" @click="saveSchoolProfile" :loading="savingConfig">保存并绑定主体</el-button></template>
+    </el-dialog>
+
+    <el-dialog v-model="schoolQuickExamDialogVisible" :title="activeWorkflowTab === 'school' ? '校级考试组织' : '全区统考组织'" width="1000px">
+      <el-steps :active="schoolExamStep" align-center class="mb-8"><el-step title="范围确认" /><el-step title="科目标准" /><el-step title="考务设置" /><el-step title="完成" /></el-steps>
+      
+      <div v-show="schoolExamStep === 0" class="px-10 py-4 text-left">
+        <el-form :model="schoolExamForm" label-position="top">
+          <el-form-item label="考试名称" required><el-input v-model="schoolExamForm.name" placeholder="请输入本次考试完整名称" /></el-form-item>
           <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="开始日期" prop="start_date">
-                <el-date-picker
-                  v-model="semesterForm.start_date"
-                  type="date"
-                  placeholder="开始日期"
-                  format="YYYY-MM-DD"
-                  value-format="YYYY-MM-DD"
-                  style="width: 100%;"
-                />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="结束日期" prop="end_date">
-                <el-date-picker
-                  v-model="semesterForm.end_date"
-                  type="date"
-                  placeholder="结束日期"
-                  format="YYYY-MM-DD"
-                  value-format="YYYY-MM-DD"
-                  style="width: 100%;"
-                />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-form-item label="学期名称" prop="name">
-            <el-input v-model="semesterForm.name" placeholder="自动生成或手动输入">
-              <template #append>
-                <el-button @click="generateSemesterName">自动生成</el-button>
+            <el-col :span="8"><el-form-item label="考试类型" required>
+              <el-select v-model="schoolExamForm.exam_type" style="width:100%">
+                <el-option label="月考" value="monthly" />
+                <el-option label="期中考试" value="midterm" />
+                <el-option label="期末考试" value="final" />
+                <el-option label="模拟考试" value="mock" />
+                <el-option label="单元测试" value="unit" />
+                <el-option label="区县统考" value="district_unified" />
+              </el-select>
+            </el-form-item></el-col>
+            <el-col :span="8"><el-form-item label="对应学期" required><el-select v-model="schoolExamForm.semester_id" style="width:100%"><el-option v-for="s in semesters" :key="s.id" :label="s.name" :value="s.id" /></el-select></el-form-item></el-col>
+            <el-col :span="8">
+              <!-- 校级考试：学校选择 -->
+              <template v-if="activeWorkflowTab === 'school'">
+                <el-form-item label="组织主体" v-if="configuredSchoolId">
+                  <div class="mt-1 flex items-center gap-2 text-gray-800 font-bold bg-gray-50 p-2 rounded border border-dashed border-green-300">
+                    <el-icon color="#67c23a"><OfficeBuilding /></el-icon>
+                    {{ configuredSchoolName }}
+                  </div>
+                </el-form-item>
+                <el-form-item label="目标学校" v-else required>
+                  <el-select v-model="schoolExamForm.target_school_id" @change="onSchoolChange" style="width:100%" filterable placeholder="搜索学校"><el-option v-for="s in schools" :key="s.id" :label="s.name" :value="s.id" /></el-select>
+                </el-form-item>
               </template>
-            </el-input>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="createSemester" :loading="semesterSubmitting">
-              创建学期
-            </el-button>
-          </el-form-item>
-        </el-form>
-      </div>
-
-      <el-divider />
-
-      <!-- 学期列表 -->
-      <div class="semester-list-section">
-        <h4>学期列表</h4>
-        <el-table :data="semesters" max-height="300" size="small">
-          <el-table-column prop="name" label="名称" width="180" />
-          <el-table-column prop="year" label="学年" width="80" />
-          <el-table-column prop="semester_type" label="类型" width="80">
-            <template #default="{ row }">
-              {{ row.semester_type === 'up' ? '上' : '下' }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="start_date" label="开始" width="110" />
-          <el-table-column prop="end_date" label="结束" width="110" />
-          <el-table-column prop="is_current" label="状态" width="80">
-            <template #default="{ row }">
-              <el-tag :type="row.is_current ? 'success' : 'info'" size="small">
-                {{ row.is_current ? '当前' : '非当前' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="150">
-            <template #default="{ row }">
-              <el-button
-                v-if="!row.is_current"
-                size="small"
-                type="success"
-                link
-                @click.stop="setCurrentSemester(row)"
-              >
-                设为当前
+              <!-- 全区统考：区县选择 -->
+              <template v-else>
+                <el-form-item label="所属区县" required>
+                  <el-select v-model="schoolExamForm.region_id" @change="onDistrictRegionChange" style="width:100%" placeholder="选择区县">
+                    <el-option v-for="r in regions" :key="r.id" :label="r.name" :value="r.id" />
+                  </el-select>
+                </el-form-item>
+              </template>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="参与年级" required>
+                <el-select v-model="schoolExamForm.grade_id" @change="activeWorkflowTab === 'school' ? onGradeChange(schoolExamForm.grade_id) : onDistrictGradeChange(schoolExamForm.grade_id)" style="width:100%" :placeholder="activeWorkflowTab === 'school' ? '请先选择学校' : '选择年级'">
+                  <el-option v-for="g in (activeWorkflowTab === 'school' ? availableGrades : grades)" :key="g.id" :label="g.name" :value="g.id" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12" v-if="activeWorkflowTab === 'district'">
+              <el-form-item label="参与学校" required>
+                <div class="flex gap-2">
+                  <el-select v-model="schoolExamForm.school_ids" multiple collapse-tags style="flex:1" placeholder="请先选择区县和年级">
+                    <el-option v-for="s in filteredSchoolsForDistrict" :key="s.id" :label="s.name" :value="s.id" />
+                  </el-select>
+                  <el-button @click="toggleAllDistrictSchools" :disabled="filteredSchoolsForDistrict.length === 0">
+                    {{ isAllDistrictSchoolsSelected ? '取消全选' : '全选' }}
+                  </el-button>
+                </div>
+                <div class="text-xs text-gray-500 mt-1" v-if="schoolExamForm.grade_id">
+                  已显示 {{ filteredSchoolsForDistrict.length }} 所{{ grades.find(g => g.id === schoolExamForm.grade_id)?.name }}学校
+                </div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item label="参与班级" v-if="activeWorkflowTab === 'school'" required>
+            <div class="flex gap-2">
+              <el-select v-model="schoolExamForm.class_ids" multiple collapse-tags style="flex:1" placeholder="请先选择学校和年级">
+                <el-option v-for="c in filteredClassrooms" :key="c.id" :label="c.name" :value="c.id" />
+              </el-select>
+              <el-button @click="toggleAllClasses" :disabled="filteredClassrooms.length === 0">
+                {{ isAllClassesSelected ? '取消全选' : '全选' }}
               </el-button>
-              <el-button size="small" link @click.stop="deleteSemester(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+            </div>
+            <div class="text-xs text-gray-500 mt-1" v-if="schoolExamForm.grade_id">
+              已显示 {{ filteredClassrooms.length }} 个{{ grades.find(g => g.id === schoolExamForm.grade_id)?.name }}班级
+            </div>
+          </el-form-item>
+        </el-form>
       </div>
-    </el-dialog>
 
-    <!-- 考试管理对话框 -->
-    <el-dialog
-      v-model="examDialogVisible"
-      title="考试管理"
-      width="1000px"
-      @close="resetExamForm"
-    >
-      <!-- 快速创建考试表单 -->
-      <div class="quick-create-section">
-        <h4>快速创建考试</h4>
-        <el-form :model="examForm" :rules="examRules" ref="examFormRef" label-width="100px">
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="考试名称" prop="name">
-                <el-input v-model="examForm.name" placeholder="请输入考试名称" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="考试类型" prop="exam_type">
-                <el-select v-model="examForm.exam_type" placeholder="选择类型" style="width: 100%;">
-                  <el-option label="期中考试" value="midterm" />
-                  <el-option label="期末考试" value="final" />
-                  <el-option label="月考" value="monthly" />
-                  <el-option label="模考" value="mock" />
-                  <el-option label="统考" value="unified" />
-                </el-select>
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-form-item label="学期" prop="semester_id">
-                <el-select v-model="examForm.semester_id" placeholder="选择学期" style="width: 100%;">
-                  <el-option
-                    v-for="semester in semesters"
-                    :key="semester.id"
-                    :label="semester.name"
-                    :value="semester.id"
-                  />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="年级" prop="grade_id">
-                <el-select v-model="examForm.grade_id" placeholder="选择年级" clearable style="width: 100%;">
-                  <el-option
-                    v-for="grade in grades"
-                    :key="grade.id"
-                    :label="grade.name"
-                    :value="grade.id"
-                  />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="考试日期" prop="exam_date">
-                <el-date-picker
-                  v-model="examForm.exam_date"
-                  type="date"
-                  placeholder="选择日期"
-                  format="YYYY-MM-DD"
-                  value-format="YYYY-MM-DD"
-                  style="width: 100%;"
-                />
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-form-item>
-            <el-button type="primary" @click="createExam" :loading="examSubmitting">
-              创建考试
+      <div v-show="schoolExamStep === 1" class="px-10 py-4 text-left">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <span class="text-gray-700">已配置的学科标准</span>
+            <div class="text-xs text-gray-500 mt-1" v-if="schoolExamForm.grade_id">
+              {{ availableSubjects.length }} 个学科 · {{ grades.find(g => g.id === schoolExamForm.grade_id)?.name }}
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <el-button size="small" @click="openSubjectConfigDialog">
+              <el-icon class="mr-1"><Setting /></el-icon>
+              配置学科标准
             </el-button>
-          </el-form-item>
-        </el-form>
-      </div>
-
-      <el-divider />
-
-      <!-- 考试列表 -->
-      <div class="exam-list-section">
-        <h4>考试列表</h4>
-        <el-table :data="exams" max-height="300" size="small">
-          <el-table-column prop="name" label="考试名称" width="180" />
-          <el-table-column prop="exam_type" label="类型" width="90">
-            <template #default="{ row }">
-              <el-tag size="small">{{ getExamTypeName(row.exam_type) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="exam_level" label="级别" width="80">
-            <template #default="{ row }">
-              <el-tag :type="getExamLevelType(row.exam_level)" size="small">
-                {{ getExamLevelName(row.exam_level) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="status" label="状态" width="90">
-            <template #default="{ row }">
-              <el-tag :type="getStatusType(row.status)" size="small">
-                {{ getStatusName(row.status) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="exam_date" label="日期" width="110" />
-          <el-table-column label="操作" width="150">
-            <template #default="{ row }">
-              <el-button size="small" link @click.stop="deleteExam(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-    </el-dialog>
-
-    <!-- 导入考生信息对话框 -->
-    <el-dialog
-      v-model="studentImportDialogVisible"
-      title="导入考生信息"
-      width="600px"
-    >
-      <el-alert
-        title="功能开发中"
-        type="info"
-        description="考生信息导入功能正在开发中，敬请期待。"
-        :closable="false"
-        show-icon
-      />
-      <div style="margin-top: 20px;">
-        <p>此功能将支持：</p>
-        <ul>
-          <li>批量导入考生基本资料</li>
-          <li>Excel模板下载</li>
-          <li>数据验证和错误提示</li>
-          <li>导入进度显示</li>
-        </ul>
-      </div>
-    </el-dialog>
-
-    <!-- 导入成绩对话框 -->
-    <el-dialog
-      v-model="scoreImportDialogVisible"
-      title="导入成绩"
-      width="700px"
-    >
-      <el-alert
-        title="功能开发中"
-        type="info"
-        description="成绩导入功能正在开发中，敬请期待。"
-        :closable="false"
-        show-icon
-      />
-      <div style="margin-top: 20px;">
-        <p>此功能将支持：</p>
-        <ul>
-          <li>Excel成绩单上传</li>
-          <li>自动关联考试和科目</li>
-          <li>数据验证和查重</li>
-          <li>实时导入进度</li>
-          <li>错误报告下载</li>
-        </ul>
-      </div>
-    </el-dialog>
-
-    <!-- 评价报告对话框 -->
-    <el-dialog
-      v-model="evaluationDialogVisible"
-      title="评价报告"
-      width="700px"
-    >
-      <el-alert
-        title="功能开发中"
-        type="info"
-        description="评价报告功能正在开发中，敬请期待。"
-        :closable="false"
-        show-icon
-      />
-      <div style="margin-top: 20px;">
-        <p>此功能将支持：</p>
-        <ul>
-          <li>基线考试与结束考试对比</li>
-          <li>增值评价自动计算</li>
-          <li>多维度数据分析</li>
-          <li>可视化图表展示</li>
-          <li>报告导出</li>
-        </ul>
-      </div>
-    </el-dialog>
-
-    <!-- 学期表现对话框 -->
-    <el-dialog
-      v-model="performanceDialogVisible"
-      title="学期表现"
-      width="700px"
-    >
-      <el-alert
-        title="功能开发中"
-        type="info"
-        description="学期表现功能正在开发中，敬请期待。"
-        :closable="false"
-        show-icon
-      />
-      <div style="margin-top: 20px;">
-        <p>此功能将支持：</p>
-        <ul>
-          <li>学期整体表现统计</li>
-          <li>各学科成绩分析</li>
-          <li>进步趋势展示</li>
-          <li>优秀率/合格率对比</li>
-          <li>数据可视化图表</li>
-        </ul>
-      </div>
-    </el-dialog>
-
-    <!-- 学校端快速创建考试对话框 -->
-    <el-dialog
-      v-model="schoolQuickExamDialogVisible"
-      title="快速组织考试"
-      width="900px"
-      @close="closeSchoolQuickExamDialog"
-    >
-      <!-- 步骤条 -->
-      <el-steps :active="schoolExamStep" align-center style="margin-bottom: 30px;">
-        <el-step title="选择班级" description="选择参与考试的班级" />
-        <el-step title="设置科目" description="设置考试科目和分值" />
-        <el-step title="确认学生" description="系统自动获取学生名单" />
-        <el-step title="完成" description="创建成功" />
-      </el-steps>
-
-      <!-- 步骤1: 选择班级（区县管理员） -->
-      <div v-show="schoolExamStep === 0 && isDistrictAdmin" class="step-content">
-        <h4>🏛️ 区县管理员 - 创建统考</h4>
-        <el-form :model="schoolExamForm" label-width="100px">
-          <el-form-item label="考试名称">
-            <el-input v-model="schoolExamForm.name" placeholder="例如：2024年春季期末统考" />
-          </el-form-item>
-          <el-form-item label="考试级别">
-            <el-select v-model="schoolExamForm.exam_level" placeholder="选择考试级别" style="width: 100%;">
-              <el-option label="校级考试" value="school">
-                <span>校级考试</span>
-                <span style="font-size: 12px; color: #999; margin-left: 8px;">本校考试，使用班级选择</span>
-              </el-option>
-              <el-option label="区县统考" value="district">
-                <span>区县统考</span>
-                <span style="font-size: 12px; color: #999; margin-left: 8px;">区县统一考试，选择区县和学校</span>
-              </el-option>
-              <el-option label="市级考试" value="city">
-                <span>市级考试</span>
-                <span style="font-size: 12px; color: #999; margin-left: 8px;">市级统一考试，需导入市级考号</span>
-              </el-option>
-            </el-select>
-          </el-form-item>
-          <el-form-item
-            v-if="schoolExamForm.exam_level === 'district' || schoolExamForm.exam_level === 'city'"
-            label="选择区县"
-          >
-            <el-select
-              v-model="schoolExamForm.region_id"
-              placeholder="请选择区县"
-              style="width: 100%;"
-              filterable
-              @change="onRegionChange"
-            >
-              <el-option
-                v-for="region in availableRegions"
-                :key="region.id"
-                :label="region.name"
-                :value="region.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item
-            v-if="schoolExamForm.exam_level === 'district' || schoolExamForm.exam_level === 'city'"
-            label="选择学段"
-          >
-            <el-select
-              v-model="schoolExamForm.study_level"
-              placeholder="请先选择区县"
-              style="width: 100%;"
-              :disabled="!schoolExamForm.region_id"
-              @change="onStudyLevelChange"
-            >
-              <el-option
-                v-for="studyLevel in availableStudyLevels"
-                :key="studyLevel"
-                :label="studyLevel"
-                :value="studyLevel"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item
-            v-if="schoolExamForm.exam_level === 'district' || schoolExamForm.exam_level === 'city'"
-            label="选择年级"
-          >
-            <el-select
-              v-model="schoolExamForm.grade_id"
-              placeholder="请先选择学段"
-              style="width: 100%;"
-              :disabled="!schoolExamForm.study_level"
-              @change="onGradeChange"
-            >
-              <el-option
-                v-for="grade in filteredGrades"
-                :key="grade.id"
-                :label="grade.name"
-                :value="grade.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item
-            v-if="schoolExamForm.exam_level === 'district' || schoolExamForm.exam_level === 'city'"
-            label="选择学校"
-          >
-            <el-select
-              v-model="schoolExamForm.school_ids"
-              multiple
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="请先选择年级，可多选学校"
-              style="width: 100%;"
-              :disabled="!schoolExamForm.grade_id"
-              @change="onSchoolsChange"
-            >
-              <el-option
-                v-if="filteredSchools.length > 0"
-                label="全选"
-                :value="'all'"
-                @click="selectAllSchools"
-              />
-              <el-option
-                v-for="school in filteredSchools"
-                :key="school.id"
-                :label="school.name"
-                :value="school.id"
-              />
-            </el-select>
-            <div v-if="schoolExamForm.grade_id && filteredSchools.length > 0" style="margin-top: 8px;">
-              <el-link type="primary" @click="selectAllSchools" style="font-size: 13px;">
-                全选{{ filteredSchools.length }}所学校
-              </el-link>
-              <el-divider direction="vertical" />
-              <el-link type="info" @click="schoolExamForm.school_ids = []" style="font-size: 13px;">
-                清空选择
-              </el-link>
-            </div>
-          </el-form-item>
-          <el-form-item label="选择学期">
-            <el-select
-              v-model="schoolExamForm.semester_id"
-              placeholder="请选择学期"
-              style="width: 100%;"
-            >
-              <el-option
-                v-for="semester in semesters"
-                :key="semester.id"
-                :label="semester.name"
-                :value="semester.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="考试日期">
-            <el-date-picker
-              v-model="schoolExamForm.exam_date"
-              type="date"
-              placeholder="选择考试日期"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              style="width: 100%;"
-            />
-          </el-form-item>
-        </el-form>
-        <div class="step-info">
-          <el-alert
-            type="info"
-            :closable="false"
-            show-icon
-          >
-            <template #title>
-              <span v-if="schoolExamForm.school_ids.length > 0">
-                已选择 <strong>{{ schoolExamForm.school_ids.length }}</strong> 所学校参与统考
-              </span>
-              <span v-else>请按顺序选择：区县 → 学校（可多选）→ 年级</span>
-            </template>
-          </el-alert>
+            <el-checkbox :model-value="isAllSelected" :indeterminate="isIndeterminate" @change="handleSelectAllChange">全选所有学科</el-checkbox>
+          </div>
         </div>
-      </div>
-
-      <!-- 步骤1: 选择班级（学校管理员） -->
-      <div v-show="schoolExamStep === 0 && isSchoolAdmin" class="step-content">
-        <h4>🏫 学校管理员 - 组织考试</h4>
-        <el-form :model="schoolExamForm" label-width="120px">
-          <el-form-item label="考试名称">
-            <el-input v-model="schoolExamForm.name" placeholder="例如：2024年春季期末考试" />
-          </el-form-item>
-          <el-form-item label="考试级别">
-            <el-select v-model="schoolExamForm.exam_level" placeholder="选择考试级别" style="width: 100%;">
-              <el-option label="校级考试" value="school">
-                <span>校级考试</span>
-                <span style="font-size: 12px; color: #999; margin-left: 8px;">本校考试，使用班级选择</span>
-              </el-option>
-              <el-option label="区县统考" value="district">
-                <span>区县统考</span>
-                <span style="font-size: 12px; color: #999; margin-left: 8px;">区县统一考试，选择区县和学校</span>
-              </el-option>
-              <el-option label="市级考试" value="city">
-                <span>市级考试</span>
-                <span style="font-size: 12px; color: #999; margin-left: 8px;">市级统一考试，需导入市级考号</span>
-              </el-option>
-            </el-select>
-          </el-form-item>
-          <el-form-item label="所属学校">
-            <el-input :value="currentUser?.school_name" disabled style="width: 100%;" />
-            <div style="margin-top: 8px;">
-              <el-checkbox v-model="schoolExamForm.isJointExam" @change="onJointExamChange">
-                联考模式（邀请其他学校参与）
-              </el-checkbox>
-            </div>
-          </el-form-item>
-          <el-form-item v-if="schoolExamForm.isJointExam" label="参与学校">
-            <el-select
-              v-model="schoolExamForm.additional_school_ids"
-              multiple
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="选择参与联考的其他学校"
-              style="width: 100%;"
-            >
-              <el-option
-                v-for="school in availableSchools.filter(s => s.id !== currentUser?.school_id)"
-                :key="school.id"
-                :label="school.name"
-                :value="school.id"
-              />
-            </el-select>
-            <div style="margin-top: 8px; color: #909399; font-size: 13px;">
-              <el-icon><InfoFilled /></el-icon>
-              已自动包含本校：{{ currentUser?.school_name }}
-            </div>
-          </el-form-item>
-          <el-form-item label="选择年级">
-            <el-select
-              v-model="schoolExamForm.grade_id"
-              placeholder="请选择年级"
-              style="width: 100%;"
-              @change="onGradeChange"
-            >
-              <el-option
-                v-for="grade in availableGrades"
-                :key="grade.id"
-                :label="grade.name"
-                :value="grade.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item
-            v-if="schoolExamForm.exam_level === 'school'"
-            label="选择班级"
-          >
-            <el-select
-              v-model="schoolExamForm.class_ids"
-              multiple
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="请先选择年级"
-              style="width: 100%;"
-              :disabled="!schoolExamForm.grade_id"
-            >
-              <el-option
-                v-if="availableClassrooms.length > 0"
-                label="全选"
-                :value="'all'"
-                @click="selectAllClasses"
-              />
-              <el-option
-                v-for="classroom in availableClassrooms"
-                :key="classroom.id"
-                :label="classroom.name"
-                :value="classroom.id"
-              />
-            </el-select>
-            <div v-if="schoolExamForm.grade_id && availableClassrooms.length > 0" style="margin-top: 8px;">
-              <el-link type="primary" @click="selectAllClasses" style="font-size: 13px;">
-                全选{{ availableClassrooms.length }}个班级
-              </el-link>
-              <el-divider direction="vertical" />
-              <el-link type="info" @click="schoolExamForm.class_ids = []" style="font-size: 13px;">
-                清空选择
-              </el-link>
-            </div>
-          </el-form-item>
-          <el-form-item label="选择学期">
-            <el-select
-              v-model="schoolExamForm.semester_id"
-              placeholder="请选择学期"
-              style="width: 100%;"
-            >
-              <el-option
-                v-for="semester in semesters"
-                :key="semester.id"
-                :label="semester.name"
-                :value="semester.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="考试日期">
-            <el-date-picker
-              v-model="schoolExamForm.exam_date"
-              type="date"
-              placeholder="选择考试日期"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              style="width: 100%;"
-            />
-          </el-form-item>
-        </el-form>
-        <div class="step-info">
-          <el-alert
-            type="info"
-            :closable="false"
-            show-icon
-          >
-            <template #title>
-              <span v-if="schoolExamForm.class_ids.length > 0">
-                已选择 <strong>{{ schoolExamForm.class_ids.length }}</strong> 个班级，
-                预计约 <strong>{{ estimatedStudentCount }}</strong> 名学生参与
-              </span>
-              <span v-else>请按顺序选择：年级 → 班级</span>
-            </template>
-          </el-alert>
-        </div>
-      </div>
-
-      <!-- 步骤1: 通用管理员（无角色特定限制） -->
-      <div v-show="schoolExamStep === 0 && !isDistrictAdmin && !isSchoolAdmin" class="step-content">
-        <h4>📚 选择参与考试的班级</h4>
-        <el-form :model="schoolExamForm" label-width="100px">
-          <el-form-item label="考试名称">
-            <el-input v-model="schoolExamForm.name" placeholder="例如：2024年春季期末考试" />
-          </el-form-item>
-          <el-form-item label="选择学校">
-            <el-select
-              v-model="schoolExamForm.school_id"
-              placeholder="请先选择学校"
-              style="width: 100%;"
-              filterable
-              @change="onSchoolChange"
-            >
-              <el-option
-                v-for="school in availableSchools"
-                :key="school.id"
-                :label="school.name"
-                :value="school.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="选择年级">
-            <el-select
-              v-model="schoolExamForm.grade_id"
-              placeholder="请先选择学校"
-              style="width: 100%;"
-              :disabled="!schoolExamForm.school_id"
-              @change="onGradeChange"
-            >
-              <el-option
-                v-for="grade in availableGrades"
-                :key="grade.id"
-                :label="grade.name"
-                :value="grade.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="选择班级">
-            <el-select
-              v-model="schoolExamForm.class_ids"
-              multiple
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="请先选择学校和年级"
-              style="width: 100%;"
-              :disabled="!schoolExamForm.grade_id"
-            >
-              <el-option
-                v-if="availableClassrooms.length > 0"
-                label="全选"
-                :value="'all'"
-                @click="selectAllClasses"
-              />
-              <el-option
-                v-for="classroom in availableClassrooms"
-                :key="classroom.id"
-                :label="classroom.name"
-                :value="classroom.id"
-              />
-            </el-select>
-            <div v-if="schoolExamForm.grade_id && availableClassrooms.length > 0" style="margin-top: 8px;">
-              <el-link type="primary" @click="selectAllClasses" style="font-size: 13px;">
-                全选{{ availableClassrooms.length }}个班级
-              </el-link>
-              <el-divider direction="vertical" />
-              <el-link type="info" @click="schoolExamForm.class_ids = []" style="font-size: 13px;">
-                清空选择
-              </el-link>
-            </div>
-          </el-form-item>
-          <el-form-item label="选择学期">
-            <el-select
-              v-model="schoolExamForm.semester_id"
-              placeholder="请选择学期"
-              style="width: 100%;"
-            >
-              <el-option
-                v-for="semester in semesters"
-                :key="semester.id"
-                :label="semester.name"
-                :value="semester.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="考试日期">
-            <el-date-picker
-              v-model="schoolExamForm.exam_date"
-              type="date"
-              placeholder="选择考试日期"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              style="width: 100%;"
-            />
-          </el-form-item>
-        </el-form>
-        <div class="step-info">
-          <el-alert
-            type="info"
-            :closable="false"
-            show-icon
-          >
-            <template #title>
-              <span v-if="schoolExamForm.class_ids.length > 0">
-                已选择 <strong>{{ schoolExamForm.class_ids.length }}</strong> 个班级，
-                预计约 <strong>{{ estimatedStudentCount }}</strong> 名学生参与
-              </span>
-              <span v-else>请按顺序选择：学校 → 年级 → 班级</span>
-            </template>
-          </el-alert>
-        </div>
-      </div>
-
-      <!-- 步骤2: 设置科目 -->
-      <div v-show="schoolExamStep === 1" class="step-content">
-        <h4>📝 选择考试科目</h4>
-        <p style="color: #909399; margin-bottom: 16px;">
-          请勾选本次考试的科目，并设置满分值
-        </p>
-
-        <el-table :data="availableSubjects" border stripe style="width: 100%;">
-          <el-table-column width="60" align="center">
-            <template #header>
-              <el-checkbox
-                v-model="selectAllSubjects"
-                :indeterminate="isIndeterminateSubjects"
-                @change="handleSelectAllSubjects"
-              >
-                全选
-              </el-checkbox>
-            </template>
-            <template #default="{ row }">
-              <el-checkbox
-                v-model="row.selected"
-                @change="updateSelectedSubjects"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column prop="name" label="科目名称" width="150" />
-          <el-table-column prop="code" label="科目代码" width="120" />
-          <el-table-column label="满分值" width="200">
-            <template #default="{ row }">
-              <el-input-number
-                v-model="row.max_score"
-                :min="1"
-                :max="200"
-                :disabled="!row.selected"
-                placeholder="满分"
-                style="width: 100%;"
-                @change="updateTotalMaxScore"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column prop="description" label="说明" show-overflow-tooltip />
-        </el-table>
-
-        <div class="step-info" style="margin-top: 20px;">
-          <el-alert
-            type="success"
-            :closable="false"
-            show-icon
-          >
-            <template #title>
-              已选择 <strong>{{ selectedSubjectsCount }}</strong> 个科目，
-              总分 <strong>{{ totalMaxScore }}</strong> 分
-            </template>
-          </el-alert>
-        </div>
-      </div>
-
-      <!-- 步骤3: 考场安排 -->
-      <div v-show="schoolExamStep === 2" class="step-content">
-        <h4>🏫 考场安排</h4>
-
-        <!-- 考场信息概览 -->
-        <el-alert
-          type="info"
-          :closable="false"
-          show-icon
-          style="margin-bottom: 20px;"
-        >
+        <el-alert v-if="availableSubjects.length === 0 && !subjectLoading" type="warning" :closable="false" class="mb-4">
           <template #title>
-            参考学生：<strong>{{ estimatedStudentCount }}</strong> 名
-            预计考场数：<strong>{{ estimatedRoomsCount }}</strong> 个
+            该年级尚未配置学科标准，请先点击右上角「配置学科标准」按钮进行配置
           </template>
         </el-alert>
-
-        <!-- 编排规则 -->
-        <el-form :model="roomArrangementForm" label-width="140px" style="margin-bottom: 20px;">
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="每个考场人数">
-                <el-input-number
-                  v-model="roomArrangementForm.capacityPerRoom"
-                  :min="10"
-                  :max="100"
-                  :step="5"
-                  @change="updateCanGoNext"
-                />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="编排方式">
-                <el-radio-group v-model="roomArrangementForm.arrangementType">
-                  <el-radio value="by_class">按班级</el-radio>
-                  <el-radio value="mixed">混排</el-radio>
-                </el-radio-group>
-              </el-form-item>
-            </el-col>
-          </el-row>
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="座位排列">
-                <el-radio-group v-model="roomArrangementForm.seatPattern">
-                  <el-radio value="s_shape">S型</el-radio>
-                  <el-radio value="sequential">顺序</el-radio>
-                </el-radio-group>
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="考场位置">
-                <el-checkbox v-model="roomArrangementForm.useExistingRooms">
-                  使用现有教室作为考场
-                </el-checkbox>
-              </el-form-item>
-            </el-col>
-          </el-row>
-        </el-form>
-
-        <!-- 操作按钮 -->
-        <div style="margin-bottom: 20px;">
-          <el-button
-            type="primary"
-            size="large"
-            @click="autoAssignExamRooms"
-            :loading="arrangingRooms"
-            :icon="MagicStick"
-          >
-            自动编排考场
-          </el-button>
-          <el-button
-            v-if="examRooms.length > 0"
-            @click="autoAssignProctors"
-            :loading="assigningProctors"
-          >
-            分配监考教师
-          </el-button>
-          <el-button
-            v-if="examRooms.length > 0"
-            type="danger"
-            @click="clearAllExamRooms"
-          >
-            清空考场
-          </el-button>
-        </div>
-
-        <!-- 考场列表 -->
-        <div v-if="examRooms.length > 0">
-          <h5 style="margin-bottom: 10px;">考场列表</h5>
-          <el-table :data="examRooms" border stripe>
-            <el-table-column prop="name" label="考场" width="120" />
-            <el-table-column label="容量" width="80">
-              <template #default="{ row }">
-                {{ row.seat_count }}/{{ row.capacity }}
-              </template>
-            </el-table-column>
-            <el-table-column label="监考教师" width="200">
-              <template #default="{ row }">
-                {{ getProctorNames(row) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="考号范围" width="180">
-              <template #default="{ row }">
-                {{ row.exam_number_start }} - {{ row.exam_number_end }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="320">
-              <template #default="{ row }">
-                <el-button size="small" @click="viewRoomDetail(row)">详情</el-button>
-                <el-button size="small" type="primary" @click="exportSeatingChart(row)">座位表</el-button>
-                <el-button size="small" type="success" @click="exportExamTickets(row)">准考证</el-button>
-                <el-button size="small" type="warning" @click="exportProctorHandbook(row)">监考手册</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </div>
-
-      <!-- 步骤4: 确认学生 -->
-      <div v-show="schoolExamStep === 3" class="step-content">
-        <h4>👥 确认学生名单</h4>
-        <p style="color: #909399; margin-bottom: 16px;">
-          系统已自动从选定班级获取学生名单，共 <strong>{{ confirmedStudents.length }}</strong> 名学生
-        </p>
-
-        <el-table :data="confirmedStudents" max-height="300" stripe border>
-          <el-table-column type="index" label="序号" width="60" />
-          <el-table-column prop="name" label="姓名" width="120" />
-          <el-table-column prop="classroom" label="班级" width="150" />
-          <el-table-column prop="student_code" label="学号" />
+        <el-table :data="availableSubjects" border size="small" v-loading="subjectLoading">
+          <el-table-column width="50" align="center"><template #default="{ row }"><el-checkbox :model-value="isSubjectSelected(row)" @change="(v) => toggleSubject(row, v)" /></template></el-table-column>
+          <el-table-column prop="name" label="学科" /><el-table-column label="设定满分"><template #default="{ row }"><el-input-number v-model="row.max_score" size="small" :min="0" :max="200" /></template></el-table-column>
         </el-table>
-
-        <div class="step-actions" style="margin-top: 20px;">
-          <el-alert
-            type="info"
-            :closable="false"
-            show-icon
-          >
-            <template #title>
-              学生名单已自动获取，确认无误后点击"完成"创建考试
-            </template>
-          </el-alert>
-        </div>
       </div>
 
-      <!-- 步骤4: 完成 -->
-      <div v-show="schoolExamStep === 4" class="step-content">
-        <el-result
-          icon="success"
-          title="考试创建成功！"
-          sub-title="现在可以开始录入成绩了"
-        >
+      <div v-show="schoolExamStep === 2" class="px-10 py-4 text-left"><el-form label-width="120px"><el-form-item label="考场容量"><el-input-number v-model="roomConfig.capacity" :min="10" :max="60" /></el-form-item></el-form></div>
+      <div v-show="schoolExamStep === 3" class="px-10 py-4">
+        <el-result icon="success" title="档案组织完毕" sub-title="请确认以下信息无误后生成考试档案">
           <template #extra>
-            <el-space>
-              <el-button type="primary" @click="goToScoreEntry">
-                立即录入成绩
-              </el-button>
-              <el-button @click="closeSchoolQuickExamDialog">
-                返回首页
-              </el-button>
-            </el-space>
+            <div class="text-left bg-gray-50 p-6 rounded-lg max-w-2xl mx-auto">
+              <div class="grid grid-cols-2 gap-4 text-sm">
+                <div><span class="text-gray-600">考试名称：</span><span class="font-semibold">{{ schoolExamForm.name }}</span></div>
+                <div><span class="text-gray-600">考试类型：</span><span class="font-semibold">{{ getExamTypeName(schoolExamForm.exam_type) }}</span></div>
+                <div><span class="text-gray-600">所属学期：</span><span class="font-semibold">{{ semesters.find(s => s.id === schoolExamForm.semester_id)?.name }}</span></div>
+                <div><span class="text-gray-600">参与年级：</span><span class="font-semibold">{{ grades.find(g => g.id === schoolExamForm.grade_id)?.name }}</span></div>
+
+                <!-- 校级考试：显示班级 -->
+                <div v-if="activeWorkflowTab === 'school'" class="col-span-2">
+                  <span class="text-gray-600">参与班级：</span>
+                  <el-tag v-for="classId in schoolExamForm.class_ids" :key="classId" size="small" class="ml-1">{{ availableClassrooms.find(c => c.id === classId)?.name }}</el-tag>
+                  <span v-if="schoolExamForm.class_ids.length === 0" class="text-red-500 font-semibold ml-2">未选择班级</span>
+                </div>
+
+                <!-- 全区统考：显示区县和学校 -->
+                <template v-if="activeWorkflowTab === 'district'">
+                  <div class="col-span-2">
+                    <span class="text-gray-600">所属区县：</span>
+                    <span class="font-semibold">{{ regions.find(r => r.id === schoolExamForm.region_id)?.name }}</span>
+                  </div>
+                  <div class="col-span-2">
+                    <span class="text-gray-600">参与学校：</span>
+                    <el-tag v-for="schoolId in schoolExamForm.school_ids" :key="schoolId" size="small" type="warning" class="ml-1">{{ schools.find(s => s.id === schoolId)?.name }}</el-tag>
+                    <span v-if="schoolExamForm.school_ids.length === 0" class="text-red-500 font-semibold ml-2">未选择学校</span>
+                  </div>
+                </template>
+
+                <div class="col-span-2">
+                  <span class="text-gray-600">考试科目：</span>
+                  <el-tag v-for="subject in schoolExamForm.subjects" :key="subject.id" size="small" type="success" class="ml-1">{{ subject.name }} ({{ subject.max_score }}分)</el-tag>
+                  <span v-if="schoolExamForm.subjects.length === 0" class="text-red-500 font-semibold ml-2">未选择科目</span>
+                </div>
+                <div><span class="text-gray-600">考场容量：</span><span class="font-semibold">{{ roomConfig.capacity }}人/考场</span></div>
+              </div>
+
+              <!-- 校级考试警告 -->
+              <el-alert v-if="activeWorkflowTab === 'school' && schoolExamForm.class_ids.length === 0" type="error" :closable="false" class="mt-4">
+                <template #title>
+                  <strong>警告：</strong>尚未选择参与班级，请返回上一步选择班级后再生成考试档案
+                </template>
+              </el-alert>
+
+              <!-- 全区统考警告 -->
+              <el-alert v-if="activeWorkflowTab === 'district' && schoolExamForm.school_ids.length === 0" type="error" :closable="false" class="mt-4">
+                <template #title>
+                  <strong>警告：</strong>尚未选择参与学校，请返回上一步选择学校后再生成考试档案
+                </template>
+              </el-alert>
+            </div>
           </template>
         </el-result>
       </div>
+      <template #footer>
+        <!-- 第0步：只显示"下一步" -->
+        <el-button v-if="schoolExamStep === 0" type="primary" @click="handleNextStep">下一步</el-button>
 
-      <!-- 对话框底部按钮 -->
-      <template #footer v-if="schoolExamStep < 4">
-        <span class="dialog-footer">
-          <el-button @click="prevStep" :disabled="schoolExamStep === 0">上一步</el-button>
-          <el-button type="primary" @click="nextStep" :disabled="!canGoNext">
-            {{ schoolExamStep === 3 ? '完成' : '下一步' }}
+        <!-- 第1步：显示"上一步"和"下一步" -->
+        <template v-if="schoolExamStep === 1">
+          <el-button @click="schoolExamStep--">上一步</el-button>
+          <el-button type="primary" @click="handleNextStep" :disabled="schoolExamForm.subjects.length === 0">
+            下一步
           </el-button>
-        </span>
+        </template>
+
+        <!-- 第2步：显示"上一步"和"生成档案" -->
+        <template v-if="schoolExamStep === 2">
+          <el-button @click="schoolExamStep--">上一步</el-button>
+          <el-button type="primary" @click="handleNextStep">生成档案</el-button>
+        </template>
+
+        <!-- 第3步：显示"生成考试档案"和"取消" -->
+        <template v-if="schoolExamStep === 3">
+          <el-button @click="schoolExamStep--">返回修改</el-button>
+          <el-button
+            type="success"
+            @click="createExam"
+            :loading="creatingExam"
+            :disabled="activeWorkflowTab === 'school' && schoolExamForm.class_ids.length === 0">
+            生成考试档案
+          </el-button>
+        </template>
+      </template>
+    </el-dialog>
+
+    <!-- 学期管理对话框 -->
+    <el-dialog v-model="semesterDialogVisible" title="学期管理" width="900px">
+       <div class="p-4">
+         <el-form :model="semesterForm" label-width="120px" class="mb-4">
+           <el-row :gutter="20">
+             <el-col :span="12">
+               <el-form-item label="学年">
+                 <el-input v-model="semesterForm.year" placeholder="如：2024" />
+               </el-form-item>
+             </el-col>
+             <el-col :span="12">
+               <el-form-item label="学期">
+                 <el-select v-model="semesterForm.semester_type" style="width:100%">
+                   <el-option label="上学期" value="up" />
+                   <el-option label="下学期" value="down" />
+                 </el-select>
+               </el-form-item>
+             </el-col>
+           </el-row>
+         </el-form>
+         <el-button type="primary" @click="handleCreateSemester">创建学期</el-button>
+         <el-divider />
+         <el-table :data="semesters" border>
+           <el-table-column prop="name" label="学期名称" />
+           <el-table-column prop="year" label="学年" />
+           <el-table-column label="操作" width="150">
+             <template #default="{ row }">
+               <el-button v-if="row.is_current" type="success" size="small" disabled>当前学期</el-button>
+               <el-button v-else type="primary" size="small" @click="handleSetCurrentSemester(row)">设为当前</el-button>
+             </template>
+           </el-table-column>
+         </el-table>
+       </div>
+    </el-dialog>
+
+    <!-- 年级科目标准配置对话框 -->
+    <el-dialog v-model="subjectConfigDialogVisible" title="年级科目标准配置" width="1200px" @open="initSubjectConfig" @closed="refreshSubjects">
+      <div class="config-dialog-content">
+        <!-- 年级选择标签页 -->
+        <el-tabs v-model="selectedGradeTab" type="card" @tab-change="selectGrade">
+          <el-tab-pane v-for="grade in grades" :key="grade.id" :label="grade.name" :name="String(grade.id)">
+            <div class="grade-config-content">
+              <!-- 统计信息 -->
+              <div class="mb-4 p-3 bg-blue-50 rounded">
+                <span class="text-sm text-gray-700">
+                  已配置 <strong>{{ currentGradeSubjectConfigs.length }}</strong> 个学科
+                </span>
+              </div>
+
+              <!-- 操作按钮 -->
+              <div class="mb-4 flex justify-between items-center">
+                <h3 class="text-lg font-semibold">科目列表</h3>
+                <el-button type="primary" size="small" @click="openAddSubjectStandardModal">
+                  <el-icon class="mr-1"><Plus /></el-icon>
+                  添加科目标准
+                </el-button>
+              </div>
+
+              <!-- Loading -->
+              <div v-if="subjectLoading" class="text-center py-8 text-gray-500">
+                <el-icon class="is-loading"><Loading /></el-icon>
+                <span class="ml-2">加载中...</span>
+              </div>
+
+              <!-- Empty State -->
+              <div v-else-if="currentGradeSubjectConfigs.length === 0" class="text-center py-12 bg-gray-50 rounded">
+                <div class="text-4xl mb-2">📋</div>
+                <p class="text-gray-600 mb-4">该年级暂未配置科目标准</p>
+                <el-button type="primary" @click="openAddSubjectStandardModal">立即配置</el-button>
+              </div>
+
+              <!-- Subject List -->
+              <el-table v-else :data="currentGradeSubjectConfigs" border stripe>
+                <el-table-column prop="subject_name" label="学科" width="120" />
+                <el-table-column prop="subject_code" label="代码" width="100" />
+                <el-table-column prop="full_score" label="满分" width="80" />
+                <el-table-column prop="pass_line" label="及格线" width="80" />
+                <el-table-column prop="excellent_line" label="优秀线" width="80" />
+                <el-table-column prop="good_line" label="良好线" width="80" />
+                <el-table-column prop="description" label="说明" min-width="150" show-overflow-tooltip />
+                <el-table-column label="状态" width="80">
+                  <template #default="{ row }">
+                    <el-tag :type="row.is_active ? 'success' : 'danger'" size="small">
+                      {{ row.is_active ? '启用' : '禁用' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="180" fixed="right">
+                  <template #default="{ row }">
+                    <el-button link type="primary" size="small" @click="editSubjectStandard(row)">编辑</el-button>
+                    <el-button link type="warning" size="small" @click="handleDeleteSubjectConfig(row)">删除</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+    </el-dialog>
+
+    <!-- 添加/编辑科目标准对话框 -->
+    <el-dialog v-model="subjectStandardFormVisible" :title="editingConfigId ? '编辑标准' : '新增标准'" width="500px" append-to-body>
+      <el-form :model="subjectStandardForm" label-width="100px">
+        <el-form-item label="学科" required>
+          <el-select v-model="subjectStandardForm.subject_id" filterable style="width:100%" :disabled="!!editingConfigId">
+            <el-option v-for="s in allSubjects" :key="s.id" :label="`${s.name} (${s.code})`" :value="s.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="满分" required>
+          <el-input-number v-model="subjectStandardForm.full_score" :min="1" :max="200" style="width:100%" @change="autoFillLines" />
+        </el-form-item>
+        <el-form-item label="及格线">
+          <el-input-number v-model="subjectStandardForm.pass_line" :min="0" :max="subjectStandardForm.full_score" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="优秀线">
+          <el-input-number v-model="subjectStandardForm.excellent_line" :min="0" :max="subjectStandardForm.full_score" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="良好线">
+          <el-input-number v-model="subjectStandardForm.good_line" :min="0" :max="subjectStandardForm.full_score" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="subjectStandardForm.description" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="subjectStandardFormVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveSubjectStandard" :loading="savingConfig">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { ElMessage, ElMessageBox } from 'element-plus';
-import type { FormInstance } from 'element-plus';
-import {
-  Document,
-  ArrowRight,
-  Upload,
-  CopyDocument,
-  Plus,
-  User,
-  Delete,
-  Refresh,
-  Calendar,
-  DataAnalysis,
-  TrendCharts,
-  List,
-  InfoFilled,
-  MagicStick,
-  Download
-} from '@element-plus/icons-vue';
-import { semesterApi, examApi } from '@/services/evaluation';
-import { curriculumService } from '@/services/curriculum';
-import { adminService } from '@/services/admin';  // 导入adminService
-import { examRoomService } from '@/services/examRoom';  // 导入examRoomService
-import { useUserStore } from '@/store/user';  // 导入userStore
-import type { Semester, Exam, ExamRoom } from '@/types/evaluation';
-import type { Grade } from '@/types/curriculum';
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Setting, Edit, DataLine, Operation, InfoFilled, Search, Plus, Calendar, Document, Upload, TrendCharts, OfficeBuilding, UserFilled, Bell, Refresh, Reading, User, CircleCheckFilled, Loading } from '@element-plus/icons-vue'
+import AdminFunctionCard from '@/components/Admin/AdminFunctionCard.vue'
+import { useSemesterStore } from '@/store/semester'
+import { evaluationService } from '@/services/evaluation'
+import { curriculumService } from '@/services/curriculum'
+import { adminService } from '@/services/admin'
+import examSubjectsService from '@/services/examSubjects'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 
-// 获取当前用户信息
-const userStore = useUserStore();
-const currentUser = computed(() => userStore.user);
-const currentUserRole = computed(() => currentUser.value?.role?.toLowerCase());
-const isDistrictAdmin = computed(() => currentUserRole.value === 'district_admin');
-const isSchoolAdmin = computed(() => currentUserRole.value === 'school_admin');
+const router = useRouter(); const semesterStore = useSemesterStore(); const currentSemester = computed(() => semesterStore.currentSemester)
+const loading = ref(false); const subjectLoading = ref(false); const savingConfig = ref(false); const creatingExam = ref(false); const searchQuery = ref('')
+const exams = ref<any[]>([]); const semesters = ref<any[]>([]); const grades = ref<any[]>([]); const schools = ref<any[]>([]); const allSubjects = ref<any[]>([]); const regions = ref<any[]>([])
+const currentGradeSubjectConfigs = ref<any[]>([]); const runningTasks = ref<any[]>([])
+const activeWorkflowTab = ref('school'); const schoolExamStep = ref(0); const schoolWorkflowStep = ref(0); const districtWorkflowStep = ref(0)
+const semesterDialogVisible = ref(false); const subjectConfigDialogVisible = ref(false); const schoolProfileDialogVisible = ref(false); const schoolQuickExamDialogVisible = ref(false); const subjectStandardFormVisible = ref(false)
 
-// 扩展 Exam 类型以包含数据准备状态
-interface ExamWithStatus extends Exam {
-  hasStudents?: boolean;
-  hasScores?: boolean;
+// 响应式声明
+const roomConfig = reactive({ capacity: 30, codeRule: 'student_no' }); const editingConfigId = ref<number | null>(null)
+const configuredSchoolId = ref<number | null>(null); const configuredSchoolName = ref<string>('')
+const availableClassrooms = ref<any[]>([]); const availableSubjects = ref<any[]>([]); const availableGrades = ref<any[]>([])
+const selectedGradeTab = ref<string>('')
+
+const schoolProfileForm = reactive({ id: null as any, name: '', code: '', address: '' })
+const schoolExamForm = reactive({ name: '', exam_type: 'monthly', target_school_id: null as any, grade_id: null as any, semester_id: null as any, class_ids: [], school_ids: [], region_id: null as any, subjects: [] as any[] })
+const subjectStandardForm = reactive({ subject_id: null as any, full_score: 100, pass_line: 60, excellent_line: 85, good_line: 75, description: '' })
+const semesterForm = reactive({ year: '', semester_type: 'up', name: '' })
+
+// 逻辑方法
+const handleConfigCommand = (c: string) => { if (c === 'semester') semesterDialogVisible.value = true; else if (c === 'subject') subjectConfigDialogVisible.value = true; else if (c === 'school-profile') schoolProfileDialogVisible.value = true; else router.push('/admin/organization') }
+// 打开学科标准配置对话框（从考试组织流程中）
+const openSubjectConfigDialog = () => {
+  subjectConfigDialogVisible.value = true
+  // 设置当前选中的年级标签
+  if (schoolExamForm.grade_id) {
+    selectedGradeTab.value = String(schoolExamForm.grade_id)
+  }
 }
-
-const router = useRouter();
-
-// 响应式数据
-const loading = ref(false);
-const semesters = ref<Semester[]>([]);
-const exams = ref<ExamWithStatus[]>([]);
-const grades = ref<Grade[]>([]);
-const currentSemester = ref<Semester | null>(null);
-const importTasks = ref([]);
-const evaluations = ref([]);
-
-// 工作流程相关
-const activeWorkflowTab = ref('district');
-const districtWorkflowStep = ref(0);
-const schoolWorkflowStep = ref(0);
-
-// 快速入口相关
-const examTemplates = ref(5); // 考试模板数量
-const quickExamDialogVisible = ref(false);
-const batchImportDialogVisible = ref(false);
-const examTemplateDialogVisible = ref(false);
-
-// 学校端快速创建考试相关
-const schoolQuickExamDialogVisible = ref(false);
-const schoolExamStep = ref(0);
-const availableSchools = ref<any[]>([]);
-const availableRegions = ref<any[]>([]);
-const availableGrades = ref<any[]>([]);
-const availableClassrooms = ref<any[]>([]);
-const confirmedStudents = ref<any[]>([]);
-
-// 考场安排相关
-const examRooms = ref<ExamRoom[]>([]);
-const createdExamId = ref<number | null>(null);
-const arrangingRooms = ref(false);
-const assigningProctors = ref(false);
-
-// 考场编排配置
-const roomArrangementForm = reactive({
-  capacityPerRoom: 30,
-  arrangementType: 'by_class' as 'by_class' | 'mixed',
-  seatPattern: 's_shape' as 'sequential' | 's_shape',
-  useExistingRooms: true
-});
-
-// 计算属性：动态获取当前区县的学段（学校类型）列表
-const availableStudyLevels = computed(() => {
-  let schools = availableSchools.value;
-
-  // 先根据区县过滤
-  if (schoolExamForm.region_id) {
-    schools = schools.filter(s => s.region_id === schoolExamForm.region_id);
+// 监听学科标准对话框关闭，刷新学科列表
+const refreshSubjects = () => {
+  if (schoolExamForm.grade_id) {
+    onGradeChange(schoolExamForm.grade_id)
   }
-
-  // 提取学校类型（去重、排序）
-  const studyLevels = [...new Set(schools.map(s => s.school_type))].filter(Boolean);
-
-  // 按照常见顺序排序（小学、初中、高中）
-  const order = { '小学': 1, '初中': 2, '高中': 3 };
-  studyLevels.sort((a, b) => {
-    const orderA = order[a as keyof typeof order] || 999;
-    const orderB = order[b as keyof typeof order] || 999;
-    return orderA - orderB;
-  });
-
-  return studyLevels;
-});
-
-// 计算属性：根据选择的区县过滤学校
-const filteredSchools = computed(() => {
-  let result = availableSchools.value;
-
-  // 先根据区县过滤
-  if (schoolExamForm.region_id) {
-    result = result.filter(s => s.region_id === schoolExamForm.region_id);
-  }
-
-  // 再根据学段过滤（只显示该学段的学校）
-  if (schoolExamForm.study_level) {
-    result = result.filter(s => s.school_type === schoolExamForm.study_level);
-  }
-
-  return result;
-});
-
-// 计算属性：根据选择的学段过滤年级（使用 Grade 的 level 字段）
-const filteredGrades = computed(() => {
-  if (!schoolExamForm.study_level) {
-    return [];
-  }
-
-  // 根据学段使用 level 字段过滤
-  return availableGrades.value.filter(grade => {
-    const level = grade.level;
-
-    if (schoolExamForm.study_level === '小学') {
-      // 小学：1-6年级
-      return level >= 1 && level <= 6;
-    } else if (schoolExamForm.study_level === '初中') {
-      // 初中：7-9年级
-      return level >= 7 && level <= 9;
-    } else if (schoolExamForm.study_level === '高中') {
-      // 高中：10-12年级
-      return level >= 10 && level <= 12;
-    }
-
-    return false;
-  });
-});
-
-// 学校端考试表单
-interface Subject {
-  name: string;
-  max_score: number;
 }
-
-const schoolExamForm = reactive({
-  name: '',
-  exam_type: '',
-  // 考试级别：school（校级）/ district（区级）/ city（市级）
-  exam_level: 'school',
-  // 区县管理员字段（用于 district/city 级别）
-  region_id: undefined as number | undefined,
-  study_level: undefined as string | undefined,  // 学段：小学/初中/高中
-  grade_id: undefined as number | undefined,  // 年级
-  school_ids: [] as number[],  // 多选学校
-  // 学校管理员字段（用于 school 级别）
-  isJointExam: false,
-  additional_school_ids: [] as number[],  // 联考时额外的学校
-  // 通用字段
-  school_id: undefined as number | undefined,
-  class_ids: [] as number[],
-  semester_id: undefined as number | undefined,  // 学期ID
-  exam_date: '',
-  subjects: [
-    { name: '语文', max_score: 150 },
-    { name: '数学', max_score: 150 },
-    { name: '英语', max_score: 150 },
-  ] as Subject[],
-});
-
-// 对话框显示状态
-const semesterDialogVisible = ref(false);
-const examDialogVisible = ref(false);
-const studentImportDialogVisible = ref(false);
-const scoreImportDialogVisible = ref(false);
-const evaluationDialogVisible = ref(false);
-const performanceDialogVisible = ref(false);
-
-// 学期表单
-const semesterForm = reactive({
-  year: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
-  semester_type: 'up', // 'up' 表示上学期, 'down' 表示下学期
-  name: '',
-  start_date: '',
-  end_date: '',
-});
-
-const semesterRules = {
-  year: [
-    { required: true, message: '请输入学年', trigger: 'blur' },
-    {
-      pattern: /^\d{4}-\d{4}$/,
-      message: '学年格式不正确，应为：2023-2024',
-      trigger: 'blur'
-    }
-  ],
-  semester_type: [{ required: true, message: '请选择学期类型', trigger: 'change' }],
-  name: [{ required: true, message: '请输入学期名称', trigger: 'blur' }],
-  start_date: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
-  end_date: [{ required: true, message: '请选择结束日期', trigger: 'change' }],
-};
-
-const semesterFormRef = ref<FormInstance>();
-const semesterSubmitting = ref(false);
-
-// 考试表单
-const examForm = reactive({
-  name: '',
-  exam_type: '',
-  grade_id: undefined,
-  semester_id: undefined,
-  exam_date: '',
-  description: '',
-});
-
-const examRules = {
-  name: [{ required: true, message: '请输入考试名称', trigger: 'blur' }],
-  exam_type: [{ required: true, message: '请选择考试类型', trigger: 'change' }],
-  semester_id: [{ required: true, message: '请选择学期', trigger: 'change' }],
-  exam_date: [{ required: true, message: '请选择考试日期', trigger: 'change' }],
-};
-
-const examFormRef = ref<FormInstance>();
-const examSubmitting = ref(false);
-
-// 加载数据
-const loadData = async () => {
-  loading.value = true;
-  try {
-    semesters.value = await semesterApi.list();
-    const examsList = await examApi.list({ skip: 0, limit: 100 });
-
-    // 为每个考试添加数据准备状态（这里需要调用API获取实际状态）
-    // 暂时使用模拟数据，实际应该从后端获取
-    exams.value = examsList.map((exam: Exam) => ({
-      ...exam,
-      hasStudents: false, // TODO: 从API获取是否有考生映射
-      hasScores: false, // TODO: 从API获取是否有成绩数据
-    })) as ExamWithStatus[];
-
-    // 加载年级数据
-    grades.value = await curriculumService.getGrades();
-    availableGrades.value = grades.value;  // 同时赋值给 availableGrades
-
-    // 查找当前学期
-    currentSemester.value = semesters.value.find(s => s.is_current) || null;
-  } catch (error: any) {
-    console.error('加载数据失败:', error);
-    ElMessage.error(error.response?.data?.detail || '加载数据失败');
-  } finally {
-    loading.value = false;
-  }
-};
-
-// 生成学期名称
-const generateSemesterName = () => {
-  const semesterText = semesterForm.semester_type === 'up' ? '上学期' : '下学期';
-  semesterForm.name = `${semesterForm.year}学年${semesterText}`;
-};
-
-// 监听学期表单变化
-watch(
-  () => [semesterForm.year, semesterForm.semester_type],
-  () => {
-    generateSemesterName();
-  }
-);
-
-// 监听学校端考试表单变化
-watch(
-  () => schoolExamForm.class_ids,
-  () => {
-    updateEstimatedStudentCount();
-  },
-  { deep: true }
-);
-
-watch(
-  () => schoolExamForm.subjects,
-  () => {
-    updateTotalMaxScore();
-  },
-  { deep: true }
-);
-
-watch(
-  () => [
-    schoolExamForm.name,
-    schoolExamForm.school_id,
-    schoolExamForm.school_ids,
-    schoolExamForm.region_id,
-    schoolExamForm.grade_id,
-    schoolExamForm.class_ids,
-    schoolExamForm.semester_id,
-    schoolExamForm.exam_date
-  ],
-  () => {
-    updateCanGoNext();
-  },
-  { deep: true }
-);
-
-// ==================== 快速入口方法 ====================
-
-// 快速创建考试 - 直接打开学校端快速创建考试对话框
-const openQuickExamDialog = async () => {
-  schoolQuickExamDialogVisible.value = true;
-  resetSchoolExamForm();
-  // 加载学校数据
-  await loadSchools();
-
-  // 如果是学校管理员，自动加载当前学校的年级
-  if (isSchoolAdmin.value && currentUser.value?.school_id) {
-    const school = availableSchools.value.find(s => s.id === currentUser.value.school_id);
+// 打开学校资料对话框时，初始化表单数据
+const openSchoolProfileDialog = () => {
+  if (configuredSchoolId.value && configuredSchoolName.value) {
+    // 如果已经绑定过学校，从 schools 列表中找到完整的学校信息
+    const school = schools.value.find(s => s.id === configuredSchoolId.value)
     if (school) {
-      await loadGradesBySchoolType(school);
-      schoolExamForm.school_id = currentUser.value.school_id;
-      ElMessage.success(`已自动加载${currentUser.value.school_name}的年级数据`);
-    }
-  }
-
-  ElMessage.info(isDistrictAdmin.value ? '开始创建统考...' : '开始快速创建考试...');
-};
-
-// 批量导入成绩 - 跳转到成绩导入页面
-const openBatchImportDialog = () => {
-  router.push('/district-admin/score-import');
-};
-
-// 使用考试模板 - 显示提示信息
-const openExamTemplateDialog = () => {
-  ElMessage.info('考试模板功能开发中，敬请期待...');
-  // TODO: 未来实现从历史考试创建新考试
-};
-
-// 开始区县管理员工作流
-const startDistrictWorkflow = async () => {
-  activeWorkflowTab.value = 'district';
-  districtWorkflowStep.value = 0;
-  // 区县管理员也可以使用快速创建考试功能
-  schoolQuickExamDialogVisible.value = true;
-  resetSchoolExamForm();
-  // 加载学校数据
-  await loadSchools();
-  ElMessage.info('开始创建考试...');
-};
-
-// 开始学校管理员工作流
-const startSchoolWorkflow = async () => {
-  activeWorkflowTab.value = 'school';
-  schoolWorkflowStep.value = 0;
-  schoolQuickExamDialogVisible.value = true;
-  resetSchoolExamForm();
-  // 加载学校数据
-  await loadSchools();
-
-  // 如果是学校管理员，自动加载当前学校的年级
-  if (isSchoolAdmin.value && currentUser.value?.school_id) {
-    const school = availableSchools.value.find(s => s.id === currentUser.value.school_id);
-    if (school) {
-      await loadGradesBySchoolType(school);
-      schoolExamForm.school_id = currentUser.value.school_id;
-      ElMessage.success(`已自动加载${currentUser.value.school_name}的年级数据`);
-    }
-  }
-};
-
-// ==================== 学校端快速创建考试方法 ====================
-
-// 计算属性：预估学生数量
-const estimatedStudentCount = ref(0);
-
-// 计算属性：科目总分
-const totalMaxScore = ref(450);
-
-// 计算属性：是否可以进入下一步
-const canGoNext = ref(false);
-
-// 可选科目列表（从系统动态获取）
-const availableSubjects = ref<any[]>([]);
-
-// 科目全选相关
-const selectAllSubjects = ref(false);
-const isIndeterminateSubjects = ref(false);
-
-// 计算属性：已选科目数量
-const selectedSubjectsCount = computed(() => {
-  return availableSubjects.value.filter(s => s.selected).length;
-});
-
-// 计算属性：预计考场数量
-const estimatedRoomsCount = computed(() => {
-  const students = estimatedStudentCount.value || 0;
-  const capacity = roomArrangementForm.capacityPerRoom;
-  return Math.ceil(students / capacity);
-});
-
-// 加载学校列表和区域列表
-const loadSchools = async () => {
-  try {
-    // 并行加载学校和区域数据
-    const [schoolsResponse, regionsResponse] = await Promise.all([
-      adminService.getSchools({
-        page: 1,
-        size: 1000,
-        search: ''
-      }),
-      // TODO: 需要添加获取区域的API
-      // adminService.getRegions()
-    ]);
-
-    availableSchools.value = schoolsResponse.schools;
-
-    // 提取唯一的区域列表（从学校数据中获取）
-    const regionMap = new Map();
-    availableSchools.value.forEach(school => {
-      if (school.region_id && school.region) {
-        regionMap.set(school.region_id, {
-          id: school.region_id,
-          name: school.region.name
-        });
-      }
-    });
-    availableRegions.value = Array.from(regionMap.values());
-
-    if (availableSchools.value.length === 0) {
-      ElMessage.warning('暂无学校数据，请先创建学校');
+      Object.assign(schoolProfileForm, {
+        id: school.id,
+        name: school.name,
+        code: school.code || '',
+        address: school.address || ''
+      })
     } else {
-      console.log(`已加载 ${availableSchools.value.length} 所学校`);
-      if (isDistrictAdmin.value) {
-        console.log(`已加载 ${availableRegions.value.length} 个区域`);
-      }
+      // 如果找不到学校，至少填充已有的信息
+      Object.assign(schoolProfileForm, {
+        id: configuredSchoolId.value,
+        name: configuredSchoolName.value,
+        code: '',
+        address: ''
+      })
     }
-  } catch (error: any) {
-    console.error('加载学校失败:', error);
-    ElMessage.error(error.response?.data?.detail || '加载学校失败');
-  }
-};
-
-// 学校变化时加载对应的年级
-const onSchoolChange = async (schoolId: number | undefined) => {
-  // 清空已选择的年级和班级
-  schoolExamForm.grade_id = undefined;
-  schoolExamForm.class_ids = [];
-  availableGrades.value = [];
-  availableClassrooms.value = [];
-
-  if (!schoolId) {
-    return;
-  }
-
-  try {
-    // 使用curriculumService获取所有年级，然后根据学校类型过滤
-    const allGrades = await curriculumService.getGrades();
-
-    // 获取学校信息
-    const school = availableSchools.value.find(s => s.id === schoolId);
-
-    if (school) {
-      // 根据学校类型过滤年级
-      let filteredGrades = [];
-
-      if (school.school_type === '小学') {
-        filteredGrades = allGrades.filter(g =>
-          g.name.includes('一年级') || g.name.includes('二年级') ||
-          g.name.includes('三年级') || g.name.includes('四年级') ||
-          g.name.includes('五年级') || g.name.includes('六年级')
-        );
-      } else if (school.school_type === '初中') {
-        filteredGrades = allGrades.filter(g =>
-          g.name.includes('七年级') || g.name.includes('八年级') || g.name.includes('九年级')
-        );
-      } else if (school.school_type === '高中') {
-        filteredGrades = allGrades.filter(g =>
-          g.name.includes('高一') || g.name.includes('高二') || g.name.includes('高三')
-        );
-      } else {
-        // 完全中学或其他类型，返回所有年级
-        filteredGrades = allGrades;
-      }
-
-      availableGrades.value = filteredGrades;
-
-      if (filteredGrades.length > 0) {
-        ElMessage.success(`${school.name} - 已加载${filteredGrades.length}个年级`);
-      } else {
-        ElMessage.warning(`${school.name} - 暂无对应年级数据`);
-      }
-    }
-  } catch (error) {
-    console.error('加载年级失败:', error);
-    ElMessage.error('加载年级失败');
-  }
-};
-
-// 年级变化时加载对应的班级
-const onGradeChange = async (gradeId: number | undefined) => {
-  // 清空已选择的班级
-  schoolExamForm.class_ids = [];
-  availableClassrooms.value = [];
-
-  if (!gradeId) {
-    return;
-  }
-
-  // 区县管理员：选择年级后，自动加载所有选中学校的该年级班级
-  if (isDistrictAdmin.value && schoolExamForm.school_ids.length > 0) {
-    try {
-      // 获取第一个选中学校的年级信息（用于显示）
-      const firstSchool = availableSchools.value.find(s => s.id === schoolExamForm.school_ids[0]);
-
-      // 加载所有选中学校的该年级班级
-      const allClassrooms = [];
-      for (const schoolId of schoolExamForm.school_ids) {
-        const response = await adminService.getClassrooms({
-          school_id: schoolId,
-          grade_id: gradeId,
-          page: 1,
-          size: 100
-        });
-        allClassrooms.push(...response.classrooms);
-      }
-
-      availableClassrooms.value = allClassrooms;
-
-      if (allClassrooms.length > 0) {
-        const grade = availableGrades.value.find(g => g.id === gradeId);
-        ElMessage.success(`已加载${schoolExamForm.school_ids.length}所学校的${grade?.name}班级，共${allClassrooms.length}个班级`);
-      } else {
-        ElMessage.warning('所选学校该年级暂无班级数据');
-      }
-    } catch (error: any) {
-      console.error('加载班级失败:', error);
-      ElMessage.error(error.response?.data?.detail || '加载班级失败');
-    }
-  }
-  // 学校管理员：使用当前学校的ID
-  else if (isSchoolAdmin.value && currentUser.value?.school_id) {
-    schoolExamForm.school_id = currentUser.value.school_id;
-
-    try {
-      const response = await adminService.getClassrooms({
-        school_id: schoolExamForm.school_id,
-        grade_id: gradeId,
-        page: 1,
-        size: 100
-      });
-
-      availableClassrooms.value = response.classrooms;
-
-      if (availableClassrooms.value.length > 0) {
-        const grade = availableGrades.value.find(g => g.id === gradeId);
-        ElMessage.success(`${currentUser.value.school_name} ${grade?.name} - 已加载${availableClassrooms.value.length}个班级`);
-      } else {
-        ElMessage.warning('该年级暂无班级数据');
-      }
-    } catch (error: any) {
-      console.error('加载班级失败:', error);
-      ElMessage.error(error.response?.data?.detail || '加载班级失败');
-    }
-  }
-  // 通用管理员：使用选中的单个学校ID
-  else if (schoolExamForm.school_id) {
-    try {
-      const response = await adminService.getClassrooms({
-        school_id: schoolExamForm.school_id,
-        grade_id: gradeId,
-        page: 1,
-        size: 100
-      });
-
-      availableClassrooms.value = response.classrooms;
-
-      if (availableClassrooms.value.length > 0) {
-        const grade = availableGrades.value.find(g => g.id === gradeId);
-        const school = availableSchools.value.find(s => s.id === schoolExamForm.school_id);
-        ElMessage.success(`${school?.name} ${grade?.name} - 已加载${availableClassrooms.value.length}个班级`);
-      } else {
-        ElMessage.warning('该年级暂无班级数据');
-      }
-    } catch (error: any) {
-      console.error('加载班级失败:', error);
-      ElMessage.error(error.response?.data?.detail || '加载班级失败');
-    }
-  }
-};
-
-// 区县管理员：区县变化时的处理
-const onRegionChange = (regionId: number | undefined) => {
-  // 清空已选择的学段、年级和学校
-  schoolExamForm.study_level = undefined;
-  schoolExamForm.school_ids = [];
-  schoolExamForm.grade_id = undefined;
-  schoolExamForm.class_ids = [];
-  availableClassrooms.value = [];
-
-  if (regionId) {
-    const region = availableRegions.value.find(r => r.id === regionId);
-    const schoolCount = filteredSchools.value.length;
-    ElMessage.success(`${region?.name} - 共有${schoolCount}所学校`);
-  }
-};
-
-// 区县管理员：学段变化时的处理
-const onStudyLevelChange = (studyLevel: string | undefined) => {
-  // 清空已选择的年级和学校
-  schoolExamForm.grade_id = undefined;
-  schoolExamForm.school_ids = [];
-  schoolExamForm.class_ids = [];
-  availableClassrooms.value = [];
-
-  if (studyLevel) {
-    // 根据学段过滤年级
-    const gradeCount = filteredGrades.value.length;
-    const schoolCount = filteredSchools.value.length;
-    ElMessage.success(`${studyLevel} - 共${schoolCount}所学校，${gradeCount}个年级`);
-  }
-};
-
-// 区县管理员：学校列表变化时的处理
-const onSchoolsChange = () => {
-  // 清空已选择的班级
-  schoolExamForm.class_ids = [];
-  availableClassrooms.value = [];
-
-  // 注意：年级已经通过学段选择了，这里不需要再加载年级
-};
-
-// 学校管理员：联考模式变化
-const onJointExamChange = (isJoint: boolean) => {
-  if (!isJoint) {
-    schoolExamForm.additional_school_ids = [];
-  }
-};
-
-// 区县管理员：全选学校
-const selectAllSchools = () => {
-  schoolExamForm.school_ids = filteredSchools.value.map(s => s.id);
-  onSchoolsChange();
-};
-
-// 根据学校类型加载年级（辅助函数）
-const loadGradesBySchoolType = async (school: any) => {
-  try {
-    const allGrades = await curriculumService.getGrades();
-
-    let filteredGrades = [];
-
-    if (school.school_type === '小学') {
-      filteredGrades = allGrades.filter(g =>
-        g.name.includes('一年级') || g.name.includes('二年级') ||
-        g.name.includes('三年级') || g.name.includes('四年级') ||
-        g.name.includes('五年级') || g.name.includes('六年级')
-      );
-    } else if (school.school_type === '初中') {
-      filteredGrades = allGrades.filter(g =>
-        g.name.includes('七年级') || g.name.includes('八年级') || g.name.includes('九年级')
-      );
-    } else if (school.school_type === '高中') {
-      filteredGrades = allGrades.filter(g =>
-        g.name.includes('高一') || g.name.includes('高二') || g.name.includes('高三')
-      );
-    } else {
-      // 完全中学或其他类型，返回所有年级
-      filteredGrades = allGrades;
-    }
-
-    availableGrades.value = filteredGrades;
-
-    if (filteredGrades.length > 0) {
-      ElMessage.success(`${school.name} - 已加载${filteredGrades.length}个年级`);
-    } else {
-      ElMessage.warning(`${school.name} - 暂无对应年级数据`);
-    }
-  } catch (error) {
-    console.error('加载年级失败:', error);
-    ElMessage.error('加载年级失败');
-  }
-};
-
-// 加载科目列表（从系统动态获取）
-const loadSubjects = async () => {
-  try {
-    const subjects = await curriculumService.getSubjects(true);
-
-    // 为每个科目添加selected和max_score字段
-    availableSubjects.value = subjects.map(subject => ({
-      ...subject,
-      selected: false,
-      max_score: 100  // 默认满分值
-    }));
-
-    // 预选常用科目（语文、数学、英语）
-    const commonSubjects = ['语文', '数学', '英语'];
-    availableSubjects.value.forEach(subject => {
-      if (commonSubjects.includes(subject.name)) {
-        subject.selected = true;
-        subject.max_score = 150;  // 主科默认150分
-      }
-    });
-
-    updateSelectedSubjects();
-
-    ElMessage.success(`已加载${subjects.length}个科目`);
-  } catch (error: any) {
-    console.error('加载科目失败:', error);
-    ElMessage.error(error.response?.data?.detail || '加载科目失败');
-  }
-};
-
-// 处理全选科目
-const handleSelectAllSubjects = (checked: boolean) => {
-  availableSubjects.value.forEach(subject => {
-    subject.selected = checked;
-    if (checked && !subject.max_score) {
-      subject.max_score = 100;
-    }
-  });
-  updateSelectedSubjects();
-};
-
-// 更新选中科目列表
-const updateSelectedSubjects = () => {
-  const selected = availableSubjects.value.filter(s => s.selected);
-  const allSelected = availableSubjects.value.length > 0 &&
-    selected.length === availableSubjects.value.length;
-
-  selectAllSubjects.value = allSelected;
-  isIndeterminateSubjects.value = selected.length > 0 && !allSelected;
-
-  // 更新表单中的科目列表
-  schoolExamForm.subjects = selected.map(s => ({
-    name: s.name,
-    max_score: s.max_score || 100
-  }));
-
-  updateTotalMaxScore();
-  updateCanGoNext();
-};
-
-// 全选班级
-const selectAllClasses = () => {
-  schoolExamForm.class_ids = availableClassrooms.value.map(c => c.id);
-  updateEstimatedStudentCount();
-};
-
-// 更新预估学生数量
-const updateEstimatedStudentCount = () => {
-  estimatedStudentCount.value = schoolExamForm.class_ids.length * 45;
-  updateCanGoNext();
-};
-
-// 更新科目总分
-const updateTotalMaxScore = () => {
-  totalMaxScore.value = availableSubjects.value
-    .filter(s => s.selected)
-    .reduce((sum, subject) => sum + (subject.max_score || 0), 0);
-  updateCanGoNext();
-};
-
-// 更新是否可以进入下一步
-const updateCanGoNext = () => {
-  if (schoolExamStep.value === 0) {
-    // 区县管理员验证
-    if (isDistrictAdmin.value) {
-      canGoNext.value =
-        schoolExamForm.name.trim() !== '' &&
-        schoolExamForm.region_id !== undefined &&
-        schoolExamForm.school_ids.length > 0 &&
-        schoolExamForm.grade_id !== undefined &&
-        schoolExamForm.semester_id !== undefined &&
-        schoolExamForm.exam_date !== '';
-    }
-    // 学校管理员验证
-    else if (isSchoolAdmin.value) {
-      canGoNext.value =
-        schoolExamForm.name.trim() !== '' &&
-        schoolExamForm.grade_id !== undefined &&
-        schoolExamForm.class_ids.length > 0 &&
-        schoolExamForm.semester_id !== undefined &&
-        schoolExamForm.exam_date !== '';
-    }
-    // 通用管理员验证
-    else {
-      canGoNext.value =
-        schoolExamForm.name.trim() !== '' &&
-        schoolExamForm.school_id !== undefined &&
-        schoolExamForm.grade_id !== undefined &&
-        schoolExamForm.class_ids.length > 0 &&
-        schoolExamForm.semester_id !== undefined &&
-        schoolExamForm.exam_date !== '';
-    }
-  } else if (schoolExamStep.value === 1) {
-    // 验证是否选择了至少一个科目
-    canGoNext.value = selectedSubjectsCount.value > 0;
-  } else if (schoolExamStep.value === 2) {
-    // 考场安排步骤：必须有已分配的考场
-    canGoNext.value = examRooms.value.length > 0;
-  } else if (schoolExamStep.value === 3) {
-    // 预览确认步骤：学生数量大于0
-    canGoNext.value = confirmedStudents.value.length > 0;
-  }
-};
-
-// 上一步
-const prevStep = () => {
-  if (schoolExamStep.value > 0) {
-    schoolExamStep.value--;
-    updateCanGoNext();
-  }
-};
-
-// 下一步
-const nextStep = async () => {
-  if (!canGoNext.value) return;
-
-  if (schoolExamStep.value === 0) {
-    // 从步骤1进入步骤2：加载科目
-    schoolExamStep.value = 1;
-    await loadSubjects();
-    updateCanGoNext();
-  } else if (schoolExamStep.value === 1) {
-    // 从步骤2进入步骤3：创建考试（为考场安排准备）
-    await createSchoolExamForRooms();
-    schoolExamStep.value = 2;
-    updateCanGoNext();
-  } else if (schoolExamStep.value === 2) {
-    // 从步骤3进入步骤4：加载学生名单
-    schoolExamStep.value = 3;
-    await loadConfirmedStudents();
-    updateCanGoNext();
-  } else if (schoolExamStep.value === 3) {
-    // 从步骤4进入步骤5：完成
-    await finalizeSchoolExam();
-  }
-};
-
-// 加载确认的学生名单
-const loadConfirmedStudents = async () => {
-  try {
-    // TODO: 后端需要添加按班级批量获取学生的API
-    // 暂时使用 getUsers API 获取所有学生，然后在前端过滤
-
-    // 获取所有学生
-    const response = await adminService.getUsers({
-      role: 'student',
-      page: 1,
-      size: 1000  // 足够大的数量
-    });
-
-    // 过滤出选定班级的学生
-    const selectedClassIds = schoolExamForm.class_ids;
-    confirmedStudents.value = response.users
-      .filter(user => selectedClassIds.includes(user.classroom_id!))
-      .map(user => ({
-        id: user.id,
-        name: user.full_name || user.username,
-        classroom: user.classroom_name || '未分配班级',
-        student_code: user.student_id_number || user.username,
-        classroom_id: user.classroom_id,
-        school_id: user.school_id
-      }));
-
-    if (confirmedStudents.value.length > 0) {
-      ElMessage.success(`已加载 ${confirmedStudents.value.length} 名学生`);
-    } else {
-      ElMessage.warning('选定班级暂无学生数据');
-    }
-  } catch (error: any) {
-    console.error('加载学生名单失败:', error);
-    ElMessage.error(error.response?.data?.detail || '加载学生名单失败');
-  }
-};
-
-// 创建学校考试
-// 创建考试（为考场安排准备）- 不显示成功消息
-const createSchoolExamForRooms = async () => {
-  try {
-    // 构建考试日期时间（使用中午12点，格式：YYYY-MM-DD HH:mm:ss）
-    const examDate = new Date(schoolExamForm.exam_date);
-    const year = examDate.getFullYear();
-    const month = String(examDate.getMonth() + 1).padStart(2, '0');
-    const day = String(examDate.getDate()).padStart(2, '0');
-    const examDateTime = `${year}-${month}-${day} 12:00:00`;
-
-    // 构建请求数据
-    const requestData: any = {
-      name: schoolExamForm.name,
-      exam_type: schoolExamForm.exam_type || 'final',  // 考试类型
-      exam_level: schoolExamForm.exam_level,  // 考试级别：school/district/city
-      semester_id: schoolExamForm.semester_id!,
-      grade_id: schoolExamForm.grade_id!,
-      exam_date: examDateTime,  // 格式：YYYY-MM-DD HH:mm:ss
-    };
-
-    // 根据考试级别和用户角色添加不同的字段
-    if (schoolExamForm.exam_level === 'school') {
-      // 校级考试：使用 school_id 和 class_ids
-      requestData.school_id = isSchoolAdmin.value ? currentUser.value?.school_id : schoolExamForm.school_id;
-      if (schoolExamForm.class_ids.length > 0) {
-        requestData.class_ids = schoolExamForm.class_ids;
-      }
-    } else if (schoolExamForm.exam_level === 'district' || schoolExamForm.exam_level === 'city') {
-      // 区级/市级考试：使用 region_id 和 school_ids
-      requestData.region_id = schoolExamForm.region_id;
-      if (schoolExamForm.school_ids.length > 0) {
-        requestData.school_ids = schoolExamForm.school_ids;
-      }
-      // study_level 仅用于前端过滤，不发送到后端
-    }
-
-    console.log('创建考试请求:', requestData);
-
-    // 调用API创建考试
-    const response = await examApi.create(requestData);
-
-    // 保存考试ID用于后续考场安排
-    createdExamId.value = response.id;
-
-    console.log('考试创建成功，ID:', createdExamId.value);
-  } catch (error: any) {
-    console.error('创建考试失败:', error);
-    console.error('错误详情:', error.response?.data);
-
-    // 显示详细错误信息
-    const detail = error.response?.data?.detail || '创建考试失败';
-    ElMessage.error(typeof detail === 'string' ? detail : JSON.stringify(detail));
-    throw error;
-  }
-};
-
-// 自动分配考场
-const autoAssignExamRooms = async () => {
-  if (!createdExamId.value) {
-    ElMessage.error('考试ID不存在，请先创建考试');
-    return;
-  }
-
-  arrangingRooms.value = true;
-  try {
-    const requestData = {
-      capacity_per_room: roomArrangementForm.capacityPerRoom,
-      arrangement_type: roomArrangementForm.arrangementType,
-      seat_pattern: roomArrangementForm.seatPattern,
-      use_existing_rooms: roomArrangementForm.useExistingRooms
-    };
-
-    console.log('编排考场请求:', requestData);
-    console.log('考试ID:', createdExamId.value);
-
-    const rooms = await examRoomService.autoAssignRooms(
-      createdExamId.value,
-      requestData
-    );
-    examRooms.value = rooms;
-    ElMessage.success(`成功创建 ${rooms.length} 个考场`);
-    updateCanGoNext();
-  } catch (error: any) {
-    console.error('编排考场失败:', error);
-    console.error('错误详情:', error.response?.data);
-
-    // 显示详细错误信息
-    const detail = error.response?.data?.detail || '编排考场失败';
-    ElMessage.error(typeof detail === 'string' ? detail : JSON.stringify(detail));
-  } finally {
-    arrangingRooms.value = false;
-  }
-};
-
-// 自动分配监考教师
-const autoAssignProctors = async () => {
-  if (!createdExamId.value) {
-    ElMessage.error('考试ID不存在，请先创建考试');
-    return;
-  }
-
-  if (examRooms.value.length === 0) {
-    ElMessage.warning('请先编排考场');
-    return;
-  }
-
-  assigningProctors.value = true;
-  try {
-    const result = await examRoomService.autoAssignProctors(
-      createdExamId.value,
-      {
-        auto_assign: true,
-        avoid_own_class: true,
-        same_school_only: true
-      }
-    );
-    ElMessage.success(result.message);
-    // 刷新考场数据以显示监考教师
-    await loadExamRooms();
-  } catch (error: any) {
-    console.error('分配监考失败:', error);
-    ElMessage.error(error.response?.data?.detail || '分配监考失败');
-  } finally {
-    assigningProctors.value = false;
-  }
-};
-
-// 清空所有考场
-const clearAllExamRooms = async () => {
-  if (!createdExamId.value) {
-    ElMessage.error('考试ID不存在，请先创建考试');
-    return;
-  }
-
-  try {
-    await ElMessageBox.confirm(
-      '确定要清空所有考场编排吗？此操作将删除所有考场、学生分配和监考分配，且不可恢复。',
-      '确认清空',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      }
-    );
-
-    await examRoomService.clearAllRooms(createdExamId.value);
-    ElMessage.success('已清空所有考场');
-    // 清空本地数据
-    examRooms.value = [];
-    // 刷新数据
-    await loadExamRooms();
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      console.error('清空考场失败:', error);
-      ElMessage.error(error.response?.data?.detail || '清空考场失败');
-    }
-  }
-};
-
-// 加载考场列表
-const loadExamRooms = async () => {
-  if (!createdExamId.value) return;
-
-  try {
-    const rooms = await examRoomService.getExamRooms(createdExamId.value);
-    examRooms.value = rooms;
-  } catch (error: any) {
-    console.error('加载考场失败:', error);
-  }
-};
-
-// 获取监考教师姓名
-const getProctorNames = (room: ExamRoom) => {
-  if (!room.proctors || room.proctors.length === 0) {
-    return '未分配';
-  }
-  return room.proctors
-    .map(p => {
-      const type = p.proctor_type === 'primary' ? '(主)' : '(副)';
-      // TODO: 从user数据获取姓名，暂时返回占位符
-      return `${type}`;
+  } else {
+    // 清空表单
+    Object.assign(schoolProfileForm, {
+      id: null,
+      name: '',
+      code: '',
+      address: ''
     })
-    .join('、');
-};
+  }
+}
+const saveSchoolProfile = async () => { if (!schoolProfileForm.id) return ElMessage.warning('请选择学校'); configuredSchoolId.value = schoolProfileForm.id; configuredSchoolName.value = schoolProfileForm.name; localStorage.setItem('admin_bound_school_id', String(schoolProfileForm.id)); localStorage.setItem('admin_bound_school_name', schoolProfileForm.name); ElMessage.success('学校主体绑定成功'); schoolProfileDialogVisible.value = false }
+const querySearchSchools = (q: string, cb: any) => { const res = q ? schools.value.filter(s => s.name.includes(q)) : schools.value; cb(res.map(s => ({ ...s, value: s.name }))) }
+const handleSchoolSelect = (i: any) => { Object.assign(schoolProfileForm, { id: i.id, name: i.name, code: i.code || '', address: i.address || '' }) }
 
-// 完成考试创建
-const finalizeSchoolExam = async () => {
+const startSchoolWorkflow = () => { activeWorkflowTab.value = 'school'; schoolExamStep.value = 0; schoolWorkflowStep.value = 0; if (configuredSchoolId.value) { schoolExamForm.target_school_id = configuredSchoolId.value; onSchoolChange(configuredSchoolId.value) } schoolQuickExamDialogVisible.value = true }
+const startDistrictWorkflow = () => { activeWorkflowTab.value = 'district'; schoolExamStep.value = 0; districtWorkflowStep.value = 0; schoolQuickExamDialogVisible.value = true }
+const onSchoolChange = async (id: number) => {
+  schoolExamForm.class_ids = []
+  schoolExamForm.grade_id = null  // 清空年级选择
+  if (!id) {
+    availableClassrooms.value = []
+    availableGrades.value = []
+    return
+  }
+  const res = await adminService.getClassrooms({ school_id: id, size: 1000 })
+  availableClassrooms.value = res.classrooms || []
+
+  // 从班级列表中提取该校实际开设的年级（去重）
+  const schoolGradeIds = Array.from(new Set(availableClassrooms.value.map(c => c.grade_id)))
+  availableGrades.value = grades.value.filter(g => schoolGradeIds.includes(g.id))
+}
+
+// 根据选择的年级过滤班级列表
+const filteredClassrooms = computed(() => {
+  if (!schoolExamForm.grade_id) {
+    return availableClassrooms.value
+  }
+  return availableClassrooms.value.filter(c => c.grade_id === schoolExamForm.grade_id)
+})
+
+// 根据选择的区县和年级过滤学校列表（全区统考用）
+const filteredSchoolsForDistrict = computed(() => {
+  let result = schools.value
+
+  // 先按区县筛选
+  if (schoolExamForm.region_id) {
+    result = result.filter(s => s.region_id === schoolExamForm.region_id)
+  }
+
+  // 再按年级筛选（查找该校是否有该年级的班级）
+  if (schoolExamForm.grade_id && availableClassrooms.value.length > 0) {
+    const schoolIdsWithGrade = Array.from(new Set(
+      availableClassrooms.value
+        .filter(c => c.grade_id === schoolExamForm.grade_id)
+        .map(c => c.school_id)
+    ))
+    result = result.filter(s => schoolIdsWithGrade.includes(s.id))
+  }
+
+  return result
+})
+
+// 全区统考：是否全选了所有学校
+const isAllDistrictSchoolsSelected = computed(() => {
+  return filteredSchoolsForDistrict.value.length > 0 &&
+    schoolExamForm.school_ids.length === filteredSchoolsForDistrict.value.length
+})
+
+// 全区统考：区县变化时的处理
+const onDistrictRegionChange = async (regionId: number) => {
+  // 清空已选学校和年级
+  schoolExamForm.school_ids = []
+  schoolExamForm.grade_id = null
+
+  if (!regionId) {
+    availableClassrooms.value = []
+    return
+  }
+
+  // 加载该区县所有学校的班级信息
   try {
-    schoolExamStep.value = 4;
-    ElMessage.success('考试创建成功！');
-  } catch (error: any) {
-    console.error('完成考试创建失败:', error);
-    ElMessage.error('操作失败');
-  }
-};
+    const regionSchools = schools.value.filter(s => s.region_id === regionId)
+    const classroomPromises = regionSchools.map(school =>
+      adminService.getClassrooms({ school_id: school.id, size: 1000 })
+    )
+    const results = await Promise.all(classroomPromises)
 
-// 查看考场详情
-const viewRoomDetail = async (room: ExamRoom) => {
-  ElMessage.info(`查看 ${room.name} 详情`);
-  // TODO: 实现考场详情对话框
-  // 可以显示该考场的所有学生及其座位号
-};
-
-// 导出座位表
-const exportSeatingChart = async (room: ExamRoom) => {
-  if (!createdExamId.value) {
-    ElMessage.error('考试ID不存在');
-    return;
+    // 合并所有班级
+    availableClassrooms.value = results.flatMap(res => res.classrooms || [])
+  } catch (error) {
+    console.error('加载区县班级失败:', error)
+    availableClassrooms.value = []
   }
+}
+
+// 全区统考：年级变化时的处理
+const onDistrictGradeChange = async (gradeId: number) => {
+  // 切换年级时清空已选学校和科目
+  schoolExamForm.school_ids = []
+  schoolExamForm.subjects = []
+  subjectLoading.value = true
 
   try {
-    ElMessage.info(`正在导出 ${room.name} 座位表...`);
-    await examRoomService.exportSeatingChart(createdExamId.value, room.id);
-    ElMessage.success('座位表导出成功');
-  } catch (error: any) {
-    console.error('导出座位表失败:', error);
-    ElMessage.error(error.response?.data?.detail || '导出座位表失败');
-  }
-};
+    // 只获取该年级已配置的学科标准
+    const res = await examSubjectsService.getGradeSubjects(gradeId)
 
-// 导出准考证
-const exportExamTickets = async (room: ExamRoom) => {
-  if (!createdExamId.value) {
-    ElMessage.error('考试ID不存在');
-    return;
+    if (res.subjects && res.subjects.length > 0) {
+      // 获取所有学科信息（用于显示学科名称）
+      const allSubjects = await curriculumService.getSubjects()
+
+      // 只显示该年级已配置的学科
+      availableSubjects.value = res.subjects.map((std: any) => {
+        const subject = allSubjects.find(s => s.id === std.subject_id)
+        return {
+          id: std.subject_id,
+          name: subject?.name || '未知学科',
+          max_score: std.full_score || 100,
+          is_standard: true
+        }
+      })
+    } else {
+      // 该年级没有配置任何学科标准
+      availableSubjects.value = []
+    }
+  } catch (error) {
+    console.error('获取年级学科标准失败:', error)
+    availableSubjects.value = []
+  } finally {
+    subjectLoading.value = false
   }
+}
+
+// 全区统考：全选/取消全选学校
+const toggleAllDistrictSchools = () => {
+  if (isAllDistrictSchoolsSelected.value) {
+    schoolExamForm.school_ids = []
+  } else {
+    schoolExamForm.school_ids = filteredSchoolsForDistrict.value.map(s => s.id)
+  }
+}
+
+const onGradeChange = async (v: number) => {
+  // 切换年级时清空已选班级和科目
+  schoolExamForm.class_ids = []
+  schoolExamForm.subjects = []
+  subjectLoading.value = true
 
   try {
-    ElMessage.info(`正在导出 ${room.name} 准考证...`);
-    await examRoomService.exportExamTickets(createdExamId.value, room.id);
-    ElMessage.success('准考证导出成功');
-  } catch (error: any) {
-    console.error('导出准考证失败:', error);
-    ElMessage.error(error.response?.data?.detail || '导出准考证失败');
-  }
-};
+    // 只获取该年级已配置的学科标准
+    const res = await examSubjectsService.getGradeSubjects(v)
 
-// 导出监考手册
-const exportProctorHandbook = async (room: ExamRoom) => {
-  if (!createdExamId.value) {
-    ElMessage.error('考试ID不存在');
-    return;
-  }
+    if (res.subjects && res.subjects.length > 0) {
+      // 获取所有学科信息（用于显示学科名称）
+      const allSubjects = await curriculumService.getSubjects()
 
+      // 只显示该年级已配置的学科
+      availableSubjects.value = res.subjects.map((std: any) => {
+        const subject = allSubjects.find(s => s.id === std.subject_id)
+        return {
+          id: std.subject_id,
+          name: subject?.name || '未知学科',
+          max_score: std.full_score || 100,
+          is_standard: true
+        }
+      })
+    } else {
+      // 该年级没有配置任何学科标准
+      availableSubjects.value = []
+    }
+  } catch (error) {
+    console.error('获取年级学科标准失败:', error)
+    availableSubjects.value = []
+  } finally {
+    subjectLoading.value = false
+  }
+}
+
+const handleNextStep = () => {
+  if (schoolExamStep.value === 0) {
+    // 验证必填项
+    if (!schoolExamForm.name) {
+      return ElMessage.warning('请输入考试名称')
+    }
+
+    if (activeWorkflowTab === 'school') {
+      // 校级考试验证
+      if (!schoolExamForm.target_school_id) {
+        return ElMessage.warning('请选择目标学校')
+      }
+      if (schoolExamForm.class_ids.length === 0) {
+        return ElMessage.warning('请选择至少一个参与班级')
+      }
+    } else {
+      // 全区统考验证
+      if (!schoolExamForm.region_id) {
+        return ElMessage.warning('请选择所属区县')
+      }
+      if (!schoolExamForm.grade_id) {
+        return ElMessage.warning('请选择参与年级')
+      }
+      if (schoolExamForm.school_ids.length === 0) {
+        return ElMessage.warning('请选择至少一个参与学校')
+      }
+    }
+    schoolExamStep.value++
+  } else if (schoolExamStep.value === 1) {
+    // 验证是否选择了学科
+    if (schoolExamForm.subjects.length === 0) {
+      return ElMessage.warning('请至少选择一个考试科目')
+    }
+    schoolExamStep.value++
+  } else {
+    schoolExamStep.value++
+  }
+}
+// 班级全选相关
+const isAllClassesSelected = computed(() => filteredClassrooms.value.length > 0 && schoolExamForm.class_ids.length === filteredClassrooms.value.length)
+const toggleAllClasses = () => { if (isAllClassesSelected.value) { schoolExamForm.class_ids = [] } else { schoolExamForm.class_ids = filteredClassrooms.value.map(c => c.id) } }
+const isAllSelected = computed(() => availableSubjects.value.length > 0 && schoolExamForm.subjects.length === availableSubjects.value.length)
+const isIndeterminate = computed(() => schoolExamForm.subjects.length > 0 && schoolExamForm.subjects.length < availableSubjects.value.length)
+const handleSelectAllChange = (v: boolean) => schoolExamForm.subjects = v ? [...availableSubjects.value] : []
+const isSubjectSelected = (r: any) => schoolExamForm.subjects.some(s => s.id === r.id)
+const toggleSubject = (r: any, v: boolean) => { if (v) schoolExamForm.subjects.push(r); else schoolExamForm.subjects = schoolExamForm.subjects.filter(s => s.id !== r.id) }
+
+const initSubjectConfig = () => { if (grades.value.length > 0 && !selectedGradeTab.value) { selectedGradeTab.value = String(grades.value[0].id); selectGrade(grades.value[0].id) } }
+const selectGrade = async (id: number) => { selectedGradeTab.value = String(id); subjectLoading.value = true; try { const res = await examSubjectsService.getGradeSubjects(id); currentGradeSubjectConfigs.value = res.subjects || [] } finally { subjectLoading.value = false } }
+const openAddSubjectStandardModal = () => { editingConfigId.value = null; Object.assign(subjectStandardForm, { subject_id: null, full_score: 100, pass_line: 60, excellent_line: 85, good_line: 75, description: '' }); subjectStandardFormVisible.value = true }
+const editSubjectStandard = (row: any) => { editingConfigId.value = row.id; Object.assign(subjectStandardForm, { subject_id: row.subject_id, full_score: row.full_score, pass_line: row.pass_line, excellent_line: row.excellent_line, good_line: row.good_line || 75, description: row.description || '' }); subjectStandardFormVisible.value = true }
+const autoFillLines = (v: number) => { subjectStandardForm.pass_line = Math.round(v * 0.6); subjectStandardForm.excellent_line = Math.round(v * 0.85); subjectStandardForm.good_line = Math.round(v * 0.75) }
+const saveSubjectStandard = async () => { try { const p = { ...subjectStandardForm, grade_id: Number(selectedGradeTab.value) }; if (editingConfigId.value) await examSubjectsService.updateGradeSubjectConfig(editingConfigId.value, p as any); else await examSubjectsService.createGradeSubjectConfig(p as any); ElMessage.success('成功'); subjectStandardFormVisible.value = false; selectGrade(Number(selectedGradeTab.value)) } catch (e) { ElMessage.error('失败') } }
+const handleDeleteSubjectConfig = (row: any) => ElMessageBox.confirm('移除？').then(async () => { await examSubjectsService.deleteGradeSubjectConfig(row.id); selectGrade(Number(selectedGradeTab.value)) })
+
+const loadData = async () => {
+  loading.value = true
   try {
-    ElMessage.info(`正在导出 ${room.name} 监考手册...`);
-    await examRoomService.exportProctorHandbook(createdExamId.value, room.id);
-    ElMessage.success('监考手册导出成功');
-  } catch (error: any) {
-    console.error('导出监考手册失败:', error);
-    ElMessage.error(error.response?.data?.detail || '导出监考手册失败');
-  }
-};
+    const [e, s, g, sch, r, sub] = await Promise.all([
+      evaluationService.exam.list(),
+      evaluationService.semester.list(),
+      curriculumService.getGrades(),
+      adminService.getSchools({ size: 1000 }),
+      adminService.getRegions({ size: 100 }),
+      curriculumService.getSubjects()
+    ]);
+    exams.value = e; semesters.value = s; grades.value = g; schools.value = sch.schools || []; regions.value = r.regions || []; allSubjects.value = sub;
+    if (currentSemester.value) schoolExamForm.semester_id = currentSemester.value.id
+    const savedId = localStorage.getItem('admin_bound_school_id'); const savedName = localStorage.getItem('admin_bound_school_name')
+    if (savedId) { configuredSchoolId.value = Number(savedId); configuredSchoolName.value = savedName || '' }
+  } finally { loading.value = false }
+}
 
-const createSchoolExam = async () => {
-  try {
-    // TODO: 调用API创建考试
-    // await examApi.create({
-    //   name: schoolExamForm.name,
-    //   class_ids: schoolExamForm.class_ids,
-    //   exam_date: schoolExamForm.exam_date,
-    //   subjects: schoolExamForm.subjects,
-    //   student_ids: confirmedStudents.value.map(s => s.id),
-    // });
+const getExamProgress = (r: any) => (r.has_students ? 50 : 0) + (r.has_scores ? 50 : 0); const getExamProgressStatus = (r: any) => getExamProgress(r) === 100 ? 'success' : 'warning'; const deleteExam = (r: any) => ElMessageBox.confirm(`删除 ${r.name}?`).then(async () => { await evaluationService.exam.delete(r.id); loadData() }); const filteredExams = computed(() => searchQuery.value ? exams.value.filter(e => e.name.includes(searchQuery.value)) : exams.value)
+const handleCreateSemester = async () => { if (!semesterForm.year) return; await evaluationService.semester.create({ ...semesterForm, name: `${semesterForm.year}学年${semesterForm.semester_type === 'up' ? '上学期' : '下学期'}` } as any); loadData() }
+const handleSetCurrentSemester = async (r: any) => { await evaluationService.semester.update(r.id, { is_current: true }); await semesterStore.fetchCurrentSemester(); loadData() }
+// 查看考试详情
+const viewExamDetail = (exam: any) => {
+  router.push(`/district-admin/exam-list`)
+}
 
-    // 模拟创建成功
-    await new Promise(resolve => setTimeout(resolve, 1000));
+// 查看座位表（考场管理）
+const viewExamRooms = (exam: any) => {
+  router.push(`/district-admin/exam-list/${exam.id}/rooms`)
+}
 
-    schoolExamStep.value = 3;
-    ElMessage.success('考试创建成功！');
-  } catch (error: any) {
-    console.error('创建考试失败:', error);
-    ElMessage.error(error.response?.data?.detail || '创建考试失败');
-  }
-};
-
-// 跳转到成绩录入页面
-const goToScoreEntry = () => {
-  // TODO: 跳转到成绩录入页面，并传递考试ID
-  ElMessage.info('跳转到成绩录入页面...');
-  // router.push({
-  //   path: '/district-admin/score-entry',
-  //   query: { exam_id: createdExamId }
-  // });
-};
-
-// 关闭学校端快速创建考试对话框
-const closeSchoolQuickExamDialog = () => {
-  schoolQuickExamDialogVisible.value = false;
-  resetSchoolExamForm();
-};
-
-// 重置学校端考试表单
-const resetSchoolExamForm = () => {
-  schoolExamStep.value = 0;
-  schoolExamForm.name = '';
-  schoolExamForm.exam_type = '';
-  schoolExamForm.exam_level = 'school';  // 重置为默认值
-  // 重置区县管理员字段
-  schoolExamForm.region_id = undefined;
-  schoolExamForm.study_level = undefined;
-  schoolExamForm.school_ids = [];
-  // 重置学校管理员字段
-  schoolExamForm.isJointExam = false;
-  schoolExamForm.additional_school_ids = [];
-  // 重置通用字段
-  schoolExamForm.school_id = undefined;
-  schoolExamForm.grade_id = undefined;
-  schoolExamForm.class_ids = [];
-  schoolExamForm.semester_id = undefined;
-  schoolExamForm.exam_date = '';
-  schoolExamForm.subjects = [
-    { name: '语文', max_score: 150 },
-    { name: '数学', max_score: 150 },
-    { name: '英语', max_score: 150 },
-  ];
-  availableSchools.value = [];
-  availableRegions.value = [];
-  // 注意：availableGrades 是全局数据，不应在重置表单时清空
-  // availableGrades.value = [];  // ← 移除这行
-  availableClassrooms.value = [];
-  availableSubjects.value = [];
-  confirmedStudents.value = [];
-  estimatedStudentCount.value = 0;
-  totalMaxScore.value = 450;
-  selectAllSubjects.value = false;
-  isIndeterminateSubjects.value = false;
-  canGoNext.value = false;
-
-  // 重置考场安排相关状态
-  examRooms.value = [];
-  createdExamId.value = null;
-  arrangingRooms.value = false;
-  assigningProctors.value = false;
-  roomArrangementForm.capacityPerRoom = 30;
-  roomArrangementForm.arrangementType = 'by_class';
-  roomArrangementForm.seatPattern = 's_shape';
-  roomArrangementForm.useExistingRooms = true;
-};
-
-// ==================== 原有方法 ====================
-
-// 打开对话框方法
-const openSemesterDialog = () => {
-  router.push('/district-admin/semesters');
-};
-
-const openExamDialog = () => {
-  router.push('/district-admin/exam-management');
-};
-
-const openStudentImportDialog = () => {
-  router.push('/district-admin/student-import');
-};
-
-const openScoreImportDialog = () => {
-  router.push('/district-admin/score-import');
-};
-
-const openEvaluationDialog = () => {
-  router.push('/district-admin/evaluation-report');
-};
-
-const openPerformanceDialog = () => {
-  router.push('/district-admin/semester-performance');
-};
-
-const goToExamSubjectConfig = () => {
-  router.push('/district-admin/exam-subject-config');
-};
-
-const viewImportTasks = () => {
-  router.push('/district-admin/score-import');
-};
-
-// 为指定考试导入考生信息
-const importStudentsForExam = (exam: Exam) => {
+const importStudentsForExam = (exam: any) => {
   router.push({
     path: '/district-admin/student-import',
-    query: { exam_id: exam.id.toString() }
-  });
-};
+    query: { examId: exam.id, examName: exam.name }
+  })
+}
 
-// 为指定考试导入成绩
-const importScoresForExam = (exam: Exam) => {
+const importScoresForExam = (exam: any) => {
   router.push({
     path: '/district-admin/score-import',
-    query: { exam_id: exam.id.toString() }
-  });
-};
+    query: { examId: exam.id, examName: exam.name }
+  })
+}
 
-// 计算考试数据准备进度
-const getExamProgress = (exam: ExamWithStatus): number => {
-  let progress = 0;
-  if (exam.hasStudents) progress += 50;
-  if (exam.hasScores) progress += 50;
-  return progress;
-};
+const viewReport = (r: any) => ElMessage.info('分析报告功能开发中')
+const closeSchoolQuickExamDialog = () => { schoolQuickExamDialogVisible.value = false; schoolExamStep.value = 0 }
 
-// 获取进度状态
-const getExamProgressStatus = (exam: ExamWithStatus): string => {
-  if (exam.hasStudents && exam.hasScores) return 'success';
-  if (exam.hasStudents || exam.hasScores) return 'warning';
-  return '';
-};
-
-// 学期操作
-const createSemester = async () => {
-  const valid = await semesterFormRef.value?.validate().catch(() => false);
-  if (!valid) return;
-
-  semesterSubmitting.value = true;
-  try {
-    await semesterApi.create({
-      year: semesterForm.year,
-      semester_type: semesterForm.semester_type,
-      name: semesterForm.name,
-      start_date: semesterForm.start_date + 'T00:00:00', // 转换为完整的 datetime 格式
-      end_date: semesterForm.end_date + 'T00:00:00', // 转换为完整的 datetime 格式
-      is_current: false,
-    });
-    ElMessage.success('创建成功');
-    resetSemesterForm();
-    await loadData();
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || '创建失败');
-  } finally {
-    semesterSubmitting.value = false;
-  }
-};
-
-const setCurrentSemester = async (semester: Semester) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要将"${semester.name}"设为当前学期吗？`,
-      '确认设置',
-      { type: 'info' }
-    );
-    await semesterApi.update(semester.id, { is_current: true });
-    ElMessage.success('设置成功');
-    await loadData();
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || '设置失败');
-    }
-  }
-};
-
-const deleteSemester = async (semester: Semester) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除学期"${semester.name}"吗？`,
-      '确认删除',
-      { type: 'warning' }
-    );
-    await semesterApi.delete(semester.id);
-    ElMessage.success('删除成功');
-    await loadData();
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || '删除失败');
-    }
-  }
-};
-
-const resetSemesterForm = () => {
-  const currentYear = new Date().getFullYear();
-  semesterForm.year = `${currentYear}-${currentYear + 1}`;
-  semesterForm.semester_type = 'up'; // 'up' 表示上学期
-  semesterForm.name = '';
-  semesterForm.start_date = '';
-  semesterForm.end_date = '';
-  generateSemesterName();
-  semesterFormRef.value?.resetFields();
-};
-
-// 考试操作
-const createExam = async () => {
-  const valid = await examFormRef.value?.validate().catch(() => false);
-  if (!valid) return;
-
-  examSubmitting.value = true;
-  try {
-    await examApi.create({
-      name: examForm.name,
-      exam_type: examForm.exam_type as any,
-      grade_id: examForm.grade_id,
-      semester_id: examForm.semester_id!,
-      exam_date: examForm.exam_date,
-      description: examForm.description,
-    });
-    ElMessage.success('创建成功');
-    resetExamForm();
-    await loadData();
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || '创建失败');
-  } finally {
-    examSubmitting.value = false;
-  }
-};
-
-const deleteExam = async (exam: Exam) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除考试"${exam.name}"吗？`,
-      '确认删除',
-      { type: 'warning' }
-    );
-    await examApi.delete(exam.id);
-    ElMessage.success('删除成功');
-    await loadData();
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || '删除失败');
-    }
-  }
-};
-
-const resetExamForm = () => {
-  examForm.name = '';
-  examForm.exam_type = '';
-  examForm.grade_id = undefined;
-  examForm.semester_id = undefined;
-  examForm.exam_date = '';
-  examForm.description = '';
-  examFormRef.value?.resetFields();
-};
-
-// 辅助函数
+// 获取考试类型名称
 const getExamTypeName = (type: string) => {
   const typeMap: Record<string, string> = {
-    midterm: '期中',
-    final: '期末',
-    monthly: '月考',
-    mock: '模考',
-    unified: '统考',
-  };
-  return typeMap[type] || type;
-};
+    'monthly': '月考',
+    'midterm': '期中考试',
+    'final': '期末考试',
+    'mock': '模拟考试',
+    'unit': '单元测试',
+    'district_unified': '区县统考'
+  }
+  return typeMap[type] || type
+}
 
-const getStatusName = (status: string) => {
-  const statusMap: Record<string, string> = {
-    draft: '草稿',
-    scheduled: '已安排',
-    in_progress: '进行中',
-    completed: '已完成',
-  };
-  return statusMap[status] || status;
-};
+// 创建考试
+const createExam = async () => {
+  // 验证必填项
+  if (!schoolExamForm.name || !schoolExamForm.grade_id || !schoolExamForm.semester_id) {
+    return ElMessage.error('缺少必填信息')
+  }
 
-const getStatusType = (status: string) => {
-  const typeMap: Record<string, any> = {
-    draft: 'info',
-    scheduled: '',
-    in_progress: 'warning',
-    completed: 'success',
-  };
-  return typeMap[status] || '';
-};
+  if (!schoolExamForm.exam_type) {
+    return ElMessage.error('请选择考试类型')
+  }
 
-const getExamLevelName = (level: string) => {
-  const levelMap: Record<string, string> = {
-    school: '校级',
-    district: '区级',
-    city: '市级',
-  };
-  return levelMap[level] || level;
-};
+  if (schoolExamForm.subjects.length === 0) {
+    return ElMessage.error('请至少选择一个考试科目')
+  }
 
-const getExamLevelType = (level: string) => {
-  const typeMap: Record<string, any> = {
-    school: 'info',
-    district: 'warning',
-    city: 'danger',
-  };
-  return typeMap[level] || 'info';
-};
+  // 根据考试级别验证特定字段
+  if (activeWorkflowTab.value === 'school') {
+    if (!schoolExamForm.target_school_id) {
+      return ElMessage.error('请选择目标学校')
+    }
+    if (schoolExamForm.class_ids.length === 0) {
+      return ElMessage.error('请选择至少一个参与班级')
+    }
+  } else {
+    // 全区统考
+    if (!schoolExamForm.region_id) {
+      return ElMessage.error('请选择所属区县')
+    }
+    if (schoolExamForm.school_ids.length === 0) {
+      return ElMessage.error('请选择至少一个参与学校')
+    }
+  }
 
-// 组件挂载
-onMounted(() => {
-  loadData();
-  generateSemesterName();
-});
+  creatingExam.value = true
+  try {
+    // 构建考试数据
+    const now = new Date()
+    const examData: any = {
+      name: schoolExamForm.name,
+      exam_type: schoolExamForm.exam_type,  // 考试性质：monthly、midterm、final等
+      exam_level: activeWorkflowTab.value === 'school' ? 'school' : 'district',  // 考试级别
+      semester_id: schoolExamForm.semester_id,
+      grade_id: schoolExamForm.grade_id,
+      // 使用不带时区的datetime格式，匹配数据库的 TIMESTAMP WITHOUT TIME ZONE
+      exam_date: now.toISOString().replace('Z', ''),  // 2024-01-19T12:15:27.150 (移除Z)
+      status: 'draft'
+    }
+
+    // 如果是校级考试，添加学校和班级信息
+    if (activeWorkflowTab.value === 'school') {
+      examData.school_id = schoolExamForm.target_school_id
+      examData.class_ids = schoolExamForm.class_ids
+    } else {
+      // 如果是全区统考，添加区县和学校列表
+      examData.region_id = schoolExamForm.region_id
+      examData.school_ids = schoolExamForm.school_ids
+    }
+
+    // 添加考试科目
+    examData.subjects = schoolExamForm.subjects.map((s: any) => ({
+      subject_id: s.id,
+      full_score: s.max_score
+    }))
+
+    // 添加考场配置
+    examData.room_config = {
+      capacity: roomConfig.capacity
+    }
+
+    console.log('创建考试数据：', examData)
+
+    // 调用API创建考试
+    await evaluationService.exam.create(examData)
+
+    ElMessage.success('考试档案创建成功！')
+
+    // 关闭对话框
+    closeSchoolQuickExamDialog()
+
+    // 刷新考试列表
+    await loadData()
+  } catch (error: any) {
+    console.error('创建考试失败:', error)
+    ElMessage.error(error?.response?.data?.detail || error?.message || '创建考试失败，请重试')
+  } finally {
+    creatingExam.value = false
+  }
+}
+
+const schoolSteps = [
+  { title: '范围确认', desc: '学校及班级', icon: 'UserFilled', action: () => { schoolWorkflowStep.value = 0; activeWorkflowTab.value = 'school'; schoolExamStep.value = 0; schoolQuickExamDialogVisible.value = true } },
+  { title: '设置标准', desc: '分值及标准', icon: 'Setting', action: () => { schoolWorkflowStep.value = 1; activeWorkflowTab.value = 'school'; schoolExamStep.value = 1; schoolQuickExamDialogVisible.value = true } },
+  { title: '成绩录入', desc: '数据补录', icon: 'Edit', action: () => { schoolWorkflowStep.value = 2; activeWorkflowTab.value = 'school'; schoolExamStep.value = 2; schoolQuickExamDialogVisible.value = true } },
+  { title: '教学反馈', desc: '进步分析', icon: 'DataLine', action: () => { schoolWorkflowStep.value = 3; activeWorkflowTab.value = 'school'; schoolExamStep.value = 3; schoolQuickExamDialogVisible.value = true } }
+]
+
+const districtSteps = [
+  { title: '创建考试', desc: '联考范围', icon: 'Plus', action: () => { districtWorkflowStep.value = 0; activeWorkflowTab.value = 'district'; schoolExamStep.value = 0; schoolQuickExamDialogVisible.value = true } },
+  { title: '考场安排', desc: '全区分配', icon: 'OfficeBuilding', action: () => { districtWorkflowStep.value = 1; activeWorkflowTab.value = 'district'; schoolExamStep.value = 2; schoolQuickExamDialogVisible.value = true } },
+  { title: '成绩导入', desc: '批量汇总', icon: 'Upload', action: () => ElMessage.info('成绩导入功能开发中') },
+  { title: '分析对比', desc: '全区表现', icon: 'TrendCharts', action: () => ElMessage.info('数据分析功能开发中') }
+]
+
+onMounted(() => { loadData(); semesterStore.fetchCurrentSemester() })
 </script>
 
 <style scoped>
-.district-admin-dashboard {
-  padding: 20px;
-  min-height: 100vh;
-  background: #f5f7fa;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.page-header h1 {
-  margin: 0;
-  font-size: 28px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.subtitle {
-  margin: 8px 0 0 0;
-  font-size: 14px;
-  color: #909399;
-}
-
-.current-semester {
-  flex-shrink: 0;
-}
-
-.cards-container {
-  margin-bottom: 20px;
-}
-
-.function-card {
-  cursor: pointer;
-  transition: all 0.3s;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.function-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.function-card :deep(.el-card__body) {
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.card-icon {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 12px;
-  background: #f5f7fa;
-}
-
-.card-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.card-content h3 {
-  margin: 0 0 4px 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.card-content p {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  color: #909399;
-}
-
-.card-stats {
-  font-size: 13px;
-  color: #67c23a;
-  font-weight: 500;
-}
-
-.card-arrow {
-  flex-shrink: 0;
-  color: #c0c4cc;
-  transition: color 0.3s;
-}
-
-.function-card:hover .card-arrow {
-  color: #409eff;
-}
-
-/* 工作流区域样式 */
-.workflow-section {
-  margin-bottom: 20px;
-}
-
-.workflow-header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.workflow-header h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.workflow-subtitle {
-  margin: 0;
-  font-size: 14px;
-  color: #909399;
-}
-
-.workflow-steps {
-  padding: 20px 0;
-}
-
-.workflow-actions {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 30px;
-  flex-wrap: wrap;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.section-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.progress-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.progress-steps {
-  display: flex;
-  align-items: center;
-}
-
-.quick-create-section {
-  margin-bottom: 20px;
-}
-
-.quick-create-section h4 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.semester-list-section h4,
-.exam-list-section h4 {
-  margin: 0 0 12px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
-/* 学校端快速创建考试对话框样式 */
-.step-content {
-  min-height: 300px;
-}
-
-.step-content h4 {
-  margin: 0 0 20px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.step-info {
-  margin-top: 20px;
-}
-
-.step-actions {
-  margin-top: 20px;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-/* 工作流区域样式优化 */
-.workflow-content {
-  padding: 20px 0;
-}
-
-.workflow-description {
-  margin: 30px 0;
-  padding: 20px;
-  background: #f5f7fa;
-  border-radius: 8px;
-}
-
-.workflow-description h4 {
-  margin: 0 0 12px 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.instruction-list {
-  margin: 0;
-  padding-left: 20px;
-  list-style: none;
-}
-
-.instruction-list li {
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: #606266;
-  line-height: 1.6;
-}
-
-.instruction-list li strong {
-  color: #303133;
-  font-weight: 600;
-}
-
-.workflow-header h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.workflow-subtitle {
-  margin: 4px 0 0 0;
-  font-size: 14px;
-  color: #909399;
-}
-
-/* 快速入口卡片样式 */
-.quick-action-card {
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.quick-action-card:hover {
-  transform: translateY(-4px);
-}
-
-.quick-action-card:hover :deep(.el-card) {
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15) !important;
-}
-
-.quick-action-card :deep(.el-card__body) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px;
-}
-
-.quick-action-card .card-content {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex: 1;
-}
-
-.quick-action-card .card-content h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.quick-action-card .card-content .description {
-  margin: 0;
-  font-size: 14px;
-  color: #909399;
-}
-
-.quick-action-card .steps {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #606266;
-}
-
-.quick-action-card .step {
-  padding: 4px 12px;
-  background: #ecf5ff;
-  color: #409eff;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.quick-action-card .arrow {
-  color: #c0c4cc;
-  font-size: 14px;
-}
-
-.quick-action-card .feature-tags {
-  display: flex;
-  gap: 8px;
-}
-
-.quick-action-card .stats {
-  display: flex;
-  gap: 12px;
-}
-
-.quick-action-card .stat-item {
-  font-size: 13px;
-  color: #67c23a;
-  font-weight: 500;
-}
-
-.quick-action-card .card-arrow {
-  color: #c0c4cc;
-  transition: color 0.3s;
-}
-
-.quick-action-card:hover .card-arrow {
-  color: #409eff;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .function-card :deep(.el-card__body) {
-    padding: 16px;
-  }
-
-  .card-icon {
-    width: 48px;
-    height: 48px;
-  }
-
-  .quick-action-card :deep(.el-card__body) {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-}
+.stat-mini-card :deep(.el-card__body) { padding: 16px; }
+.stat-icon { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.task-center { max-height: 400px; overflow-y: auto; }
 </style>
