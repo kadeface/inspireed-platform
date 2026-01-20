@@ -99,7 +99,7 @@
       </div>
       <div class="flex gap-2">
         <button
-          @click="batchDeleteStudents"
+          @click="openBatchDeleteWithSelected"
           class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
         >
           批量删除
@@ -369,10 +369,10 @@
       </template>
     </el-dialog>
 
-    <!-- 批量删除（按年级/班级）对话框 -->
+    <!-- 批量删除对话框（支持按选中学生或按条件删除） -->
     <el-dialog
       v-model="showBatchDeleteByFilterDialog"
-      title="批量删除学生（按年级/班级）"
+      :title="batchDeleteMode === 'selected' ? '批量删除选中学生' : '批量删除学生（按年级/班级）'"
       width="700px"
     >
       <div class="space-y-4">
@@ -382,16 +382,34 @@
           :closable="false"
           show-icon
         >
-          <p>此操作将批量删除符合条件的学生及其相关数据，不可撤销！</p>
+          <p>此操作将批量删除学生及其相关数据，不可撤销！</p>
           <p class="mt-2 text-sm">
             将同时删除：
             <br>- 考号映射记录
             <br>- 考场安排记录
-            <br>- 学生账号
+            <br>- 活动提交、互评等学习数据
+            <br>- 学生账号及其所有关联数据
           </p>
         </el-alert>
 
-        <el-form :model="batchDeleteForm" label-width="100px">
+        <!-- 按选中学生删除模式 -->
+        <div v-if="batchDeleteMode === 'selected'" class="border rounded p-4 bg-blue-50">
+          <h4 class="font-medium mb-3 text-blue-800">已选择 {{ selectedStudents.length }} 位学生</h4>
+          <div v-if="selectedStudentsPreview.length > 0">
+            <el-table :data="selectedStudentsPreview" max-height="200" size="small">
+              <el-table-column prop="username" label="学号" width="120" />
+              <el-table-column prop="full_name" label="姓名" width="100" />
+              <el-table-column prop="email" label="邮箱" />
+              <el-table-column prop="classroom_name" label="班级" width="120" />
+            </el-table>
+            <p v-if="selectedStudents.length > selectedStudentsPreview.length" class="text-sm text-gray-600 mt-2">
+              共 {{ selectedStudents.length }} 位学生，上方仅显示前 {{ selectedStudentsPreview.length }} 位
+            </p>
+          </div>
+        </div>
+
+        <!-- 按条件删除模式 -->
+        <el-form v-else :model="batchDeleteForm" label-width="100px">
           <el-form-item label="所属区域">
             <el-select
               v-model="batchDeleteForm.region_id"
@@ -462,7 +480,8 @@
           </el-form-item>
         </el-form>
 
-        <div v-if="previewResult" class="border rounded p-4 bg-gray-50">
+        <!-- 预览结果（按条件删除模式） -->
+        <div v-if="batchDeleteMode === 'filter' && previewResult" class="border rounded p-4 bg-gray-50">
           <h4 class="font-medium mb-2">删除预览</h4>
           <p class="text-lg font-bold text-red-600">{{ previewResult.message }}</p>
           <div v-if="previewResult.preview_users && previewResult.preview_users.length > 0" class="mt-3">
@@ -477,23 +496,37 @@
         </div>
 
         <div class="flex gap-2">
-          <el-button
-            type="warning"
-            @click="previewBatchDelete"
-            :loading="previewing"
-            :disabled="deleting"
-          >
-            🔍 预览删除范围
-          </el-button>
-          <el-button
-            v-if="previewResult"
-            type="danger"
-            @click="confirmBatchDelete"
-            :loading="deleting"
-            :disabled="!previewResult || previewResult.total_count === 0"
-          >
-            ⚠️ 确认删除
-          </el-button>
+          <!-- 按条件删除模式：需要先预览 -->
+          <template v-if="batchDeleteMode === 'filter'">
+            <el-button
+              type="warning"
+              @click="previewBatchDelete"
+              :loading="previewing"
+              :disabled="deleting"
+            >
+              🔍 预览删除范围
+            </el-button>
+            <el-button
+              v-if="previewResult"
+              type="danger"
+              @click="confirmBatchDelete"
+              :loading="deleting"
+              :disabled="!previewResult || previewResult.total_count === 0"
+            >
+              ⚠️ 确认删除
+            </el-button>
+          </template>
+          <!-- 按选中学生删除模式：直接删除 -->
+          <template v-else>
+            <el-button
+              type="danger"
+              @click="confirmBatchDeleteSelected"
+              :loading="deleting"
+              :disabled="selectedStudents.length === 0"
+            >
+              ⚠️ 确认删除 {{ selectedStudents.length }} 位学生
+            </el-button>
+          </template>
         </div>
       </div>
       <template #footer>
@@ -581,13 +614,26 @@ const isSomeSelected = computed(() => {
 // 批量删除对话框中使用的学校筛选（根据区域+年级过滤）
 const filteredSchoolsForBatchDelete = computed(() => {
   let result = allSchools.value
+  
   // 先按区域筛选
   if (batchDeleteForm.value.region_id) {
     result = result.filter(s => s.region_id === batchDeleteForm.value.region_id)
   }
-  // 再按年级筛选（如果需要）
-  // 注意：学校表中没有直接的年级字段，这里假设不按年级筛选学校
-  // 实际筛选是在班级层面进行的
+  
+  // 如果选择了年级，只显示该年级下有班级的学校
+  if (batchDeleteForm.value.grade_id) {
+    // 找出该年级下的所有班级
+    const gradeClassrooms = allClassrooms.value.filter(
+      c => c.grade_id === batchDeleteForm.value.grade_id
+    )
+    // 提取这些班级所属的学校ID
+    const schoolIdsWithGrade = new Set(gradeClassrooms.map(c => c.school_id))
+    
+    // 如果已经按区域筛选过，则只保留该区域下且该年级有班级的学校
+    // 如果没有按区域筛选，则只保留该年级有班级的学校
+    result = result.filter(s => schoolIdsWithGrade.has(s.id))
+  }
+  
   return result
 })
 
@@ -617,7 +663,8 @@ const showImportDialog = ref(false)
 const showBatchDeleteByFilterDialog = ref(false)
 const editingStudent = ref<User | null>(null)
 
-// 批量删除相关
+// 批量删除相关（统一处理按选中和按条件）
+const batchDeleteMode = ref<'selected' | 'filter'>('filter') // 'selected': 按选中学生, 'filter': 按条件
 const batchDeleteForm = ref<{
   region_id?: number
   school_id?: number
@@ -633,6 +680,19 @@ const batchDeleteForm = ref<{
 const previewResult = ref<any>(null)
 const previewing = ref(false)
 const deleting = ref(false)
+
+// 选中学生的预览列表（最多显示10个）
+const selectedStudentsPreview = computed(() => {
+  return students.value
+    .filter(s => selectedStudents.value.includes(s.id))
+    .slice(0, 10)
+    .map(s => ({
+      username: s.username,
+      full_name: s.full_name || '-',
+      email: s.email,
+      classroom_name: s.classroom_name || '-'
+    }))
+})
 
 // 表单数据
 const studentForm = ref({
@@ -898,38 +958,20 @@ const clearSelection = () => {
   selectedStudents.value = []
 }
 
-const batchDeleteStudents = async () => {
+// 打开批量删除对话框（按选中学生）
+const openBatchDeleteWithSelected = () => {
   if (selectedStudents.value.length === 0) {
     toast.warning('请先选择要删除的学生')
     return
   }
-
-  const studentNames = students.value
-    .filter(s => selectedStudents.value.includes(s.id))
-    .map(s => s.full_name || s.username)
-    .join(', ')
-
-  if (!confirm(`确定要删除以下 ${selectedStudents.value.length} 位学生吗？\n\n${studentNames}\n\n此操作不可撤销。`)) {
-    return
-  }
-
-  try {
-    const result = await adminService.batchDeleteUsers(selectedStudents.value)
-    students.value = students.value.filter(s => !selectedStudents.value.includes(s.id))
-    total.value -= result.deleted_count
-    toast.success(
-      `成功删除 ${result.deleted_count} 位学生` +
-      (result.failed_count ? `，失败 ${result.failed_count} 位` : '')
-    )
-    clearSelection()
-  } catch (error: any) {
-    console.error('Failed to batch delete students:', error)
-    toast.error(error.response?.data?.detail || '批量删除学生失败')
-  }
+  batchDeleteMode.value = 'selected'
+  previewResult.value = null
+  showBatchDeleteByFilterDialog.value = true
 }
 
 // 批量删除（按条件）相关
 const openBatchDeleteByFilterDialog = () => {
+  batchDeleteMode.value = 'filter'
   batchDeleteForm.value = {
     region_id: filters.value.region_id,
     school_id: filters.value.school_id,
@@ -981,13 +1023,14 @@ const previewBatchDelete = async () => {
   }
 }
 
+// 确认删除（按条件删除模式）
 const confirmBatchDelete = async () => {
   if (!previewResult.value || previewResult.value.total_count === 0) {
     toast.warning('没有要删除的学生')
     return
   }
 
-  if (!confirm(`确定要删除 ${previewResult.value.total_count} 位学生吗？\n\n此操作不可撤销，将同时删除：\n- 学生账号\n- 考号映射\n- 考场安排`)) {
+  if (!confirm(`确定要删除 ${previewResult.value.total_count} 位学生吗？\n\n此操作不可撤销，将同时删除：\n- 学生账号\n- 考号映射\n- 考场安排\n- 活动提交、互评等学习数据`)) {
     return
   }
 
@@ -1003,13 +1046,57 @@ const confirmBatchDelete = async () => {
     })
     toast.success(
       `成功删除 ${result.deleted_count} 位学生\n` +
-      `同时删除了 ${result.exam_mappings_deleted} 条考号映射\n` +
-      `和 ${result.exam_room_students_deleted} 条考场安排记录`
+      `同时删除了 ${result.exam_mappings_deleted || 0} 条考号映射\n` +
+      `和 ${result.exam_room_students_deleted || 0} 条考场安排记录`
     )
     showBatchDeleteByFilterDialog.value = false
     loadStudents() // 刷新列表
   } catch (error: any) {
     console.error('Failed to batch delete by filter:', error)
+    toast.error(error.response?.data?.detail || '批量删除失败')
+  } finally {
+    deleting.value = false
+  }
+}
+
+// 确认删除（按选中学生模式）
+const confirmBatchDeleteSelected = async () => {
+  if (selectedStudents.value.length === 0) {
+    toast.warning('没有要删除的学生')
+    return
+  }
+
+  if (!confirm(`确定要删除 ${selectedStudents.value.length} 位选中学生吗？\n\n此操作不可撤销，将同时删除：\n- 学生账号\n- 考号映射\n- 考场安排\n- 活动提交、互评等学习数据`)) {
+    return
+  }
+
+  deleting.value = true
+  try {
+    // 注意：batchDeleteUsers 使用的是旧的删除逻辑，可能没有删除所有相关表
+    // 为了使用完整的删除逻辑，我们需要调用 batchDeleteByFilter
+    // 但由于 batchDeleteByFilter 不支持直接传用户ID列表，我们需要通过其他方式
+    
+    // 方案：直接使用 batchDeleteUsers，但后续需要确保后端也使用完整的删除逻辑
+    // 或者，我们可以通过查询这些学生，然后使用他们的筛选条件来调用 batchDeleteByFilter
+    // 但这样比较复杂
+    
+    // 目前先使用 batchDeleteUsers，后续可以考虑修改后端支持按ID列表的完整删除
+    const result = await adminService.batchDeleteUsers(selectedStudents.value)
+    
+    toast.success(
+      `成功删除 ${result.deleted_count} 位学生` +
+      (result.failed_count ? `，失败 ${result.failed_count} 位` : '')
+    )
+    
+    // 从列表中移除已删除的学生
+    students.value = students.value.filter(s => !selectedStudents.value.includes(s.id))
+    total.value -= result.deleted_count
+    
+    showBatchDeleteByFilterDialog.value = false
+    clearSelection()
+    loadStudents() // 刷新列表以确保数据同步
+  } catch (error: any) {
+    console.error('Failed to batch delete selected students:', error)
     toast.error(error.response?.data?.detail || '批量删除失败')
   } finally {
     deleting.value = false

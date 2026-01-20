@@ -20,6 +20,7 @@ from app.api.v1 import (
     course_export,
     curriculum,
     daily_performance,
+    data_center,
     evaluations,
     exam_rooms,
     exam_subjects,
@@ -156,6 +157,9 @@ api_router.include_router(
 )
 api_router.include_router(
     evaluations.router, prefix="/evaluations", tags=["评价-增值评价"]
+)
+api_router.include_router(
+    data_center.router, tags=["评价-数据中心"]
 )
 api_router.include_router(
     import_tasks.router, prefix="/import-tasks", tags=["评价-导入任务"]

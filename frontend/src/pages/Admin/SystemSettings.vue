@@ -1,21 +1,13 @@
 <template>
   <div class="system-settings p-6">
-    <!-- 面包屑导航 -->
-    <div class="mb-4">
-      <router-link
-        to="/admin"
-        class="text-blue-600 hover:text-blue-800 flex items-center gap-2"
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
-        返回管理员首页
-      </router-link>
-    </div>
-
-    <div class="header mb-6">
-      <h1 class="text-3xl font-bold text-gray-900">系统设置</h1>
-      <p class="text-gray-600 mt-2">管理员专属 - 管理系统配置和权限</p>
+    <div class="header flex items-center gap-4 mb-8">
+      <el-button @click="router.back()" circle>
+        <el-icon><ArrowLeft /></el-icon>
+      </el-button>
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900">系统设置</h1>
+        <p class="text-gray-600 mt-2">管理员专属 - 管理系统配置和权限</p>
+      </div>
     </div>
 
     <!-- 功能卡片网格 -->
@@ -117,12 +109,15 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import AdminManagementCard from './SystemSettings/AdminManagementCard.vue'
 import ResearcherManagementCard from './SystemSettings/ResearcherManagementCard.vue'
 import PermissionManagementCard from './SystemSettings/PermissionManagementCard.vue'
 import SystemConfigCard from './SystemSettings/SystemConfigCard.vue'
 
 // 标签页状态
+const router = useRouter()
 const activeTab = ref<'admins' | 'researchers' | 'permissions' | 'config'>('admins')
 </script>
 

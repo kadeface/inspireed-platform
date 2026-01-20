@@ -271,6 +271,14 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'district_admin', title: '导入成绩 - InspireEd' },
   },
 
+  // === 数据中心 ===
+  {
+    path: '/district-admin/data-center',
+    name: 'DataCenter',
+    component: () => import('../pages/DistrictExamAdmin/DataCenter.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '数据中心 - InspireEd' },
+  },
+
   // === 增值评价（分析环节） ===
   {
     path: '/district-admin/value-added',

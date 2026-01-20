@@ -14,8 +14,22 @@ import logging
 from app.core.database import get_db
 from app.core.validators import normalize_user_role
 from app.models import User, UserRole, Region, School, Grade, Classroom
-from app.models.evaluation import ExamNumberMapping
+from app.models.evaluation import ExamNumberMapping, Score
 from app.models.exam_room import ExamRoom, ExamRoomStudent
+from app.models.activity import ActivitySubmission, PeerReview, FlowchartSnapshot, FormativeAssessment
+from app.models.classroom_session import StudentSessionParticipation
+from app.models.classroom_assistant import ClassroomMembership, AttendanceEntry, PositiveBehavior, DisciplineRecord, DutyAssignment
+from app.models.question import Question, Answer, QuestionVote
+from app.models.student_project import StudentProject
+from app.models.project_cell import ProjectCell
+from app.models.favorite import Favorite
+from app.models.review import Review
+from app.models.subject_group import GroupMembership
+from app.models.teacher import TeacherTeachingAssignment
+from app.models.exam_room import ExamProctor
+from app.models.classroom_session import ClassSession
+from app.models.lesson import Lesson, LessonClassroom
+from app.models.cell import Cell
 from app.api.deps import get_current_admin
 from app.core.security import get_password_hash
 from app.core.config import settings
@@ -514,9 +528,35 @@ async def batch_delete_users(
     if not users:
         raise HTTPException(status_code=404, detail="未找到任何用户")
 
-    # 统计删除结果
+    # 统计删除结果（使用与 batch_delete_by_filter 相同的完整删除逻辑）
     deleted_count = 0
-    failed_users = []
+    mappings_deleted = 0
+    room_students_deleted = 0
+    activity_submissions_deleted = 0
+    peer_reviews_deleted = 0
+    flowchart_snapshots_deleted = 0
+    session_participations_deleted = 0
+    classroom_memberships_deleted = 0
+    attendance_entries_deleted = 0
+    positive_behaviors_deleted = 0
+    discipline_records_deleted = 0
+    scores_deleted = 0
+    formative_assessments_deleted = 0
+    questions_deleted = 0
+    student_projects_deleted = 0
+    project_cells_deleted = 0
+    favorites_deleted = 0
+    reviews_deleted = 0
+    question_votes_deleted = 0
+    answers_deleted = 0
+    group_memberships_deleted = 0
+    duty_assignments_deleted = 0
+    teaching_assignments_deleted = 0
+    exam_proctors_deleted = 0
+    class_sessions_deleted = 0
+    lessons_deleted = 0
+    lesson_classrooms_deleted = 0
+    cells_deleted = 0
 
     try:
         # 第一步：删除考号映射记录（批量删除）
@@ -537,27 +577,298 @@ async def batch_delete_users(
         room_students_deleted = delete_room_students_result.rowcount
         logger.info(f"Deleted {room_students_deleted} exam room student assignments for users: {user_ids}")
 
+        # 第三步：获取学生的活动提交ID（用于删除相关的互评和流程图快照）
+        submissions_result = await db.execute(
+            select(ActivitySubmission.id).where(
+                ActivitySubmission.student_id.in_(user_ids)
+            )
+        )
+        submission_ids = [row[0] for row in submissions_result.all()]
+        logger.info(f"Found {len(submission_ids)} activity submissions to delete")
+
+        # 第四步：删除流程图快照（通过 submission_id 和 student_id 关联）
+        conditions = [FlowchartSnapshot.student_id.in_(user_ids)]
+        if submission_ids:
+            conditions.append(FlowchartSnapshot.submission_id.in_(submission_ids))
+        
+        delete_flowchart_snapshots_result = await db.execute(
+            delete(FlowchartSnapshot).where(
+                or_(*conditions)
+            )
+        )
+        flowchart_snapshots_deleted = delete_flowchart_snapshots_result.rowcount
+        logger.info(f"Deleted {flowchart_snapshots_deleted} flowchart snapshots")
+
+        # 第五步：删除互评记录（包括学生作为评审者的互评，以及评审这些学生提交的互评）
+        delete_reviewer_peer_reviews_result = await db.execute(
+            delete(PeerReview).where(
+                PeerReview.reviewer_id.in_(user_ids)
+            )
+        )
+        reviewer_peer_reviews_deleted = delete_reviewer_peer_reviews_result.rowcount
+        if submission_ids:
+            delete_submission_peer_reviews_result = await db.execute(
+                delete(PeerReview).where(
+                    PeerReview.submission_id.in_(submission_ids)
+                )
+            )
+            submission_peer_reviews_deleted = delete_submission_peer_reviews_result.rowcount
+        else:
+            submission_peer_reviews_deleted = 0
+        peer_reviews_deleted = reviewer_peer_reviews_deleted + submission_peer_reviews_deleted
+        logger.info(f"Deleted {peer_reviews_deleted} peer reviews")
+
+        # 第六步：删除活动提交记录（批量删除）
+        delete_activity_submissions_result = await db.execute(
+            delete(ActivitySubmission).where(
+                ActivitySubmission.student_id.in_(user_ids)
+            )
+        )
+        activity_submissions_deleted = delete_activity_submissions_result.rowcount
+        logger.info(f"Deleted {activity_submissions_deleted} activity submissions")
+
+        # 第七步：删除课堂会话参与记录（批量删除）
+        delete_session_participations_result = await db.execute(
+            delete(StudentSessionParticipation).where(
+                StudentSessionParticipation.student_id.in_(user_ids)
+            )
+        )
+        session_participations_deleted = delete_session_participations_result.rowcount
+        logger.info(f"Deleted {session_participations_deleted} session participations")
+
+        # 第八步：删除班级成员关系（批量删除）
+        delete_classroom_memberships_result = await db.execute(
+            delete(ClassroomMembership).where(
+                ClassroomMembership.user_id.in_(user_ids)
+            )
+        )
+        classroom_memberships_deleted = delete_classroom_memberships_result.rowcount
+        logger.info(f"Deleted {classroom_memberships_deleted} classroom memberships")
+
+        # 第九步：删除考勤记录（批量删除）
+        delete_attendance_entries_result = await db.execute(
+            delete(AttendanceEntry).where(
+                AttendanceEntry.student_id.in_(user_ids)
+            )
+        )
+        attendance_entries_deleted = delete_attendance_entries_result.rowcount
+        logger.info(f"Deleted {attendance_entries_deleted} attendance entries")
+
+        # 第十步：删除正面行为记录（批量删除）
+        delete_positive_behaviors_result = await db.execute(
+            delete(PositiveBehavior).where(
+                PositiveBehavior.student_id.in_(user_ids)
+            )
+        )
+        positive_behaviors_deleted = delete_positive_behaviors_result.rowcount
+        logger.info(f"Deleted {positive_behaviors_deleted} positive behaviors")
+
+        # 第十一步：删除纪律记录（批量删除）
+        delete_discipline_records_result = await db.execute(
+            delete(DisciplineRecord).where(
+                DisciplineRecord.student_id.in_(user_ids)
+            )
+        )
+        discipline_records_deleted = delete_discipline_records_result.rowcount
+        logger.info(f"Deleted {discipline_records_deleted} discipline records")
+
+        # 第十二步：删除成绩记录（批量删除）
+        delete_scores_result = await db.execute(
+            delete(Score).where(
+                Score.student_id.in_(user_ids)
+            )
+        )
+        scores_deleted = delete_scores_result.rowcount
+        logger.info(f"Deleted {scores_deleted} scores")
+
+        # 第十三步：删除过程性评估记录（批量删除）
+        delete_formative_assessments_result = await db.execute(
+            delete(FormativeAssessment).where(
+                FormativeAssessment.student_id.in_(user_ids)
+            )
+        )
+        formative_assessments_deleted = delete_formative_assessments_result.rowcount
+        logger.info(f"Deleted {formative_assessments_deleted} formative assessments")
+
+        # 第十四步：删除问题记录（批量删除）
+        delete_questions_result = await db.execute(
+            delete(Question).where(
+                Question.student_id.in_(user_ids)
+            )
+        )
+        questions_deleted = delete_questions_result.rowcount
+        logger.info(f"Deleted {questions_deleted} questions")
+
+        # 第十五步：获取学生项目ID（用于删除相关的项目Cell）
+        projects_result = await db.execute(
+            select(StudentProject.id).where(
+                StudentProject.creator_id.in_(user_ids)
+            )
+        )
+        project_ids = [row[0] for row in projects_result.all()]
+        logger.info(f"Found {len(project_ids)} student projects to delete")
+
+        # 第十六步：删除项目Cell
+        if project_ids:
+            delete_project_cells_result = await db.execute(
+                delete(ProjectCell).where(
+                    ProjectCell.project_id.in_(project_ids)
+                )
+            )
+            project_cells_deleted = delete_project_cells_result.rowcount
+        else:
+            project_cells_deleted = 0
+        logger.info(f"Deleted {project_cells_deleted} project cells")
+
+        # 第十七步：删除学生项目（批量删除）
+        delete_student_projects_result = await db.execute(
+            delete(StudentProject).where(
+                StudentProject.creator_id.in_(user_ids)
+            )
+        )
+        student_projects_deleted = delete_student_projects_result.rowcount
+        logger.info(f"Deleted {student_projects_deleted} student projects")
+
+        # 第十八步：删除收藏记录（批量删除）
+        delete_favorites_result = await db.execute(
+            delete(Favorite).where(
+                Favorite.user_id.in_(user_ids)
+            )
+        )
+        favorites_deleted = delete_favorites_result.rowcount
+        logger.info(f"Deleted {favorites_deleted} favorites")
+
+        # 第十九步：删除评分评论记录（批量删除）
+        delete_reviews_result = await db.execute(
+            delete(Review).where(
+                Review.user_id.in_(user_ids)
+            )
+        )
+        reviews_deleted = delete_reviews_result.rowcount
+        logger.info(f"Deleted {reviews_deleted} reviews")
+
+        # 第二十步：删除问题点赞记录（批量删除）
+        delete_question_votes_result = await db.execute(
+            delete(QuestionVote).where(
+                QuestionVote.user_id.in_(user_ids)
+            )
+        )
+        question_votes_deleted = delete_question_votes_result.rowcount
+        logger.info(f"Deleted {question_votes_deleted} question votes")
+
+        # 第二十一步：删除回答记录（批量删除）
+        delete_answers_result = await db.execute(
+            delete(Answer).where(
+                Answer.answerer_id.in_(user_ids)
+            )
+        )
+        answers_deleted = delete_answers_result.rowcount
+        logger.info(f"Deleted {answers_deleted} answers")
+
+        # 第二十二步：删除教研组成员关系（批量删除）
+        delete_group_memberships_result = await db.execute(
+            delete(GroupMembership).where(
+                GroupMembership.user_id.in_(user_ids)
+            )
+        )
+        group_memberships_deleted = delete_group_memberships_result.rowcount
+        logger.info(f"Deleted {group_memberships_deleted} group memberships")
+
+        # 第二十三步：删除值日任务分配记录（批量删除，包括被分配者和完成者）
+        delete_duty_assignments_result = await db.execute(
+            delete(DutyAssignment).where(
+                or_(
+                    DutyAssignment.assignee_user_id.in_(user_ids),
+                    DutyAssignment.completed_by_user_id.in_(user_ids)
+                )
+            )
+        )
+        duty_assignments_deleted = delete_duty_assignments_result.rowcount
+        logger.info(f"Deleted {duty_assignments_deleted} duty assignments")
+
+        # 第二十四步：删除教师教学任务分配（批量删除）
+        delete_teaching_assignments_result = await db.execute(
+            delete(TeacherTeachingAssignment).where(
+                TeacherTeachingAssignment.teacher_id.in_(user_ids)
+            )
+        )
+        teaching_assignments_deleted = delete_teaching_assignments_result.rowcount
+        logger.info(f"Deleted {teaching_assignments_deleted} teaching assignments")
+
+        # 第二十五步：删除考场监考安排（批量删除）
+        delete_exam_proctors_result = await db.execute(
+            delete(ExamProctor).where(
+                ExamProctor.user_id.in_(user_ids)
+            )
+        )
+        exam_proctors_deleted = delete_exam_proctors_result.rowcount
+        logger.info(f"Deleted {exam_proctors_deleted} exam proctors")
+
+        # 第二十六步：删除课堂会话（教师创建的会话，批量删除）
+        delete_class_sessions_result = await db.execute(
+            delete(ClassSession).where(
+                ClassSession.teacher_id.in_(user_ids)
+            )
+        )
+        class_sessions_deleted = delete_class_sessions_result.rowcount
+        logger.info(f"Deleted {class_sessions_deleted} class sessions")
+
+        # 第二十七步：获取教师创建的课程ID（用于删除相关的 LessonClassroom）
+        lessons_result = await db.execute(
+            select(Lesson.id).where(
+                Lesson.creator_id.in_(user_ids)
+            )
+        )
+        lesson_ids = [row[0] for row in lessons_result.all()]
+        logger.info(f"Found {len(lesson_ids)} lessons created by users to delete")
+
+        # 第二十八步：删除课程-班级关联（批量删除，虽然设置了CASCADE，但为了明确先删除）
+        if lesson_ids:
+            delete_lesson_classrooms_result = await db.execute(
+                delete(LessonClassroom).where(
+                    LessonClassroom.lesson_id.in_(lesson_ids)
+                )
+            )
+            lesson_classrooms_deleted = delete_lesson_classrooms_result.rowcount
+        else:
+            lesson_classrooms_deleted = 0
+        logger.info(f"Deleted {lesson_classrooms_deleted} lesson classrooms")
+
+        # 第二十九步：删除课程的Cell（批量删除，因为Cell没有CASCADE设置）
+        if lesson_ids:
+            delete_cells_result = await db.execute(
+                delete(Cell).where(
+                    Cell.lesson_id.in_(lesson_ids)
+                )
+            )
+            cells_deleted = delete_cells_result.rowcount
+        else:
+            cells_deleted = 0
+        logger.info(f"Deleted {cells_deleted} cells")
+
+        # 第三十步：删除课程（教师创建的课程，批量删除）
+        delete_lessons_result = await db.execute(
+            delete(Lesson).where(
+                Lesson.creator_id.in_(user_ids)
+            )
+        )
+        lessons_deleted = delete_lessons_result.rowcount
+        logger.info(f"Deleted {lessons_deleted} lessons")
+
         # 使用flush确保操作执行但保持事务
         await db.flush()
-        logger.info("Flushed exam mapping and room student deletions")
+        logger.info("Flushed all user-related data deletions")
 
-        # 第三步：删除用户
-        for user in users:
-            try:
-                await db.delete(user)
-                deleted_count += 1
-                logger.info(f"Deleted user {user.id}: {user.username}")
-            except Exception as e:
-                logger.error(f"Failed to delete user {user.id}: {str(e)}")
-                failed_users.append({
-                    "id": user.id,
-                    "username": user.username,
-                    "error": str(e)
-                })
+        # 第三十一步：批量删除用户（使用批量删除更高效）
+        delete_users_result = await db.execute(
+            delete(User).where(User.id.in_(user_ids))
+        )
+        deleted_count = delete_users_result.rowcount
+        logger.info(f"Deleted {deleted_count} users")
 
         # 提交所有删除操作
         await db.commit()
-        logger.info(f"Successfully deleted {deleted_count} users")
+        logger.info(f"Successfully committed batch delete of {deleted_count} users")
 
     except Exception as e:
         logger.error(f"Batch delete failed: {str(e)}", exc_info=True)
@@ -570,12 +881,35 @@ async def batch_delete_users(
     response_data = {
         "message": f"成功删除 {deleted_count} 个用户",
         "deleted_count": deleted_count,
-        "total_requested": len(user_ids)
+        "total_requested": len(user_ids),
+        "exam_mappings_deleted": mappings_deleted,
+        "exam_room_students_deleted": room_students_deleted,
+        "activity_submissions_deleted": activity_submissions_deleted,
+        "peer_reviews_deleted": peer_reviews_deleted,
+        "flowchart_snapshots_deleted": flowchart_snapshots_deleted,
+        "session_participations_deleted": session_participations_deleted,
+        "classroom_memberships_deleted": classroom_memberships_deleted,
+        "attendance_entries_deleted": attendance_entries_deleted,
+        "positive_behaviors_deleted": positive_behaviors_deleted,
+        "discipline_records_deleted": discipline_records_deleted,
+        "scores_deleted": scores_deleted,
+        "formative_assessments_deleted": formative_assessments_deleted,
+        "questions_deleted": questions_deleted,
+        "student_projects_deleted": student_projects_deleted,
+        "project_cells_deleted": project_cells_deleted,
+        "favorites_deleted": favorites_deleted,
+        "reviews_deleted": reviews_deleted,
+        "question_votes_deleted": question_votes_deleted,
+        "answers_deleted": answers_deleted,
+        "group_memberships_deleted": group_memberships_deleted,
+        "duty_assignments_deleted": duty_assignments_deleted,
+        "teaching_assignments_deleted": teaching_assignments_deleted,
+        "exam_proctors_deleted": exam_proctors_deleted,
+        "class_sessions_deleted": class_sessions_deleted,
+        "lessons_deleted": lessons_deleted,
+        "lesson_classrooms_deleted": lesson_classrooms_deleted,
+        "cells_deleted": cells_deleted
     }
-
-    if failed_users:
-        response_data["failed_users"] = failed_users
-        response_data["failed_count"] = len(failed_users)
 
     return response_data
 
@@ -694,6 +1028,26 @@ async def batch_delete_by_filter(
         raise HTTPException(status_code=400, detail="删除条件包含当前登录用户，不能删除自己的账号")
 
     deleted_count = 0
+    mappings_deleted = 0
+    room_students_deleted = 0
+    activity_submissions_deleted = 0
+    peer_reviews_deleted = 0
+    flowchart_snapshots_deleted = 0
+    session_participations_deleted = 0
+    classroom_memberships_deleted = 0
+    attendance_entries_deleted = 0
+    positive_behaviors_deleted = 0
+    discipline_records_deleted = 0
+    scores_deleted = 0
+    formative_assessments_deleted = 0
+    questions_deleted = 0
+    student_projects_deleted = 0
+    project_cells_deleted = 0
+    favorites_deleted = 0
+    reviews_deleted = 0
+    question_votes_deleted = 0
+    answers_deleted = 0
+    group_memberships_deleted = 0
 
     try:
         # 第一步：删除考号映射记录（批量删除）
@@ -714,11 +1068,291 @@ async def batch_delete_by_filter(
         room_students_deleted = delete_room_students_result.rowcount
         logger.info(f"Deleted {room_students_deleted} exam room student assignments")
 
+        # 第三步：获取学生的活动提交ID（用于删除相关的互评和流程图快照）
+        submissions_result = await db.execute(
+            select(ActivitySubmission.id).where(
+                ActivitySubmission.student_id.in_(user_ids)
+            )
+        )
+        submission_ids = [row[0] for row in submissions_result.all()]
+        logger.info(f"Found {len(submission_ids)} activity submissions to delete")
+
+        # 第四步：删除流程图快照（通过 submission_id 和 student_id 关联）
+        conditions = [FlowchartSnapshot.student_id.in_(user_ids)]
+        if submission_ids:
+            conditions.append(FlowchartSnapshot.submission_id.in_(submission_ids))
+        
+        delete_flowchart_snapshots_result = await db.execute(
+            delete(FlowchartSnapshot).where(
+                or_(*conditions)
+            )
+        )
+        flowchart_snapshots_deleted = delete_flowchart_snapshots_result.rowcount
+        logger.info(f"Deleted {flowchart_snapshots_deleted} flowchart snapshots")
+
+        # 第五步：删除互评记录（包括学生作为评审者的互评，以及评审这些学生提交的互评）
+        # 删除学生作为评审者的互评记录
+        delete_reviewer_peer_reviews_result = await db.execute(
+            delete(PeerReview).where(
+                PeerReview.reviewer_id.in_(user_ids)
+            )
+        )
+        reviewer_peer_reviews_deleted = delete_reviewer_peer_reviews_result.rowcount
+        # 删除评审这些学生提交的互评记录
+        if submission_ids:
+            delete_submission_peer_reviews_result = await db.execute(
+                delete(PeerReview).where(
+                    PeerReview.submission_id.in_(submission_ids)
+                )
+            )
+            submission_peer_reviews_deleted = delete_submission_peer_reviews_result.rowcount
+        else:
+            submission_peer_reviews_deleted = 0
+        peer_reviews_deleted = reviewer_peer_reviews_deleted + submission_peer_reviews_deleted
+        logger.info(f"Deleted {peer_reviews_deleted} peer reviews ({reviewer_peer_reviews_deleted} as reviewer, {submission_peer_reviews_deleted} on submissions)")
+
+        # 第六步：删除活动提交记录（批量删除）
+        delete_activity_submissions_result = await db.execute(
+            delete(ActivitySubmission).where(
+                ActivitySubmission.student_id.in_(user_ids)
+            )
+        )
+        activity_submissions_deleted = delete_activity_submissions_result.rowcount
+        logger.info(f"Deleted {activity_submissions_deleted} activity submissions")
+
+        # 第六步：删除课堂会话参与记录（批量删除）
+        delete_session_participations_result = await db.execute(
+            delete(StudentSessionParticipation).where(
+                StudentSessionParticipation.student_id.in_(user_ids)
+            )
+        )
+        session_participations_deleted = delete_session_participations_result.rowcount
+        logger.info(f"Deleted {session_participations_deleted} session participations")
+
+        # 第七步：删除班级成员关系（批量删除）
+        delete_classroom_memberships_result = await db.execute(
+            delete(ClassroomMembership).where(
+                ClassroomMembership.user_id.in_(user_ids)
+            )
+        )
+        classroom_memberships_deleted = delete_classroom_memberships_result.rowcount
+        logger.info(f"Deleted {classroom_memberships_deleted} classroom memberships")
+
+        # 第八步：删除考勤记录（批量删除）
+        delete_attendance_entries_result = await db.execute(
+            delete(AttendanceEntry).where(
+                AttendanceEntry.student_id.in_(user_ids)
+            )
+        )
+        attendance_entries_deleted = delete_attendance_entries_result.rowcount
+        logger.info(f"Deleted {attendance_entries_deleted} attendance entries")
+
+        # 第九步：删除正面行为记录（批量删除）
+        delete_positive_behaviors_result = await db.execute(
+            delete(PositiveBehavior).where(
+                PositiveBehavior.student_id.in_(user_ids)
+            )
+        )
+        positive_behaviors_deleted = delete_positive_behaviors_result.rowcount
+        logger.info(f"Deleted {positive_behaviors_deleted} positive behaviors")
+
+        # 第十步：删除纪律记录（批量删除）
+        delete_discipline_records_result = await db.execute(
+            delete(DisciplineRecord).where(
+                DisciplineRecord.student_id.in_(user_ids)
+            )
+        )
+        discipline_records_deleted = delete_discipline_records_result.rowcount
+        logger.info(f"Deleted {discipline_records_deleted} discipline records")
+
+        # 第十一步：删除成绩记录（批量删除）
+        delete_scores_result = await db.execute(
+            delete(Score).where(
+                Score.student_id.in_(user_ids)
+            )
+        )
+        scores_deleted = delete_scores_result.rowcount
+        logger.info(f"Deleted {scores_deleted} scores")
+
+        # 第十二步：删除过程性评估记录（批量删除）
+        delete_formative_assessments_result = await db.execute(
+            delete(FormativeAssessment).where(
+                FormativeAssessment.student_id.in_(user_ids)
+            )
+        )
+        formative_assessments_deleted = delete_formative_assessments_result.rowcount
+        logger.info(f"Deleted {formative_assessments_deleted} formative assessments")
+
+        # 第十三步：删除问题记录（批量删除）
+        delete_questions_result = await db.execute(
+            delete(Question).where(
+                Question.student_id.in_(user_ids)
+            )
+        )
+        questions_deleted = delete_questions_result.rowcount
+        logger.info(f"Deleted {questions_deleted} questions")
+
+        # 第十四步：获取学生项目ID（用于删除相关的项目Cell）
+        projects_result = await db.execute(
+            select(StudentProject.id).where(
+                StudentProject.creator_id.in_(user_ids)
+            )
+        )
+        project_ids = [row[0] for row in projects_result.all()]
+        logger.info(f"Found {len(project_ids)} student projects to delete")
+
+        # 第十五步：删除项目Cell（虽然CASCADE会自动删除，但为了完整性先删除）
+        if project_ids:
+            delete_project_cells_result = await db.execute(
+                delete(ProjectCell).where(
+                    ProjectCell.project_id.in_(project_ids)
+                )
+            )
+            project_cells_deleted = delete_project_cells_result.rowcount
+        else:
+            project_cells_deleted = 0
+        logger.info(f"Deleted {project_cells_deleted} project cells")
+
+        # 第十六步：删除学生项目（批量删除）
+        delete_student_projects_result = await db.execute(
+            delete(StudentProject).where(
+                StudentProject.creator_id.in_(user_ids)
+            )
+        )
+        student_projects_deleted = delete_student_projects_result.rowcount
+        logger.info(f"Deleted {student_projects_deleted} student projects")
+
+        # 第十七步：删除收藏记录（批量删除）
+        delete_favorites_result = await db.execute(
+            delete(Favorite).where(
+                Favorite.user_id.in_(user_ids)
+            )
+        )
+        favorites_deleted = delete_favorites_result.rowcount
+        logger.info(f"Deleted {favorites_deleted} favorites")
+
+        # 第十八步：删除评分评论记录（批量删除）
+        delete_reviews_result = await db.execute(
+            delete(Review).where(
+                Review.user_id.in_(user_ids)
+            )
+        )
+        reviews_deleted = delete_reviews_result.rowcount
+        logger.info(f"Deleted {reviews_deleted} reviews")
+
+        # 第十九步：删除问题点赞记录（批量删除）
+        delete_question_votes_result = await db.execute(
+            delete(QuestionVote).where(
+                QuestionVote.user_id.in_(user_ids)
+            )
+        )
+        question_votes_deleted = delete_question_votes_result.rowcount
+        logger.info(f"Deleted {question_votes_deleted} question votes")
+
+        # 第二十步：删除回答记录（批量删除，学生可能回答过问题）
+        delete_answers_result = await db.execute(
+            delete(Answer).where(
+                Answer.answerer_id.in_(user_ids)
+            )
+        )
+        answers_deleted = delete_answers_result.rowcount
+        logger.info(f"Deleted {answers_deleted} answers")
+
+        # 第二十一步：删除教研组成员关系（批量删除）
+        delete_group_memberships_result = await db.execute(
+            delete(GroupMembership).where(
+                GroupMembership.user_id.in_(user_ids)
+            )
+        )
+        group_memberships_deleted = delete_group_memberships_result.rowcount
+        logger.info(f"Deleted {group_memberships_deleted} group memberships")
+
+        # 第二十二步：删除值日任务分配记录（批量删除，包括被分配者和完成者）
+        delete_duty_assignments_result = await db.execute(
+            delete(DutyAssignment).where(
+                or_(
+                    DutyAssignment.assignee_user_id.in_(user_ids),
+                    DutyAssignment.completed_by_user_id.in_(user_ids)
+                )
+            )
+        )
+        duty_assignments_deleted = delete_duty_assignments_result.rowcount
+        logger.info(f"Deleted {duty_assignments_deleted} duty assignments")
+
+        # 第二十三步：删除教师教学任务分配（批量删除）
+        delete_teaching_assignments_result = await db.execute(
+            delete(TeacherTeachingAssignment).where(
+                TeacherTeachingAssignment.teacher_id.in_(user_ids)
+            )
+        )
+        teaching_assignments_deleted = delete_teaching_assignments_result.rowcount
+        logger.info(f"Deleted {teaching_assignments_deleted} teaching assignments")
+
+        # 第二十四步：删除考场监考安排（批量删除）
+        delete_exam_proctors_result = await db.execute(
+            delete(ExamProctor).where(
+                ExamProctor.user_id.in_(user_ids)
+            )
+        )
+        exam_proctors_deleted = delete_exam_proctors_result.rowcount
+        logger.info(f"Deleted {exam_proctors_deleted} exam proctors")
+
+        # 第二十五步：删除课堂会话（教师创建的会话，批量删除）
+        delete_class_sessions_result = await db.execute(
+            delete(ClassSession).where(
+                ClassSession.teacher_id.in_(user_ids)
+            )
+        )
+        class_sessions_deleted = delete_class_sessions_result.rowcount
+        logger.info(f"Deleted {class_sessions_deleted} class sessions")
+
+        # 第二十六步：获取教师创建的课程ID（用于删除相关的表）
+        lessons_result = await db.execute(
+            select(Lesson.id).where(
+                Lesson.creator_id.in_(user_ids)
+            )
+        )
+        lesson_ids = [row[0] for row in lessons_result.all()]
+        logger.info(f"Found {len(lesson_ids)} lessons created by users to delete")
+
+        # 第二十七步：删除课程-班级关联（批量删除，虽然设置了CASCADE，但为了明确先删除）
+        if lesson_ids:
+            delete_lesson_classrooms_result = await db.execute(
+                delete(LessonClassroom).where(
+                    LessonClassroom.lesson_id.in_(lesson_ids)
+                )
+            )
+            lesson_classrooms_deleted = delete_lesson_classrooms_result.rowcount
+        else:
+            lesson_classrooms_deleted = 0
+        logger.info(f"Deleted {lesson_classrooms_deleted} lesson classrooms")
+
+        # 第二十八步：删除课程的Cell（批量删除，因为Cell没有CASCADE设置）
+        if lesson_ids:
+            delete_cells_result = await db.execute(
+                delete(Cell).where(
+                    Cell.lesson_id.in_(lesson_ids)
+                )
+            )
+            cells_deleted = delete_cells_result.rowcount
+        else:
+            cells_deleted = 0
+        logger.info(f"Deleted {cells_deleted} cells")
+
+        # 第二十九步：删除课程（教师创建的课程，批量删除）
+        delete_lessons_result = await db.execute(
+            delete(Lesson).where(
+                Lesson.creator_id.in_(user_ids)
+            )
+        )
+        lessons_deleted = delete_lessons_result.rowcount
+        logger.info(f"Deleted {lessons_deleted} lessons")
+
         # 使用flush确保操作执行但保持事务
         await db.flush()
-        logger.info("Flushed exam mapping and room student deletions")
+        logger.info("Flushed all student-related data deletions")
 
-        # 第三步：批量删除用户（使用批量删除更高效）
+        # 第三十步：批量删除用户（使用批量删除更高效）
         delete_users_result = await db.execute(
             delete(User).where(User.id.in_(user_ids))
         )
@@ -741,7 +1375,31 @@ async def batch_delete_by_filter(
         "message": f"成功删除 {deleted_count} 个用户",
         "deleted_count": deleted_count,
         "exam_mappings_deleted": mappings_deleted,
-        "exam_room_students_deleted": room_students_deleted
+        "exam_room_students_deleted": room_students_deleted,
+        "activity_submissions_deleted": activity_submissions_deleted,
+        "peer_reviews_deleted": peer_reviews_deleted,
+        "flowchart_snapshots_deleted": flowchart_snapshots_deleted,
+        "session_participations_deleted": session_participations_deleted,
+        "classroom_memberships_deleted": classroom_memberships_deleted,
+        "attendance_entries_deleted": attendance_entries_deleted,
+        "positive_behaviors_deleted": positive_behaviors_deleted,
+        "discipline_records_deleted": discipline_records_deleted,
+        "scores_deleted": scores_deleted,
+        "formative_assessments_deleted": formative_assessments_deleted,
+        "questions_deleted": questions_deleted,
+        "student_projects_deleted": student_projects_deleted,
+        "project_cells_deleted": project_cells_deleted,
+        "favorites_deleted": favorites_deleted,
+        "reviews_deleted": reviews_deleted,
+        "question_votes_deleted": question_votes_deleted,
+        "answers_deleted": answers_deleted,
+        "group_memberships_deleted": group_memberships_deleted,
+        "duty_assignments_deleted": duty_assignments_deleted,
+        "teaching_assignments_deleted": teaching_assignments_deleted,
+        "exam_proctors_deleted": exam_proctors_deleted,
+        "class_sessions_deleted": class_sessions_deleted,
+        "lessons_deleted": lessons_deleted,
+        "lesson_classrooms_deleted": lesson_classrooms_deleted
     }
 
 
