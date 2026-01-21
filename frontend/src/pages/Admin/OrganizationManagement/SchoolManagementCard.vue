@@ -59,6 +59,15 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
+            <th class="px-4 py-3 text-left w-12">
+              <input
+                type="checkbox"
+                :checked="isAllCurrentPageSelected"
+                :indeterminate="isIndeterminate"
+                @change="toggleSelectAll($event.target.checked)"
+                class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              />
+            </th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学校名称</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">编码</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">类型</th>
@@ -68,7 +77,16 @@
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="school in schools" :key="school.id" class="hover:bg-gray-50">
+          <tr v-for="school in schools" :key="school.id"
+              :class="['hover:bg-gray-50', isSelected(school.id) ? 'bg-blue-50' : '']">
+            <td class="px-4 py-4 whitespace-nowrap">
+              <input
+                type="checkbox"
+                :checked="isSelected(school.id)"
+                @change="toggleSelectSchool(school.id)"
+                class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              />
+            </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <div class="text-sm font-medium text-gray-900">{{ school.name }}</div>
               <div class="text-sm text-gray-500">{{ school.address }}</div>
@@ -635,6 +653,7 @@ async function loadSchools() {
     })
     schools.value = response.schools
     schoolTotal.value = response.total
+    updateSelectAllState()
   } catch (error: any) {
     console.error('Failed to load schools:', error)
     toast.error(error.response?.data?.detail || '加载学校列表失败')
@@ -980,6 +999,56 @@ async function startDistrictClassroomImport() {
     districtClassroomImportStep.value = 2
   } finally {
     districtClassroomImporting.value = false
+  }
+}
+
+// 选择逻辑方法
+function toggleSelectAll(checked: boolean) {
+  if (checked) {
+    // 选择当前页所有学校
+    schools.value.forEach(school => {
+      selectedSchoolIds.value.add(school.id)
+    })
+  } else {
+    // 取消选择当前页所有学校
+    schools.value.forEach(school => {
+      selectedSchoolIds.value.delete(school.id)
+    })
+  }
+  updateSelectAllState()
+}
+
+function toggleSelectSchool(schoolId: number) {
+  if (selectedSchoolIds.value.has(schoolId)) {
+    selectedSchoolIds.value.delete(schoolId)
+  } else {
+    selectedSchoolIds.value.add(schoolId)
+  }
+  updateSelectAllState()
+}
+
+function isSelected(schoolId: number): boolean {
+  return selectedSchoolIds.value.has(schoolId)
+}
+
+function clearSelection() {
+  selectedSchoolIds.value.clear()
+  updateSelectAllState()
+}
+
+function updateSelectAllState() {
+  const currentSchoolIds = schools.value.map(s => s.id)
+  const selectedInCurrentPage = currentSchoolIds.filter(id => selectedSchoolIds.value.has(id))
+
+  if (selectedInCurrentPage.length === 0) {
+    isAllCurrentPageSelected.value = false
+    isIndeterminate.value = false
+  } else if (selectedInCurrentPage.length === schools.value.length) {
+    isAllCurrentPageSelected.value = true
+    isIndeterminate.value = false
+  } else {
+    isAllCurrentPageSelected.value = false
+    isIndeterminate.value = true
   }
 }
 
