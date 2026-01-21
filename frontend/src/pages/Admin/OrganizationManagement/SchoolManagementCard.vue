@@ -503,7 +503,7 @@ import { Download, UploadFilled, Upload, ArrowRight, ArrowLeft } from '@element-
 import type { UploadProps } from 'element-plus'
 import * as XLSX from 'xlsx'
 import { useToast } from '@/composables/useToast'
-import adminService, { type Region, type School, type SchoolImportResponse, type ClassroomImportResponse } from '@/services/admin'
+import adminService, { type Region, type School, type SchoolImportResponse, type ClassroomImportResponse, type SchoolRelationCheck, type BatchDeleteSchoolsResponse } from '@/services/admin'
 
 const toast = useToast()
 
@@ -532,6 +532,14 @@ const schoolForm = ref({
 })
 
 const schoolTotalPages = computed(() => Math.ceil(schoolTotal.value / schoolPageSize.value))
+
+const selectedCount = computed(() => selectedSchoolIds.value.size)
+
+const hasSelection = computed(() => selectedSchoolIds.value.size > 0)
+
+const canSelectAllCurrentPage = computed(() => {
+  return schools.value.length > 0 && schools.value.every(school => selectedSchoolIds.value.has(school.id))
+})
 
 // 学校批量导入状态
 const showSchoolImportDialog = ref(false)
@@ -594,6 +602,17 @@ const districtClassroomTemplateFields = [
   { field: '班级容量', required: '⭕ 选填', description: '计划人数（可在导入界面统一设置）', example: '45' },
   { field: '班级描述', required: '⭕ 选填', description: '班级描述信息', example: '重点班' },
 ]
+
+// 批量选择状态
+const selectedSchoolIds = ref<Set<number>>(new Set())
+const isAllCurrentPageSelected = ref(false)
+const isIndeterminate = ref(false)
+const showBatchDeleteDialog = ref(false)
+const checkingRelations = ref(false)
+const deletingSchools = ref(false)
+const schoolRelations = ref<SchoolRelationCheck[]>([])
+const batchDeleteResult = ref<BatchDeleteSchoolsResponse | null>(null)
+const cascadeDelete = ref(false)
 
 // 方法
 async function loadAllRegions() {
