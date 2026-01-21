@@ -768,6 +768,7 @@ async def check_school_relations(
     """检查学校的关联数据
 
     返回每个学校的关联数据统计（班级、教师、学生）
+    使用批量查询优化性能，避免N+1查询问题
     """
     school_ids = request.get("school_ids", [])
 
@@ -778,14 +779,32 @@ async def check_school_relations(
     if len(school_ids) > 1000:
         raise HTTPException(status_code=400, detail="单次最多检查1000所学校")
 
-    results = []
+    # 批量获取所有学校信息（1次查询）
+    schools_result = await db.execute(
+        select(School).where(School.id.in_(school_ids))
+    )
+    schools = {school.id: school for school in schools_result.scalars()}
 
+    # 批量获取所有学校的班级数量（1次查询）
+    classroom_counts_result = await db.execute(
+        select(Classroom.school_id, func.count(Classroom.id))
+        .group_by(Classroom.school_id)
+        .where(Classroom.school_id.in_(school_ids))
+    )
+    classroom_counts = {row[0]: row[1] for row in classroom_counts_result}
+
+    # 批量获取所有学校的用户数量（1次查询）
+    user_counts_result = await db.execute(
+        select(User.school_id, func.count(User.id))
+        .group_by(User.school_id)
+        .where(User.school_id.in_(school_ids))
+    )
+    user_counts = {row[0]: row[1] for row in user_counts_result}
+
+    # 构建结果（在内存中处理）
+    results = []
     for school_id in school_ids:
-        # 获取学校信息
-        school_result = await db.execute(
-            select(School).where(School.id == school_id)
-        )
-        school = school_result.scalar_one_or_none()
+        school = schools.get(school_id)
 
         if not school:
             results.append(SchoolRelationCheck(
@@ -796,17 +815,9 @@ async def check_school_relations(
             ))
             continue
 
-        # 检查班级数量
-        classrooms_count_result = await db.execute(
-            select(func.count()).select_from(Classroom).where(Classroom.school_id == school_id)
-        )
-        classrooms_count = classrooms_count_result.scalar() or 0
-
-        # 检查用户数量（教师+学生）
-        users_count_result = await db.execute(
-            select(func.count()).select_from(User).where(User.school_id == school_id)
-        )
-        users_count = users_count_result.scalar() or 0
+        # 从预取的计数结果中获取数据
+        classrooms_count = classroom_counts.get(school_id, 0)
+        users_count = user_counts.get(school_id, 0)
 
         has_relations = classrooms_count > 0 or users_count > 0
 
