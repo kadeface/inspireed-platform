@@ -54,6 +54,29 @@
       </div>
     </div>
 
+    <!-- 批量操作栏 -->
+    <div v-if="hasSelection" class="bg-blue-50 border border-blue-200 rounded-lg shadow p-4">
+      <div class="flex justify-between items-center">
+        <div class="text-sm text-blue-800">
+          <strong>已选择 {{ selectedCount }} 所学校</strong>
+        </div>
+        <div class="flex gap-2">
+          <button
+            @click="openBatchDeleteDialog"
+            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+          >
+            🗑️ 批量删除
+          </button>
+          <button
+            @click="clearSelection"
+            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+          >
+            取消选择
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 学校列表 -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
       <table class="min-w-full divide-y divide-gray-200">
