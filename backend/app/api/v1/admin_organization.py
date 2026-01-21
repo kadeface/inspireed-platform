@@ -150,6 +150,35 @@ class SchoolTypeListResponse(BaseModel):
     school_types: List[SchoolTypeResponse]
 
 
+class SchoolRelationCheck(BaseModel):
+    """学校关联数据检查结果"""
+    school_id: int
+    school_name: str
+    has_relations: bool
+    relations: Optional[Dict[str, int]] = None  # {classrooms: 0, teachers: 0, students: 0}
+
+
+class BatchDeleteSchoolsRequest(BaseModel):
+    """批量删除学校请求"""
+    school_ids: List[int]
+    cascade_delete: bool = False
+
+
+class BatchDeleteSchoolsError(BaseModel):
+    """批量删除学校错误详情"""
+    school_id: int
+    school_name: str
+    error: str
+
+
+class BatchDeleteSchoolsResponse(BaseModel):
+    """批量删除学校响应"""
+    total_requested: int
+    deleted_count: int
+    failed_count: int
+    errors: List[BatchDeleteSchoolsError]
+
+
 class ClassroomCreate(BaseModel):
     """创建班级请求"""
 
