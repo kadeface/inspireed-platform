@@ -6,7 +6,7 @@
 import logging
 from typing import Any, List, Optional, Dict
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Body, Request
 from sqlalchemy import select, func, or_, join, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -836,7 +836,7 @@ async def check_school_relations(
 
 @router.delete("/schools/batch")
 async def batch_delete_schools(
-    request: BatchDeleteSchoolsRequest,
+    req: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ) -> Any:
@@ -850,8 +850,10 @@ async def batch_delete_schools(
     注意：此操作采用"尽力而为"的策略，即使某些学校删除失败，也会继续处理其他学校。
     每个学校的删除结果是独立跟踪的，最终返回详细的成功/失败统计。
     """
-    school_ids = request.school_ids
-    cascade_delete = request.cascade_delete
+    # 手动解析 JSON body（DELETE 请求的 body 需要）
+    data = await req.json()
+    school_ids = data.get("school_ids", [])
+    cascade_delete = data.get("cascade_delete", False)
 
     if not school_ids:
         raise HTTPException(status_code=400, detail="必须提供学校ID列表")
