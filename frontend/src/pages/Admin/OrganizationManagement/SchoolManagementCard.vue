@@ -534,13 +534,143 @@
         <el-button v-if="districtClassroomImportStep === 2" type="primary" @click="closeDistrictClassroomImportDialog">完成</el-button>
       </template>
     </el-dialog>
+
+    <!-- 批量删除学校对话框 -->
+    <el-dialog
+      v-model="showBatchDeleteDialog"
+      title="批量删除学校"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <!-- 步骤1: 检查关联数据 -->
+      <div v-if="!checkingRelations && !deletingSchools && schoolRelations.length === 0" class="space-y-4">
+        <p class="text-sm text-gray-600">正在检查学校关联数据...</p>
+      </div>
+
+      <!-- 步骤2: 显示删除预览 -->
+      <div v-if="!checkingRelations && schoolRelations.length > 0 && !batchDeleteResult" class="space-y-4">
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p class="text-sm text-yellow-800">
+            <strong>⚠️ 即将删除 {{ selectedCount }} 所学校</strong>
+          </p>
+        </div>
+
+        <!-- 学校列表 -->
+        <div class="max-h-60 overflow-y-auto border rounded-lg">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">学校名称</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">关联数据</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr v-for="relation in schoolRelations" :key="relation.school_id" class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-sm">{{ relation.school_name }}</td>
+                <td class="px-4 py-2 text-sm">
+                  <span v-if="!relation.has_relations" class="text-green-600">✓ 无关联数据</span>
+                  <span v-else class="text-red-600">
+                    ⚠️ {{ relation.relations?.classrooms }} 个班级,
+                    {{ relation.relations?.teachers_students }} 个用户
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 有关联数据的学校提示 -->
+        <div v-if="schoolRelations.some(r => r.has_relations)" class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p class="text-sm text-red-800 mb-2">
+            <strong>⚠️ 检测到学校有关联数据</strong>
+          </p>
+          <label class="flex items-start gap-2 text-sm text-red-700">
+            <input
+              type="checkbox"
+              v-model="cascadeDelete"
+              class="mt-1 w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-500"
+            />
+            <span>
+              <strong>同时删除关联数据</strong>（包括班级、教师、学生等）
+              <br>
+              <span class="text-xs">如果不勾选，将只删除没有关联数据的学校</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 步骤3: 删除结果 -->
+      <div v-if="batchDeleteResult" class="space-y-4">
+        <el-alert
+          :title="batchDeleteResult.deleted_count > 0 ? '✅ 删除完成' : '❌ 删除失败'"
+          :type="batchDeleteResult.deleted_count > 0 ? 'success' : 'error'"
+          :closable="false"
+        />
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-blue-50 border rounded-lg p-3 text-center">
+            <div class="text-2xl font-bold text-blue-600">{{ batchDeleteResult.total_requested }}</div>
+            <div class="text-sm text-gray-600">请求删除</div>
+          </div>
+          <div class="bg-green-50 border rounded-lg p-3 text-center">
+            <div class="text-2xl font-bold text-green-600">{{ batchDeleteResult.deleted_count }}</div>
+            <div class="text-sm text-gray-600">成功删除</div>
+          </div>
+          <div class="bg-red-50 border rounded-lg p-3 text-center">
+            <div class="text-2xl font-bold text-red-600">{{ batchDeleteResult.failed_count }}</div>
+            <div class="text-sm text-gray-600">删除失败</div>
+          </div>
+        </div>
+        <div v-if="batchDeleteResult.errors.length > 0" class="mt-4">
+          <h4 class="text-sm font-medium mb-2">⚠️ 错误详情</h4>
+          <el-table :data="batchDeleteResult.errors" max-height="200" size="small">
+            <el-table-column prop="school_name" label="学校" width="200" />
+            <el-table-column prop="error" label="错误信息" />
+          </el-table>
+        </div>
+      </div>
+
+      <!-- 加载状态 -->
+      <div v-if="checkingRelations || deletingSchools" class="text-center py-8">
+        <el-icon class="is-loading text-4xl text-blue-600"><loading /></el-icon>
+        <p class="text-sm text-gray-600 mt-2">
+          {{ checkingRelations ? '正在检查关联数据...' : '正在删除学校...' }}
+        </p>
+      </div>
+
+      <template #footer>
+        <el-button
+          v-if="!batchDeleteResult"
+          @click="showBatchDeleteDialog = false"
+          :disabled="checkingRelations || deletingSchools"
+        >
+          取消
+        </el-button>
+        <el-button
+          v-if="schoolRelations.length > 0 && !batchDeleteResult"
+          type="primary"
+          @click="confirmBatchDelete"
+          :loading="deletingSchools"
+          :disabled="checkingRelations"
+          class="bg-red-600 hover:bg-red-700"
+        >
+          确认删除
+        </el-button>
+        <el-button
+          v-if="batchDeleteResult"
+          type="primary"
+          @click="showBatchDeleteDialog = false"
+        >
+          完成
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, UploadFilled, Upload, ArrowRight, ArrowLeft } from '@element-plus/icons-vue'
+import { Download, UploadFilled, Upload, ArrowRight, ArrowLeft, Loading } from '@element-plus/icons-vue'
 import type { UploadProps } from 'element-plus'
 import * as XLSX from 'xlsx'
 import { useToast } from '@/composables/useToast'
