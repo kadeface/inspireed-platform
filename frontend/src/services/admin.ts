@@ -777,8 +777,9 @@ export const adminService = {
     schoolIds: number[],
     cascadeDelete: boolean = false
   ): Promise<BatchDeleteSchoolsResponse> {
-    return await api.delete('/admin/organization/schools/batch', {
-      data: { school_ids: schoolIds, cascade_delete: cascadeDelete }
+    return await api.post('/admin/organization/schools/batch-delete', {
+      school_ids: schoolIds,
+      cascade_delete: cascadeDelete
     })
   }
 }
