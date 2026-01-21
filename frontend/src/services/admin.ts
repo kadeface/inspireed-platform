@@ -759,6 +759,27 @@ export const adminService = {
     return await api.post('/admin/organization/rooms/import', formData, {
       params: { update_existing: updateExisting }
     })
+  },
+
+  /**
+   * 检查学校关联数据
+   */
+  async checkSchoolRelations(
+    schoolIds: number[]
+  ): Promise<CheckSchoolRelationsResponse> {
+    return await api.post('/admin/organization/schools/check-relations', { school_ids: schoolIds })
+  },
+
+  /**
+   * 批量删除学校
+   */
+  async batchDeleteSchools(
+    schoolIds: number[],
+    cascadeDelete: boolean = false
+  ): Promise<BatchDeleteSchoolsResponse> {
+    return await api.delete('/admin/organization/schools/batch', {
+      data: { school_ids: schoolIds, cascade_delete: cascadeDelete }
+    })
   }
 }
 
