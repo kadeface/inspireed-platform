@@ -640,7 +640,7 @@
       <template #footer>
         <el-button
           v-if="!batchDeleteResult"
-          @click="showBatchDeleteDialog = false"
+          @click="closeBatchDeleteDialog"
           :disabled="checkingRelations || deletingSchools"
         >
           取消
@@ -658,7 +658,7 @@
         <el-button
           v-if="batchDeleteResult"
           type="primary"
-          @click="showBatchDeleteDialog = false"
+          @click="closeBatchDeleteDialog"
         >
           完成
         </el-button>
@@ -1203,6 +1203,75 @@ function updateSelectAllState() {
     isAllCurrentPageSelected.value = false
     isIndeterminate.value = true
   }
+}
+
+// 批量删除相关方法
+async function openBatchDeleteDialog() {
+  if (selectedSchoolIds.value.size === 0) {
+    ElMessage.warning('请先选择要删除的学校')
+    return
+  }
+
+  showBatchDeleteDialog.value = true
+  batchDeleteResult.value = null
+  cascadeDelete.value = false
+  schoolRelations.value = []
+
+  // 检查关联数据
+  await checkSchoolRelations()
+}
+
+async function checkSchoolRelations() {
+  checkingRelations.value = true
+
+  try {
+    const schoolIds = Array.from(selectedSchoolIds.value)
+    const response = await adminService.checkSchoolRelations(schoolIds)
+    schoolRelations.value = response.schools
+  } catch (error: any) {
+    console.error('检查关联数据失败:', error)
+    ElMessage.error(error.response?.data?.detail || '检查关联数据失败')
+    showBatchDeleteDialog.value = false
+  } finally {
+    checkingRelations.value = false
+  }
+}
+
+async function confirmBatchDelete() {
+  deletingSchools.value = true
+
+  try {
+    const schoolIds = Array.from(selectedSchoolIds.value)
+    const result = await adminService.batchDeleteSchools(schoolIds, cascadeDelete.value)
+
+    batchDeleteResult.value = result
+
+    if (result.deleted_count > 0) {
+      ElMessage.success(`成功删除 ${result.deleted_count} 所学校`)
+    }
+
+    if (result.failed_count > 0) {
+      ElMessage.warning(`${result.failed_count} 所学校删除失败`)
+    }
+
+    // 刷新学校列表
+    await loadSchools()
+
+    // 清空选择
+    clearSelection()
+  } catch (error: any) {
+    console.error('批量删除失败:', error)
+    ElMessage.error(error.response?.data?.detail || '批量删除失败')
+  } finally {
+    deletingSchools.value = false
+  }
+}
+
+function closeBatchDeleteDialog() {
+  showBatchDeleteDialog.value = false
+  schoolRelations.value = []
+  batchDeleteResult.value = null
+  cascadeDelete.value = false
 }
 
 // 初始化
