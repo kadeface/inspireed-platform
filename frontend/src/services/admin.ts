@@ -224,6 +224,33 @@ export interface ClassroomImportResponse {
   errors: ClassroomImportError[]
 }
 
+export interface SchoolRelationCheck {
+  school_id: number
+  school_name: string
+  has_relations: boolean
+  relations: {
+    classrooms: number
+    teachers_students: number
+  } | null
+}
+
+export interface BatchDeleteSchoolsError {
+  school_id: number
+  school_name: string
+  error: string
+}
+
+export interface BatchDeleteSchoolsResponse {
+  total_requested: number
+  deleted_count: number
+  failed_count: number
+  errors: BatchDeleteSchoolsError[]
+}
+
+export interface CheckSchoolRelationsResponse {
+  schools: SchoolRelationCheck[]
+}
+
 export interface Classroom {
   id: number
   name: string
