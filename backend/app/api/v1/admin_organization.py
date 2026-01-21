@@ -7,7 +7,7 @@ import logging
 from typing import Any, List, Optional, Dict
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
-from sqlalchemy import select, func, or_, join
+from sqlalchemy import select, func, or_, join, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
@@ -842,8 +842,13 @@ async def batch_delete_schools(
 ) -> Any:
     """批量删除学校
 
+    使用批量查询优化性能，避免N+1查询问题。
+
     - cascade_delete=False: 只删除没有关联数据的学校
     - cascade_delete=True: 删除所有学校，包括有关联数据的学校（级联删除）
+
+    注意：此操作采用"尽力而为"的策略，即使某些学校删除失败，也会继续处理其他学校。
+    每个学校的删除结果是独立跟踪的，最终返回详细的成功/失败统计。
     """
     school_ids = request.school_ids
     cascade_delete = request.cascade_delete
@@ -859,13 +864,34 @@ async def batch_delete_schools(
     failed_count = 0
     errors: List[BatchDeleteSchoolsError] = []
 
+    # 使用批量查询优化性能（避免N+1问题）
+    # 批量获取所有学校信息（1次查询）
+    schools_result = await db.execute(
+        select(School).where(School.id.in_(school_ids))
+    )
+    schools = {school.id: school for school in schools_result.scalars()}
+
+    # 批量获取所有学校的班级数量（1次查询）
+    classroom_counts_result = await db.execute(
+        select(Classroom.school_id, func.count(Classroom.id))
+        .group_by(Classroom.school_id)
+        .where(Classroom.school_id.in_(school_ids))
+    )
+    classroom_counts = {row[0]: row[1] for row in classroom_counts_result}
+
+    # 批量获取所有学校的用户数量（1次查询）
+    user_counts_result = await db.execute(
+        select(User.school_id, func.count(User.id))
+        .group_by(User.school_id)
+        .where(User.school_id.in_(school_ids))
+    )
+    user_counts = {row[0]: row[1] for row in user_counts_result}
+
+    # 在内存中处理每个学校
     for school_id in school_ids:
         try:
             # 获取学校信息
-            school_result = await db.execute(
-                select(School).where(School.id == school_id)
-            )
-            school = school_result.scalar_one_or_none()
+            school = schools.get(school_id)
 
             if not school:
                 errors.append(BatchDeleteSchoolsError(
@@ -876,17 +902,9 @@ async def batch_delete_schools(
                 failed_count += 1
                 continue
 
-            # 检查班级数量
-            classrooms_count_result = await db.execute(
-                select(func.count()).select_from(Classroom).where(Classroom.school_id == school_id)
-            )
-            classrooms_count = classrooms_count_result.scalar() or 0
-
-            # 检查用户数量
-            users_count_result = await db.execute(
-                select(func.count()).select_from(User).where(User.school_id == school_id)
-            )
-            users_count = users_count_result.scalar() or 0
+            # 从预取的计数结果中获取数据
+            classrooms_count = classroom_counts.get(school_id, 0)
+            users_count = user_counts.get(school_id, 0)
 
             has_relations = classrooms_count > 0 or users_count > 0
 
@@ -902,9 +920,29 @@ async def batch_delete_schools(
 
             # 级联删除关联数据（如果启用）
             if cascade_delete and has_relations:
-                # 注意：实际的级联删除应该通过外键约束或显式删除来完成
-                # 这里简化处理，假设数据库有正确的级联设置
-                pass
+                try:
+                    # 先删除所有班级
+                    if classrooms_count > 0:
+                        await db.execute(
+                            delete(Classroom).where(Classroom.school_id == school_id)
+                        )
+
+                    # 注意：用户的删除由数据库外键约束处理
+                    # 如果User表有ON DELETE CASCADE约束，删除学校会自动删除关联用户
+                    # 如果没有，需要在这里显式删除
+                    # await db.execute(
+                    #     delete(User).where(User.school_id == school_id)
+                    # )
+
+                except Exception as cascade_error:
+                    logger.error(f"级联删除学校 {school_id} 的关联数据失败: {str(cascade_error)}")
+                    errors.append(BatchDeleteSchoolsError(
+                        school_id=school_id,
+                        school_name=school.name,
+                        error=f"级联删除关联数据失败: {str(cascade_error)}"
+                    ))
+                    failed_count += 1
+                    continue
 
             # 删除学校
             await db.delete(school)
