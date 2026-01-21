@@ -759,6 +759,70 @@ async def delete_school(
     return {"message": "学校删除成功"}
 
 
+@router.post("/schools/check-relations")
+async def check_school_relations(
+    request: Dict[str, List[int]],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """检查学校的关联数据
+
+    返回每个学校的关联数据统计（班级、教师、学生）
+    """
+    school_ids = request.get("school_ids", [])
+
+    if not school_ids:
+        raise HTTPException(status_code=400, detail="必须提供学校ID列表")
+
+    # 限制批量操作的数量
+    if len(school_ids) > 1000:
+        raise HTTPException(status_code=400, detail="单次最多检查1000所学校")
+
+    results = []
+
+    for school_id in school_ids:
+        # 获取学校信息
+        school_result = await db.execute(
+            select(School).where(School.id == school_id)
+        )
+        school = school_result.scalar_one_or_none()
+
+        if not school:
+            results.append(SchoolRelationCheck(
+                school_id=school_id,
+                school_name=f"未知学校 (ID: {school_id})",
+                has_relations=False,
+                relations=None
+            ))
+            continue
+
+        # 检查班级数量
+        classrooms_count_result = await db.execute(
+            select(func.count()).select_from(Classroom).where(Classroom.school_id == school_id)
+        )
+        classrooms_count = classrooms_count_result.scalar() or 0
+
+        # 检查用户数量（教师+学生）
+        users_count_result = await db.execute(
+            select(func.count()).select_from(User).where(User.school_id == school_id)
+        )
+        users_count = users_count_result.scalar() or 0
+
+        has_relations = classrooms_count > 0 or users_count > 0
+
+        results.append(SchoolRelationCheck(
+            school_id=school_id,
+            school_name=school.name,
+            has_relations=has_relations,
+            relations={
+                "classrooms": classrooms_count,
+                "teachers_students": users_count  # 简化统计，不细分教师和学生
+            } if has_relations else None
+        ))
+
+    return {"schools": results}
+
+
 # ==================== School Import Endpoints ====================
 
 
