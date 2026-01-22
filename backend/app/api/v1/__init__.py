@@ -12,6 +12,7 @@ from app.api.v1 import (
     admin_organization,
     admin_rooms,
     admin_users,
+    analytics,
     auth,
     cells,
     chapters,
@@ -169,4 +170,7 @@ api_router.include_router(
 )
 api_router.include_router(
     teacher_positions.router, tags=["教师-职务类型管理"]
+)
+api_router.include_router(
+    analytics.router, prefix="/admin", tags=["评价-增值分析"]
 )
