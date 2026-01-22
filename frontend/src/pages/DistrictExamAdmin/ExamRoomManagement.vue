@@ -173,7 +173,11 @@
         <el-table-column prop="exam_number" label="考号" width="120" align="center" />
         <el-table-column prop="student_name" label="姓名" width="100" align="center" />
         <el-table-column prop="student_id_number" label="学籍号" width="180" align="center" />
-        <el-table-column prop="seat_number" label="座位号" width="80" align="center" />
+        <el-table-column prop="seat_number" label="座位号" width="80" align="center">
+          <template #default="{ row }">
+            {{ row.seat_number?.toString().padStart(2, '0') }}
+          </template>
+        </el-table-column>
         <el-table-column prop="school_id" label="学校ID" width="80" align="center" />
         <el-table-column prop="classroom_id" label="班级ID" width="80" align="center" />
       </el-table>
