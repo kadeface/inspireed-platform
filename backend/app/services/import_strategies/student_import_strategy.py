@@ -21,6 +21,7 @@ from app.models import (
     Grade,
     Classroom,
 )
+from app.utils.exam_number_generator import generate_exam_number, validate_exam_number_async
 from .base_strategy import BaseImportStrategy
 from ..import_exceptions import ValidationError, EntityNotFoundError
 
@@ -61,7 +62,7 @@ class StudentImportStrategy(BaseImportStrategy):
 
     REQUIRED_COLUMNS = [
         "region_name", "school_name", "full_name",
-        "student_id_number", "exam_number", "classroom_code"
+        "student_id_number", "classroom_code"
     ]
 
     def get_column_mapping(self) -> Dict[str, str]:
@@ -130,13 +131,8 @@ class StudentImportStrategy(BaseImportStrategy):
                 field="student_id_number"
             )
 
+        # exam_number is now optional - will be generated if not provided
         exam_number = record.get("exam_number")
-        if not exam_number:
-            raise ValidationError(
-                "考生号不能为空",
-                row_number=record.get("row_number"),
-                field="exam_number"
-            )
 
         classroom_code = record.get("classroom_code")
         if not classroom_code:
@@ -242,21 +238,53 @@ class StudentImportStrategy(BaseImportStrategy):
                 f"与导入的班级ID ({classroom.id}) 不匹配"
             )
 
-        # 6. Check if exam number mapping already exists
-        existing_mapping = await self.find_existing_mapping(
-            db, exam_id, exam_number
-        )
+        # 6. Generate exam number if not provided
+        if not exam_number:
+            # Generate exam number using school code, enrollment year, classroom code, and seat number
+            # Default seat_number to 1 if not available (can be updated later)
+            seat_number = getattr(student, 'seat_number', None) or 1
 
-        if existing_mapping:
-            # Update existing mapping
-            if existing_mapping.student_id != student.id:  # type: ignore
+            exam_number = generate_exam_number(
+                school_code=school.code,  # type: ignore
+                enrollment_year=classroom.enrollment_year or 2023,  # type: ignore
+                classroom_code=classroom.code or classroom_code,  # type: ignore
+                seat_number=seat_number
+            )
+
+            self.logger.info(
+                f"Generated exam number {exam_number} for student {student_id_number}"
+            )
+
+        # 7. Validate and handle conflicts (only if exam number is 12 digits)
+        # City exam numbers (10 digits) are accepted as-is without validation
+        if exam_number and len(exam_number) == 12 and exam_number.isdigit():
+            try:
+                exam_number = await validate_exam_number_async(db, exam_id, exam_number)
+            except ValueError as e:
                 raise ValidationError(
-                    f"考生号 '{exam_number}' 已被其他学生使用",
+                    f"考生号格式错误: {str(e)}",
                     row_number=row_number,
                     field="exam_number"
                 )
 
-            # Update redundant fields
+        # Note: After validation, we know the exam_number is unique
+        # So we don't need to check existing_mapping again
+
+        # 8. Check if student already has a mapping for this exam (by student_id)
+        existing_mapping = await db.execute(
+            select(ExamNumberMapping).where(
+                and_(
+                    ExamNumberMapping.exam_id == exam_id,
+                    ExamNumberMapping.student_id == student.id  # type: ignore
+                )
+            )
+        )
+        existing_mapping = existing_mapping.scalar_one_or_none()
+
+        if existing_mapping:
+            # Update existing mapping (this student already has a mapping for this exam)
+            # Update the exam number and related fields
+            existing_mapping.exam_number = exam_number  # type: ignore
             existing_mapping.student_id_number = student_id_number  # type: ignore
             existing_mapping.school_id = int(school.id)  # type: ignore
             existing_mapping.classroom_id = int(classroom.id)  # type: ignore
