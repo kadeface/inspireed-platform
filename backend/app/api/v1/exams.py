@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, and_
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, Query, File, UploadFile, Body
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from openpyxl import Workbook
@@ -57,6 +57,14 @@ class StudentImportResponse(BaseModel):
     updated: int = Field(0, description="更新的映射数")
     skipped: int = Field(0, description="跳过的映射数（已存在）")
     errors: List[StudentImportError] = Field(default_factory=list, description="错误列表")
+
+
+class ExamNumberGenerationResponse(BaseModel):
+    """考号生成响应"""
+
+    generated: int = Field(..., description="生成的考号数量")
+    conflicts: int = Field(..., description="解决的冲突数量")
+    exam_numbers: List[str] = Field(..., description="生成的考号列表（前10个预览）")
 
 
 @router.post("/", response_model=ExamResponse, status_code=status.HTTP_201_CREATED)
@@ -635,4 +643,165 @@ async def export_exam_numbers(
         path=temp_file.name,
         filename=filename,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+# ==================== 考号生成 ====================
+
+@router.post("/generate-exam-numbers", response_model=ExamNumberGenerationResponse)
+async def generate_exam_numbers(
+    exam_id: int = Body(..., embed=True, description="考试ID"),
+    school_id: int = Body(..., embed=True, description="学校ID"),
+    auto_generate: bool = Body(True, embed=True, description="是否自动生成考号"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    批量生成考号
+
+    为指定考试和学校的所有学生生成考号。
+
+    考号格式：school_code (4) + enrollment_year (4) + class_sequence (2) + seat_number (2)
+    总长度：12位数字
+
+    权限说明：
+    - 管理员、区县管理员、学校管理员可以生成考号
+
+    参数：
+    - exam_id: 考试ID
+    - school_id: 学校ID
+    - auto_generate: 是否自动生成（默认True）
+
+    返回：
+    - generated: 生成的考号数量
+    - conflicts: 解决的冲突数量
+    - exam_numbers: 生成的考号列表（前10个预览）
+    """
+    from app.utils.exam_number_generator import generate_exam_number, validate_exam_number_async
+
+    # 权限检查
+    if current_user.role not in [UserRole.ADMIN, UserRole.DISTRICT_ADMIN, UserRole.SCHOOL_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有管理员可以生成考号"
+        )
+
+    # 验证考试是否存在
+    exam = await db.get(Exam, exam_id)
+    if not exam:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="考试不存在"
+        )
+
+    # 验证学校是否存在
+    school = await db.get(School, school_id)
+    if not school:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="学校不存在"
+        )
+
+    logger.info(f"开始批量生成考号：考试ID={exam_id}, 学校ID={school_id}, 学校代码={school.code}")
+
+    # 获取该学校的所有学生
+    students_result = await db.execute(
+        select(UserModel).where(
+            UserModel.school_id == school_id,
+            UserModel.role == UserRole.STUDENT
+        )
+    )
+    students = students_result.scalars().all()
+
+    if not students:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"该学校没有学生数据"
+        )
+
+    logger.info(f"找到 {len(students)} 名学生")
+
+    generated_numbers = []
+    conflicts = 0
+    processed = 0
+
+    for student in students:
+        # 获取学生班级信息
+        if not student.classroom_id:
+            logger.warning(f"学生 {student.id} ({student.full_name}) 没有班级信息，跳过")
+            continue
+
+        classroom = await db.get(Classroom, student.classroom_id)
+        if not classroom:
+            logger.warning(f"学生 {student.id} 的班级 {student.classroom_id} 不存在，跳过")
+            continue
+
+        # 如果没有入学年份，使用当前年份
+        enrollment_year = classroom.enrollment_year if classroom.enrollment_year else datetime.now().year
+
+        # 如果没有班级代码，使用班级ID的后2位
+        classroom_code = classroom.code if classroom.code else f"{classroom.id:04d}"
+
+        # 生成考号（座位号默认为1，因为User模型没有seat_number字段）
+        # TODO: 未来可以从ExamRoomAssignment获取座位号
+        try:
+            exam_number = generate_exam_number(
+                school_code=school.code,
+                enrollment_year=enrollment_year,
+                classroom_code=classroom_code,
+                seat_number=1  # 默认座位号
+            )
+
+            # 验证并处理冲突
+            validated_number = await validate_exam_number_async(db, exam_id, exam_number)
+            if validated_number != exam_number:
+                conflicts += 1
+                logger.info(f"考号冲突：{exam_number} -> {validated_number}")
+
+            # 创建考号映射
+            # 检查是否已存在
+            existing_mapping = await db.execute(
+                select(ExamNumberMapping).where(
+                    ExamNumberMapping.exam_id == exam_id,
+                    ExamNumberMapping.student_id == student.id
+                )
+            )
+            existing = existing_mapping.scalar_one_or_none()
+
+            if existing:
+                # 更新现有映射
+                existing.exam_number = validated_number
+                existing.school_id = school_id
+                existing.classroom_id = classroom.id
+            else:
+                # 创建新映射
+                mapping = ExamNumberMapping(
+                    exam_id=exam_id,
+                    exam_number=validated_number,
+                    student_id=student.id,
+                    student_id_number=student.student_id_number or "",
+                    school_id=school_id,
+                    classroom_id=classroom.id
+                )
+                db.add(mapping)
+
+            generated_numbers.append(validated_number)
+            processed += 1
+
+        except ValueError as e:
+            logger.error(f"生成考号失败：学生 {student.id}, 错误：{str(e)}")
+            continue
+
+    # 提交所有更改
+    await db.commit()
+
+    logger.info(
+        f"考号生成完成：处理={processed}, 生成={len(generated_numbers)}, "
+        f"冲突={conflicts}, 学生总数={len(students)}"
+    )
+
+    return ExamNumberGenerationResponse(
+        generated=len(generated_numbers),
+        conflicts=conflicts,
+        exam_numbers=generated_numbers[:10]  # 返回前10个作为预览
     )
