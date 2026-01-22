@@ -4,7 +4,8 @@
 
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, Session, sessionmaker
+from sqlalchemy import create_engine
 
 from app.core.config import settings
 
@@ -18,10 +19,30 @@ engine = create_async_engine(
     max_overflow=20,
 )
 
-# 创建会话工厂
+# 创建会话工厂（异步）
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+
+# 创建同步引擎和会话工厂（用于迁移脚本等）
+# 将异步数据库URI转换为同步URI（postgresql+asyncpg:// -> postgresql://）
+sync_db_uri = str(settings.DATABASE_URI).replace("+asyncpg", "", 1)
+sync_engine = create_engine(
+    sync_db_uri,
+    echo=False,
+    future=True,
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+)
+
+SessionLocal = sessionmaker(
+    sync_engine,
+    class_=Session,
     expire_on_commit=False,
     autocommit=False,
     autoflush=False,
