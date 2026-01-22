@@ -12,6 +12,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User, UserRole, Region, School, Grade, Classroom
+from app.utils.username_generator import generate_username
 from .base_strategy import BaseImportStrategy
 from ..import_exceptions import ValidationError, EntityNotFoundError
 
@@ -300,8 +301,11 @@ class StudentAccountImportStrategy(BaseImportStrategy):
                 field="classroom_code",
             )
 
-        # 4. Check if student already exists
+        # 4. Generate username using new utility
         student_id_number = validated_data["student_id_number"]
+        username = generate_username(school.code, student_id_number)
+
+        # 5. Check if student already exists
         existing_student = await self.find_student(db, student_id_number)
 
         if existing_student:
@@ -311,6 +315,7 @@ class StudentAccountImportStrategy(BaseImportStrategy):
                 existing_student.school_id = school_id
                 existing_student.grade_id = int(grade.id)
                 existing_student.classroom_id = int(classroom.id)
+                existing_student.username = username  # Update username
 
                 # Update email if provided
                 if validated_data.get("email"):
@@ -333,21 +338,9 @@ class StudentAccountImportStrategy(BaseImportStrategy):
                 }
         else:
             # Create new student account
-            student_id_number = validated_data["student_id_number"]
             full_name = validated_data["full_name"]
 
-            # Generate username if not provided
-            username = validated_data.get("username")
-            if not username:
-                # Use student_id_number as username
-                username = student_id_number
-
-            # Check if username already exists
-            existing_username = await self.find_user_by_username(db, username)
-            if existing_username:
-                # Generate unique username
-                username = f"{student_id_number}_user"
-
+            # Use generated username (ignore username from Excel if provided)
             # Generate email if not provided
             email = validated_data.get("email")
             if not email:
