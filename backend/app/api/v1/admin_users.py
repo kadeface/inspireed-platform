@@ -1901,3 +1901,52 @@ async def unified_import(
         created_user_count=len(created_users),
         added_member_count=len(added_members),
     )
+
+
+@router.get("/check-username")
+async def check_username_availability(
+    school_code: str = Query(..., description="4-digit school code"),
+    student_id_number: str = Query(..., description="18-digit student ID number"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """
+    Check username availability and generate username
+
+    Args:
+        school_code: 4-digit school code
+        student_id_number: 18-digit student ID number
+
+    Returns:
+        - available: boolean - whether the username is available
+        - username: generated username
+        - conflicts: list of conflicting usernames (if any)
+
+    Example:
+        GET /api/v1/admin/users/check-username?school_code=4401&student_id_number=110101200501011234
+
+        Response:
+        {
+            "available": true,
+            "username": "4401011234",
+            "conflicts": []
+        }
+    """
+    from app.utils.username_generator import generate_username
+
+    username = generate_username(school_code, student_id_number)
+
+    # Check if username already exists
+    existing = await db.execute(
+        select(User).where(User.username == username)
+    ).scalar_one_or_none()
+
+    conflicts = []
+    if existing:
+        conflicts.append(username)
+
+    return {
+        "available": len(conflicts) == 0,
+        "username": username,
+        "conflicts": conflicts
+    }
