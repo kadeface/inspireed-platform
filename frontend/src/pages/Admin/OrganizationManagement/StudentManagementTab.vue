@@ -129,6 +129,7 @@
             </th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">姓名</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">用户名</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学号</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学籍号</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">邮箱</th>
@@ -140,12 +141,12 @@
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <tr v-if="loading">
-            <td :colspan="10" class="px-6 py-4 text-center text-gray-500">
+            <td :colspan="11" class="px-6 py-4 text-center text-gray-500">
               加载中...
             </td>
           </tr>
           <tr v-else-if="students.length === 0">
-            <td :colspan="10" class="px-6 py-4 text-center text-gray-500">
+            <td :colspan="11" class="px-6 py-4 text-center text-gray-500">
               暂无学生数据
             </td>
           </tr>
@@ -162,6 +163,7 @@
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               {{ student.full_name || '-' }}
             </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.username }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.username }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.student_id_number || '-' }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.email }}</td>
