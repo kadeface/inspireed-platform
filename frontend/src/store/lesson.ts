@@ -203,24 +203,6 @@ export const useLessonStore = defineStore('lesson', () => {
     
     try {
       const lesson = await lessonService.fetchLessonById(id)
-      
-      // 调试日志：记录加载的数据
-      console.log('📥 加载教案:', {
-        lessonId: lesson.id,
-        title: lesson.title,
-        contentLength: lesson.content?.length || 0,
-        contentDetails: (lesson.content || []).map((cell: any, idx: number) => ({
-          index: idx,
-          id: cell?.id,
-          type: cell?.type,
-          order: cell?.order,
-          hasContent: !!cell?.content,
-        })),
-        contentPreview: lesson.content?.slice(0, 2) || [],
-        version: lesson.version,
-        updatedAt: lesson.updated_at,
-      })
-      
       currentLesson.value = lesson
       return lesson
     } catch (err: any) {
@@ -285,14 +267,6 @@ export const useLessonStore = defineStore('lesson', () => {
         const contentCells = Array.isArray(content)
           ? content
           : (content as any)?.sections?.flatMap((s: any) => s.cells || []) || []
-        // 调试日志
-        console.log('💾 保存教案:', {
-          lessonId: currentLesson.value.id,
-          title: updateData.title,
-          contentLength: contentCells.length,
-          hasSections: !Array.isArray(content) && !!(content as any)?.sections,
-          tags: updateData.tags,
-        })
 
         if (contentCells.length === 0 && !(content as any)?.sections?.length) {
           console.warn('⚠️ 警告：保存的教案 content 为空')
@@ -310,15 +284,6 @@ export const useLessonStore = defineStore('lesson', () => {
         const afterSaveCount = savedCells.length
         const afterSaveIds = savedCells.map((c: any) => c?.id).filter(Boolean)
 
-        console.log('✅ 保存成功，返回数据:', {
-          lessonId: savedLesson.id,
-          title: savedLesson.title,
-          contentLength: afterSaveCount,
-          hasSections: !Array.isArray(savedLesson.content) && !!(savedLesson.content as any)?.sections,
-          version: savedLesson.version,
-          updatedAt: savedLesson.updated_at,
-        })
-        
         // 检查保存前后数量是否一致
         if (beforeSaveCount !== afterSaveCount) {
           console.error('❌ 警告：保存前后 cell 数量不一致！', {

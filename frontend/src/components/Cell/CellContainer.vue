@@ -137,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch, inject, onMounted, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, nextTick, watch, inject, type ComputedRef, type Ref } from 'vue'
 import type { Cell } from '../../types/cell'
 import { CellType } from '../../types/cell'
 import TextCell from './TextCell.vue'
@@ -223,19 +223,6 @@ watch(() => finalSessionId.value, (newId, oldId) => {
     }
   }
 }, { immediate: true })
-
-// 组件挂载时输出初始状态
-onMounted(() => {
-  if (props.cell.type === 'activity') {
-    console.log('🔍 CellContainer (Activity) 已挂载:', {
-      cellId: props.cell.id,
-      finalSessionId: finalSessionId.value,
-      propsSessionId: props.sessionId,
-      injectedSessionIdValue: injectedSessionId?.value,
-      timestamp: new Date().toLocaleTimeString(),
-    })
-  }
-})
 
 // 计算最终的 lessonId：优先使用 props，否则从注入的 session 获取
 const finalLessonId = computed(() => {
