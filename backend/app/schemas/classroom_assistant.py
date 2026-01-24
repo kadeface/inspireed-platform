@@ -68,6 +68,16 @@ class ClassroomMembershipResponse(BaseModel):
         from_attributes = True
 
 
+class ClassroomMembershipListResponse(BaseModel):
+    """班级成员列表响应（分页）"""
+
+    members: List[ClassroomMembershipResponse] = Field(default_factory=list)
+    total: int
+    page: int
+    size: int
+    total_pages: int
+
+
 class ClassroomMemberBatchItem(BaseModel):
     """批量导入班级成员单项"""
 

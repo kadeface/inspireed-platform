@@ -35,6 +35,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # Database migrations
 cd backend
+source venv/bin/activate          # Activate virtual environment (REQUIRED before migration)
 alembic upgrade head              # Apply all migrations
 alembic revision --autogenerate -m "description"  # Create new migration
 alembic downgrade -1              # Rollback one migration

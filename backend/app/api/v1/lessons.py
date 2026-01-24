@@ -247,10 +247,16 @@ async def create_lesson(
         if chapter.is_active is False:
             raise HTTPException(status_code=400, detail="该章节已被禁用")
 
-    # 计算 cell_count
-    content_list = lesson_in.content if isinstance(lesson_in.content, list) else []
-    cell_count = len(content_list)
-    
+    # 计算 cell_count（支持旧格式 List 和新格式 {sections: [{cells:[]}]}）
+    if isinstance(lesson_in.content, dict) and "sections" in lesson_in.content:
+        cell_count = sum(
+            len(s.get("cells") or [])
+            for s in (lesson_in.content.get("sections") or [])
+        )
+    else:
+        content_list = lesson_in.content if isinstance(lesson_in.content, list) else []
+        cell_count = len(content_list)
+
     lesson = Lesson(
         title=lesson_in.title,
         description=lesson_in.description,
@@ -741,35 +747,54 @@ async def update_lesson(
 
     # 检查是否更新了内容（content字段）
     content_updated = False
+
+    def _content_cell_count(c: Any) -> int:
+        """计算 content 中的 cell 数量，支持 List[dict] 或 {sections:[{cells:[]}]}"""
+        if c is None:
+            return 0
+        if isinstance(c, list):
+            return len(c)
+        if isinstance(c, dict) and "sections" in c:
+            return sum(len(s.get("cells") or []) for s in (c.get("sections") or []))
+        return 0
+
     if "content" in update_data:
         old_content = lesson.content
         new_content = update_data["content"]
-        
-        # 确保 new_content 是列表类型
-        if new_content is not None and not isinstance(new_content, list):
+
+        # 支持两种格式：List[dict]（旧）或 { "sections": [ { "cells": [...] } ] }（新）
+        # 不要将 sections 格式错误地替换为 []，否则会导致所有 cell 丢失
+        if new_content is not None and not isinstance(new_content, list) and not (
+            isinstance(new_content, dict) and "sections" in new_content
+        ):
             logger.error(
-                f"❌ 教案 {lesson_id} content 字段类型错误: 期望 list，实际 {type(new_content)}"
+                f"❌ 教案 {lesson_id} content 字段类型错误: 期望 list 或 {{sections}}，实际 {type(new_content)}"
             )
-            # 尝试转换或使用空列表
             if isinstance(new_content, (str, bytes)):
                 try:
-                    new_content = json.loads(new_content)
-                except:
+                    parsed = json.loads(new_content)
+                    if isinstance(parsed, list) or (
+                        isinstance(parsed, dict) and "sections" in parsed
+                    ):
+                        new_content = parsed
+                    else:
+                        new_content = []
+                except Exception:
                     new_content = []
             else:
                 new_content = []
             update_data["content"] = new_content
-        
-        # 详细日志：记录保存前后的内容对比
-        old_count = len(old_content) if isinstance(old_content, list) else (0 if old_content is None else 0)
-        new_count = len(new_content) if isinstance(new_content, list) else (0 if new_content is None else 0)
+
+        # 详细日志：记录保存前后的内容对比（兼容 list 与 sections）
+        old_count = _content_cell_count(old_content)
+        new_count = _content_cell_count(new_content)
         logger.info(
             f"教案 {lesson_id} 内容更新详情: "
-            f"保存前长度={old_count}, "
-            f"保存后长度={new_count}"
+            f"保存前 cell 数={old_count}, "
+            f"保存后 cell 数={new_count}"
         )
-        
-        # 检查每个cell的详细信息并验证数据完整性（但不过滤，避免数据丢失）
+
+        # 检查每个 cell 的详细信息并验证数据完整性（支持 list 与 sections）
         if new_content and isinstance(new_content, list):
             cell_ids = []
             invalid_cells = []
@@ -843,62 +868,85 @@ async def update_lesson(
             )
             # 更新 update_data 中的 content
             update_data["content"] = new_content
-        
-        # 比较内容是否真正发生变化（简单比较长度和结构）
-        # 确保类型安全：old_content 和 new_content 都应该是列表或 None
-        old_content_list: list = old_content if isinstance(old_content, list) else ([] if old_content is None else [])
-        new_content_list: list = new_content if isinstance(new_content, list) else ([] if new_content is None else [])
-        
-        # 使用明确的比较方式避免类型检查问题
-        content_changed = bool(old_content_list != new_content_list)
+
+        elif isinstance(new_content, dict) and "sections" in new_content:
+            # 新格式 { sections: [ { cells: [...] } ] }：对每个 section 的 cells 做校验与补全
+            import uuid as _uuid
+            for sec in new_content.get("sections") or []:
+                cells = sec.get("cells") or []
+                invalid_cells = []
+                for idx, cell in enumerate(cells):
+                    if not isinstance(cell, dict):
+                        if hasattr(cell, "__dict__"):
+                            cells[idx] = cell.__dict__
+                            cell = cells[idx]
+                        elif hasattr(cell, "model_dump"):
+                            cells[idx] = cell.model_dump()
+                            cell = cells[idx]
+                        else:
+                            invalid_cells.append(idx)
+                            continue
+                    if not cell.get("id"):
+                        cell["id"] = str(_uuid.uuid4())
+                    if not cell.get("type"):
+                        cell["type"] = "text"
+                for idx in reversed(invalid_cells):
+                    cells.pop(idx)
+                sec["cells"] = cells
+            logger.info(
+                f"教案 {lesson_id} 准备保存 sections 格式, 共 {_content_cell_count(new_content)} 个 cells"
+            )
+
+        # 比较内容是否真正发生变化（兼容 list 与 {sections}）
+        content_changed = (old_content != new_content)
         if content_changed:
             content_updated = True
-            
-            # 如果数量不一致，记录警告
-            old_count = len(old_content_list)
-            new_count = len(new_content_list)
-            if old_count != new_count:
+            oc, nc = _content_cell_count(old_content), _content_cell_count(new_content)
+            if oc != nc:
                 logger.warning(
-                    f"⚠️ 教案 {lesson_id} 内容数量变化: {old_count} -> {new_count}"
+                    f"⚠️ 教案 {lesson_id} 内容 cell 数变化: {oc} -> {nc}"
                 )
 
     # 更新字段
     for field, value in update_data.items():
-        # 对于 content 字段，确保它是列表类型
+        # 对于 content 字段：支持 list 或 {sections}，仅对非法类型做修复
         if field == "content":
-            if value is not None and not isinstance(value, list):
+            if value is not None and not isinstance(value, list) and not (
+                isinstance(value, dict) and "sections" in value
+            ):
                 logger.error(
                     f"❌ 教案 {lesson_id} 在设置 content 字段时类型错误: "
-                    f"期望 list，实际 {type(value)}"
+                    f"期望 list 或 {{sections}}，实际 {type(value)}"
                 )
-                # 尝试修复
                 if isinstance(value, (str, bytes)):
                     try:
                         value = json.loads(value)
-                    except:
+                        if not isinstance(value, list) and not (
+                            isinstance(value, dict) and "sections" in value
+                        ):
+                            value = []
+                    except Exception:
                         value = []
                 else:
                     value = []
-            # 确保 content 是列表（即使是空列表）
             if value is None:
                 value = []
             logger.info(
-                f"教案 {lesson_id} 设置 content 字段: 类型={type(value)}, 长度={len(value) if isinstance(value, list) else 'N/A'}"
+                f"教案 {lesson_id} 设置 content 字段: 类型={type(value)}, "
+                f"cell 数={_content_cell_count(value)}"
             )
         setattr(lesson, field, value)
-        
-        # 验证设置后的值
+
         if field == "content":
             set_value = getattr(lesson, field, None)
             logger.info(
                 f"教案 {lesson_id} 设置后验证: content类型={type(set_value)}, "
-                f"长度={len(set_value) if isinstance(set_value, list) else 'N/A'}"
+                f"cell 数={_content_cell_count(set_value)}"
             )
 
-    # 如果更新了内容，自动更新 cell_count
+    # 如果更新了内容，自动更新 cell_count（兼容 list 与 {sections}）
     if content_updated:
-        content_list = lesson.content if isinstance(lesson.content, list) else []
-        cell_count = len(content_list)
+        cell_count = _content_cell_count(lesson.content)
         setattr(lesson, "cell_count", cell_count)
         logger.info(f"教案 {lesson_id} 更新 cell_count: {cell_count}")
     

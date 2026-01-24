@@ -96,12 +96,13 @@ docs/_build/
 site/
 
 # Documentation Files (exclude from git)
-docs/
+# Allow docs/plans/ for design documents
+!docs/plans/
+docs/_build/
 *_SUMMARY.md
 *_GUIDE.md
 *_REPORT.md
 *_COMPLETE.md
-*_DESIGN.md
 *_QUICKSTART.md
 *_PROGRESS.md
 *_TEST*.md
@@ -133,4 +134,7 @@ GIT_*.md
 .cache/
 *.cache
 .parcel-cache/
+
+# Git Worktrees
+.worktrees/
 

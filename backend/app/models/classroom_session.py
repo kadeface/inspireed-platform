@@ -40,6 +40,13 @@ class ClassSession(Base):
     # 关联信息
     lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
     classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=False, index=True)
+    room_id = Column(
+        Integer,
+        ForeignKey("rooms.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Physical room ID where the session takes place",
+    )
     teacher_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # 会话状态
@@ -85,6 +92,7 @@ class ClassSession(Base):
     # 关联关系
     lesson = relationship("Lesson", foreign_keys=[lesson_id])
     classroom = relationship("Classroom", foreign_keys=[classroom_id])
+    room = relationship("Room", foreign_keys=[room_id])
     teacher = relationship("User", foreign_keys=[teacher_id])
     current_cell = relationship("Cell", foreign_keys=[current_cell_id])
     participations = relationship(

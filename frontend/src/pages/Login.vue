@@ -605,6 +605,10 @@ async function handleSubmit() {
       let targetPath = ''
       if (userRole === UserRole.ADMIN || userRole === 'admin') {
         targetPath = '/admin'
+      } else if (userRole === UserRole.DISTRICT_ADMIN || userRole === 'district_admin') {
+        targetPath = '/district-admin/exam-management'
+      } else if (userRole === UserRole.SCHOOL_ADMIN || userRole === 'school_admin') {
+        targetPath = '/school-admin'
       } else if (userRole === UserRole.TEACHER || userRole === 'teacher') {
         targetPath = '/teacher'
       } else if (userRole === UserRole.STUDENT || userRole === 'student') {

@@ -43,6 +43,7 @@ export interface User {
   username: string
   email: string
   full_name?: string | null
+  student_id_number?: string | null
   role: string
   is_active: boolean
   created_at: string
@@ -68,6 +69,7 @@ export interface UserListResponse {
 export interface UserCreate {
   username: string
   full_name?: string | null
+  student_id_number?: string | null
   email: string
   password: string
   role: string
@@ -82,6 +84,7 @@ export interface UserUpdate {
   username?: string
   email?: string
   full_name?: string | null
+  student_id_number?: string | null
   role?: string
   is_active?: boolean
   region_id?: number | null
@@ -179,6 +182,75 @@ export interface SchoolListResponse {
   total_pages: number
 }
 
+export interface SchoolType {
+  name: string
+  school_count: number
+}
+
+export interface SchoolTypeListResponse {
+  school_types: SchoolType[]
+}
+
+export interface SchoolImportError {
+  row: number
+  field?: string | null
+  message: string
+}
+
+export interface SchoolImportResponse {
+  total: number
+  success: number
+  failed: number
+  created_regions: number
+  created_schools: number
+  updated_schools: number
+  skipped_schools: number
+  errors: SchoolImportError[]
+}
+
+export interface ClassroomImportError {
+  row: number
+  field?: string | null
+  message: string
+}
+
+export interface ClassroomImportResponse {
+  total: number
+  success: number
+  failed: number
+  created: number
+  updated: number
+  skipped: number
+  errors: ClassroomImportError[]
+}
+
+export interface SchoolRelationCheck {
+  school_id: number
+  school_name: string
+  has_relations: boolean
+  relations: {
+    classrooms: number
+    teachers_students: number
+  } | null
+}
+
+export interface BatchDeleteSchoolsError {
+  school_id: number
+  school_name: string
+  error: string
+}
+
+export interface BatchDeleteSchoolsResponse {
+  total_requested: number
+  deleted_count: number
+  failed_count: number
+  errors: BatchDeleteSchoolsError[]
+}
+
+export interface CheckSchoolRelationsResponse {
+  schools: SchoolRelationCheck[]
+}
+
 export interface Classroom {
   id: number
   name: string
@@ -187,6 +259,7 @@ export interface Classroom {
   code?: string | null
   enrollment_year?: number | null
   head_teacher_id?: number | null
+  capacity?: number | null
   is_active: boolean
   description?: string | null
   created_at: string
@@ -199,6 +272,94 @@ export interface ClassroomListResponse {
   page: number
   size: number
   total_pages: number
+}
+
+// ==================== 课室管理 (物理教室) ====================
+
+export interface Room {
+  id: number
+  name: string
+  code?: string | null
+  school_id: number
+  building?: string | null
+  floor?: number | null
+  room_type: string
+  capacity?: number | null
+  equipment?: string[] | null
+  assigned_classroom_id?: number | null
+  is_active: boolean
+  description?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RoomCreate {
+  name: string
+  code?: string | null
+  school_id: number
+  building?: string | null
+  floor?: number | null
+  room_type: string
+  capacity?: number | null
+  equipment?: string[] | null
+  assigned_classroom_id?: number | null
+  is_active?: boolean
+  description?: string | null
+}
+
+export interface RoomUpdate {
+  name?: string
+  code?: string | null
+  school_id?: number
+  building?: string | null
+  floor?: number | null
+  room_type?: string
+  capacity?: number | null
+  equipment?: string[] | null
+  assigned_classroom_id?: number | null
+  is_active?: boolean
+  description?: string | null
+}
+
+export interface RoomResponse {
+  id: number
+  name: string
+  code?: string | null
+  school_id: number
+  building?: string | null
+  floor?: number | null
+  room_type: string
+  capacity?: number | null
+  equipment?: string[] | null
+  assigned_classroom_id?: number | null
+  is_active: boolean
+  description?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RoomListResponse {
+  rooms: RoomResponse[]
+  total: number
+  page: number
+  size: number
+  total_pages: number
+}
+
+export interface RoomImportError {
+  row: number
+  field?: string | null
+  message: string
+}
+
+export interface RoomImportResponse {
+  total: number
+  success: number
+  failed: number
+  created: number
+  updated: number
+  skipped: number
+  errors: RoomImportError[]
 }
 
 export const adminService = {
@@ -254,6 +415,65 @@ export const adminService = {
    */
   async deleteUser(userId: number): Promise<void> {
     return await api.delete(`/admin/users/${userId}`)
+  },
+
+  /**
+   * 批量删除用户
+   */
+  async batchDeleteUsers(userIds: number[]): Promise<{
+    message: string
+    deleted_count: number
+    total_requested: number
+    failed_count?: number
+    failed_users?: Array<{ id: number; username: string; error: string }>
+  }> {
+    return await api.post('/admin/users/batch-delete', userIds)
+  },
+
+  /**
+   * 预览按条件批量删除的用户
+   */
+  async previewBatchDeleteByFilter(filters: {
+    role: string
+    region_id?: number
+    school_id?: number
+    grade_id?: number
+    classroom_id?: number
+    confirm?: boolean
+  }): Promise<{
+    total_count: number
+    preview_users: Array<{
+      id: number
+      username: string
+      full_name?: string
+      email: string
+      school_name?: string
+      grade_name?: string
+      classroom_name?: string
+    }>
+    showing: number
+    message: string
+  }> {
+    return await api.post('/admin/users/batch-delete-by-filter/preview', filters)
+  },
+
+  /**
+   * 按条件批量删除用户（支持大规模删除）
+   */
+  async batchDeleteByFilter(filters: {
+    role: string
+    region_id?: number
+    school_id?: number
+    grade_id?: number
+    classroom_id?: number
+    confirm: boolean
+  }): Promise<{
+    message: string
+    deleted_count: number
+    exam_mappings_deleted: number
+    exam_room_students_deleted: number
+  }> {
+    return await api.post('/admin/users/batch-delete-by-filter', filters)
   },
 
   /**
@@ -397,6 +617,29 @@ export const adminService = {
   },
 
   /**
+   * 获取所有学校类型（学段）
+   * 从数据库动态获取所有不重复的 school_type 值
+   */
+  async getSchoolTypes(): Promise<SchoolTypeListResponse> {
+    return await api.get('/admin/organization/school-types')
+  },
+
+  /**
+   * 批量导入学校
+   */
+  async importSchools(
+    file: File,
+    autoCreateRegion: boolean = true
+  ): Promise<SchoolImportResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+    // 注意：不要手动设置Content-Type，api.ts中的拦截器会自动处理FormData
+    return await api.post('/admin/organization/schools/import', formData, {
+      params: { auto_create_region: autoCreateRegion },
+    })
+  },
+
+  /**
    * 获取班级列表
    */
   async getClassrooms(params: {
@@ -404,6 +647,8 @@ export const adminService = {
     size?: number
     school_id?: number
     grade_id?: number
+    region_id?: number
+    school_type?: string
     is_active?: boolean
     search?: string
   } = {}): Promise<ClassroomListResponse> {
@@ -429,6 +674,113 @@ export const adminService = {
    */
   async deleteClassroom(classroomId: number): Promise<void> {
     return await api.delete(`/admin/organization/classrooms/${classroomId}`)
+  },
+
+  /**
+   * 批量导入班级
+   */
+  async importClassrooms(
+    file: File,
+    schoolId?: number,
+    regionId?: number,
+    updateExisting: boolean = false,
+    enrollmentYear?: number,
+    capacity?: number
+  ): Promise<ClassroomImportResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+    // 注意：不要手动设置Content-Type，api.ts中的拦截器会自动处理FormData
+    const params: Record<string, any> = {
+      update_existing: updateExisting
+    }
+    if (schoolId) params.school_id = schoolId
+    if (regionId) params.region_id = regionId
+    if (enrollmentYear) params.enrollment_year = enrollmentYear
+    if (capacity) params.capacity = capacity
+
+    return await api.post('/admin/organization/classrooms/import', formData, {
+      params
+    })
+  },
+
+  // ==================== 课室管理 (物理教室) ====================
+
+  /**
+   * 获取课室列表
+   */
+  async getRooms(params: {
+    page?: number
+    size?: number
+    school_id?: number
+    room_type?: string
+    building?: string
+    search?: string
+  } = {}): Promise<RoomListResponse> {
+    return await api.get('/admin/organization/rooms', { params })
+  },
+
+  /**
+   * 获取课室详情
+   */
+  async getRoom(roomId: number): Promise<RoomResponse> {
+    return await api.get(`/admin/organization/rooms/${roomId}`)
+  },
+
+  /**
+   * 创建课室
+   */
+  async createRoom(roomData: RoomCreate): Promise<RoomResponse> {
+    return await api.post('/admin/organization/rooms', roomData)
+  },
+
+  /**
+   * 更新课室
+   */
+  async updateRoom(roomId: number, roomData: RoomUpdate): Promise<RoomResponse> {
+    return await api.put(`/admin/organization/rooms/${roomId}`, roomData)
+  },
+
+  /**
+   * 删除课室
+   */
+  async deleteRoom(roomId: number): Promise<{ message: string }> {
+    return await api.delete(`/admin/organization/rooms/${roomId}`)
+  },
+
+  /**
+   * 批量导入课室
+   */
+  async importRooms(
+    file: File,
+    updateExisting: boolean = false
+  ): Promise<RoomImportResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return await api.post('/admin/organization/rooms/import', formData, {
+      params: { update_existing: updateExisting }
+    })
+  },
+
+  /**
+   * 检查学校关联数据
+   */
+  async checkSchoolRelations(
+    schoolIds: number[]
+  ): Promise<CheckSchoolRelationsResponse> {
+    return await api.post('/admin/organization/schools/check-relations', { school_ids: schoolIds })
+  },
+
+  /**
+   * 批量删除学校
+   */
+  async batchDeleteSchools(
+    schoolIds: number[],
+    cascadeDelete: boolean = false
+  ): Promise<BatchDeleteSchoolsResponse> {
+    return await api.post('/admin/organization/schools/batch-delete', {
+      school_ids: schoolIds,
+      cascade_delete: cascadeDelete
+    })
   }
 }
 

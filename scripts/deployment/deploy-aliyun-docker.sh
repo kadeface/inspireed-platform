@@ -152,10 +152,18 @@ echo "2. 查看日志: docker-compose -f docker-compose.prod.yml logs -f"
 echo "3. 配置 Nginx 反向代理（如果需要域名访问）"
 echo "4. 配置 SSL 证书（生产环境）"
 echo ""
+# 检测是否使用 HTTPS（部署脚本默认使用 https）
+USE_HTTPS=${USE_HTTPS:-true}
+PROTOCOL="https"
+if [[ "$USE_HTTPS" == "false" ]]; then
+    PROTOCOL="http"
+fi
+
+SERVER_IP=$(hostname -I | awk '{print $1}')
 echo "🌐 访问地址："
-echo "   - 前端: http://$(hostname -I | awk '{print $1}')"
-echo "   - 后端 API: http://$(hostname -I | awk '{print $1}'):8000"
-echo "   - API 文档: http://$(hostname -I | awk '{print $1}'):8000/docs"
+echo "   - 前端: ${PROTOCOL}://${SERVER_IP}"
+echo "   - 后端 API: ${PROTOCOL}://${SERVER_IP}:8000"
+echo "   - API 文档: ${PROTOCOL}://${SERVER_IP}:8000/docs"
 echo ""
 echo "📚 详细文档: docs/deployment/ALIYUN_DEPLOYMENT_GUIDE.md"
 

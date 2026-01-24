@@ -185,6 +185,11 @@ sleep 5
 # 创建日志目录
 mkdir -p logs
 
+# 检测是否使用 HTTPS（通过环境变量或检测是否为公网环境）
+# 如果 USE_HTTPS 环境变量设置为 true，则使用 https
+# 如果检测到公网 IP，则使用 https
+USE_HTTPS=${USE_HTTPS:-false}
+
 # 获取本机 IP 地址
 get_local_ip() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -199,7 +204,43 @@ get_local_ip() {
     fi
 }
 
+# 检测是否为私有 IP
+is_private_ip() {
+    local ip=$1
+    if [[ -z "$ip" ]]; then
+        return 0  # 空值视为私有
+    fi
+    # 私有 IP 段：10.x.x.x, 192.168.x.x, 172.16-31.x.x, 127.x.x.x
+    if [[ "$ip" =~ ^10\. ]] || \
+       [[ "$ip" =~ ^192\.168\. ]] || \
+       [[ "$ip" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
+       [[ "$ip" =~ ^127\. ]]; then
+        return 0  # 是私有 IP
+    fi
+    return 1  # 不是私有 IP（可能是公网 IP）
+}
+
+# 获取公网 IP（用于判断是否为互联网部署）
+get_public_ip() {
+    if command -v curl &> /dev/null; then
+        curl -s --max-time 2 ifconfig.me 2>/dev/null || \
+        curl -s --max-time 2 ipinfo.io/ip 2>/dev/null || echo ""
+    else
+        echo ""
+    fi
+}
+
 LOCAL_IP=$(get_local_ip)
+PUBLIC_IP=$(get_public_ip)
+
+# 判断是否使用 HTTPS
+PROTOCOL="http"
+if [[ "$USE_HTTPS" == "true" ]]; then
+    PROTOCOL="https"
+elif [[ ! -z "$PUBLIC_IP" ]] && ! is_private_ip "$PUBLIC_IP"; then
+    # 如果获取到公网 IP 且不是私有 IP，说明是互联网部署，使用 https
+    PROTOCOL="https"
+fi
 
 echo ""
 echo "🎉 服务启动完成！"
@@ -207,21 +248,32 @@ echo ""
 echo "📱 访问地址："
 echo ""
 echo "   【本机访问】"
-echo "   前端应用: http://localhost:5173"
-echo "   后端API: http://localhost:8000"
-echo "   API文档: http://localhost:8000/docs"
+echo "   前端应用: ${PROTOCOL}://localhost:5173"
+echo "   后端API: ${PROTOCOL}://localhost:8000"
+echo "   API文档: ${PROTOCOL}://localhost:8000/docs"
 
 if [ ! -z "$LOCAL_IP" ]; then
     echo ""
-    echo "   【局域网访问】（其他设备使用这些地址）"
-    echo "   前端应用: http://$LOCAL_IP:5173"
-    echo "   后端API: http://$LOCAL_IP:8000"
-    echo "   API文档: http://$LOCAL_IP:8000/docs"
+    if is_private_ip "$LOCAL_IP"; then
+        echo "   【局域网访问】（其他设备使用这些地址）"
+        echo "   前端应用: ${PROTOCOL}://$LOCAL_IP:5173"
+        echo "   后端API: ${PROTOCOL}://$LOCAL_IP:8000"
+        echo "   API文档: ${PROTOCOL}://$LOCAL_IP:8000/docs"
+    else
+        echo "   【公网访问】"
+        echo "   前端应用: ${PROTOCOL}://$LOCAL_IP:5173"
+        echo "   后端API: ${PROTOCOL}://$LOCAL_IP:8000"
+        echo "   API文档: ${PROTOCOL}://$LOCAL_IP:8000/docs"
+    fi
     echo ""
     echo "   💡 提示："
-    echo "   - 确保设备连接到同一局域网"
+    if [[ "$PROTOCOL" == "https" ]]; then
+        echo "   - 当前使用 HTTPS 协议（互联网部署模式）"
+    else
+        echo "   - 确保设备连接到同一局域网"
+    fi
     echo "   - 防火墙需允许 5173 和 8000 端口"
-    echo "   - 移动设备可访问: http://$LOCAL_IP:5173"
+    echo "   - 移动设备可访问: ${PROTOCOL}://$LOCAL_IP:5173"
 fi
 
 echo ""

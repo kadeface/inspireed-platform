@@ -31,9 +31,9 @@
         <h2 class="text-xl font-semibold">课程体系树</h2>
         <div class="flex gap-2">
           <label class="flex items-center">
-            <input 
-              v-model="includeInactive" 
-              type="checkbox" 
+            <input
+              v-model="includeInactive"
+              type="checkbox"
               class="mr-2"
               @change="loadCurriculumTree"
             />
@@ -458,7 +458,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import curriculumService from '@/services/curriculum'
-import type { CurriculumTree, Subject, Grade, Course, CourseCreate, CourseUpdate } from '@/types/curriculum'
+import type { CurriculumTree, Subject, SubjectTreeNode, Grade, GradeTreeNode, Course, CourseCreate, CourseUpdate } from '@/types/curriculum'
 import CourseFormModal from './CourseFormModal.vue'
 import UploadResourceModal from '@/components/Admin/UploadResourceModal.vue'
 import ImportChaptersModal from '@/components/Curriculum/ImportChaptersModal.vue'

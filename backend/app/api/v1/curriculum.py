@@ -13,8 +13,12 @@ from app.models import User, Subject, Grade, Course, Lesson, UserRole, Chapter
 from app.schemas.curriculum import (
     SubjectResponse,
     SubjectToggle,
+    SubjectCreate,
+    SubjectUpdate,
     GradeResponse,
     GradeToggle,
+    GradeCreate,
+    GradeUpdate,
     CourseCreate,
     CourseUpdate,
     CourseResponse,
@@ -125,6 +129,109 @@ async def toggle_subject(
     return subject
 
 
+@router.post("/subjects", response_model=SubjectResponse, status_code=201)
+async def create_subject(
+    subject_in: SubjectCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> Any:
+    """创建学科 (仅管理员)"""
+    # 检查学科名称是否已存在
+    existing_name = await db.execute(
+        select(Subject).where(Subject.name == subject_in.name)
+    )
+    if existing_name.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="学科名称已存在")
+
+    # 检查学科代码是否已存在
+    existing_code = await db.execute(
+        select(Subject).where(Subject.code == subject_in.code)
+    )
+    if existing_code.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="学科代码已存在")
+
+    # 创建学科
+    subject = Subject(**subject_in.model_dump())
+    db.add(subject)
+    await db.commit()
+    await db.refresh(subject)
+    return subject
+
+
+@router.put("/subjects/{subject_id}", response_model=SubjectResponse)
+async def update_subject(
+    subject_id: int,
+    subject_in: SubjectUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> Any:
+    """更新学科 (仅管理员)"""
+    result = await db.execute(select(Subject).where(Subject.id == subject_id))
+    subject = result.scalar_one_or_none()
+
+    if not subject:
+        raise HTTPException(status_code=404, detail="学科不存在")
+
+    # 检查学科名称是否与其他学科冲突
+    if subject_in.name is not None:
+        existing_name = await db.execute(
+            select(Subject).where(
+                Subject.name == subject_in.name,
+                Subject.id != subject_id
+            )
+        )
+        if existing_name.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="学科名称已存在")
+
+    # 检查学科代码是否与其他学科冲突
+    if subject_in.code is not None:
+        existing_code = await db.execute(
+            select(Subject).where(
+                Subject.code == subject_in.code,
+                Subject.id != subject_id
+            )
+        )
+        if existing_code.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="学科代码已存在")
+
+    # 更新学科
+    update_data = subject_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(subject, field, value)
+
+    await db.commit()
+    await db.refresh(subject)
+    return subject
+
+
+@router.delete("/subjects/{subject_id}", status_code=204)
+async def delete_subject(
+    subject_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> None:
+    """删除学科 (仅管理员)"""
+    result = await db.execute(select(Subject).where(Subject.id == subject_id))
+    subject = result.scalar_one_or_none()
+
+    if not subject:
+        raise HTTPException(status_code=404, detail="学科不存在")
+
+    # 检查是否有关联的课程
+    course_count = await db.execute(
+        select(func.count()).select_from(Course).where(Course.subject_id == subject_id)
+    )
+    courses = course_count.scalar() or 0
+    if courses > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"该学科下有 {courses} 个课程，无法删除。请先删除所有相关课程。"
+        )
+
+    await db.delete(subject)
+    await db.commit()
+
+
 # ==================== Grade Endpoints ====================
 
 
@@ -174,6 +281,109 @@ async def toggle_grade(
     await db.commit()
     await db.refresh(grade)
     return grade
+
+
+@router.post("/grades", response_model=GradeResponse, status_code=201)
+async def create_grade(
+    grade_in: GradeCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> Any:
+    """创建年级 (仅管理员)"""
+    # 检查年级名称是否已存在
+    existing_name = await db.execute(
+        select(Grade).where(Grade.name == grade_in.name)
+    )
+    if existing_name.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="年级名称已存在")
+
+    # 检查年级级别是否已存在
+    existing_level = await db.execute(
+        select(Grade).where(Grade.level == grade_in.level)
+    )
+    if existing_level.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="该年级级别已存在")
+
+    # 创建年级
+    grade = Grade(**grade_in.model_dump())
+    db.add(grade)
+    await db.commit()
+    await db.refresh(grade)
+    return grade
+
+
+@router.put("/grades/{grade_id}", response_model=GradeResponse)
+async def update_grade(
+    grade_id: int,
+    grade_in: GradeUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> Any:
+    """更新年级 (仅管理员)"""
+    result = await db.execute(select(Grade).where(Grade.id == grade_id))
+    grade = result.scalar_one_or_none()
+
+    if not grade:
+        raise HTTPException(status_code=404, detail="年级不存在")
+
+    # 检查年级名称是否与其他年级冲突
+    if grade_in.name is not None:
+        existing_name = await db.execute(
+            select(Grade).where(
+                Grade.name == grade_in.name,
+                Grade.id != grade_id
+            )
+        )
+        if existing_name.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="年级名称已存在")
+
+    # 检查年级级别是否与其他年级冲突
+    if grade_in.level is not None:
+        existing_level = await db.execute(
+            select(Grade).where(
+                Grade.level == grade_in.level,
+                Grade.id != grade_id
+            )
+        )
+        if existing_level.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="该年级级别已存在")
+
+    # 更新年级
+    update_data = grade_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(grade, field, value)
+
+    await db.commit()
+    await db.refresh(grade)
+    return grade
+
+
+@router.delete("/grades/{grade_id}", status_code=204)
+async def delete_grade(
+    grade_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> None:
+    """删除年级 (仅管理员)"""
+    result = await db.execute(select(Grade).where(Grade.id == grade_id))
+    grade = result.scalar_one_or_none()
+
+    if not grade:
+        raise HTTPException(status_code=404, detail="年级不存在")
+
+    # 检查是否有关联的课程
+    course_count = await db.execute(
+        select(func.count()).select_from(Course).where(Course.grade_id == grade_id)
+    )
+    courses = course_count.scalar() or 0
+    if courses > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"该年级下有 {courses} 个课程，无法删除。请先删除所有相关课程。"
+        )
+
+    await db.delete(grade)
+    await db.commit()
 
 
 # ==================== Course Endpoints ====================

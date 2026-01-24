@@ -211,16 +211,98 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'admin', title: '课程管理 - InspireEd' },
   },
   {
+    path: '/admin/settings',
+    name: 'AdminSettings',
+    component: () => import('../pages/Admin/SystemSettings.vue'),
+    meta: { requiresAuth: true, role: 'admin', title: '系统设置 - InspireEd' },
+  },
+  // TODO: 废弃路由，保留向后兼容，未来版本将移除
+  {
     path: '/admin/users',
-    name: 'AdminUsers',
-    component: () => import('../pages/Admin/UserManagement.vue'),
-    meta: { requiresAuth: true, role: 'admin', title: '用户管理 - InspireEd' },
+    redirect: '/admin/settings',
+    meta: { requiresAuth: true, role: 'admin' },
   },
   {
     path: '/admin/organization',
     name: 'AdminOrganization',
     component: () => import('../pages/Admin/OrganizationManagement.vue'),
     meta: { requiresAuth: true, role: 'admin', title: '组织管理 - InspireEd' },
+  },
+  // 考试管理与增值评价系统 - 区县考试管理员
+  {
+    path: '/district-admin',
+    redirect: '/district-admin/exam-management',
+  },
+  // === 考试管理（操作环节） ===
+  {
+    path: '/district-admin/exam-management',
+    name: 'DistrictExamManagementPage',
+    component: () => import('../pages/DistrictExamAdmin/Dashboard.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '考试管理 - InspireEd' },
+  },
+  {
+    path: '/district-admin/semesters',
+    name: 'DistrictSemesterManagement',
+    component: () => import('../pages/DistrictExamAdmin/SemesterManagement.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '学期管理 - InspireEd' },
+  },
+  {
+    path: '/district-admin/exam-list',
+    name: 'DistrictExamList',
+    component: () => import('../pages/DistrictExamAdmin/ExamManagement.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '考试列表 - InspireEd' },
+  },
+  {
+    path: '/district-admin/exam-list/:examId/rooms',
+    name: 'DistrictExamRoomManagement',
+    component: () => import('../pages/DistrictExamAdmin/ExamRoomManagement.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '考场管理 - InspireEd' },
+  },
+  {
+    path: '/district-admin/student-import',
+    name: 'DistrictStudentImport',
+    component: () => import('../pages/DistrictExamAdmin/StudentImport.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '导入考生信息 - InspireEd' },
+  },
+  {
+    path: '/district-admin/score-import',
+    name: 'DistrictScoreImport',
+    component: () => import('../pages/DistrictExamAdmin/ScoreImport.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '导入成绩 - InspireEd' },
+  },
+
+  // === 数据中心 ===
+  {
+    path: '/district-admin/data-center',
+    name: 'DataCenter',
+    component: () => import('../pages/DistrictExamAdmin/DataCenter.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '数据中心 - InspireEd' },
+  },
+
+  // === 增值评价（分析环节） ===
+  {
+    path: '/district-admin/value-added',
+    name: 'ValueAddedEvaluation',
+    component: () => import('../pages/DistrictExamAdmin/ValueAddedEvaluation.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '增值评价 - InspireEd' },
+  },
+  {
+    path: '/district-admin/evaluation-report',
+    name: 'DistrictEvaluationReport',
+    component: () => import('../pages/DistrictExamAdmin/EvaluationReport.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '评价报告 - InspireEd' },
+  },
+  {
+    path: '/district-admin/semester-performance',
+    name: 'DistrictSemesterPerformance',
+    component: () => import('../pages/DistrictExamAdmin/SemesterPerformance.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '学期表现 - InspireEd' },
+  },
+  {
+    path: '/district-admin/exam-subject-config',
+    name: 'DistrictExamSubjectConfig',
+    component: () => import('../pages/DistrictExamAdmin/ExamSubjectConfig.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '考试科目配置 - InspireEd' },
   },
 ]
 

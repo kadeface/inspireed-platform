@@ -35,6 +35,7 @@ from app.schemas.classroom_assistant import (
     ClassroomMembershipCreate,
     ClassroomMembershipUpdate,
     ClassroomMembershipResponse,
+    ClassroomMembershipListResponse,
     ClassroomMemberBatchImportRequest,
     ClassroomMemberBatchImportResponse,
     AttendanceSessionCreate,
@@ -243,18 +244,20 @@ async def get_my_classrooms(
     return classrooms
 
 
-@router.get("/classrooms/{classroom_id}/members", response_model=List[ClassroomMembershipResponse])
+@router.get("/classrooms/{classroom_id}/members", response_model=ClassroomMembershipListResponse)
 async def get_classroom_members(
     classroom_id: int,
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(10, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """获取班级所有成员列表（管理员可直接访问，否则需要是班级成员）"""
+    """获取班级成员列表（分页，管理员可直接访问，否则需要是班级成员）"""
     # 检查班级是否存在
     classroom = await db.get(Classroom, classroom_id)
     if not classroom:
         raise HTTPException(status_code=404, detail="班级不存在")
-    
+
     # 管理员可以直接访问，否则需要检查是否是班级成员
     is_admin = isinstance(current_user.role, UserRole) and cast(UserRole, current_user.role) == UserRole.ADMIN
     if not is_admin:
@@ -262,8 +265,20 @@ async def get_classroom_members(
         membership = await get_classroom_membership(db, cast(int, current_user.id), classroom_id)
         if not membership:
             raise HTTPException(status_code=403, detail="您不是该班级的成员")
-    
-    # 查询班级成员列表
+
+    # 获取总数
+    count_query = select(func.count()).select_from(ClassroomMembership).where(
+        ClassroomMembership.classroom_id == classroom_id,
+        ClassroomMembership.is_active == True,
+    )
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # 计算总页数
+    total_pages = (total + size - 1) // size if total > 0 else 0
+
+    # 查询班级成员列表（分页）
+    offset = (page - 1) * size
     result = await db.execute(
         select(ClassroomMembership)
         .options(selectinload(ClassroomMembership.user))
@@ -272,6 +287,8 @@ async def get_classroom_members(
             ClassroomMembership.is_active == True,
         )
         .order_by(asc(ClassroomMembership.role_in_class), asc(ClassroomMembership.seat_no), asc(ClassroomMembership.created_at))
+        .offset(offset)
+        .limit(size)
     )
     memberships = result.scalars().all()
 
@@ -285,8 +302,14 @@ async def get_classroom_members(
             response_dict["user_email"] = m.user.email
             response_dict["user_username"] = m.user.username
         responses.append(ClassroomMembershipResponse(**response_dict))
-    
-    return responses
+
+    return ClassroomMembershipListResponse(
+        members=responses,
+        total=total,
+        page=page,
+        size=size,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/classrooms/{classroom_id}/students", response_model=List[StudentInfo])

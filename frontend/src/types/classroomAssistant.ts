@@ -122,6 +122,14 @@ export interface ClassroomMembershipUpdate {
   cadreTitle?: string | null
 }
 
+export interface ClassroomMembershipListResponse {
+  members: ClassroomMembership[]
+  total: number
+  page: number
+  size: number
+  totalPages: number
+}
+
 export interface ClassroomMemberBatchItem {
   // 用户匹配字段（至少提供一个）
   userId?: number | null

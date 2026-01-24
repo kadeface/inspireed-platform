@@ -21,6 +21,12 @@ class Subject(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     display_order = Column(Integer, default=0, nullable=False)
 
+    # 分数线配置（用于增值评价）
+    full_score = Column(Integer, nullable=True, default=100, comment="满分")
+    pass_line = Column(Integer, nullable=True, default=60, comment="及格线")
+    excellent_line = Column(Integer, nullable=True, default=85, comment="优秀线")
+    good_line = Column(Integer, nullable=True, default=75, comment="良好线")
+
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(

@@ -112,11 +112,15 @@ done
 # 返回项目根目录
 cd "$SCRIPT_DIR" || exit 1
 
+# 检测是否使用 HTTPS（生产环境默认使用 https）
+# 如果 USE_HTTPS 环境变量设置为 false，则使用 http（用于本地测试）
+USE_HTTPS=${USE_HTTPS:-true}
+
 # 获取服务器 IP 地址
 get_server_ip() {
     if command -v curl &> /dev/null; then
         # 尝试从外部服务获取公网 IP
-        curl -s ifconfig.me 2>/dev/null || curl -s ipinfo.io/ip 2>/dev/null || echo ""
+        curl -s --max-time 2 ifconfig.me 2>/dev/null || curl -s --max-time 2 ipinfo.io/ip 2>/dev/null || echo ""
     elif command -v hostname &> /dev/null; then
         hostname -I | awk '{print $1}' 2>/dev/null || echo ""
     else
@@ -126,23 +130,30 @@ get_server_ip() {
 
 SERVER_IP=$(get_server_ip)
 
+# 判断协议：生产环境公网访问使用 https，本地访问使用 http
+PROTOCOL_LOCAL="http"
+PROTOCOL_PUBLIC="https"
+if [[ "$USE_HTTPS" == "false" ]]; then
+    PROTOCOL_PUBLIC="http"
+fi
+
 echo ""
 echo "🎉 生产环境服务启动完成！"
 echo ""
 echo "📱 访问地址："
 echo ""
 echo "   【本地访问】"
-echo "   前端应用: http://localhost"
-echo "   后端API: http://localhost:8000"
-echo "   API文档: http://localhost:8000/docs"
-echo "   MinIO控制台: http://localhost:9001 (minioadmin/minioadmin)"
+echo "   前端应用: ${PROTOCOL_LOCAL}://localhost"
+echo "   后端API: ${PROTOCOL_LOCAL}://localhost:8000"
+echo "   API文档: ${PROTOCOL_LOCAL}://localhost:8000/docs"
+echo "   MinIO控制台: ${PROTOCOL_LOCAL}://localhost:9001 (minioadmin/minioadmin)"
 
 if [ ! -z "$SERVER_IP" ]; then
     echo ""
     echo "   【公网访问】（如果已配置）"
-    echo "   前端应用: http://$SERVER_IP"
-    echo "   后端API: http://$SERVER_IP:8000"
-    echo "   API文档: http://$SERVER_IP:8000/docs"
+    echo "   前端应用: ${PROTOCOL_PUBLIC}://$SERVER_IP"
+    echo "   后端API: ${PROTOCOL_PUBLIC}://$SERVER_IP:8000"
+    echo "   API文档: ${PROTOCOL_PUBLIC}://$SERVER_IP:8000/docs"
 fi
 
 echo ""
