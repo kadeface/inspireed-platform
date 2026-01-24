@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.lesson import LessonStatus
@@ -32,54 +32,43 @@ class LessonBase(BaseModel):
     tags: Optional[List[str]] = None
 
 
+def _validate_content_cells(v: Any) -> Any:
+    """验证 content：支持 List[dict]（旧格式）或 dict 含 sections（新格式）"""
+    import logging
+    logger = logging.getLogger(__name__)
+    if v is None:
+        return []
+    # 新格式：{ "sections": [ { id, name, type, order, cells: [...] } ] }
+    if isinstance(v, dict) and "sections" in v:
+        return v
+    if not isinstance(v, list):
+        logger.warning(f"Content 既不是列表也不是 sections 对象: {type(v)}")
+        return []
+    original_length = len(v)
+    valid_cells = []
+    for idx, cell in enumerate(v):
+        if cell is None or not isinstance(cell, dict):
+            if cell is not None:
+                logger.warning(f"Cell[{idx}] 类型无效: {type(cell)}")
+            continue
+        valid_cells.append(cell)
+    if len(valid_cells) != original_length:
+        logger.warning(f"⚠️ Content 过滤了 {original_length - len(valid_cells)} 个无效 cell")
+    return valid_cells
+
+
 class LessonCreate(LessonBase):
     """教案创建Schema"""
 
     course_id: int = Field(..., description="所属课程ID")
     chapter_id: Optional[int] = Field(None, description="所属章节ID")
-    content: List[dict] = Field(default_factory=list)
+    content: Union[List[dict], dict] = Field(default_factory=list)
     national_resource_id: Optional[str] = None
-    
+
     @field_validator("content", mode="before")
     @classmethod
-    def validate_content(cls, v):
-        """验证 content 字段，确保所有 cell 都是有效的字典"""
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        if v is None:
-            return []
-        
-        if not isinstance(v, list):
-            logger.warning(f"Content 不是列表类型: {type(v)}")
-            return []
-        
-        # 记录原始长度
-        original_length = len(v)
-        
-        # 验证每个 cell
-        valid_cells = []
-        for idx, cell in enumerate(v):
-            if cell is None:
-                logger.warning(f"Cell[{idx}] 是 None，将被跳过")
-                continue
-            
-            if not isinstance(cell, dict):
-                logger.warning(
-                    f"Cell[{idx}] 不是字典类型: type={type(cell)}, value={cell}"
-                )
-                continue
-            
-            valid_cells.append(cell)
-        
-        # 如果有 cell 被过滤，记录警告
-        if len(valid_cells) != original_length:
-            logger.warning(
-                f"⚠️ LessonCreate Content 验证时过滤了 {original_length - len(valid_cells)} 个无效 cell: "
-                f"{original_length} -> {len(valid_cells)}"
-            )
-        
-        return valid_cells
+    def validate_content(cls, v: Any) -> Any:
+        return _validate_content_cells(v)
 
 
 class LessonUpdate(BaseModel):
@@ -89,51 +78,17 @@ class LessonUpdate(BaseModel):
     description: Optional[str] = None
     course_id: Optional[int] = Field(None, description="所属课程ID")
     chapter_id: Optional[int] = Field(None, description="所属章节ID")
-    content: Optional[List[dict]] = None
+    content: Optional[Union[List[dict], dict]] = None
     tags: Optional[List[str]] = None
     status: Optional[LessonStatus] = None
     cover_image_url: Optional[str] = Field(None, description="封面图片URL")
-    
+
     @field_validator("content", mode="before")
     @classmethod
-    def validate_content(cls, v):
-        """验证 content 字段，确保所有 cell 都是有效的字典"""
-        import logging
-        logger = logging.getLogger(__name__)
-        
+    def validate_content(cls, v: Any) -> Any:
         if v is None:
             return None
-        
-        if not isinstance(v, list):
-            logger.warning(f"Content 不是列表类型: {type(v)}")
-            return []
-        
-        # 记录原始长度
-        original_length = len(v)
-        
-        # 验证每个 cell
-        valid_cells = []
-        for idx, cell in enumerate(v):
-            if cell is None:
-                logger.warning(f"Cell[{idx}] 是 None，将被跳过")
-                continue
-            
-            if not isinstance(cell, dict):
-                logger.warning(
-                    f"Cell[{idx}] 不是字典类型: type={type(cell)}, value={cell}"
-                )
-                continue
-            
-            valid_cells.append(cell)
-        
-        # 如果有 cell 被过滤，记录警告
-        if len(valid_cells) != original_length:
-            logger.warning(
-                f"⚠️ LessonUpdate Content 验证时过滤了 {original_length - len(valid_cells)} 个无效 cell: "
-                f"{original_length} -> {len(valid_cells)}"
-            )
-        
-        return valid_cells
+        return _validate_content_cells(v)
 
 
 class LessonResponse(LessonBase):
@@ -144,7 +99,7 @@ class LessonResponse(LessonBase):
     course_id: int
     chapter_id: Optional[int] = None
     status: LessonStatus
-    content: List[dict]
+    content: Union[List[dict], dict]  # 旧: List[dict]，新: { "sections": [...] }
     version: int
     parent_id: Optional[int] = None
     national_resource_id: Optional[str] = None
@@ -164,45 +119,9 @@ class LessonResponse(LessonBase):
 
     @field_validator("content", mode="before")
     @classmethod
-    def validate_content(cls, v):
-        """验证 content 字段，确保所有 cell 都是有效的字典"""
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        if v is None:
-            return []
-        
-        if not isinstance(v, list):
-            logger.warning(f"Content 不是列表类型: {type(v)}")
-            return []
-        
-        # 记录原始长度
-        original_length = len(v)
-        
-        # 验证每个 cell
-        valid_cells = []
-        for idx, cell in enumerate(v):
-            if cell is None:
-                logger.warning(f"Cell[{idx}] 是 None，将被跳过")
-                continue
-            
-            if not isinstance(cell, dict):
-                logger.warning(
-                    f"Cell[{idx}] 不是字典类型: type={type(cell)}, value={cell}"
-                )
-                continue
-            
-            valid_cells.append(cell)
-        
-        # 如果有 cell 被过滤，记录警告
-        if len(valid_cells) != original_length:
-            logger.warning(
-                f"⚠️ Content 验证时过滤了 {original_length - len(valid_cells)} 个无效 cell: "
-                f"{original_length} -> {len(valid_cells)}"
-            )
-        
-        return valid_cells
-    
+    def validate_content(cls, v: Any) -> Any:
+        return _validate_content_cells(v)
+
     @field_validator("status", mode="before")
     @classmethod
     def convert_status(cls, v):

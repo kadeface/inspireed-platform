@@ -5,6 +5,7 @@
 from app.models.user import User, UserRole, StudentType
 from app.models.lesson import Lesson, LessonStatus, DifficultyLevel, LessonClassroom
 from app.models.cell import Cell, CellType, CognitiveLevel
+from app.models.section import Section, SectionType
 from app.models.logs import ExecutionLog, QARecord, ExecutionStatus
 from app.models.curriculum import Subject, Grade, Course, Chapter, Resource
 from app.models.exam_subjects import GradeSubjectConfig
@@ -100,6 +101,8 @@ __all__ = [
     "Cell",
     "CellType",
     "CognitiveLevel",
+    "Section",
+    "SectionType",
     "ExecutionLog",
     "QARecord",
     "ExecutionStatus",

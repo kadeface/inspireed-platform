@@ -57,6 +57,9 @@ class Cell(Base):
     # 所属教案
     lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False)
 
+    # 所属大环节（可选，用于向后兼容）
+    section_id = Column(Integer, ForeignKey("sections.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Cell类型
     cell_type = Column(SQLEnum(CellType, name="celltype"), nullable=False)
 
@@ -102,6 +105,7 @@ class Cell(Base):
 
     # 关联关系
     lesson = relationship("Lesson", foreign_keys=[lesson_id])
+    section = relationship("Section", back_populates="cells")
     # execution_logs = relationship("ExecutionLog", back_populates="cell")
 
     def __repr__(self) -> str:

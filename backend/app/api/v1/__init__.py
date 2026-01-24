@@ -38,6 +38,7 @@ from app.api.v1 import (
     resources,
     reviews,
     scores,
+    sections,
     semesters,
     student_projects,
     subject_groups,
@@ -70,6 +71,7 @@ api_router.include_router(chapters.router, prefix="/chapters", tags=["章节"])
 api_router.include_router(resources.router, prefix="/resources", tags=["资源"])
 api_router.include_router(lessons.router, prefix="/lessons", tags=["教案"])
 api_router.include_router(cells.router, prefix="/cells", tags=["单元"])
+api_router.include_router(sections.router, prefix="", tags=["大环节"])
 api_router.include_router(activities.router, prefix="/activities", tags=["教学活动"])
 api_router.include_router(classroom_sessions.router, prefix="/classroom-sessions", tags=["课堂会话"])
 api_router.include_router(classroom_assistant.router, prefix="/classroom-assistant", tags=["班级教学助手"])

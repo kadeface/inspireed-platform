@@ -1,4 +1,5 @@
 import type { Cell } from './cell'
+import type { LessonContentWithSections } from './section'
 import type { Course, Chapter } from './curriculum'
 import type { Resource, ResourceType } from './resource'
 
@@ -27,7 +28,7 @@ export interface Lesson {
   course_id: number
   chapter_id?: number  // 所属章节ID
   status: LessonStatus
-  content: Cell[]
+  content: Cell[] | LessonContentWithSections
   version: number
   parent_id?: number
   national_resource_id?: string
@@ -74,7 +75,7 @@ export interface LessonUpdate {
   description?: string
   course_id?: number
   chapter_id?: number  // 所属章节ID
-  content?: Cell[]
+  content?: Cell[] | LessonContentWithSections
   tags?: string[]
   status?: LessonStatus
   cover_image_url?: string  // 封面图片URL

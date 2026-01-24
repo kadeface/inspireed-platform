@@ -128,6 +128,12 @@ class Lesson(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    sections = relationship(
+        "Section",
+        back_populates="lesson",
+        cascade="all, delete-orphan",
+        order_by="Section.order",
+    )
 
     def __repr__(self) -> str:
         return f"<Lesson(id={self.id}, title={self.title}, status={self.status})>"

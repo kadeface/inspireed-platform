@@ -9,6 +9,7 @@ import type {
 import type { Cell } from '../types/cell'
 import type { LessonListParams } from '../types/api'
 import { lessonService } from '../services/lesson'
+import { isContentWithSections, sectionsToContent } from '../utils/lessonContent'
 
 export const useLessonStore = defineStore('lesson', () => {
   const currentLesson = ref<Lesson | null>(null)
@@ -24,7 +25,15 @@ export const useLessonStore = defineStore('lesson', () => {
   const availableClassrooms = ref<LessonClassroom[]>([])
   const pendingReferenceMaterials = ref<LessonRelatedMaterial[]>([])
 
-  const cells = computed(() => currentLesson.value?.content || [])
+  const cells = computed(() => {
+    const c = currentLesson.value?.content
+    if (!c) return []
+    if (Array.isArray(c)) return c
+    if (c && typeof c === 'object' && 'sections' in c && Array.isArray((c as any).sections)) {
+      return (c as any).sections.flatMap((s: any) => s.cells || [])
+    }
+    return []
+  })
 
   function setCurrentLesson(lesson: Lesson) {
     currentLesson.value = lesson
@@ -35,44 +44,93 @@ export const useLessonStore = defineStore('lesson', () => {
   }
 
   function addCell(cell: Cell) {
-    if (currentLesson.value) {
-      currentLesson.value.content.push(cell)
+    if (!currentLesson.value) return
+    const content = currentLesson.value.content
+    if (Array.isArray(content)) {
+      content.push(cell)
+      return
+    }
+    if (isContentWithSections(content)) {
+      const sections = content.sections || []
+      const teaching = sections.find((s) => s.order === 1)
+      if (teaching) {
+        teaching.cells = teaching.cells || []
+        cell.order = teaching.cells.length
+        teaching.cells.push(cell)
+      } else {
+        const sec = {
+          id: 'sec-default-1',
+          name: '教学过程',
+          type: 'default' as const,
+          order: 1,
+          is_collapsed: false,
+          cells: [{ ...cell, order: 0 }],
+        }
+        sections.push(sec)
+        sections.sort((a, b) => a.order - b.order)
+      }
+      currentLesson.value.content = sectionsToContent(sections)
     }
   }
 
   function updateCell(cellId: string | number, updates: Partial<Cell>) {
-    if (currentLesson.value) {
-      const index = currentLesson.value.content.findIndex(
-        (c) => String(c.id) === String(cellId)
-      )
+    if (!currentLesson.value) return
+    const content = currentLesson.value.content
+    if (Array.isArray(content)) {
+      const index = content.findIndex((c) => String(c.id) === String(cellId))
       if (index !== -1) {
-        currentLesson.value.content[index] = {
-          ...currentLesson.value.content[index],
-          ...updates,
-        } as Cell
+        content[index] = { ...content[index], ...updates } as Cell
+      }
+      return
+    }
+    if (isContentWithSections(content)) {
+      const sections = content.sections || []
+      for (const sec of sections) {
+        const cells = sec.cells || []
+        const idx = cells.findIndex((c) => String(c.id) === String(cellId))
+        if (idx !== -1) {
+          cells[idx] = { ...cells[idx], ...updates } as Cell
+          currentLesson.value.content = sectionsToContent(sections)
+          return
+        }
       }
     }
   }
 
   function deleteCell(cellId: string | number) {
-    if (currentLesson.value) {
-      currentLesson.value.content = currentLesson.value.content.filter(
+    if (!currentLesson.value) return
+    const content = currentLesson.value.content
+    if (Array.isArray(content)) {
+      currentLesson.value.content = content.filter(
         (c) => String(c.id) !== String(cellId)
       )
+      return
+    }
+    if (isContentWithSections(content)) {
+      const sections = content.sections || []
+      for (const sec of sections) {
+        const before = (sec.cells || []).length
+        sec.cells = (sec.cells || []).filter(
+          (c) => String(c.id) !== String(cellId)
+        )
+        if (sec.cells.length !== before) {
+          currentLesson.value.content = sectionsToContent(sections)
+          return
+        }
+      }
     }
   }
 
   function reorderCells(fromIndex: number, toIndex: number) {
-    if (currentLesson.value) {
-      const cells = currentLesson.value.content
-      const [removed] = cells.splice(fromIndex, 1)
-      cells.splice(toIndex, 0, removed)
-      
-      // 更新order字段
-      cells.forEach((cell, index) => {
-        cell.order = index
-      })
-    }
+    if (!currentLesson.value) return
+    const content = currentLesson.value.content
+    if (!Array.isArray(content)) return // sections format: reorder not supported
+    const cells = content
+    const [removed] = cells.splice(fromIndex, 1)
+    cells.splice(toIndex, 0, removed)
+    cells.forEach((cell, index) => {
+      cell.order = index
+    })
   }
 
   function queueReferenceMaterial(material: LessonRelatedMaterial) {
@@ -206,68 +264,57 @@ export const useLessonStore = defineStore('lesson', () => {
       let savedLesson: Lesson
 
       if (currentLesson.value.id) {
-        // 更新现有教案
-        // 确保 content 字段存在且为数组
-        const content = Array.isArray(currentLesson.value.content) 
-          ? currentLesson.value.content 
+        // 更新现有教案；content 支持旧格式 Cell[] 或新格式 { sections: [...] }
+        const content = currentLesson.value.content !== undefined && currentLesson.value.content !== null
+          ? currentLesson.value.content
           : []
-        
+
         const updateData = {
           title: currentLesson.value.title,
           description: currentLesson.value.description,
-          content: content,  // 确保始终是数组
+          content,
           tags: currentLesson.value.tags || [],
           cover_image_url: currentLesson.value.cover_image_url,
         }
-        
+
         // 验证数据完整性
         if (!updateData.title) {
           throw new Error('教案标题不能为空')
         }
-        
-        // 调试日志：记录保存的数据
+
+        const contentCells = Array.isArray(content)
+          ? content
+          : (content as any)?.sections?.flatMap((s: any) => s.cells || []) || []
+        // 调试日志
         console.log('💾 保存教案:', {
           lessonId: currentLesson.value.id,
           title: updateData.title,
-          contentLength: updateData.content.length,
-          contentDetails: updateData.content.map((cell: any, idx: number) => ({
-            index: idx,
-            id: cell?.id,
-            type: cell?.type,
-            order: cell?.order,
-            hasContent: !!cell?.content,
-          })),
-          contentPreview: updateData.content.slice(0, 2),
+          contentLength: contentCells.length,
+          hasSections: !Array.isArray(content) && !!(content as any)?.sections,
           tags: updateData.tags,
         })
-        
-        // 如果 content 为空，给出警告但不阻止保存（可能是用户清空了所有内容）
-        if (updateData.content.length === 0) {
-          console.warn('⚠️ 警告：保存的教案 content 为空数组')
+
+        if (contentCells.length === 0 && !(content as any)?.sections?.length) {
+          console.warn('⚠️ 警告：保存的教案 content 为空')
         }
-        
-        // 验证保存前的内容完整性
-        const beforeSaveCount = updateData.content.length
-        const beforeSaveIds = updateData.content.map((c: any) => c?.id).filter(Boolean)
+
+        const beforeSaveCount = contentCells.length
+        const beforeSaveIds = contentCells.map((c: any) => c?.id).filter(Boolean)
         
         savedLesson = await lessonService.updateLesson(currentLesson.value.id, updateData)
         
-        // 调试日志：记录保存后的数据
-        const afterSaveCount = savedLesson.content?.length || 0
-        const afterSaveIds = (savedLesson.content || []).map((c: any) => c?.id).filter(Boolean)
-        
+        // 保存后的 content 可能是 Array 或 { sections }
+        const savedCells = Array.isArray(savedLesson.content)
+          ? savedLesson.content
+          : (savedLesson.content as any)?.sections?.flatMap((s: any) => s.cells || []) || []
+        const afterSaveCount = savedCells.length
+        const afterSaveIds = savedCells.map((c: any) => c?.id).filter(Boolean)
+
         console.log('✅ 保存成功，返回数据:', {
           lessonId: savedLesson.id,
           title: savedLesson.title,
           contentLength: afterSaveCount,
-          contentDetails: (savedLesson.content || []).map((cell: any, idx: number) => ({
-            index: idx,
-            id: cell?.id,
-            type: cell?.type,
-            order: cell?.order,
-            hasContent: !!cell?.content,
-          })),
-          contentPreview: savedLesson.content?.slice(0, 2) || [],
+          hasSections: !Array.isArray(savedLesson.content) && !!(savedLesson.content as any)?.sections,
           version: savedLesson.version,
           updatedAt: savedLesson.updated_at,
         })
@@ -297,10 +344,13 @@ export const useLessonStore = defineStore('lesson', () => {
       const wasPublished = currentLesson.value.status === 'published'
       const oldVersion = currentLesson.value.version || 1
       
-      // 保存本地 content 的副本（在服务器数据覆盖之前）
-      const localContent = currentLesson.value.content ? [...currentLesson.value.content] : []
-      const localContentLength = localContent.length
-      const savedContentLength = savedLesson.content?.length || 0
+      const localCells = Array.isArray(currentLesson.value.content)
+        ? currentLesson.value.content
+        : (currentLesson.value.content as any)?.sections?.flatMap((s: any) => s.cells || []) || []
+      const localContentLength = localCells.length
+      const savedContentLength = Array.isArray(savedLesson.content)
+        ? (savedLesson.content?.length || 0)
+        : ((savedLesson.content as any)?.sections?.flatMap((s: any) => s.cells || [])?.length || 0)
       
       // 检查服务器返回数据的完整性
       // 注意：不要直接覆盖 savedLesson.content，这会触发 watch 并导致死循环
