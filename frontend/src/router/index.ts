@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import LessonView from '../pages/Student/LessonView.vue'
+import Login from '../pages/Login.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -11,7 +12,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'Login',
-    component: () => import('../pages/Login.vue'),
+    component: Login,
     meta: { title: '登录 - InspireEd' },
   },
   {
