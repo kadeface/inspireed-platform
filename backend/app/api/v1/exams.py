@@ -724,6 +724,8 @@ async def generate_exam_numbers(
     generated_numbers = []
     conflicts = 0
     processed = 0
+    # Track exam numbers used in this batch to prevent duplicates
+    used_exam_numbers = set()
 
     for student in students:
         # 获取学生班级信息
@@ -756,7 +758,31 @@ async def generate_exam_numbers(
             validated_number = await validate_exam_number_async(db, exam_id, exam_number)
             if validated_number != exam_number:
                 conflicts += 1
-                logger.info(f"考号冲突：{exam_number} -> {validated_number}")
+                logger.info(f"考号冲突（数据库）：{exam_number} -> {validated_number}")
+
+            # 检查是否在当前批次中已使用此考号
+            if validated_number in used_exam_numbers:
+                # 考号在本批次中已被使用，添加后缀
+                suffix = 0
+                while True:
+                    suffix += 1
+                    new_number = f"{validated_number}{chr(64 + suffix)}"
+                    # 检查数据库和当前批次是否都可用
+                    if new_number not in used_exam_numbers:
+                        existing = await db.execute(
+                            select(ExamNumberMapping).where(
+                                ExamNumberMapping.exam_id == exam_id,
+                                ExamNumberMapping.exam_number == new_number
+                            )
+                        )
+                        if not existing.scalar_one_or_none():
+                            validated_number = new_number
+                            conflicts += 1
+                            logger.info(f"考号冲突（批次内）：{exam_number} -> {validated_number}")
+                            break
+
+            # 标记此考号为已使用
+            used_exam_numbers.add(validated_number)
 
             # 创建考号映射
             # 检查是否已存在
@@ -774,6 +800,23 @@ async def generate_exam_numbers(
                 existing.school_id = school_id
                 existing.classroom_id = classroom.id
             else:
+                # 创建新映射前，再次检查考号是否已被其他学生使用
+                existing_by_number_result = await db.execute(
+                    select(ExamNumberMapping).where(
+                        ExamNumberMapping.exam_id == exam_id,
+                        ExamNumberMapping.exam_number == validated_number
+                    )
+                )
+                existing_by_number = existing_by_number_result.scalar_one_or_none()
+
+                if existing_by_number:
+                    # 考号已被使用，记录警告并跳过
+                    logger.warning(
+                        f"考号 {validated_number} 已被学生 {existing_by_number.student_id} 使用，"
+                        f"跳过学生 {student.id}"
+                    )
+                    continue
+
                 # 创建新映射
                 mapping = ExamNumberMapping(
                     exam_id=exam_id,
@@ -791,6 +834,43 @@ async def generate_exam_numbers(
         except ValueError as e:
             logger.error(f"生成考号失败：学生 {student.id}, 错误：{str(e)}")
             continue
+        except Exception as e:
+            # 捕获其他异常（如唯一约束冲突）
+            if "duplicate key" in str(e) or "UniqueViolation" in str(e):
+                logger.warning(f"考号冲突：{validated_number}，尝试添加后缀")
+                # 添加后缀重试
+                suffix = 0
+                while True:
+                    suffix += 1
+                    new_number = f"{validated_number}{chr(64 + suffix)}"
+
+                    # 检查新考号是否可用
+                    existing = await db.execute(
+                        select(ExamNumberMapping).where(
+                            ExamNumberMapping.exam_id == exam_id,
+                            ExamNumberMapping.exam_number == new_number
+                        )
+                    ).scalar_one_or_none()
+
+                    if not existing:
+                        # 创建新映射
+                        mapping = ExamNumberMapping(
+                            exam_id=exam_id,
+                            exam_number=new_number,
+                            student_id=student.id,
+                            student_id_number=student.student_id_number or "",
+                            school_id=school_id,
+                            classroom_id=classroom.id
+                        )
+                        db.add(mapping)
+                        generated_numbers.append(new_number)
+                        conflicts += 1
+                        processed += 1
+                        logger.info(f"解决冲突：{validated_number} -> {new_number}")
+                        break
+            else:
+                logger.error(f"生成考号失败：学生 {student.id}, 错误：{str(e)}")
+                continue
 
     # 提交所有更改
     await db.commit()

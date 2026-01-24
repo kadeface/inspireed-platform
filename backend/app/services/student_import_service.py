@@ -234,9 +234,10 @@ class StudentImportService:
         # 去除空格
         code = str(classroom_code).strip()
 
-        # 匹配格式：前N位是年级，后M位是班级序号
-        # 例如：501, 1001, 1203
-        match = re.match(r'^(\d+)(\d{1,2})$', code)
+        # 匹配格式：前1-2位是年级，后2位是班级序号
+        # 例如：501, 0701, 1001, 1203
+        # 修复：使用非贪婪匹配确保班级部分始终是2位
+        match = re.match(r'^(\d{1,2})(\d{2})$', code)
         if not match:
             return None, None
 
