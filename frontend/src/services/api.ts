@@ -11,11 +11,7 @@ function getApiBaseUrl(): string {
   // 确保使用与当前页面相同的协议（HTTPS 或 HTTP）
   // 在 CloudStudio 中，前端通常是 HTTPS，后端也应该是 HTTPS
   const protocol = window.location.protocol
-  const port = window.location.port
-  
-  console.log('🔍 [API] 检测环境 - hostname:', hostname, 'protocol:', protocol, 'port:', port, 'full URL:', window.location.href)
-  console.log('🔍 [API] VITE_API_BASE_URL 环境变量:', import.meta.env.VITE_API_BASE_URL)
-  
+
   // 优先检测 Cloud Studio 环境：如果 hostname 包含 cloudstudio.club 或 coding.net
   // 后端端口通常是 8000，但需要通过 Cloud Studio 分配的 URL 访问
   // 这样可以避免环境变量中的 localhost 覆盖正确的 CloudStudio URL
@@ -82,13 +78,10 @@ function getApiBaseUrl(): string {
   // 如果页面是 HTTPS，也使用 HTTPS API
   const apiProtocol = protocol === 'https:' ? 'https:' : 'http:'
   const apiUrl = `${apiProtocol}//${hostname}:8000/api/v1`
-  console.log('📍 [API] 本地环境，使用后端地址:', apiUrl)
   return apiUrl
 }
 const API_BASE_URL = getApiBaseUrl()
 
-// 在控制台输出最终的 API 地址，方便调试
-console.log('🚀 [API] 最终使用的 API 基础地址:', API_BASE_URL)
 if (API_BASE_URL.startsWith('http://') && window.location.protocol === 'https:') {
   console.error('❌ [API] 警告：检测到混合内容问题！')
   console.error('   当前页面使用 HTTPS，但 API 地址使用 HTTP')
@@ -104,19 +97,15 @@ class ApiService {
     if (window.location.protocol === 'https:' && finalBaseURL.startsWith('http://')) {
       console.warn('⚠️ [API] 检测到混合内容，自动将 HTTP 转换为 HTTPS')
       finalBaseURL = finalBaseURL.replace('http://', 'https://')
-      console.log('✅ [API] 修正后的 API 地址:', finalBaseURL)
     }
-    
+
     // 在 CloudStudio 环境中，强制使用 HTTPS
     if ((window.location.hostname.includes('cloudstudio.club') || window.location.hostname.includes('coding.net')) && 
         finalBaseURL.startsWith('http://')) {
       console.warn('⚠️ [API] CloudStudio 环境强制使用 HTTPS')
       finalBaseURL = finalBaseURL.replace('http://', 'https://')
-      console.log('✅ [API] CloudStudio 环境修正后的 API 地址:', finalBaseURL)
     }
-    
-    console.log('🔧 [API] ApiService 构造函数 - 最终 baseURL:', finalBaseURL)
-    
+
     this.axiosInstance = axios.create({
       baseURL: finalBaseURL,
       timeout: 120000, // 增加到120秒，适应文档转换等长时间操作
