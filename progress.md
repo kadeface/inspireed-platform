@@ -20,6 +20,15 @@
 - Actions taken: -
 - Files created/modified: -
 
+### LessonEditorToast.vue 修复
+
+- **Status:** complete
+- **Actions:** 模板中 `show`/`type`/`message` 改为 `toast.show`/`toast.type`/`toast.message`
+- **Files modified:** `frontend/src/components/Lesson/LessonEditorToast.vue`
+- **Verification:** `pnpm run type-check` 通过，无 lint 报错
+
+---
+
 ## Test Results
 
 | 测试项 | 输入/操作 | 期望 | 实际 | 状态 |

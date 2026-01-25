@@ -97,6 +97,20 @@ frontend/src/
         └── LessonEditor.vue       # 目标约 800–1200 行
 ```
 
+## LessonEditorToast.vue 分析
+
+### 问题
+
+- **Props：** 仅有 `toast: ToastData`（`{ show, type, message }`）。
+- **模板：** 使用了 `show`、`type`、`message`，这三个名字在 script 中未定义，应从 `toast` 上读取。
+- **父组件：** `LessonEditor.vue` 使用 `<LessonEditorToast :toast="toast" @close="toast.show = false" />`，`toast` 符合 `ToastData`。
+
+### 修复
+
+在模板中统一改为：`toast.show`、`toast.type`、`toast.message`。
+
+---
+
 ## 数据流要点
 
 - **sections**：由 `useLessonEditorSections` 提供 ref，与 `currentLesson.content` 双向同步（normalizeContentToSections / sectionsToContent）。
