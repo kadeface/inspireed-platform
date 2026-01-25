@@ -86,6 +86,12 @@ uploads/
 *.swo
 *~
 
+# Generated Excel/Data Files
+exported_*.xlsx
+*_export.xlsx
+# Keep test templates
+!test_*.xlsx
+
 # OS Files
 .DS_Store
 Thumbs.db
@@ -137,4 +143,3 @@ GIT_*.md
 
 # Git Worktrees
 .worktrees/
-
