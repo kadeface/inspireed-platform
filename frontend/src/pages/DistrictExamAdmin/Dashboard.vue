@@ -102,7 +102,7 @@
     </el-row>
 
     <!-- 流程引导 (优化绑定学校显示) -->
-    <el-card class="workflow-section mb-10 text-left" shadow="sm">
+    <el-card class="workflow-section mb-10 text-left" shadow="hover">
       <template #header>
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
@@ -119,8 +119,8 @@
             </div>
           </div>
           <el-radio-group v-model="activeWorkflowTab" size="small">
-            <el-radio-button label="school">学校模式</el-radio-button>
-            <el-radio-button label="district">区县模式</el-radio-button>
+            <el-radio-button value="school">学校模式</el-radio-button>
+            <el-radio-button value="district">区县模式</el-radio-button>
           </el-radio-group>
         </div>
       </template>
@@ -166,7 +166,7 @@
     </el-card>
 
     <!-- 列表 -->
-    <el-card shadow="sm" class="text-left">
+    <el-card shadow="hover" class="text-left">
       <template #header
         ><div class="flex justify-between items-center">
           <h3 class="text-lg font-bold">考试档案列表</h3>
