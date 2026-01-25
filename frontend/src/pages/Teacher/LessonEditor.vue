@@ -1624,7 +1624,7 @@ onMounted(async () => {
             const pending = lessonStore.pendingReferenceMaterials
             const items = Array.isArray((pending as any)?.value) ? [...(pending as any).value] : []
             if ((pending as any)?.value) {
-              ;(pending as any).value = []
+              (pending as any).value = []
             }
             return items as LessonRelatedMaterial[]
           }

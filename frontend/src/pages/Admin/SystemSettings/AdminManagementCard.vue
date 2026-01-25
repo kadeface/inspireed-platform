@@ -70,17 +70,6 @@
       </div>
     </div>
 
-        <!-- 右侧操作按钮 -->
-        <div class="flex items-center gap-3">
-          <el-button @click="loadAdmins" :icon="Refresh">刷新</el-button>
-          <el-button type="success" @click="openImportDialog" :icon="Upload">批量导入</el-button>
-          <el-button type="primary" @click="openCreateAdminModal" :icon="Plus"
-            >添加管理员</el-button
-          >
-        </div>
-      </div>
-    </div>
-
     <!-- 管理员列表 -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
       <el-table

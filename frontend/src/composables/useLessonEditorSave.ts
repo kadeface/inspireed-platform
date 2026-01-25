@@ -38,7 +38,7 @@ export function useLessonEditorSave(
     if (!cur || isPreviewMode.value) return
     saveStatus.value = 'saving'
     try {
-      ;(cur as any).title = lessonTitle.value
+      (cur as any).title = lessonTitle.value
       ;(cur as any).content = sectionsToContent(sections.value)
       await lessonStore.saveCurrentLesson()
       saveStatus.value = 'saved'
@@ -116,7 +116,7 @@ export function useLessonEditorSave(
     }
     isSavingOnUnmount.value = true
     try {
-      ;(cur as any).title = lessonTitle.value
+      (cur as any).title = lessonTitle.value
       ;(cur as any).content = sectionsToContent(sections.value)
       await lessonStore.saveCurrentLesson()
       hasUnsavedChanges.value = false
@@ -136,7 +136,7 @@ export function useLessonEditorSave(
     if (!hasUnsavedChanges.value) return
     isSavingOnUnmount.value = true
     try {
-      ;(cur as any).title = lessonTitle.value
+      (cur as any).title = lessonTitle.value
       ;(cur as any).content = sectionsToContent(sections.value)
       await lessonStore.saveCurrentLesson()
       hasUnsavedChanges.value = false

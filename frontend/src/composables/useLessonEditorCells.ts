@@ -217,7 +217,7 @@ export function useLessonEditorCells(
       const arr = sections.value[i].cells ?? []
       const idx = arr.findIndex((c) => String(c.id) === String(cellId))
       if (idx > 0) {
-        ;[arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]
+        [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]
         arr.forEach((c, j) => { c.order = j })
         return
       }
@@ -229,7 +229,7 @@ export function useLessonEditorCells(
       const arr = sections.value[i].cells ?? []
       const idx = arr.findIndex((c) => String(c.id) === String(cellId))
       if (idx >= 0 && idx < arr.length - 1) {
-        ;[arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]
+        [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]
         arr.forEach((c, j) => { c.order = j })
         return
       }
