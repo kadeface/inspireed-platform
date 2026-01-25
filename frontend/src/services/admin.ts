@@ -38,6 +38,73 @@ export interface DashboardOverview {
   last_updated: string
 }
 
+export interface ExamStats {
+  totalExams: number
+  totalStudents: number
+  completedRate: number
+  pendingTasks: number
+}
+
+export interface ValueAddedStats {
+  totalReports: number
+  avgProgress: number
+  improvedSchools: number
+  excellentClasses: number
+}
+
+export interface StudentImprover {
+  id: number
+  name: string
+  school: string
+  class: string
+  improvement: number
+}
+
+export interface TopStudent {
+  id: number
+  name: string
+  school: string
+  class: string
+  score: number
+}
+
+export interface SubjectTopper {
+  subject: string
+  name: string
+  school: string
+  score: number
+}
+
+export interface StudentAchievements {
+  topImprovers: StudentImprover[]
+  topStudents: TopStudent[]
+  subjectToppers: SubjectTopper[]
+}
+
+export interface SchoolImproved {
+  id: number
+  name: string
+  improvement: number
+}
+
+export interface SchoolQuality {
+  id: number
+  name: string
+  avgScore: number
+}
+
+export interface SchoolValueAdded {
+  id: number
+  name: string
+  valueIndex: number
+}
+
+export interface SchoolHighlights {
+  topImprovedSchools: SchoolImproved[]
+  topQualitySchools: SchoolQuality[]
+  topValueAddedSchools: SchoolValueAdded[]
+}
+
 export interface User {
   id: number
   username: string
@@ -371,6 +438,83 @@ export const adminService = {
   },
 
   /**
+   * 获取考试统计数据 (Mock)
+   */
+  async getExamStats(): Promise<ExamStats> {
+    // 模拟API延迟
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return {
+      totalExams: 12,
+      totalStudents: 5420,
+      completedRate: 85,
+      pendingTasks: 3,
+    }
+  },
+
+  /**
+   * 获取增值评价统计数据 (Mock)
+   */
+  async getValueAddedStats(): Promise<ValueAddedStats> {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return {
+      totalReports: 24,
+      avgProgress: 8.5,
+      improvedSchools: 18,
+      excellentClasses: 45,
+    }
+  },
+
+  /**
+   * 获取优秀学生展示数据 (Mock)
+   */
+  async getStudentAchievements(): Promise<StudentAchievements> {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    return {
+      topImprovers: [
+        { id: 1, name: '张小明', school: '开平市第一中学', class: '高一(3)班', improvement: 15.2 },
+        { id: 2, name: '李华', school: '开平市开侨中学', class: '高二(1)班', improvement: 12.8 },
+        { id: 3, name: '王芳', school: '台山市华侨中学', class: '高三(2)班', improvement: 11.5 },
+      ],
+      topStudents: [
+        { id: 1, name: '陈思思', school: '开平市第一中学', class: '高三(1)班', score: 698 },
+        { id: 2, name: '刘伟', school: '开平市开侨中学', class: '高三(2)班', score: 685 },
+        { id: 3, name: '杨洋', school: '恩平市第一中学', class: '高三(3)班', score: 672 },
+      ],
+      subjectToppers: [
+        { subject: '语文', name: '陈思思', school: '开平市第一中学', score: 138 },
+        { subject: '数学', name: '刘伟', school: '开平市开侨中学', score: 145 },
+        { subject: '英语', name: '杨洋', school: '恩平市第一中学', score: 142 },
+        { subject: '物理', name: '赵强', school: '台山市华侨中学', score: 95 },
+        { subject: '化学', name: '孙丽', school: '开平市第一中学', score: 98 },
+      ],
+    }
+  },
+
+  /**
+   * 获取学校亮点数据 (Mock)
+   */
+  async getSchoolHighlights(): Promise<SchoolHighlights> {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    return {
+      topImprovedSchools: [
+        { id: 1, name: '开平市第一中学', improvement: 12.5 },
+        { id: 2, name: '台山市华侨中学', improvement: 10.8 },
+        { id: 3, name: '恩平市第一中学', improvement: 9.6 },
+      ],
+      topQualitySchools: [
+        { id: 1, name: '开平市开侨中学', avgScore: 586 },
+        { id: 2, name: '开平市第一中学', avgScore: 578 },
+        { id: 3, name: '台山市华侨中学', avgScore: 572 },
+      ],
+      topValueAddedSchools: [
+        { id: 1, name: '开平市第一中学', valueIndex: 1.25 },
+        { id: 2, name: '台山市华侨中学', valueIndex: 1.18 },
+        { id: 3, name: '恩平市第一中学', valueIndex: 1.12 },
+      ],
+    }
+  },
+
+  /**
    * 获取用户统计数据
    */
   async getUserStats(): Promise<UserStats> {
@@ -380,12 +524,14 @@ export const adminService = {
   /**
    * 获取用户列表
    */
-  async getUsers(params: {
-    page?: number
-    size?: number
-    role?: string
-    search?: string
-  } = {}): Promise<UserListResponse> {
+  async getUsers(
+    params: {
+      page?: number
+      size?: number
+      role?: string
+      search?: string
+    } = {}
+  ): Promise<UserListResponse> {
     return await api.get('/admin/users', { params })
   },
 
@@ -523,13 +669,15 @@ export const adminService = {
   /**
    * 获取区域列表
    */
-  async getRegions(params: {
-    page?: number
-    size?: number
-    level?: number
-    parent_id?: number
-    search?: string
-  } = {}): Promise<RegionListResponse> {
+  async getRegions(
+    params: {
+      page?: number
+      size?: number
+      level?: number
+      parent_id?: number
+      search?: string
+    } = {}
+  ): Promise<RegionListResponse> {
     return await api.get('/admin/organization/regions', { params })
   },
 
@@ -571,13 +719,15 @@ export const adminService = {
   /**
    * 获取学校列表
    */
-  async getSchools(params: {
-    page?: number
-    size?: number
-    region_id?: number
-    school_type?: string
-    search?: string
-  } = {}): Promise<SchoolListResponse> {
+  async getSchools(
+    params: {
+      page?: number
+      size?: number
+      region_id?: number
+      school_type?: string
+      search?: string
+    } = {}
+  ): Promise<SchoolListResponse> {
     return await api.get('/admin/organization/schools', { params })
   },
 
@@ -627,10 +777,7 @@ export const adminService = {
   /**
    * 批量导入学校
    */
-  async importSchools(
-    file: File,
-    autoCreateRegion: boolean = true
-  ): Promise<SchoolImportResponse> {
+  async importSchools(file: File, autoCreateRegion: boolean = true): Promise<SchoolImportResponse> {
     const formData = new FormData()
     formData.append('file', file)
     // 注意：不要手动设置Content-Type，api.ts中的拦截器会自动处理FormData
@@ -642,16 +789,18 @@ export const adminService = {
   /**
    * 获取班级列表
    */
-  async getClassrooms(params: {
-    page?: number
-    size?: number
-    school_id?: number
-    grade_id?: number
-    region_id?: number
-    school_type?: string
-    is_active?: boolean
-    search?: string
-  } = {}): Promise<ClassroomListResponse> {
+  async getClassrooms(
+    params: {
+      page?: number
+      size?: number
+      school_id?: number
+      grade_id?: number
+      region_id?: number
+      school_type?: string
+      is_active?: boolean
+      search?: string
+    } = {}
+  ): Promise<ClassroomListResponse> {
     return await api.get('/admin/organization/classrooms', { params })
   },
 
@@ -691,7 +840,7 @@ export const adminService = {
     formData.append('file', file)
     // 注意：不要手动设置Content-Type，api.ts中的拦截器会自动处理FormData
     const params: Record<string, any> = {
-      update_existing: updateExisting
+      update_existing: updateExisting,
     }
     if (schoolId) params.school_id = schoolId
     if (regionId) params.region_id = regionId
@@ -699,7 +848,7 @@ export const adminService = {
     if (capacity) params.capacity = capacity
 
     return await api.post('/admin/organization/classrooms/import', formData, {
-      params
+      params,
     })
   },
 
@@ -708,14 +857,16 @@ export const adminService = {
   /**
    * 获取课室列表
    */
-  async getRooms(params: {
-    page?: number
-    size?: number
-    school_id?: number
-    room_type?: string
-    building?: string
-    search?: string
-  } = {}): Promise<RoomListResponse> {
+  async getRooms(
+    params: {
+      page?: number
+      size?: number
+      school_id?: number
+      room_type?: string
+      building?: string
+      search?: string
+    } = {}
+  ): Promise<RoomListResponse> {
     return await api.get('/admin/organization/rooms', { params })
   },
 
@@ -750,23 +901,18 @@ export const adminService = {
   /**
    * 批量导入课室
    */
-  async importRooms(
-    file: File,
-    updateExisting: boolean = false
-  ): Promise<RoomImportResponse> {
+  async importRooms(file: File, updateExisting: boolean = false): Promise<RoomImportResponse> {
     const formData = new FormData()
     formData.append('file', file)
     return await api.post('/admin/organization/rooms/import', formData, {
-      params: { update_existing: updateExisting }
+      params: { update_existing: updateExisting },
     })
   },
 
   /**
    * 检查学校关联数据
    */
-  async checkSchoolRelations(
-    schoolIds: number[]
-  ): Promise<CheckSchoolRelationsResponse> {
+  async checkSchoolRelations(schoolIds: number[]): Promise<CheckSchoolRelationsResponse> {
     return await api.post('/admin/organization/schools/check-relations', { school_ids: schoolIds })
   },
 
@@ -779,10 +925,9 @@ export const adminService = {
   ): Promise<BatchDeleteSchoolsResponse> {
     return await api.post('/admin/organization/schools/batch-delete', {
       school_ids: schoolIds,
-      cascade_delete: cascadeDelete
+      cascade_delete: cascadeDelete,
     })
-  }
+  },
 }
 
 export default adminService
-

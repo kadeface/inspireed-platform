@@ -1,88 +1,97 @@
 <template>
-  <header class="relative overflow-hidden border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
-    <div class="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-200/40 to-transparent"></div>
-    <div class="absolute inset-y-0 left-0 w-48 bg-gradient-to-br from-emerald-50/60 via-transparent to-transparent pointer-events-none"></div>
-    <div class="absolute -bottom-8 -right-8 h-32 w-32 rounded-full bg-emerald-100/40 blur-3xl pointer-events-none"></div>
-
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div class="flex flex-col gap-5">
-        <div class="header-top flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <!-- 左侧：标题和欢迎信息 -->
-        <div class="relative z-10">
-          <div class="flex items-center gap-3">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 shadow-lg shadow-emerald-500/20">
-              <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-              </svg>
-            </div>
-            <div>
-              <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent tracking-tight">{{ title }}</h1>
-              <p v-if="subtitle" class="text-sm text-gray-600 mt-1 font-medium">
-                {{ subtitle }}
-              </p>
-            </div>
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex h-16 justify-between items-center">
+        <!-- Logo & Title -->
+        <div class="flex items-center gap-4">
+          <div
+            class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-200"
+          >
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              ></path>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-slate-800 tracking-tight leading-none">
+              {{ title }}
+            </h1>
+            <p v-if="subtitle" class="text-xs text-slate-500 font-medium mt-1">
+              {{ subtitle }}
+            </p>
           </div>
         </div>
 
-        <!-- 右侧：用户信息和操作 -->
-        <div class="relative z-10 flex items-center gap-4">
-          <!-- 用户信息 -->
-          <div class="flex flex-col items-end text-right">
-            <div class="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-800 bg-gray-100 rounded-full shadow-inner">
-              <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <span>{{ userName }}</span>
-            </div>
+        <!-- Right Side: User Profile Dropdown -->
+        <div class="flex items-center gap-4">
+          <!-- Organization Info (Hidden on mobile) -->
+          <div
+            v-if="organizationInfo.length"
+            class="hidden md:flex items-center gap-3 text-xs text-slate-500 mr-4 border-r border-slate-200 pr-4 h-8"
+          >
+            <span v-for="(info, index) in organizationInfo" :key="index" class="flex items-center">
+              {{ info }}
+            </span>
+          </div>
+
+          <el-dropdown trigger="click" @command="handleCommand">
             <div
-              v-if="organizationInfo.length"
-              class="mt-2 flex flex-wrap justify-end gap-2 text-xs text-gray-500"
+              class="flex items-center gap-3 cursor-pointer group p-1.5 rounded-lg hover:bg-slate-50 transition-colors"
             >
-              <span
-                v-for="(info, index) in organizationInfo"
-                :key="index"
-                class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700 border border-emerald-100"
+              <div class="text-right hidden sm:block">
+                <div
+                  class="text-sm font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors"
+                >
+                  {{ userName }}
+                </div>
+                <div class="text-xs text-slate-400">管理员</div>
+              </div>
+              <el-avatar
+                :size="36"
+                class="bg-indigo-100 text-indigo-600 font-semibold border border-indigo-50"
               >
-                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 10-6 0 3 3 0 006 0z" />
-                </svg>
-                {{ info }}
-              </span>
+                {{ userName.charAt(0).toUpperCase() }}
+              </el-avatar>
+              <el-icon class="text-slate-400 group-hover:text-slate-600 transition-colors"
+                ><CaretBottom
+              /></el-icon>
             </div>
-          </div>
 
-          <div class="h-10 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent"></div>
+            <template #dropdown>
+              <el-dropdown-menu class="min-w-[200px] p-2">
+                <div class="px-4 py-3 border-b border-slate-100 mb-1">
+                  <div class="text-xs text-slate-400 mb-1">登录账号</div>
+                  <div class="text-sm font-semibold text-slate-800">{{ userName }}</div>
+                </div>
 
-          <!-- 个人中心按钮（可选） -->
-          <button
-            v-if="showProfileButton"
-            @click="$emit('profile')"
-            class="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm hover:bg-white border border-gray-200 rounded-xl transition-all shadow-sm hover:shadow-md"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            个人中心
-          </button>
+                <el-dropdown-item command="profile" v-if="showProfileButton">
+                  <el-icon><User /></el-icon> 个人中心
+                </el-dropdown-item>
+                <el-dropdown-item command="settings">
+                  <el-icon><Setting /></el-icon> 系统设置
+                </el-dropdown-item>
 
-          <!-- 退出登录按钮 -->
-          <button
-            @click="$emit('logout')"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-rose-500 to-rose-600 rounded-xl shadow-lg shadow-rose-500/30 hover:shadow-xl hover:shadow-rose-500/40 hover:from-rose-600 hover:to-rose-700 transition-all transform hover:scale-105"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H3m12 0l-4 4m4-4l-4-4m13 8v-8" />
-            </svg>
-            退出登录
-          </button>
+                <div class="h-px bg-slate-100 my-1"></div>
+
+                <el-dropdown-item
+                  command="logout"
+                  class="text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                >
+                  <el-icon><SwitchButton /></el-icon> 退出登录
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
-        </div>
+      </div>
 
-        <div v-if="$slots.default" class="relative z-10">
-          <div class="header-toolbar">
-            <slot />
-          </div>
-        </div>
+      <!-- Optional Toolbar Slot -->
+      <div v-if="$slots.default" class="py-3 border-t border-slate-100 mt-2">
+        <slot />
       </div>
     </div>
   </header>
@@ -90,6 +99,7 @@
 
 <script setup lang="ts">
 import { computed, toRefs } from 'vue'
+import { CaretBottom, User, Setting, SwitchButton } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   title: string
@@ -102,45 +112,32 @@ const props = defineProps<{
   classroomName?: string | null
 }>()
 
-const { title, subtitle, userName, showProfileButton, regionName, schoolName, gradeName, classroomName } = toRefs(props)
+const { title, userName, regionName, schoolName, gradeName, classroomName } = toRefs(props)
 
 const organizationInfo = computed(() => {
   const info: string[] = []
-  if (regionName.value) {
-    info.push(`区域：${regionName.value}`)
-  }
-  if (schoolName.value) {
-    info.push(`学校：${schoolName.value}`)
-  }
-  if (gradeName.value) {
-    info.push(`年级：${gradeName.value}`)
-  }
-  if (classroomName.value) {
-    info.push(`班级：${classroomName.value}`)
-  }
+  if (regionName?.value) info.push(regionName.value)
+  if (schoolName?.value) info.push(schoolName.value)
   return info
 })
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'logout'): void
   (e: 'profile'): void
 }>()
+
+function handleCommand(command: string) {
+  if (command === 'logout') {
+    emit('logout')
+  } else if (command === 'profile') {
+    emit('profile')
+  }
+}
 </script>
 
 <style scoped>
-.header-top {
-  display: flex;
-}
-
-.header-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.85rem;
-  padding: 1rem 1.25rem;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(20, 184, 166, 0.05));
-  border: 1px solid rgba(16, 185, 129, 0.18);
-  border-radius: 1rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+:deep(.el-dropdown-menu__item) {
+  border-radius: 6px;
+  margin-bottom: 2px;
 }
 </style>
-

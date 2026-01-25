@@ -1,28 +1,21 @@
 <template>
   <el-card
     class="admin-function-card"
-    :class="[
-      { 'is-active': active },
-      { 'is-business': isBusiness },
-      customClass
-    ]"
+    :class="[{ 'is-active': active }, { 'is-business': isBusiness }, customClass]"
     shadow="hover"
     @click="$emit('click')"
   >
     <div class="card-body">
-      <div 
-        class="card-icon" 
-        :style="{ backgroundColor: iconBgColor }"
-      >
+      <div class="card-icon" :style="{ backgroundColor: iconBgColor }">
         <el-icon :size="iconSize" :color="iconColor">
           <component :is="icon" />
         </el-icon>
       </div>
-      
+
       <div class="card-content">
-        <h3 class="card-title">{{ title }}</h3>
-        <p class="card-description">{{ description }}</p>
-        
+        <h3 class="card-title" :style="{ color: textColor }">{{ title }}</h3>
+        <p class="card-description" :style="{ color: descriptionColor }">{{ description }}</p>
+
         <div v-if="$slots.footer || stats" class="card-footer mt-2">
           <slot name="footer">
             <el-tag v-if="stats" size="small" type="info" class="stats-tag">
@@ -53,6 +46,8 @@ interface Props {
   isBusiness?: boolean
   stats?: string | number
   customClass?: string
+  textColor?: string
+  descriptionColor?: string
 }
 
 withDefaults(defineProps<Props>(), {
@@ -60,7 +55,9 @@ withDefaults(defineProps<Props>(), {
   iconBgColor: '#eff6ff',
   iconSize: 32,
   active: false,
-  isBusiness: false
+  isBusiness: false,
+  textColor: '#1e293b',
+  descriptionColor: '#64748b',
 })
 
 defineEmits(['click'])
@@ -78,7 +75,9 @@ defineEmits(['click'])
 
 .admin-function-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
   border-color: #bfdbfe;
 }
 
