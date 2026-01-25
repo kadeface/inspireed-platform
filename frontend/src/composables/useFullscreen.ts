@@ -2,6 +2,9 @@
  * 全屏功能 Composable
  */
 import { ref, onMounted, onUnmounted } from 'vue'
+import { createLogger } from '../utils/logger'
+
+const logger = createLogger('FULLSCREEN')
 
 export function useFullscreen(elementRef?: { value: HTMLElement | null }) {
   const isFullscreen = ref(false)
@@ -20,13 +23,13 @@ export function useFullscreen(elementRef?: { value: HTMLElement | null }) {
       } else if ((element as any).msRequestFullscreen) {
         await (element as any).msRequestFullscreen()
       }
-      
+
       isFullscreen.value = true
-      console.log('✅ 已进入全屏模式')
+      logger.debug('已进入全屏模式')
     } catch (error: any) {
-      console.error('❌ 进入全屏失败:', error)
+      logger.error('进入全屏失败:', error)
       if (error.name !== 'NotAllowedError') {
-        console.warn('⚠️ 全屏请求被拒绝或浏览器不支持')
+        logger.warn('全屏请求被拒绝或浏览器不支持')
       }
       throw error
     }
@@ -44,11 +47,11 @@ export function useFullscreen(elementRef?: { value: HTMLElement | null }) {
       } else if ((document as any).msExitFullscreen) {
         await (document as any).msExitFullscreen()
       }
-      
+
       isFullscreen.value = false
-      console.log('✅ 已退出全屏模式')
+      logger.debug('已退出全屏模式')
     } catch (error: any) {
-      console.error('❌ 退出全屏失败:', error)
+      logger.error('退出全屏失败:', error)
       throw error
     }
   }

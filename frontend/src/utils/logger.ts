@@ -1,117 +1,141 @@
 /**
- * 日志工具 - 支持日志级别控制，减少生产环境的日志噪音
+ * 统一的调试日志工具
+ * 在生产环境自动禁用所有调试日志
  */
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+export enum LogLevel {
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
+}
 
-// 从环境变量获取日志级别，默认在生产环境只显示 warn 和 error
-const getLogLevel = (): LogLevel => {
-  if (import.meta.env.DEV) {
-    // 开发环境：可以通过 localStorage 控制日志级别
-    const stored = localStorage.getItem('logLevel')
-    if (stored && ['debug', 'info', 'warn', 'error'].includes(stored)) {
-      return stored as LogLevel
-    }
-    return 'debug' // 开发环境默认显示所有日志
+// 当前日志级别（从环境变量读取，默认为 INFO）
+let currentLogLevel: LogLevel = LogLevel.INFO
+
+// 从环境变量读取日志级别
+if (import.meta.env.VITE_LOG_LEVEL === 'DEBUG') {
+  currentLogLevel = LogLevel.DEBUG
+} else if (import.meta.env.VITE_LOG_LEVEL === 'WARN') {
+  currentLogLevel = LogLevel.WARN
+} else if (import.meta.env.VITE_LOG_LEVEL === 'ERROR') {
+  currentLogLevel = LogLevel.ERROR
+}
+
+// 是否启用调试日志
+const isDebugEnabled = import.meta.env.VITE_ENABLE_DEBUG_LOGS === 'true' && import.meta.env.DEV
+
+/**
+ * 判断是否应该输出日志
+ */
+function shouldLog(level: LogLevel, moduleName?: string): boolean {
+  // 如果禁用了调试日志，只输出 ERROR 级别
+  if (!isDebugEnabled && level !== LogLevel.ERROR) {
+    return false
   }
-  return 'warn' // 生产环境默认只显示警告和错误
-}
 
-const currentLogLevel = getLogLevel()
-
-const logLevels: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
-}
-
-const shouldLog = (level: LogLevel): boolean => {
-  return logLevels[level] >= logLevels[currentLogLevel]
-}
-
-// 日志去重：相同内容的日志在短时间内只输出一次
-const logCache = new Map<string, number>()
-const LOG_DEDUP_INTERVAL = 5000 // 5秒内相同日志只输出一次
-
-const getLogKey = (level: LogLevel, message: string, ...args: any[]): string => {
-  return `${level}:${message}:${JSON.stringify(args)}`
-}
-
-const checkDedup = (key: string): boolean => {
-  const now = Date.now()
-  const lastTime = logCache.get(key)
-  
-  if (lastTime && now - lastTime < LOG_DEDUP_INTERVAL) {
-    return false // 跳过重复日志
+  // 检查日志级别
+  if (level < currentLogLevel) {
+    return false
   }
-  
-  logCache.set(key, now)
-  
-  // 定期清理缓存（避免内存泄漏）
-  if (logCache.size > 1000) {
-    const cutoff = now - LOG_DEDUP_INTERVAL * 2
-    for (const [k, v] of logCache.entries()) {
-      if (v < cutoff) {
-        logCache.delete(k)
-      }
+
+  // 检查模块是否在允许列表中
+  if (import.meta.env.VITE_DEBUG_MODULES) {
+    const modules = import.meta.env.VITE_DEBUG_MODULES.split(',').map(m => m.trim())
+    // 如果指定了模块，并且当前模块不在列表中，不输出
+    if (modules.length > 0 && !modules.includes('*') && moduleName && !modules.includes(moduleName)) {
+      return false
     }
   }
-  
+
   return true
 }
 
-export const logger = {
-  debug: (message: string, ...args: any[]) => {
-    if (!shouldLog('debug')) return
-    const key = getLogKey('debug', message, ...args)
-    if (!checkDedup(key)) return
-    console.log(`🔍 [DEBUG] ${message}`, ...args)
-  },
-  
-  info: (message: string, ...args: any[]) => {
-    if (!shouldLog('info')) return
-    const key = getLogKey('info', message, ...args)
-    if (!checkDedup(key)) return
-    console.log(`ℹ️ [INFO] ${message}`, ...args)
-  },
-  
-  warn: (message: string, ...args: any[]) => {
-    if (!shouldLog('warn')) return
-    const key = getLogKey('warn', message, ...args)
-    if (!checkDedup(key)) return
-    console.warn(`⚠️ [WARN] ${message}`, ...args)
-  },
-  
-  error: (message: string, ...args: any[]) => {
-    if (!shouldLog('error')) return
-    // 错误日志不去重，确保重要错误都能看到
-    console.error(`❌ [ERROR] ${message}`, ...args)
-  },
-  
-  // 轮询专用日志：只在开发环境且明确启用时输出
-  poll: (message: string, ...args: any[]) => {
-    // 轮询日志默认不输出，除非在开发环境且设置了 debugPolling
-    if (import.meta.env.DEV && localStorage.getItem('debugPolling') === 'true') {
-      const key = getLogKey('debug', `[POLL] ${message}`, ...args)
-      if (!checkDedup(key)) return
-      console.log(`🔄 [POLL] ${message}`, ...args)
-    }
-  },
-  
-  // 设置日志级别（用于运行时调整）
-  setLevel: (level: LogLevel) => {
-    localStorage.setItem('logLevel', level)
-    // 重新加载页面以应用新设置（或手动刷新）
-    console.log(`日志级别已设置为: ${level}`)
-  },
-  
-  // 获取当前日志级别
-  getLevel: (): LogLevel => {
-    return currentLogLevel
-  },
+/**
+ * 获取日志前缀
+ */
+function getPrefix(moduleName?: string): string {
+  return moduleName ? `[${moduleName}] ` : ''
 }
 
-// 导出默认实例
-export default logger
+/**
+ * 调试日志（仅在开发环境）
+ */
+export function debug(message: any, ...args: any[]) {
+  if (shouldLog(LogLevel.DEBUG)) {
+    console.log(message, ...args)
+  }
+}
 
+/**
+ * 信息日志（带图标）
+ */
+export function log(message: any, ...args: any[]) {
+  if (shouldLog(LogLevel.INFO)) {
+    console.log(message, ...args)
+  }
+}
+
+/**
+ * 带图标的日志
+ */
+export function logWithEmoji(emoji: string, moduleName: string, message: any, ...args: any[]) {
+  if (shouldLog(LogLevel.INFO, moduleName)) {
+    console.log(`${emoji} ${getPrefix(moduleName)}`, message, ...args)
+  }
+}
+
+/**
+ * 警告日志
+ */
+export function warn(message: any, ...args: any[]) {
+  if (shouldLog(LogLevel.WARN)) {
+    console.warn(message, ...args)
+  }
+}
+
+/**
+ * 错误日志（始终输出）
+ */
+export function error(message: any, ...args: any[]) {
+  // ERROR 级别始终输出
+  console.error(message, ...args)
+}
+
+// 模块化日志导出
+export const createLogger = (moduleName: string) => ({
+  debug: (message: any, ...args: any[]) => {
+    if (shouldLog(LogLevel.DEBUG, moduleName)) {
+      console.log(getPrefix(moduleName), message, ...args)
+    }
+  },
+  info: (message: any, ...args: any[]) => {
+    if (shouldLog(LogLevel.INFO, moduleName)) {
+      console.log(getPrefix(moduleName), message, ...args)
+    }
+  },
+  warn: (message: any, ...args: any[]) => {
+    if (shouldLog(LogLevel.WARN, moduleName)) {
+      console.warn(getPrefix(moduleName), message, ...args)
+    }
+  },
+  error: (message: any, ...args: any[]) => {
+    console.error(getPrefix(moduleName), message, ...args)
+  },
+  // 带图标的日志方法
+  logWithEmoji: (emoji: string, message: any, ...args: any[]) => {
+    if (shouldLog(LogLevel.INFO, moduleName)) {
+      console.log(`${emoji} ${getPrefix(moduleName)}`, message, ...args)
+    }
+  },
+})
+
+// 默认导出
+export default {
+  debug,
+  log,
+  logWithEmoji,
+  warn,
+  error,
+  createLogger,
+}

@@ -869,6 +869,10 @@ async def share_lesson_to_group(
             # 重新激活
             setattr(existing, "is_active", True)
             setattr(existing, "share_note", cast(str, lesson_data.share_note))
+            
+            # 更新教研组共享教案数（修复BUG：重新激活时需要增加计数）
+            setattr(group, "lesson_count", cast(int, group.lesson_count) + 1)
+            
             await db.commit()
             await db.refresh(existing)
             shared_lesson = existing
@@ -1140,3 +1144,51 @@ async def get_statistics(
         my_groups=my_groups or 0,
         my_shared_lessons=my_shared_lessons or 0,
     )
+
+
+@router.post("/fix-lesson-counts")
+async def fix_lesson_counts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_teacher),
+) -> dict:
+    """
+    修复教研组的 lesson_count 字段（管理员工具）
+    
+    遍历所有教研组，重新计算实际的共享教案数并更新 lesson_count 字段。
+    用于修复数据不一致问题。
+    """
+    # 获取所有激活的教研组
+    result = await db.execute(
+        select(SubjectGroup).where(SubjectGroup.is_active == True)
+    )
+    groups = result.scalars().all()
+    
+    fixed_count = 0
+    for group in groups:
+        # 计算该教研组实际的共享教案数
+        actual_count = await db.scalar(
+            select(func.count(SharedLesson.id)).where(
+                and_(
+                    SharedLesson.group_id == cast(int, group.id),
+                    SharedLesson.is_active == True,
+                )
+            )
+        )
+        actual_count = actual_count or 0
+        
+        # 如果与数据库中的 lesson_count 不一致，则更新
+        if cast(int, group.lesson_count) != actual_count:
+            old_count = cast(int, group.lesson_count)
+            setattr(group, "lesson_count", actual_count)
+            fixed_count += 1
+            print(
+                f"修复教研组 {group.id} ({group.name}): {old_count} -> {actual_count}"
+            )
+    
+    await db.commit()
+    
+    return {
+        "message": f"已修复 {fixed_count} 个教研组的 lesson_count",
+        "total_groups": len(groups),
+        "fixed_count": fixed_count,
+    }

@@ -3,6 +3,7 @@
 """
 
 import json
+import os
 from typing import Any, Dict, List, Optional, Union
 from pydantic import AnyHttpUrl, PostgresDsn, field_validator, BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -32,8 +33,12 @@ def parse_cors(v: Any) -> List[str]:
 class Settings(BaseSettings):
     """应用配置类"""
 
+    # 检测是否在 Docker 环境中（通过检查是否存在环境变量）
+    _is_docker = os.getenv('POSTGRES_SERVER') and os.getenv('POSTGRES_SERVER') != 'localhost'
+
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # 在 Docker 环境中不读取 .env 文件，使用环境变量
+        env_file=None if _is_docker else ".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",

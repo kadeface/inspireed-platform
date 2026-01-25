@@ -6,19 +6,21 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.exceptions import RequestValidationError
 import traceback
 import os
 import re
+import mimetypes
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.api.v1 import api_router
 
 # CORS 源匹配正则表达式（与 CORS 配置保持一致）
+# 支持：localhost、所有IP地址（包括公网和局域网）、Cloud Studio 域名
 CORS_ORIGIN_PATTERN = re.compile(
-    r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
+    r"^https?://((localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
 )
 
 
@@ -216,11 +218,20 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """请求验证异常处理器"""
+    # 安全处理body，避免FormData等不可序列化对象
+    body_content = exc.body
+    try:
+        # 尝试序列化body，如果失败则转为字符串
+        import json
+        json.dumps(body_content)
+    except (TypeError, ValueError):
+        body_content = str(body_content) if body_content else None
+    
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "detail": exc.errors(),
-            "body": exc.body,
+            "body": body_content,
         },
     )
 
@@ -229,8 +240,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.get("/uploads/resources/{file_path:path}")
 async def serve_static_file(file_path: str, request: Request):
     """
-    提供静态文件服务，确保CORS头被正确添加
-    这样学生端就可以访问教师上传的图片了
+    提供静态文件服务，支持视频流（Range请求）和CORS
+    支持图片、视频、音频等多媒体文件
     """
     # 构建文件路径
     file_full_path = os.path.join("storage/resources", file_path)
@@ -252,25 +263,88 @@ async def serve_static_file(file_path: str, request: Request):
     # 获取请求的 Origin 头
     origin = request.headers.get("origin")
     
-    # 创建文件响应
-    response = FileResponse(
-        file_full_path,
-        media_type=None,  # 让FastAPI自动检测MIME类型
-    )
+    # 获取文件大小
+    file_size = os.path.getsize(file_full_path)
     
-    # 手动添加CORS头
-    if origin:
-        # 检查origin是否匹配允许的源
-        if settings.ALLOW_LAN_ACCESS and CORS_ORIGIN_PATTERN.match(origin):
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-        elif origin in [str(o) for o in settings.BACKEND_CORS_ORIGINS]:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "*"
+    # 检查是否是Range请求（视频流）
+    range_header = request.headers.get("range")
+    
+    if range_header:
+        # 解析Range头：bytes=start-end
+        import re
+        match = re.search(r"bytes=(\d+)-(\d*)", range_header)
+        if match:
+            start = int(match.group(1))
+            end = int(match.group(2)) if match.group(2) else file_size - 1
+            end = min(end, file_size - 1)
+            
+            # 读取指定范围的文件内容
+            from fastapi.responses import StreamingResponse
+            
+            def iter_file():
+                with open(file_full_path, "rb") as f:
+                    f.seek(start)
+                    remaining = end - start + 1
+                    chunk_size = 8192
+                    while remaining > 0:
+                        chunk = f.read(min(chunk_size, remaining))
+                        if not chunk:
+                            break
+                        remaining -= len(chunk)
+                        yield chunk
+            
+            # 检测MIME类型
+            import mimetypes
+            media_type = mimetypes.guess_type(file_full_path)[0] or "application/octet-stream"
+            
+            # 创建206 Partial Content响应
+            response = StreamingResponse(
+                iter_file(),
+                status_code=206,
+                media_type=media_type,
+            )
+            
+            # 添加Range相关头
+            response.headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+            response.headers["Content-Length"] = str(end - start + 1)
+            response.headers["Accept-Ranges"] = "bytes"
+        else:
+            # Range格式错误，返回完整文件
+            response = FileResponse(
+                file_full_path,
+                media_type=None,
+            )
+    else:
+        # 常规请求，返回完整文件
+        response = FileResponse(
+            file_full_path,
+            media_type=None,
+        )
+        response.headers["Accept-Ranges"] = "bytes"
+        response.headers["Content-Length"] = str(file_size)
+    
+    # 添加CORS头（无论是否有Origin，都添加，确保跨域访问）
+    if origin and (settings.ALLOW_LAN_ACCESS and CORS_ORIGIN_PATTERN.match(origin)):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Range, Content-Type, Accept"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Range, Content-Length, Accept-Ranges"
+    elif origin and origin in [str(o) for o in settings.BACKEND_CORS_ORIGINS]:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Range, Content-Type, Accept"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Range, Content-Length, Accept-Ranges"
+    else:
+        # 即使没有Origin或不匹配，也添加基本的CORS头（用于直接访问）
+        # 这对于生产环境的视频播放很重要
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Range, Content-Length, Accept-Ranges"
+    
+    # 添加缓存控制（视频文件可以缓存）
+    response.headers["Cache-Control"] = "public, max-age=31536000"
     
     return response
 
@@ -282,17 +356,26 @@ async def options_static_file(request: Request):
     
     response = JSONResponse(content={})
     
-    if origin:
-        if settings.ALLOW_LAN_ACCESS and CORS_ORIGIN_PATTERN.match(origin):
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-        elif origin in [str(o) for o in settings.BACKEND_CORS_ORIGINS]:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "*"
+    if origin and (settings.ALLOW_LAN_ACCESS and CORS_ORIGIN_PATTERN.match(origin)):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Range, Content-Type, Accept, Authorization"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Range, Content-Length, Accept-Ranges"
+        response.headers["Access-Control-Max-Age"] = "3600"
+    elif origin and origin in [str(o) for o in settings.BACKEND_CORS_ORIGINS]:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Range, Content-Type, Accept, Authorization"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Range, Content-Length, Accept-Ranges"
+        response.headers["Access-Control-Max-Age"] = "3600"
+    else:
+        # 默认允许所有来源（用于静态资源访问）
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Range, Content-Type, Accept"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Range, Content-Length, Accept-Ranges"
     
     return response
 

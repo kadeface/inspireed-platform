@@ -11,6 +11,25 @@ function getApiBaseUrl(): string {
   // 确保使用与当前页面相同的协议（HTTPS 或 HTTP）
   // 在 CloudStudio 中，前端通常是 HTTPS，后端也应该是 HTTPS
   const protocol = window.location.protocol
+  const port = window.location.port
+
+  // 判断是否为生产环境（非 localhost、非 127.0.0.1、非 IP 地址）
+  const isProduction = !['localhost', '127.0.0.1'].includes(hostname) && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname)
+
+  if (isProduction) {
+    // 生产环境：部署环境，使用相对路径或当前域名
+    // 后端通常在同一域名下，通过 Nginx 反向代理
+    const apiUrl = `${protocol}//${hostname}/api/v1`
+    if (import.meta.env.DEV) {
+      console.log('✅ [API] 生产环境，使用当前域名:', apiUrl)
+    }
+    return apiUrl
+  }
+
+  if (import.meta.env.DEV) {
+    console.log('🔍 [API] 检测环境 - hostname:', hostname, 'protocol:', protocol, 'port:', port, 'full URL:', window.location.href)
+    console.log('🔍 [API] VITE_API_BASE_URL 环境变量:', import.meta.env.VITE_API_BASE_URL)
+  }
 
   // 优先检测 Cloud Studio 环境：如果 hostname 包含 cloudstudio.club 或 coding.net
   // 后端端口通常是 8000，但需要通过 Cloud Studio 分配的 URL 访问
@@ -26,77 +45,87 @@ function getApiBaseUrl(): string {
       const backendHostname = hostname.replace(/--\d+/, '--8000')
       // 强制使用 HTTPS（CloudStudio 环境必须使用 HTTPS）
       const apiUrl = `https://${backendHostname}/api/v1`
-      console.log('✅ [API] Cloud Studio 环境检测成功！')
-      console.log('   前端地址:', `${protocol}//${hostname}`)
-      console.log('   后端地址:', apiUrl)
+      if (import.meta.env.DEV) {
+        console.log('✅ [API] Cloud Studio 环境检测成功！')
+        console.log('   前端地址:', `${protocol}//${hostname}`)
+        console.log('   后端地址:', apiUrl)
+      }
       return apiUrl
     } else {
       // 如果没有 -- 分隔符，尝试使用标准格式
       const backendHostname = hostname.replace(/5173/, '8000')
       // 强制使用 HTTPS
       const apiUrl = `https://${backendHostname}/api/v1`
-      console.log('✅ [API] Cloud Studio 环境（备用检测），使用后端地址:', apiUrl)
+      if (import.meta.env.DEV) {
+        console.log('✅ [API] Cloud Studio 环境（备用检测），使用后端地址:', apiUrl)
+      }
       return apiUrl
     }
   }
-  
+
   // 如果环境变量中配置了API地址，检查并处理
   if (import.meta.env.VITE_API_BASE_URL) {
     let envApiUrl = import.meta.env.VITE_API_BASE_URL
-    
+
     // 在 CloudStudio 环境中，如果环境变量包含 localhost，完全忽略它
     // 重新计算 CloudStudio 的 URL 并返回
-    if ((hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) && 
+    if ((hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) &&
         (envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1'))) {
-      console.warn('⚠️ [API] 环境变量包含 localhost，在 CloudStudio 环境中已忽略，使用自动检测的地址')
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ [API] 环境变量包含 localhost，在 CloudStudio 环境中已忽略，使用自动检测的地址')
+      }
       // 重新计算 CloudStudio 的 URL
       if (hostname.includes('--')) {
         const backendHostname = hostname.replace(/--\d+/, '--8000')
         const apiUrl = `https://${backendHostname}/api/v1`
-        console.log('✅ [API] 使用 CloudStudio 自动检测的地址:', apiUrl)
+        if (import.meta.env.DEV) {
+          console.log('✅ [API] 使用 CloudStudio 自动检测的地址:', apiUrl)
+        }
         return apiUrl
       } else {
         const backendHostname = hostname.replace(/5173/, '8000')
         const apiUrl = `https://${backendHostname}/api/v1`
-        console.log('✅ [API] 使用 CloudStudio 自动检测的地址（备用）:', apiUrl)
+        if (import.meta.env.DEV) {
+          console.log('✅ [API] 使用 CloudStudio 自动检测的地址（备用）:', apiUrl)
+        }
         return apiUrl
       }
     }
-    
-    // 🆕 在局域网环境下，如果环境变量包含 localhost，且当前 hostname 是 IP 地址，自动适配
-    // 检测 hostname 是否为 IP 地址（IPv4）
-    const isIpAddress = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)
-    if (isIpAddress && (envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1'))) {
-      console.warn('⚠️ [API] 环境变量包含 localhost，但当前通过 IP 地址访问，自动适配为当前 IP')
-      const apiProtocol = protocol === 'https:' ? 'https:' : 'http:'
-      const apiUrl = `${apiProtocol}//${hostname}:8000/api/v1`
-      console.log('✅ [API] 使用自动适配的地址:', apiUrl)
-      return apiUrl
-    }
-    
+
     // 如果是 HTTPS 页面，强制使用 HTTPS API（防止混合内容错误）
     if (protocol === 'https:' && envApiUrl.startsWith('http://')) {
-      console.warn('⚠️ [API] 环境变量使用 HTTP，但在 HTTPS 页面中强制转换为 HTTPS')
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ [API] 环境变量使用 HTTP，但在 HTTPS 页面中强制转换为 HTTPS')
+      }
       envApiUrl = envApiUrl.replace('http://', 'https://')
     }
-    console.log('🔧 [API] 使用环境变量配置的 API 地址:', envApiUrl)
+    if (import.meta.env.DEV) {
+      console.log('🔧 [API] 使用环境变量配置的 API 地址:', envApiUrl)
+    }
     return envApiUrl
   }
-  
+
   // 本地开发环境：前端端口5173 -> 后端端口8000
   // 注意：在 CloudStudio 中，如果 hostname 不包含 cloudstudio.club，也会走到这里
   // 但这种情况应该很少见
   // 如果页面是 HTTPS，也使用 HTTPS API
   const apiProtocol = protocol === 'https:' ? 'https:' : 'http:'
   const apiUrl = `${apiProtocol}//${hostname}:8000/api/v1`
+  if (import.meta.env.DEV) {
+    console.log('📍 [API] 本地环境，使用后端地址:', apiUrl)
+  }
   return apiUrl
 }
 const API_BASE_URL = getApiBaseUrl()
 
-if (API_BASE_URL.startsWith('http://') && window.location.protocol === 'https:') {
-  console.error('❌ [API] 警告：检测到混合内容问题！')
-  console.error('   当前页面使用 HTTPS，但 API 地址使用 HTTP')
-  console.error('   这会导致浏览器阻止请求')
+// 在控制台输出最终的 API 地址，方便调试（仅在开发环境）
+if (import.meta.env.DEV) {
+  console.log('🚀 [API] 最终使用的 API 基础地址:', API_BASE_URL)
+  if (API_BASE_URL.startsWith('http://') && window.location.protocol === 'https:') {
+    console.error('❌ [API] 警告：检测到混合内容问题！')
+    console.error('   当前页面使用 HTTPS，但 API 地址使用 HTTP')
+    console.error('   这会导致浏览器阻止请求')
+  }
 }
 
 class ApiService {
@@ -106,17 +135,31 @@ class ApiService {
     // 再次检查并确保在 HTTPS 页面使用 HTTPS API
     let finalBaseURL = API_BASE_URL
     if (window.location.protocol === 'https:' && finalBaseURL.startsWith('http://')) {
-      console.warn('⚠️ [API] 检测到混合内容，自动将 HTTP 转换为 HTTPS')
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ [API] 检测到混合内容，自动将 HTTP 转换为 HTTPS')
+      }
       finalBaseURL = finalBaseURL.replace('http://', 'https://')
+      if (import.meta.env.DEV) {
+        console.log('✅ [API] 修正后的 API 地址:', finalBaseURL)
+      }
     }
 
     // 在 CloudStudio 环境中，强制使用 HTTPS
-    if ((window.location.hostname.includes('cloudstudio.club') || window.location.hostname.includes('coding.net')) && 
+    if ((window.location.hostname.includes('cloudstudio.club') || window.location.hostname.includes('coding.net')) &&
         finalBaseURL.startsWith('http://')) {
-      console.warn('⚠️ [API] CloudStudio 环境强制使用 HTTPS')
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ [API] CloudStudio 环境强制使用 HTTPS')
+      }
       finalBaseURL = finalBaseURL.replace('http://', 'https://')
+      if (import.meta.env.DEV) {
+        console.log('✅ [API] CloudStudio 环境修正后的 API 地址:', finalBaseURL)
+      }
     }
 
+    if (import.meta.env.DEV) {
+      console.log('🔧 [API] ApiService 构造函数 - 最终 baseURL:', finalBaseURL)
+    }
+    
     this.axiosInstance = axios.create({
       baseURL: finalBaseURL,
       timeout: 120000, // 增加到120秒，适应文档转换等长时间操作
@@ -140,40 +183,50 @@ class ApiService {
         
         // 最后一道防线：在 HTTPS 页面中，确保 baseURL 使用 HTTPS
         if (window.location.protocol === 'https:' && config.baseURL?.startsWith('http://')) {
-          console.error('❌ [API] 请求拦截器检测到 HTTP baseURL！', {
-            baseURL: config.baseURL,
-            url: config.url,
-            fullURL: config.baseURL + (config.url || ''),
-            hostname: window.location.hostname,
-            protocol: window.location.protocol
-          })
-          console.warn('⚠️ [API] 请求拦截器自动转换为 HTTPS:', config.baseURL)
+          if (import.meta.env.DEV) {
+            console.error('❌ [API] 请求拦截器检测到 HTTP baseURL！', {
+              baseURL: config.baseURL,
+              url: config.url,
+              fullURL: config.baseURL + (config.url || ''),
+              hostname: window.location.hostname,
+              protocol: window.location.protocol
+            })
+            console.warn('⚠️ [API] 请求拦截器自动转换为 HTTPS:', config.baseURL)
+          }
           config.baseURL = config.baseURL.replace('http://', 'https://')
-          console.log('✅ [API] 请求拦截器修正后的 baseURL:', config.baseURL)
+          if (import.meta.env.DEV) {
+            console.log('✅ [API] 请求拦截器修正后的 baseURL:', config.baseURL)
+          }
         }
-        
+
         // 如果请求 URL 本身是完整的 HTTP URL，也转换为 HTTPS
         if (window.location.protocol === 'https:' && config.url?.startsWith('http://')) {
-          console.error('❌ [API] 请求拦截器检测到 HTTP 完整 URL！', {
-            url: config.url,
-            baseURL: config.baseURL,
-            hostname: window.location.hostname,
-            protocol: window.location.protocol
-          })
-          console.warn('⚠️ [API] 请求拦截器自动转换为 HTTPS:', config.url)
+          if (import.meta.env.DEV) {
+            console.error('❌ [API] 请求拦截器检测到 HTTP 完整 URL！', {
+              url: config.url,
+              baseURL: config.baseURL,
+              hostname: window.location.hostname,
+              protocol: window.location.protocol
+            })
+            console.warn('⚠️ [API] 请求拦截器自动转换为 HTTPS:', config.url)
+          }
           config.url = config.url.replace('http://', 'https://')
-          console.log('✅ [API] 请求拦截器修正后的 URL:', config.url)
+          if (import.meta.env.DEV) {
+            console.log('✅ [API] 请求拦截器修正后的 URL:', config.url)
+          }
         }
-        
+
         // 最终检查：确保完整 URL 使用 HTTPS
         const finalURL = (config.baseURL || '') + (config.url || '')
         if (window.location.protocol === 'https:' && finalURL.startsWith('http://')) {
-          console.error('❌ [API] 最终检查：完整 URL 仍然是 HTTP！', {
-            finalURL,
-            baseURL: config.baseURL,
-            url: config.url,
-            hostname: window.location.hostname
-          })
+          if (import.meta.env.DEV) {
+            console.error('❌ [API] 最终检查：完整 URL 仍然是 HTTP！', {
+              finalURL,
+              baseURL: config.baseURL,
+              url: config.url,
+              hostname: window.location.hostname
+            })
+          }
           // 强制修正
           if (config.baseURL?.startsWith('http://')) {
             config.baseURL = config.baseURL.replace('http://', 'https://')
@@ -181,7 +234,9 @@ class ApiService {
           if (config.url?.startsWith('http://')) {
             config.url = config.url.replace('http://', 'https://')
           }
-          console.log('✅ [API] 强制修正后的完整 URL:', (config.baseURL || '') + (config.url || ''))
+          if (import.meta.env.DEV) {
+            console.log('✅ [API] 强制修正后的完整 URL:', (config.baseURL || '') + (config.url || ''))
+          }
         }
         
         return config

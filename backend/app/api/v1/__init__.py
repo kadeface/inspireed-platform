@@ -22,6 +22,7 @@ from app.api.v1 import (
     curriculum,
     daily_performance,
     data_center,
+    debug_shared_lessons,
     evaluations,
     exam_rooms,
     exam_subjects,
@@ -87,6 +88,9 @@ api_router.include_router(
 # 教师协作功能路由
 api_router.include_router(
     subject_groups.router, prefix="/subject-groups", tags=["学科教研组"]
+)
+api_router.include_router(
+    debug_shared_lessons.router, prefix="/subject-groups", tags=["学科教研组-调试"]
 )
 api_router.include_router(
     teacher_ai_assistant.router,

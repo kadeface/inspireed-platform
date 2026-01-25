@@ -154,6 +154,9 @@ import BrowserCell from './BrowserCell.vue'
 import InteractiveCell from './InteractiveCell.vue'
 import ReferenceMaterialCell from '@/components/Cell/ReferenceMaterialCell.vue'
 import { useFeatureFlag } from '@/composables/useFeatureFlag'
+import { createLogger } from '../../utils/logger'
+
+const logger = createLogger('CELL_CONTAINER')
 
 interface Props {
   cell: Cell
@@ -223,6 +226,19 @@ watch(() => finalSessionId.value, (newId, oldId) => {
     }
   }
 }, { immediate: true })
+
+// 组件挂载时输出初始状态（仅在开发环境）
+onMounted(() => {
+  if (props.cell.type === 'activity') {
+    logger.debug('CellContainer (Activity) 已挂载:', {
+      cellId: props.cell.id,
+      finalSessionId: finalSessionId.value,
+      propsSessionId: props.sessionId,
+      injectedSessionIdValue: injectedSessionId?.value,
+      timestamp: new Date().toLocaleTimeString(),
+    })
+  }
+})
 
 // 计算最终的 lessonId：优先使用 props，否则从注入的 session 获取
 const finalLessonId = computed(() => {

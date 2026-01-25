@@ -2,7 +2,7 @@
 # CloudStudio 默认读取 .vscode/preview.yml
 # 此配置使用统一的 Docker Compose 启动脚本（start-cloudstudio.sh）
 
-autoOpen: false # 打开工作空间时是否自动开启所有应用的预览
+autoOpen: true # 打开工作空间时是否自动开启所有应用的预览
 
 apps:
   # 使用统一的 Docker Compose 启动脚本

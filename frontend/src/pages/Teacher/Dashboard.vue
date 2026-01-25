@@ -482,7 +482,7 @@
 
           <!-- 空状态 -->
           <div
-            v-else-if="!lessonStore.isLoading && lessonStore.lessons.length === 0"
+            v-else-if="(lessonTab === 'my' && !lessonStore.isLoading && lessonStore.lessons.length === 0) || (lessonTab === 'shared' && !isLoadingSharedLessons && sharedLessons.length === 0)"
             class="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-12 text-center"
           >
           <svg
@@ -1086,7 +1086,19 @@ async function loadSharedLessons() {
     // 从API返回的total中减去当前页被过滤掉的教案数量
     // 如果过滤后还有数据，确保总数至少等于过滤后的数量
     const estimatedTotal = Math.max(0, (response.total || 0) - currentUserCreatedInPage)
-    sharedLessonsTotal.value = Math.max(filteredItems.length, estimatedTotal)
+    // 如果当前页有过滤后的数据，总数至少等于当前页的数量
+    // 如果当前页没有数据，但总数还有值，保持总数不变（可能其他页有数据）
+    // 如果当前页没有数据且是第一页，总数设为0
+    if (filteredItems.length > 0) {
+      sharedLessonsTotal.value = Math.max(filteredItems.length, estimatedTotal)
+    } else if (sharedLessonsPage.value === 1) {
+      // 第一页没有数据，说明确实没有共享教案
+      sharedLessonsTotal.value = 0
+    } else {
+      // 不是第一页，保持之前的总数（可能其他页有数据）
+      // 如果之前没有总数，使用估算值
+      sharedLessonsTotal.value = sharedLessonsTotal.value || estimatedTotal
+    }
   } catch (error: any) {
     showToast('error', error.message || '加载共享教案列表失败')
     sharedLessons.value = []

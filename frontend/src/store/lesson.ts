@@ -8,6 +8,9 @@ import type {
 } from '../types/lesson'
 import type { Cell } from '../types/cell'
 import type { LessonListParams } from '../types/api'
+import { createLogger } from '../utils/logger'
+
+const logger = createLogger('LESSON')
 import { lessonService } from '../services/lesson'
 import { isContentWithSections, sectionsToContent } from '../utils/lessonContent'
 
@@ -203,6 +206,24 @@ export const useLessonStore = defineStore('lesson', () => {
     
     try {
       const lesson = await lessonService.fetchLessonById(id)
+
+      // 调试日志：记录加载的数据（仅在开发环境）
+      logger.debug('加载教案:', {
+        lessonId: lesson.id,
+        title: lesson.title,
+        contentLength: lesson.content?.length || 0,
+        contentDetails: (lesson.content || []).map((cell: any, idx: number) => ({
+          index: idx,
+          id: cell?.id,
+          type: cell?.type,
+          order: cell?.order,
+          hasContent: !!cell?.content,
+        })),
+        contentPreview: lesson.content?.slice(0, 2) || [],
+        version: lesson.version,
+        updatedAt: lesson.updated_at,
+      })
+
       currentLesson.value = lesson
       return lesson
     } catch (err: any) {

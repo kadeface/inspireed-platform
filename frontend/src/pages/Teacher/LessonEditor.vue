@@ -1285,7 +1285,20 @@ import { useLessonEditorNav } from '@/composables/useLessonEditorNav'
 import { useLessonEditorSlides } from '@/composables/useLessonEditorSlides'
 import { useLessonEditorCover } from '@/composables/useLessonEditorCover'
 import { useLessonEditorPublish } from '@/composables/useLessonEditorPublish'
+import { useFullscreen } from '@/composables/useFullscreen'
 import { summarizeCell, markdownToHtml } from '@/utils/lessonEditorHelpers'
+import api from '../../services/api'
+import courseExportService from '../../services/courseExport'
+import { useToast } from '@/composables/useToast'
+import { getServerBaseUrl } from '@/utils/url'
+import { createLogger } from '../../utils/logger'
+
+const logger = createLogger('LESSON_EDITOR')
+
+// 配置 dayjs
+dayjs.extend(relativeTime)
+dayjs.locale('zh-cn')
+
 
 const router = useRouter()
 const route = useRoute()
@@ -1348,6 +1361,29 @@ const classroomPanelData = computed(() => {
 
 // cells, displayCells, Slides, Cover, Publish, currentLesson
 const cells = computed(() => lessonStore.cells)
+
+// 🔧 处理 TeacherControlPanel 的 session 变化事件
+function handleSessionChanged(session: any | null) {
+  logger.debug("LessonEditor: 收到 session-changed 事件", {
+    sessionId: session?.id,
+    status: session?.status,
+    timestamp: new Date().toLocaleTimeString(),
+  })
+
+  if (session?.id) {
+    currentSessionId.value = session.id
+    providedSessionRef.value = session
+    console.log('✅ LessonEditor: 已更新 currentSessionId 和 providedSessionRef', {
+      sessionId: session.id,
+      timestamp: new Date().toLocaleTimeString(),
+    })
+  } else {
+    currentSessionId.value = undefined
+    providedSessionRef.value = null
+    logger.debug("LessonEditor: session 已清除")
+  }
+}
+
 const filteredCells = computed(() => {
   if (!cells.value?.length) return []
   if (!isPreviewMode.value) return cells.value
@@ -1394,19 +1430,16 @@ function handleOpenAssistantDrawer(type: 'attendance' | 'behavior' | 'discipline
 }
 
 // 调试：输出课堂控制按钮的显示条件
-watch(
-  [isPreviewMode, () => currentLesson.value?.status],
-  ([preview, status]) => {
-    if (preview) {
-      console.log('🔍 课堂控制按钮显示条件:', {
-        isPreviewMode: preview,
-        lessonStatus: status,
-        shouldShow: preview && status === 'published',
-      })
-    }
-  },
-  { immediate: true }
-)
+watch([isPreviewMode, () => currentLesson.value?.status], ([preview, status]) => {
+  if (preview) {
+    logger.debug("课堂控制按钮显示条件:", {
+      isPreviewMode: preview,
+      lessonStatus: status,
+      shouldShow: preview && status === 'published'
+    })
+  }
+}, { immediate: true })
+
 const isSaving = computed(() => lessonStore.isSaving)
 const availableClassrooms = computed(() => lessonStore.availableClassrooms)
 const isLoadingClassrooms = computed(() => lessonStore.isLoadingClassrooms)
