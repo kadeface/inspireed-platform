@@ -64,9 +64,6 @@
               <el-dropdown-item command="school-profile"
                 ><el-icon><OfficeBuilding /></el-icon> 学校基础资料配置</el-dropdown-item
               >
-              <el-dropdown-item command="organization" divided
-                ><el-icon><User /></el-icon> 组织架构管理</el-dropdown-item
-              >
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -857,7 +854,6 @@ import {
   Bell,
   Refresh,
   Reading,
-  User,
   CircleCheckFilled,
   Loading,
 } from '@element-plus/icons-vue'
@@ -933,7 +929,6 @@ const handleConfigCommand = (c: string) => {
   if (c === 'semester') semesterDialogVisible.value = true
   else if (c === 'subject') subjectConfigDialogVisible.value = true
   else if (c === 'school-profile') schoolProfileDialogVisible.value = true
-  else router.push('/admin/organization')
 }
 // 打开学科标准配置对话框（从考试组织流程中）
 const openSubjectConfigDialog = () => {
