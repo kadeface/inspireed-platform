@@ -14,16 +14,16 @@
     </div>
 
     <!-- 筛选和操作栏 -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-      <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
+      <div class="flex items-center justify-between gap-3 overflow-x-auto">
         <!-- 左侧筛选器 -->
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2 flex-1 min-w-0">
           <el-select
             v-model="filters.admin_role"
-            placeholder="管理员类型"
+            placeholder="类型"
             @change="loadAdmins"
             clearable
-            class="w-40"
+            class="!w-32 shrink-0"
           >
             <el-option label="超级管理员" value="admin" />
             <el-option label="区县管理员" value="district_admin" />
@@ -32,43 +32,43 @@
 
           <el-select
             v-model="filters.region_id"
-            placeholder="所有区域"
+            placeholder="区域"
             @change="loadAdmins"
             clearable
-            class="w-40"
+            class="!w-32 shrink-0"
           >
-            <el-option
-              v-for="region in allRegions"
-              :key="region.id"
-              :label="region.name"
-              :value="region.id"
-            />
+            <el-option v-for="region in allRegions" :key="region.id" :label="region.name" :value="region.id" />
           </el-select>
 
           <el-select
             v-model="filters.school_id"
-            placeholder="所有学校"
+            placeholder="学校"
             @change="loadAdmins"
             clearable
-            class="w-48"
+            class="!w-40 shrink-0"
           >
-            <el-option
-              v-for="school in filteredSchools"
-              :key="school.id"
-              :label="school.name"
-              :value="school.id"
-            />
+            <el-option v-for="school in filteredSchools" :key="school.id" :label="school.name" :value="school.id" />
           </el-select>
 
           <el-input
             v-model="filters.search"
             @input="debouncedLoadAdmins"
-            placeholder="搜索姓名、用户名、邮箱..."
-            class="w-64"
+            placeholder="搜索..."
+            class="!w-48 shrink-0"
             :prefix-icon="Search"
             clearable
           />
+          
+          <el-button @click="loadAdmins" :icon="Refresh" circle plain />
         </div>
+
+        <!-- 右侧操作按钮 -->
+        <div class="flex items-center gap-2 shrink-0">
+          <el-button type="success" @click="openImportDialog" :icon="Upload">导入</el-button>
+          <el-button type="primary" @click="openCreateAdminModal" :icon="Plus">添加</el-button>
+        </div>
+      </div>
+    </div>
 
         <!-- 右侧操作按钮 -->
         <div class="flex items-center gap-3">
