@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正负数运算游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            width: 100vw;
+            padding: 1vh 1vw;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* 全局滚动条样式 */
+        body::-webkit-scrollbar {
+            width: 14px;
+        }
+
+        body::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        body::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+
+        body::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.5);
+            background-clip: padding-box;
+        }
+
+        /* Firefox 滚动条样式 */
+        body {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, 0.3) rgba(255, 255, 255, 0.1);
+        }
+
+        .game-container {
+            min-height: 98vh;
+            width: 98vw;
+            max-width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 1.5vh;
+            padding: 1.5vh 1.5vw 3vh;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: visible;
+        }
+
+        .controls-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1vh;
+            flex-shrink: 0;
+        }
+
+        .checkboxes {
+            display: flex;
+            gap: 1.5vw;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5vw;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 1.2vw;
+            height: 1.2vw;
+            min-width: 14px;
+            min-height: 14px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            font-size: clamp(10px, 1.2vw, 14px);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .sum-display {
+            background: white;
+            border: 0.3vh solid #ff6b6b;
+            border-radius: 1vh;
+            padding: 0.8vh 1.5vw;
+            font-size: clamp(16px, 2vw, 24px);
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            min-width: 15vw;
+            text-align: center;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .sum-display .minimize-icon {
+            position: absolute;
+            top: 0.3vh;
+            right: 1vw;
+            cursor: pointer;
+            color: #ff6b6b;
+            font-size: clamp(14px, 1.5vw, 18px);
+        }
+
+        .number-line-container {
+            position: relative;
+            margin: 1vh 0;
+            padding: 4vh 1.5vw 5vh;
+            background: #f8f9fa;
+            border-radius: 1vh;
+            flex: 0 0 auto;
+            overflow: visible;
+        }
+
+        .number-line {
+            position: relative;
+            height: 5vh;
+            min-height: 50px;
+            background: linear-gradient(to right, #ddd 0%, #ddd 100%);
+            background-size: calc(100% / 31) 100%;
+            border-top: 0.3vh solid #333;
+            border-bottom: 0.3vh solid #333;
+            overflow: visible;
+        }
+
+        .number-line::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 0.3vh;
+            min-width: 2px;
+            background: #333;
+            transform: translateX(-50%);
+            z-index: 5;
+        }
+
+        .tick {
+            position: absolute;
+            top: -1vh;
+            width: 2px;
+            height: 100%;
+            background: #666;
+        }
+
+        .tick.major {
+            width: 3px;
+            background: #333;
+            height: 120%;
+        }
+
+        .tick-label {
+            position: absolute;
+            top: -3.5vh;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: clamp(10px, 1.2vw, 14px);
+            font-weight: bold;
+            color: #333;
+        }
+
+        .current-position {
+            position: absolute;
+            top: -2.5vh;
+            width: clamp(16px, 1.5vw, 20px);
+            height: clamp(16px, 1.5vw, 20px);
+            background: #3498db;
+            border: 0.3vh solid white;
+            border-radius: 50%;
+            transform: translateX(-50%);
+            transition: left 0.3s ease;
+            z-index: 15;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        /* 移动轨迹箭头 */
+        .movement-trace {
+            position: absolute;
+            top: -8vh;
+            pointer-events: none;
+            z-index: 12;
+            opacity: 0;
+            animation: fadeInOut 5s ease-out forwards;
+        }
+
+        @keyframes fadeInOut {
+            0% {
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+            }
+        }
+
+        .trace-arrow {
+            position: relative;
+            width: 100%;
+            height: 6vh;
+        }
+
+        .trace-arrow-svg {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .trace-arrow path {
+            stroke: black;
+            stroke-width: 2.5;
+            fill: none;
+            stroke-linecap: round;
+        }
+
+        .trace-labels {
+            position: absolute;
+            top: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 0.3vh;
+            align-items: center;
+            z-index: 14;
+            pointer-events: none;
+        }
+
+        .trace-label {
+            background: white;
+            color: #333;
+            padding: 0.3vh 0.8vw;
+            border-radius: 0.4vh;
+            font-size: clamp(10px, 1.2vw, 14px);
+            font-weight: bold;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 14;
+        }
+
+        .zero-bag {
+            position: absolute;
+            bottom: -4vh;
+            left: 50%;
+            transform: translateX(-50%);
+            width: clamp(30px, 3vw, 40px);
+            height: clamp(40px, 4vh, 50px);
+            background: #95a5a6;
+            border: 0.2vh solid #7f8c8d;
+            border-radius: 5px 5px 20px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: clamp(12px, 1.3vw, 16px);
+            transition: left 0.3s ease;
+        }
+
+        .token-stacks {
+            display: flex;
+            justify-content: space-between;
+            margin: 1vh 0;
+            flex: 0 0 auto;
+        }
+
+        .token-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.8vh;
+        }
+
+        .token-stack-label {
+            font-size: clamp(12px, 1.5vw, 18px);
+            font-weight: bold;
+            color: #333;
+            padding: 0.5vh 1.2vw;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .token {
+            width: clamp(45px, 5vw, 60px);
+            height: clamp(45px, 5vw, 60px);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(14px, 1.8vw, 20px);
+            font-weight: bold;
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 0.3vh solid rgba(0,0,0,0.2);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .token:active {
+            cursor: grabbing;
+            transform: scale(1.1);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        .token.positive {
+            background: #f1c40f;
+            color: #333;
+        }
+
+        .token.negative {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .token.dragging {
+            opacity: 0.7;
+            transform: scale(1.2);
+            z-index: 1000;
+        }
+
+        .bags-container {
+            display: flex;
+            justify-content: center;
+            gap: 8vw;
+            margin: 1vh 0;
+            flex: 0 0 auto;
+        }
+
+        .bag {
+            width: clamp(90px, 10vw, 120px);
+            height: clamp(100px, 12vh, 140px);
+            background: #95a5a6;
+            border: 0.3vh solid #7f8c8d;
+            border-radius: 10px 10px 40px 40px;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .bag:hover {
+            transform: scale(1.05);
+        }
+
+        .bag.negative-bag::before {
+            content: '';
+            position: absolute;
+            top: -0.5vh;
+            left: 50%;
+            transform: translateX(-50%);
+            width: clamp(45px, 5vw, 60px);
+            height: clamp(10px, 1.5vh, 15px);
+            background: #e74c3c;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .bag.positive-bag::before {
+            content: '';
+            position: absolute;
+            top: -0.5vh;
+            left: 50%;
+            transform: translateX(-50%);
+            width: clamp(45px, 5vw, 60px);
+            height: clamp(10px, 1.5vh, 15px);
+            background: #16a085;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .bag-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: clamp(14px, 2vw, 24px);
+            font-weight: bold;
+            color: white;
+        }
+
+        .bag-tokens {
+            position: absolute;
+            bottom: 1.5vh;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4vh;
+            max-width: 80%;
+            justify-content: center;
+        }
+
+        .bag-token {
+            width: clamp(18px, 2vw, 25px);
+            height: clamp(18px, 2vw, 25px);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(8px, 1vw, 10px);
+            font-weight: bold;
+            border: 0.2vh solid rgba(255,255,255,0.3);
+        }
+
+        .bag-token.positive {
+            background: #f1c40f;
+            color: #333;
+        }
+
+        .bag-token.negative {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .action-bar {
+            display: flex;
+            justify-content: center;
+            margin-top: 1vh;
+            flex-shrink: 0;
+        }
+
+        .reset-button {
+            width: clamp(45px, 5vw, 60px);
+            height: clamp(45px, 5vw, 60px);
+            border-radius: 50%;
+            background: #ff6b6b;
+            border: none;
+            color: white;
+            font-size: clamp(18px, 2.2vw, 24px);
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .reset-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+        }
+
+        .explanation {
+            margin-top: 1vh;
+            padding: 1vh 1.5vw;
+            background: #e8f5e9;
+            border-radius: 0.8vh;
+            border-left: 0.4vh solid #4caf50;
+            display: none;
+            font-size: clamp(10px, 1.2vw, 14px);
+            flex-shrink: 0;
+        }
+
+        .explanation.show {
+            display: block;
+        }
+
+        .symbolic-expression {
+            margin-top: 0.5vh;
+            font-size: clamp(12px, 1.5vw, 18px);
+            color: #333;
+            font-family: 'Courier New', monospace;
+            display: none;
+            flex-shrink: 0;
+        }
+
+        .symbolic-expression.show {
+            display: block;
+        }
+
+        /* 运算步骤显示区域 */
+        .calculation-steps {
+            background: #f8f9fa;
+            border-radius: 1vh;
+            padding: 2vh 2vw;
+            margin: 2vh 0;
+            border: 0.2vh solid #dee2e6;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            height: 20vh;
+            max-height: 25vh;
+        }
+
+        .calculation-steps-title {
+            font-size: clamp(14px, 1.8vw, 20px);
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 1.5vh;
+            text-align: center;
+            padding-bottom: 1vh;
+            border-bottom: 0.2vh solid #dee2e6;
+            flex-shrink: 0;
+        }
+
+        .calculation-steps-list {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1vh 1vw;
+            overflow-y: auto;
+            overflow-x: hidden;
+            flex: 1;
+            min-height: 0;
+            padding-right: 0.5vw;
+        }
+
+        /* 自定义滚动条样式，使其更明显 */
+        .calculation-steps-list::-webkit-scrollbar {
+            width: 14px;
+        }
+
+        .calculation-steps-list::-webkit-scrollbar-track {
+            background: #e0e0e0;
+            border-radius: 10px;
+            margin: 0.5vh 0;
+        }
+
+        .calculation-steps-list::-webkit-scrollbar-thumb {
+            background: #666;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .calculation-steps-list::-webkit-scrollbar-thumb:hover {
+            background: #444;
+        }
+
+        /* Firefox 滚动条样式 */
+        .calculation-steps-list {
+            scrollbar-width: thin;
+            scrollbar-color: #666 #e0e0e0;
+        }
+
+        .calculation-step {
+            background: white;
+            padding: 0.8vh 1vw;
+            border-radius: 0.6vh;
+            border-left: 0.3vh solid #3498db;
+            font-size: clamp(11px, 1.2vw, 14px);
+            color: #333;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-family: 'Courier New', monospace;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            animation: slideIn 0.3s ease-out;
+            min-height: 4vh;
+            gap: 0.5vw;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .calculation-step .step-number {
+            color: #666;
+            font-weight: bold;
+            font-size: clamp(11px, 1.2vw, 14px);
+            margin-right: 0.3vw;
+        }
+
+        .calculation-step .step-formula {
+            font-size: clamp(11px, 1.2vw, 14px);
+            white-space: nowrap;
+            line-height: 1.4;
+        }
+
+        .calculation-step .step-result {
+            font-weight: bold;
+            color: #ff6b35;
+            font-size: clamp(13px, 1.4vw, 17px);
+            line-height: 1.4;
+            margin-left: 0.3vw;
+        }
+
+        /* 响应式：小屏幕时减少列数 */
+        @media (max-width: 1200px) {
+            .calculation-steps-list {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .calculation-steps-list {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .calculation-steps-list {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .drop-zone {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+
+        .drop-zone.active {
+            pointer-events: all;
+            background: rgba(52, 152, 219, 0.1);
+            border: 2px dashed #3498db;
+        }
+
+        /* 底部导航栏 */
+        .bottom-nav-bar {
+            background: #000;
+            padding: 1.5vh 2vw;
+            display: flex;
+            align-items: center;
+            gap: 3vw;
+            border-radius: 0 0 1.5vh 1.5vh;
+            flex-shrink: 0;
+        }
+
+        .nav-title {
+            color: white;
+            font-size: clamp(12px, 1.5vw, 16px);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .nav-icons {
+            display: flex;
+            gap: 3vw;
+            align-items: center;
+            flex: 1;
+            justify-content: flex-start;
+        }
+
+        .nav-icon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5vh;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            flex: 0 0 auto;
+        }
+
+        .nav-icon:hover {
+            opacity: 0.8;
+        }
+
+        .nav-icon.active .nav-icon-label {
+            color: #f1c40f;
+        }
+
+        .nav-icon-svg {
+            width: clamp(20px, 3vw, 28px);
+            height: clamp(20px, 3vw, 28px);
+            stroke: white;
+        }
+
+        .nav-icon.active .nav-icon-svg {
+            stroke: #f1c40f;
+        }
+
+        .nav-icon-custom {
+            width: clamp(20px, 3vw, 28px);
+            height: clamp(20px, 3vw, 28px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .nav-icon-label {
+            color: white;
+            font-size: clamp(10px, 1.1vw, 14px);
+            white-space: nowrap;
+        }
+
+        /* 数字筹码图标样式 */
+        .nav-icon.active .chip-icon {
+            opacity: 1;
+        }
+
+        .chip-icon {
+            position: absolute;
+            width: clamp(12px, 1.8vw, 18px);
+            height: clamp(12px, 1.8vw, 18px);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(7px, 1vw, 10px);
+            font-weight: bold;
+            border: 1.5px solid rgba(255,255,255,0.3);
+        }
+
+        .chip-icon.negative-chip {
+            background: #e74c3c;
+            color: white;
+            left: 0;
+            top: 0;
+            z-index: 2;
+        }
+
+        .chip-icon.positive-chip {
+            background: #f1c40f;
+            color: #333;
+            right: 0;
+            bottom: 0;
+            z-index: 1;
+        }
+
+        /* 净资产图标样式 */
+        .jar-icon {
+            flex-direction: column;
+        }
+
+        .jar-body {
+            width: clamp(16px, 2.2vw, 22px);
+            height: clamp(18px, 2.5vw, 24px);
+            background: #16a085;
+            border-radius: 0 0 3px 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .jar-symbol {
+            color: white;
+            font-size: clamp(10px, 1.3vw, 14px);
+            font-weight: bold;
+        }
+
+        .jar-cap {
+            width: clamp(20px, 2.8vw, 26px);
+            height: clamp(4px, 0.6vh, 6px);
+            background: #d4a574;
+            border-radius: 2px;
+            margin-top: -1px;
+        }
+
+        /* 计算器图标样式 */
+        .calculator-icon {
+            flex-direction: row;
+            gap: 0.3vw;
+            width: auto;
+            height: auto;
+        }
+
+        .calc-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2vh;
+        }
+
+        .calc-btn {
+            width: clamp(8px, 1.2vw, 12px);
+            height: clamp(8px, 1.2vw, 12px);
+            background: #34495e;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(8px, 1vw, 10px);
+            font-weight: bold;
+            border-radius: 2px;
+        }
+
+        .calc-display {
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            border-radius: 2px;
+            padding: 0.2vh 0.4vw;
+            display: flex;
+            align-items: center;
+            gap: 0.2vw;
+        }
+
+        .calc-number {
+            color: #2c3e50;
+            font-size: clamp(7px, 0.9vw, 10px);
+            font-weight: bold;
+        }
+
+        .calc-arrows {
+            display: flex;
+            flex-direction: column;
+            line-height: 0.6;
+        }
+
+        .arrow-up, .arrow-down {
+            color: #7f8c8d;
+            font-size: clamp(6px, 0.8vw, 8px);
+        }
+
+        /* 抽象模型图标样式 */
+        .abstract-icon {
+            width: clamp(24px, 3.5vw, 32px);
+            height: clamp(12px, 1.8vw, 16px);
+        }
+
+        .abstract-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 页面切换 */
+        .page-content {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            overflow: visible;
+            min-height: 0;
+        }
+
+        .page-content.active {
+            display: flex !important;
+        }
+
+        /* 净资产页面样式 */
+        .net-assets-page {
+            background: linear-gradient(135deg, #b19cd9 0%, #a78fc7 100%);
+            padding: 2vh 2vw;
+        }
+
+        .net-assets-header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 2vh;
+            position: relative;
+        }
+
+        .coin-mascot {
+            width: clamp(40px, 5vw, 60px);
+            height: clamp(40px, 5vw, 60px);
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(24px, 3vw, 36px);
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .net-assets-container {
+            display: flex;
+            justify-content: space-around;
+            gap: 3vw;
+            margin-bottom: 3vh;
+            flex: 1;
+        }
+
+        .liabilities-section,
+        .assets-section {
+            flex: 1;
+            max-width: 45%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .section-header {
+            position: relative;
+            margin-bottom: 2vh;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .section-label {
+            background: white;
+            padding: 1vh 2vw;
+            border-radius: 0.5vh;
+            font-size: clamp(16px, 2vw, 24px);
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 2;
+        }
+
+        .section-tag {
+            position: absolute;
+            top: 0;
+            width: clamp(60px, 8vw, 100px);
+            height: clamp(20px, 3vh, 30px);
+            border-radius: 0.5vh 0.5vh 0 0;
+            z-index: 1;
+            margin-top: -1px;
+        }
+
+        .red-tag {
+            background: #e74c3c;
+        }
+
+        .green-tag {
+            background: #27ae60;
+        }
+
+        .items-panel {
+            background: white;
+            border-radius: 1vh;
+            padding: 1.5vh 1.5vw;
+            margin-bottom: 2vh;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5vh;
+            width: 100%;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        .financial-item {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 0.8vh;
+            padding: 1.5vh 1.5vw;
+            cursor: grab;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: clamp(60px, 8vh, 100px);
+            position: relative;
+        }
+
+        .financial-item:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        .financial-item.dragging {
+            opacity: 0.7;
+            transform: scale(1.1);
+            z-index: 1000;
+        }
+
+        .item-icon {
+            width: clamp(40px, 5vw, 60px);
+            height: clamp(40px, 5vw, 60px);
+            background: #f5e6d3;
+            border-radius: 0.5vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(24px, 3vw, 36px);
+            margin-bottom: 0.5vh;
+        }
+
+        .item-value {
+            font-size: clamp(14px, 1.8vw, 20px);
+            font-weight: bold;
+            color: #333;
+            margin: 0.3vh 0;
+        }
+
+        .item-value.large-value {
+            font-size: clamp(18px, 2.2vw, 26px);
+            margin-bottom: 0.5vh;
+        }
+
+        .item-label {
+            font-size: clamp(12px, 1.4vw, 16px);
+            color: #666;
+        }
+
+        /* 负债项目样式 */
+        .credit-card-red {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            border-color: #c0392b;
+            color: white;
+        }
+
+        .credit-card-blue {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            border-color: #2980b9;
+            color: white;
+        }
+
+        .card-number {
+            font-size: clamp(10px, 1.2vw, 14px);
+            letter-spacing: 0.1em;
+            margin: 0.3vh 0;
+        }
+
+        .card-logo {
+            font-size: clamp(8px, 1vw, 12px);
+            font-weight: bold;
+            margin-top: 0.5vh;
+        }
+
+        /* 资产项目样式 */
+        .banknote {
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            border-color: #229954;
+            color: white;
+        }
+
+        .television {
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+            border-color: #7f8c8d;
+        }
+
+        .tv-icon, .bike-icon, .ring-icon {
+            font-size: clamp(28px, 3.5vw, 42px);
+            margin-bottom: 0.5vh;
+        }
+
+        .bike {
+            background: linear-gradient(135deg, #5dade2 0%, #3498db 100%);
+            border-color: #3498db;
+        }
+
+        .ring {
+            background: linear-gradient(135deg, #f4d03f 0%, #f39c12 100%);
+            border-color: #f39c12;
+        }
+
+        /* 袋子样式 */
+        .liabilities-bag,
+        .assets-bag {
+            width: clamp(120px, 15vw, 180px);
+            height: clamp(140px, 18vh, 200px);
+            background: #ecf0f1;
+            border: 3px solid #bdc3c7;
+            border-radius: 10px 10px 50px 50px;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 2vh;
+        }
+
+        .bag-tag {
+            position: absolute;
+            top: -2vh;
+            left: 50%;
+            transform: translateX(-50%);
+            width: clamp(60px, 8vw, 100px);
+            height: clamp(15px, 2vh, 20px);
+            border-radius: 10px 10px 0 0;
+        }
+
+        .red-string {
+            background: #e74c3c;
+        }
+
+        .green-string {
+            background: #27ae60;
+        }
+
+        .bag-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5vh;
+            max-width: 90%;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .bag-item {
+            width: clamp(30px, 4vw, 45px);
+            height: clamp(30px, 4vw, 45px);
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 0.5vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(10px, 1.2vw, 14px);
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .bag-item:hover {
+            transform: scale(1.1);
+        }
+
+        /* 净资产汇总 */
+        .net-assets-summary {
+            background: white;
+            border-radius: 1vh;
+            padding: 2vh 3vw;
+            margin-bottom: 2vh;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 2vw;
+        }
+
+        .summary-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5vh;
+        }
+
+        .summary-label {
+            font-size: clamp(12px, 1.5vw, 18px);
+            color: #666;
+        }
+
+        .summary-value {
+            font-size: clamp(20px, 2.5vw, 32px);
+            font-weight: bold;
+            color: #333;
+        }
+
+        .net-worth {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            padding: 1.5vh 3vw;
+            border-radius: 0.8vh;
+            color: white;
+        }
+
+        .net-worth .summary-label,
+        .net-worth .summary-value {
+            color: white;
+        }
+
+        /* 响应式设计 */
+        @media (max-height: 700px) {
+            .number-line-container {
+                padding: 2vh 1.5vw 3vh;
+            }
+            .token-stacks {
+                margin: 0.5vh 0;
+            }
+            .bags-container {
+                margin: 0.5vh 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 0.5vh 0.5vw;
+            }
+            .game-container {
+                height: 99vh;
+                width: 99vw;
+                padding: 1vh 1vw;
+            }
+            .controls-top {
+                flex-direction: column;
+                gap: 1vh;
+                align-items: flex-start;
+            }
+            .checkboxes {
+                gap: 1vw;
+            }
+            .bags-container {
+                gap: 5vw;
+            }
+            .bottom-nav-bar {
+                padding: 1vh 1.5vw;
+                gap: 2vw;
+            }
+            .nav-icons {
+                gap: 2vw;
+            }
+            .nav-title {
+                font-size: clamp(10px, 1.2vw, 14px);
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 600px) {
+            .number-line-container {
+                padding: 2vh 1.5vw 2.5vh;
+            }
+            .token-stacks {
+                margin: 0.3vh 0;
+            }
+            .token-stack {
+                gap: 0.5vh;
+            }
+            .bags-container {
+                margin: 0.3vh 0;
+            }
+            .action-bar {
+                margin-top: 0.5vh;
+            }
+            .bottom-nav-bar {
+                padding: 0.8vh 1.5vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- 数字筹码页面 -->
+        <div class="game-content page-content active" id="numberLinePage" style="flex: 1; flex-direction: column; overflow: visible;">
+            <div class="controls-top">
+                <div class="checkboxes">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="showExplanation" checked>
+                        <label for="showExplanation">运算说明</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="showSymbolic" checked>
+                        <label for="showSymbolic">符号语言</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="showUnitLength" checked>
+                        <label for="showUnitLength">单位长度</label>
+                    </div>
+                </div>
+                <div class="sum-display">
+                    <span class="minimize-icon" onclick="toggleSumDisplay()">−</span>
+                    <div>总和 = <span id="totalSum">0</span></div>
+                </div>
+            </div>
+            <div class="number-line-container">
+                <div class="number-line" id="numberLine">
+                    <div class="current-position" id="currentPosition" style="left: 50%;"></div>
+                    <div class="zero-bag" id="zeroBag">0</div>
+                </div>
+            </div>
+
+            <div class="explanation" id="explanation">
+                <strong>使用说明：</strong>
+                <ul style="margin-top: 0.5vh; padding-left: 1.5vw;">
+                    <li>拖拽正数筹码（黄色）或负数筹码（红色）到袋子中</li>
+                    <li>蓝色圆点会在数轴上显示当前的总和</li>
+                    <li>将筹码拖到"0"袋子中可以移除该筹码</li>
+                    <li>点击重置按钮可以清空所有筹码</li>
+                </ul>
+            </div>
+
+            <div class="symbolic-expression" id="symbolicExpression">
+                表达式: <span id="expression">0</span>
+            </div>
+
+            <div class="calculation-steps" id="calculationSteps">
+                <div class="calculation-steps-title">运算步骤</div>
+                <div class="calculation-steps-list" id="calculationStepsList">
+                    <!-- 运算步骤将动态添加到这里 -->
+                </div>
+            </div>
+
+            <div class="token-stacks">
+                <div class="token-stack">
+                    <div class="token-stack-label">负数</div>
+                    <div class="token negative" draggable="true" data-value="-1">-1</div>
+                    <div class="token negative" draggable="true" data-value="-2">-2</div>
+                    <div class="token negative" draggable="true" data-value="-3">-3</div>
+                    <div class="token negative" draggable="true" data-value="-4">-4</div>
+                    <div class="token negative" draggable="true" data-value="-5">-5</div>
+                </div>
+                <div class="token-stack">
+                    <div class="token-stack-label">正数</div>
+                    <div class="token positive" draggable="true" data-value="1">+1</div>
+                    <div class="token positive" draggable="true" data-value="2">+2</div>
+                    <div class="token positive" draggable="true" data-value="3">+3</div>
+                    <div class="token positive" draggable="true" data-value="4">+4</div>
+                    <div class="token positive" draggable="true" data-value="5">+5</div>
+                </div>
+            </div>
+
+            <div class="bags-container">
+                <div class="bag negative-bag" id="negativeBag">
+                    <div class="bag-content">负数袋</div>
+                    <div class="bag-tokens" id="negativeBagTokens"></div>
+                </div>
+                <div class="bag positive-bag" id="positiveBag">
+                    <div class="bag-content">正数袋</div>
+                    <div class="bag-tokens" id="positiveBagTokens"></div>
+                </div>
+            </div>
+
+            <div class="action-bar">
+                <button class="reset-button" onclick="resetGame()" title="重置">↻</button>
+            </div>
+        </div>
+
+        <!-- 净资产页面 -->
+        <div class="net-assets-page page-content" id="netAssetsPage" style="flex: 1; flex-direction: column; overflow: visible;">
+            <div class="net-assets-header">
+                <div class="coin-mascot">$</div>
+            </div>
+            
+            <div class="net-assets-container">
+                <!-- 负债部分 -->
+                <div class="liabilities-section">
+                    <div class="section-header liabilities-header">
+                        <div class="section-label liabilities-label">负债</div>
+                        <div class="section-tag red-tag"></div>
+                    </div>
+                    <div class="items-panel liabilities-items-panel">
+                        <div class="financial-item liability-item" draggable="true" data-value="-100" data-type="liability">
+                            <div class="item-icon bank-loan-icon">
+                                <div class="icon-building">🏦</div>
+                            </div>
+                            <div class="item-value">$100</div>
+                            <div class="item-label">贷款</div>
+                        </div>
+                        <div class="financial-item liability-item credit-card-red" draggable="true" data-value="-200" data-type="liability">
+                            <div class="item-value large-value">$200</div>
+                            <div class="card-number">123 456 789</div>
+                            <div class="card-logo">PHET</div>
+                        </div>
+                        <div class="financial-item liability-item" draggable="true" data-value="-300" data-type="liability">
+                            <div class="item-icon bike-loan-icon">
+                                <div class="icon-bike">🚲</div>
+                            </div>
+                            <div class="item-value">$300</div>
+                            <div class="item-label">贷款</div>
+                        </div>
+                        <div class="financial-item liability-item credit-card-blue" draggable="true" data-value="-400" data-type="liability">
+                            <div class="item-value large-value">$400</div>
+                            <div class="card-number">123 456 789</div>
+                            <div class="card-logo">PHET</div>
+                        </div>
+                    </div>
+                    <div class="liabilities-bag" id="liabilitiesBag">
+                        <div class="bag-tag red-string"></div>
+                        <div class="bag-items" id="liabilitiesBagItems"></div>
+                    </div>
+                </div>
+
+                <!-- 资产部分 -->
+                <div class="assets-section">
+                    <div class="section-header assets-header">
+                        <div class="section-label assets-label">资产</div>
+                        <div class="section-tag green-tag"></div>
+                    </div>
+                    <div class="items-panel assets-items-panel">
+                        <div class="financial-item asset-item banknote" draggable="true" data-value="100" data-type="asset">
+                            <div class="item-value">$100</div>
+                        </div>
+                        <div class="financial-item asset-item television" draggable="true" data-value="200" data-type="asset">
+                            <div class="tv-icon">📺</div>
+                            <div class="item-value">$200</div>
+                        </div>
+                        <div class="financial-item asset-item bike" draggable="true" data-value="300" data-type="asset">
+                            <div class="bike-icon">🚲</div>
+                            <div class="item-value">$300</div>
+                        </div>
+                        <div class="financial-item asset-item ring" draggable="true" data-value="400" data-type="asset">
+                            <div class="ring-icon">💍</div>
+                            <div class="item-value">$400</div>
+                        </div>
+                    </div>
+                    <div class="assets-bag" id="assetsBag">
+                        <div class="bag-tag green-string"></div>
+                        <div class="bag-items" id="assetsBagItems"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="net-assets-summary">
+                <div class="summary-item">
+                    <span class="summary-label">总资产:</span>
+                    <span class="summary-value assets-total">$0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">总负债:</span>
+                    <span class="summary-value liabilities-total">$0</span>
+                </div>
+                <div class="summary-item net-worth">
+                    <span class="summary-label">净资产:</span>
+                    <span class="summary-value net-worth-value">$0</span>
+                </div>
+            </div>
+
+            <div class="action-bar">
+                <button class="reset-button" onclick="resetNetAssets()" title="重置">↻</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let totalSum = 0;
+        let previousSum = 0;
+        let tokensInBags = { positive: [], negative: [] };
+        let draggedElement = null;
+        let calculationHistory = []; // 存储运算历史
+
+        // 初始化数轴刻度
+        function initNumberLine() {
+            const numberLine = document.getElementById('numberLine');
+            const startValue = -15;
+            const endValue = 15;
+            const totalIntervals = endValue - startValue; // 30个间隔（-15到15之间有30个单位）
+
+            // 清除现有刻度
+            const existingTicks = numberLine.querySelectorAll('.tick, .tick-label');
+            existingTicks.forEach(tick => tick.remove());
+
+            // 创建刻度：从-15到15，共31个整数位置
+            for (let value = startValue; value <= endValue; value++) {
+                const isMajor = value % 5 === 0;
+                const tick = document.createElement('div');
+                tick.className = `tick ${isMajor ? 'major' : ''}`;
+                
+                // 计算位置：将value映射到0-100%的位置
+                const position = ((value - startValue) / totalIntervals) * 100;
+                tick.style.left = `${position}%`;
+
+                if (isMajor) {
+                    const label = document.createElement('div');
+                    label.className = 'tick-label';
+                    label.textContent = value;
+                    label.style.left = `${position}%`;
+                    numberLine.appendChild(label);
+                }
+
+                numberLine.appendChild(tick);
+            }
+        }
+
+        // 更新总和显示
+        function updateSum() {
+            document.getElementById('totalSum').textContent = totalSum;
+            updateCurrentPosition();
+            updateSymbolicExpression();
+        }
+
+        // 创建移动轨迹
+        function createMovementTrace(startValue, endValue, operationValue) {
+            const numberLine = document.getElementById('numberLine');
+            const startPos = -15;
+            const endPos = 15;
+            const totalIntervals = endPos - startPos;
+            
+            // 限制数值范围
+            const clampedStart = Math.max(-15, Math.min(15, startValue));
+            const clampedEnd = Math.max(-15, Math.min(15, endValue));
+            
+            // 计算起点和终点的百分比位置
+            const startPercentage = ((clampedStart - startPos) / totalIntervals) * 100;
+            const endPercentage = ((clampedEnd - startPos) / totalIntervals) * 100;
+            
+            // 创建轨迹容器
+            const traceContainer = document.createElement('div');
+            traceContainer.className = 'movement-trace';
+            
+            // 设置容器的位置（使用起点和终点的中间位置，宽度为两者距离）
+            const minPercentage = Math.min(startPercentage, endPercentage);
+            const maxPercentage = Math.max(startPercentage, endPercentage);
+            const traceWidth = maxPercentage - minPercentage;
+            const traceLeft = minPercentage;
+            
+            traceContainer.style.left = `${traceLeft}%`;
+            traceContainer.style.width = `${traceWidth}%`;
+            
+            // 创建箭头SVG
+            const arrowContainer = document.createElement('div');
+            arrowContainer.className = 'trace-arrow';
+            
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'trace-arrow-svg');
+            svg.setAttribute('viewBox', '0 0 100 100');
+            svg.setAttribute('preserveAspectRatio', 'none');
+            
+            // 定义箭头标记（使用唯一ID）
+            const markerId = 'arrowhead-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+            marker.setAttribute('id', markerId);
+            marker.setAttribute('markerWidth', '10');
+            marker.setAttribute('markerHeight', '10');
+            marker.setAttribute('refX', '9');
+            marker.setAttribute('refY', '3');
+            marker.setAttribute('orient', 'auto');
+            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            polygon.setAttribute('points', '0 0, 10 3, 0 6');
+            polygon.setAttribute('fill', 'black');
+            marker.appendChild(polygon);
+            defs.appendChild(marker);
+            svg.appendChild(defs);
+            
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            
+            // 计算路径：向上弯曲的箭头
+            const isLeftToRight = startPercentage < endPercentage;
+            const startX = isLeftToRight ? 5 : 95;
+            const endX = isLeftToRight ? 95 : 5;
+            // 箭头路径放在SVG的下半部分（70-70），控制点在45，为标签留出上方空间
+            const startY = 70;
+            const endY = 70;
+            const midY = 45; // 向上弯曲，中间点向上偏移
+            
+            // 使用二次贝塞尔曲线创建向上弯曲的箭头
+            const pathData = `M ${startX} ${startY} Q 50 ${midY} ${endX} ${endY}`;
+            path.setAttribute('d', pathData);
+            
+            // 箭头方向：向右移动时箭头在终点，向左移动时需要反转
+            if (isLeftToRight) {
+                path.setAttribute('marker-end', `url(#${markerId})`);
+            } else {
+                // 向左移动，需要创建反向箭头标记
+                const reverseMarker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+                const reverseMarkerId = markerId + '-reverse';
+                reverseMarker.setAttribute('id', reverseMarkerId);
+                reverseMarker.setAttribute('markerWidth', '10');
+                reverseMarker.setAttribute('markerHeight', '10');
+                reverseMarker.setAttribute('refX', '1');
+                reverseMarker.setAttribute('refY', '3');
+                reverseMarker.setAttribute('orient', 'auto');
+                const reversePolygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                reversePolygon.setAttribute('points', '10 0, 0 3, 10 6');
+                reversePolygon.setAttribute('fill', 'black');
+                reverseMarker.appendChild(reversePolygon);
+                defs.appendChild(reverseMarker);
+                path.setAttribute('marker-end', `url(#${reverseMarkerId})`);
+            }
+            
+            svg.appendChild(path);
+            arrowContainer.appendChild(svg);
+            
+            // 创建标签（只显示数字，不显示描述文字）
+            const labelsContainer = document.createElement('div');
+            labelsContainer.className = 'trace-labels';
+            
+            const label = document.createElement('div');
+            label.className = 'trace-label';
+            label.textContent = operationValue > 0 ? `+${operationValue}` : `${operationValue}`;
+            
+            labelsContainer.appendChild(label);
+            
+            traceContainer.appendChild(arrowContainer);
+            traceContainer.appendChild(labelsContainer);
+            
+            numberLine.appendChild(traceContainer);
+            
+            // 5秒后移除轨迹
+            setTimeout(() => {
+                if (traceContainer.parentNode) {
+                    traceContainer.parentNode.removeChild(traceContainer);
+                }
+            }, 5000);
+        }
+
+        // 更新数轴上的位置
+        function updateCurrentPosition() {
+            const position = document.getElementById('currentPosition');
+            const zeroBag = document.getElementById('zeroBag');
+            const startValue = -15;
+            const endValue = 15;
+            const totalIntervals = endValue - startValue; // 30个间隔
+            
+            // 限制总和在-15到15之间
+            const clampedSum = Math.max(-15, Math.min(15, totalSum));
+            const clampedPrevious = Math.max(-15, Math.min(15, previousSum));
+            
+            // 如果总和发生变化（且不是初始状态），创建移动轨迹
+            if (previousSum !== totalSum) {
+                const operationValue = totalSum - previousSum;
+                createMovementTrace(clampedPrevious, clampedSum, operationValue);
+            }
+            
+            // 计算位置：将总和映射到0-100%的位置
+            const percentage = ((clampedSum - startValue) / totalIntervals) * 100;
+            position.style.left = `${percentage}%`;
+            
+            // 同时更新"0"袋子的位置
+            if (zeroBag) {
+                zeroBag.style.left = `${percentage}%`;
+                // 更新袋子中显示的数字为当前总和
+                zeroBag.textContent = clampedSum;
+            }
+            
+            // 更新previousSum
+            previousSum = totalSum;
+        }
+
+        // 更新符号表达式
+        function updateSymbolicExpression() {
+            const expressionDiv = document.getElementById('expression');
+            if (totalSum === 0) {
+                expressionDiv.textContent = '0';
+                return;
+            }
+
+            const parts = [];
+            tokensInBags.positive.forEach(val => parts.push(`+${val}`));
+            tokensInBags.negative.forEach(val => parts.push(`${val}`));
+            
+            if (parts.length === 0) {
+                expressionDiv.textContent = '0';
+            } else {
+                expressionDiv.textContent = parts.join(' ') + ' = ' + totalSum;
+            }
+        }
+
+        // 更新运算步骤显示
+        function updateCalculationSteps() {
+            const stepsList = document.getElementById('calculationStepsList');
+            stepsList.innerHTML = '';
+
+            if (calculationHistory.length === 0) {
+                return;
+            }
+
+            calculationHistory.forEach((step, index) => {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'calculation-step';
+                
+                const stepNumber = document.createElement('span');
+                stepNumber.className = 'step-number';
+                stepNumber.textContent = `${index + 1}.`;
+                
+                const stepFormula = document.createElement('span');
+                stepFormula.className = 'step-formula';
+                const prevValue = step.previousSum;
+                const addedValue = step.addedValue;
+                const formattedValue = addedValue > 0 ? `(+${addedValue})` : `(${addedValue})`;
+                stepFormula.textContent = `${prevValue} + ${formattedValue} =`;
+                
+                const stepResult = document.createElement('span');
+                stepResult.className = 'step-result';
+                stepResult.textContent = step.newSum;
+                
+                stepDiv.appendChild(stepNumber);
+                stepDiv.appendChild(stepFormula);
+                stepDiv.appendChild(stepResult);
+                
+                stepsList.appendChild(stepDiv);
+            });
+
+            // 滚动到底部以显示最新的步骤（滚动父容器）
+            const stepsContainer = document.getElementById('calculationSteps');
+            if (stepsContainer) {
+                stepsContainer.scrollTop = stepsContainer.scrollHeight;
+            }
+        }
+
+        // 添加筹码到袋子
+        function addTokenToBag(value, bagType) {
+            const previousSum = totalSum;
+            tokensInBags[bagType].push(value);
+            totalSum += value;
+            
+            // 记录运算步骤
+            calculationHistory.push({
+                previousSum: previousSum,
+                addedValue: value,
+                newSum: totalSum
+            });
+            
+            updateBagDisplay(bagType);
+            updateSum();
+            updateCalculationSteps();
+        }
+
+        // 从袋子移除筹码
+        function removeTokenFromBag(value, bagType) {
+            const index = tokensInBags[bagType].indexOf(value);
+            if (index > -1) {
+                tokensInBags[bagType].splice(index, 1);
+                totalSum -= value;
+                
+                // 重新构建运算历史
+                rebuildCalculationHistory();
+                
+                updateBagDisplay(bagType);
+                updateSum();
+                updateCalculationSteps();
+            }
+        }
+
+        // 重新构建运算历史（当移除筹码时使用）
+        function rebuildCalculationHistory() {
+            calculationHistory = [];
+            let currentSum = 0;
+            
+            // 按照添加顺序重建历史（先处理负数，再处理正数，或者按照实际添加顺序）
+            // 为了简化，我们按照袋子中的顺序重建
+            const allTokens = [];
+            tokensInBags.negative.forEach(val => allTokens.push({value: val, type: 'negative'}));
+            tokensInBags.positive.forEach(val => allTokens.push({value: val, type: 'positive'}));
+            
+            allTokens.forEach(token => {
+                const previousSum = currentSum;
+                currentSum += token.value;
+                calculationHistory.push({
+                    previousSum: previousSum,
+                    addedValue: token.value,
+                    newSum: currentSum
+                });
+            });
+        }
+
+        // 更新袋子显示
+        function updateBagDisplay(bagType) {
+            const bagTokensDiv = document.getElementById(`${bagType}BagTokens`);
+            bagTokensDiv.innerHTML = '';
+            tokensInBags[bagType].forEach((value, index) => {
+                const token = document.createElement('div');
+                token.className = `bag-token ${bagType === 'positive' ? 'positive' : 'negative'}`;
+                token.textContent = bagType === 'positive' ? `+${value}` : value;
+                token.onclick = () => {
+                    removeTokenFromBag(value, bagType);
+                };
+                bagTokensDiv.appendChild(token);
+            });
+        }
+
+        // 拖拽开始
+        document.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('token')) {
+                draggedElement = e.target;
+                e.target.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            }
+        });
+
+        // 拖拽结束
+        document.addEventListener('dragend', (e) => {
+            if (e.target.classList.contains('token')) {
+                e.target.classList.remove('dragging');
+            }
+        });
+
+        // 拖拽悬停
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (e.target.classList.contains('bag') || e.target.closest('.bag')) {
+                e.dataTransfer.dropEffect = 'move';
+            }
+        });
+
+        // 拖拽放下
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!draggedElement) return;
+
+            const value = parseInt(draggedElement.getAttribute('data-value'));
+            const bag = e.target.closest('.bag');
+            const zeroBag = e.target.closest('.zero-bag');
+
+            if (zeroBag) {
+                // 如果拖到0袋子，移除最近添加的对应值的筹码
+                const bagType = value > 0 ? 'positive' : 'negative';
+                removeTokenFromBag(value, bagType);
+                draggedElement = null;
+                return;
+            }
+
+            if (bag) {
+                if (bag.id === 'positiveBag' && value > 0) {
+                    addTokenToBag(value, 'positive');
+                } else if (bag.id === 'negativeBag' && value < 0) {
+                    addTokenToBag(value, 'negative');
+                }
+            }
+
+            draggedElement = null;
+        });
+
+        // 重置游戏
+        function resetGame() {
+            totalSum = 0;
+            previousSum = 0;
+            tokensInBags = { positive: [], negative: [] };
+            calculationHistory = [];
+            
+            // 清除所有移动轨迹
+            const numberLine = document.getElementById('numberLine');
+            const traces = numberLine.querySelectorAll('.movement-trace');
+            traces.forEach(trace => trace.remove());
+            
+            updateBagDisplay('positive');
+            updateBagDisplay('negative');
+            updateSum();
+            updateCalculationSteps();
+        }
+
+        // 切换总和显示
+        function toggleSumDisplay() {
+            const display = document.querySelector('.sum-display > div');
+            display.style.display = display.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // 复选框事件
+        document.getElementById('showExplanation').addEventListener('change', (e) => {
+            const explanation = document.getElementById('explanation');
+            if (e.target.checked) {
+                explanation.classList.add('show');
+            } else {
+                explanation.classList.remove('show');
+            }
+        });
+
+        document.getElementById('showSymbolic').addEventListener('change', (e) => {
+            const symbolic = document.getElementById('symbolicExpression');
+            if (e.target.checked) {
+                symbolic.classList.add('show');
+            } else {
+                symbolic.classList.remove('show');
+            }
+        });
+
+        document.getElementById('showUnitLength').addEventListener('change', (e) => {
+            const labels = document.querySelectorAll('.tick-label');
+            labels.forEach(label => {
+                label.style.display = e.target.checked ? 'block' : 'none';
+            });
+        });
+
+        // 净资产页面数据
+        let netAssetsData = {
+            assets: [],
+            liabilities: []
+        };
+
+        // 页面切换功能
+        function switchPage(pageName) {
+            // 隐藏所有页面
+            document.querySelectorAll('.page-content').forEach(page => {
+                page.classList.remove('active');
+            });
+
+            // 显示目标页面
+            if (pageName === 'numberLine') {
+                document.getElementById('numberLinePage').classList.add('active');
+                document.querySelector('.nav-title').textContent = '数轴: 运算';
+            } else if (pageName === 'netAssets') {
+                document.getElementById('netAssetsPage').classList.add('active');
+                document.querySelector('.nav-title').textContent = '净资产';
+            } else if (pageName === 'home') {
+                document.getElementById('numberLinePage').classList.add('active');
+                document.querySelector('.nav-title').textContent = '数轴: 运算';
+            }
+        }
+
+        // 导航栏交互
+        document.addEventListener('DOMContentLoaded', () => {
+            const navIcons = document.querySelectorAll('.nav-icon');
+            navIcons.forEach(icon => {
+                icon.addEventListener('click', () => {
+                    const pageName = icon.getAttribute('data-page');
+                    if (pageName) {
+                        // 移除所有active状态
+                        navIcons.forEach(i => i.classList.remove('active'));
+                        // 添加当前点击的active状态
+                        icon.classList.add('active');
+                        // 切换页面
+                        switchPage(pageName);
+                    }
+                });
+            });
+        });
+
+        // 更新净资产汇总
+        function updateNetAssetsSummary() {
+            const totalAssets = netAssetsData.assets.reduce((sum, item) => sum + item.value, 0);
+            const totalLiabilities = netAssetsData.liabilities.reduce((sum, item) => sum + Math.abs(item.value), 0);
+            const netWorth = totalAssets - totalLiabilities;
+
+            document.querySelector('.assets-total').textContent = `$${totalAssets}`;
+            document.querySelector('.liabilities-total').textContent = `$${totalLiabilities}`;
+            document.querySelector('.net-worth-value').textContent = `$${netWorth}`;
+        }
+
+        // 添加项目到袋子
+        function addItemToBag(itemElement, bagType) {
+            const value = parseInt(itemElement.getAttribute('data-value'));
+            const type = itemElement.getAttribute('data-type');
+            const itemData = {
+                value: value,
+                type: type,
+                element: itemElement
+            };
+
+            if (bagType === 'assets') {
+                netAssetsData.assets.push(itemData);
+                displayBagItems('assetsBagItems', netAssetsData.assets);
+            } else if (bagType === 'liabilities') {
+                netAssetsData.liabilities.push(itemData);
+                displayBagItems('liabilitiesBagItems', netAssetsData.liabilities);
+            }
+
+            updateNetAssetsSummary();
+        }
+
+        // 从袋子移除项目
+        function removeItemFromBag(value, bagType, index) {
+            if (bagType === 'assets') {
+                netAssetsData.assets.splice(index, 1);
+                displayBagItems('assetsBagItems', netAssetsData.assets);
+            } else if (bagType === 'liabilities') {
+                netAssetsData.liabilities.splice(index, 1);
+                displayBagItems('liabilitiesBagItems', netAssetsData.liabilities);
+            }
+            updateNetAssetsSummary();
+        }
+
+        // 显示袋子中的项目
+        function displayBagItems(bagId, items) {
+            const bagItems = document.getElementById(bagId);
+            bagItems.innerHTML = '';
+            items.forEach((item, index) => {
+                const bagItem = document.createElement('div');
+                bagItem.className = 'bag-item';
+                bagItem.textContent = `$${Math.abs(item.value)}`;
+                bagItem.onclick = () => {
+                    removeItemFromBag(item.value, item.type === 'asset' ? 'assets' : 'liabilities', index);
+                };
+                bagItems.appendChild(bagItem);
+            });
+        }
+
+        // 重置净资产页面
+        function resetNetAssets() {
+            netAssetsData = {
+                assets: [],
+                liabilities: []
+            };
+            displayBagItems('assetsBagItems', []);
+            displayBagItems('liabilitiesBagItems', []);
+            updateNetAssetsSummary();
+        }
+
+        // 净资产页面拖拽功能
+        document.addEventListener('DOMContentLoaded', () => {
+            // 拖拽开始
+            document.addEventListener('dragstart', (e) => {
+                if (e.target.classList.contains('financial-item')) {
+                    e.target.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                }
+            });
+
+            // 拖拽结束
+            document.addEventListener('dragend', (e) => {
+                if (e.target.classList.contains('financial-item')) {
+                    e.target.classList.remove('dragging');
+                }
+            });
+
+            // 拖拽悬停
+            document.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (e.target.classList.contains('assets-bag') || 
+                    e.target.classList.contains('liabilities-bag') ||
+                    e.target.closest('.assets-bag') ||
+                    e.target.closest('.liabilities-bag')) {
+                    e.dataTransfer.dropEffect = 'move';
+                }
+            });
+
+            // 拖拽放下
+            document.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const draggedItem = document.querySelector('.financial-item.dragging');
+                if (!draggedItem) return;
+
+                const itemType = draggedItem.getAttribute('data-type');
+                const value = parseInt(draggedItem.getAttribute('data-value'));
+
+                const bag = e.target.closest('.assets-bag') || e.target.closest('.liabilities-bag');
+                
+                if (bag) {
+                    if (bag.id === 'assetsBag' && itemType === 'asset') {
+                        addItemToBag(draggedItem, 'assets');
+                    } else if (bag.id === 'liabilitiesBag' && itemType === 'liability') {
+                        addItemToBag(draggedItem, 'liabilities');
+                    }
+                }
+            });
+        });
+
+        // 初始化
+        window.addEventListener('load', () => {
+            initNumberLine();
+            updateSum();
+            // 默认显示数字筹码页面
+            switchPage('numberLine');
+        });
+
+        window.addEventListener('resize', () => {
+            initNumberLine();
+            updateCurrentPosition();
+        });
+    </script>
+</body>
+</html>

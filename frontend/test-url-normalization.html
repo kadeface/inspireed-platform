@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL规范化测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .result-box {
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .url-original {
+            color: #d32f2f;
+            word-break: break-all;
+        }
+        .url-normalized {
+            color: #388e3c;
+            word-break: break-all;
+        }
+        .info-box {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-left: 4px solid #2196f3;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>URL规范化测试</h1>
+    <div id="results"></div>
+    
+    <script>
+        // 模拟 getServerBaseUrl
+        function getServerBaseUrl() {
+            const hostname = window.location.hostname;
+            const protocol = window.location.protocol;
+            return `${protocol}//${hostname}:8000`;
+        }
+        
+        // 测试URL
+        const testUrls = [
+            'http://localhost:8000/uploads/resources/test.png',
+            'http://127.0.0.1:8000/uploads/resources/test.png',
+            'http://192.168.1.100:8000/uploads/resources/test.png',
+            '/uploads/resources/test.png',
+            'test.png'
+        ];
+        
+        const baseURL = getServerBaseUrl();
+        const results = document.getElementById('results');
+        
+        results.innerHTML = `
+            <div class="info-box">
+                <p><strong>当前访问地址:</strong> ${window.location.href}</p>
+                <p><strong>服务器基础URL:</strong> ${baseURL}</p>
+                <p><strong>说明:</strong> 如果你通过 192.168.2.53:5173 访问，服务器基础URL应该是 http://192.168.2.53:8000</p>
+            </div>
+        `;
+        results.innerHTML += '<h2>URL规范化测试结果:</h2>';
+        
+        testUrls.forEach(url => {
+            let normalized = url;
+            
+            // 规范化逻辑
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                try {
+                    const urlObj = new URL(url);
+                    if (urlObj.pathname.startsWith('/uploads/')) {
+                        normalized = baseURL + urlObj.pathname;
+                    }
+                } catch (e) {
+                    console.error('URL解析失败:', e);
+                }
+            } else if (url.startsWith('/uploads/')) {
+                normalized = baseURL + url;
+            }
+            
+            const isChanged = url !== normalized;
+            results.innerHTML += `
+                <div class="result-box">
+                    <p><strong>原始URL:</strong><br><span class="url-original">${url}</span></p>
+                    <p><strong>规范化后:</strong><br><span class="url-normalized">${normalized}</span></p>
+                    <p><strong>状态:</strong> ${isChanged ? '✅ 已转换' : '⚪ 无需转换'}</p>
+                </div>
+            `;
+        });
+    </script>
+</body>
+</html>
+

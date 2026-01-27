@@ -1,0 +1,153 @@
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: inspireed-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: PI8UMvbPmzCtAfirVBHRsWm3sKGGkYuO
+      POSTGRES_DB: inspireed
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - inspireed-network
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: inspireed-redis
+    command: redis-server --requirepass Khk2J4WGp9w87ZaSpYFtRPjsinB7aL6B
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - inspireed-network
+
+  # MinIO 对象存储（生产环境建议使用阿里云 OSS）
+  minio:
+    image: minio/minio:latest
+    container_name: inspireed-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: PkvxwDXsGO1nZM5h6Mu8CYjNpgPfvGEO
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - inspireed-network
+
+  # 后端 FastAPI 服务
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: inspireed-backend
+    # backend/.env 通过 volume mount 挂载到容器中，应用会自动读取
+    # 但需要覆盖一些 Docker 网络相关的配置
+    env_file:
+      - .env
+    environment:
+      # 数据库配置（Docker 网络中使用服务名，覆盖 backend/.env 中的 localhost）
+      POSTGRES_SERVER: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: PI8UMvbPmzCtAfirVBHRsWm3sKGGkYuO
+      POSTGRES_DB: inspireed
+      POSTGRES_PORT: 5432
+      # Redis 配置（Docker 网络中使用服务名）
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: Khk2J4WGp9w87ZaSpYFtRPjsinB7aL6B
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: PkvxwDXsGO1nZM5h6Mu8CYjNpgPfvGEO
+      MINIO_SECURE: "false"
+      # CORS 配置 - CloudStudio 环境需要允许所有来源
+      # 确保 ALLOW_LAN_ACCESS 为 True，这样会使用正则表达式匹配所有 CloudStudio 域名
+      ALLOW_LAN_ACCESS: "true"
+      BACKEND_CORS_ORIGINS: '["*"]'
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+      - backend_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - inspireed-network
+
+  # 前端 Vue 应用 - 生产版本（使用 Nginx，端口 80）
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile  # 使用生产模式 Dockerfile（多阶段构建）
+      args:
+        VITE_API_BASE_URL: http://111.230.61.28:8000/api/v1
+    container_name: inspireed-frontend
+    ports:
+      - "80:80"  # 生产环境使用标准 HTTP 端口
+    volumes:
+      - ../frontend:/app  # 可选：用于开发时热重载，生产环境可移除
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - inspireed-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  backend_storage:
+    driver: local
+
+networks:
+  inspireed-network:
+    name: docker_inspireed-network
+    driver: bridge
+

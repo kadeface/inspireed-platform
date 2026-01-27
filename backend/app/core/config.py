@@ -1,0 +1,158 @@
+"""
+应用配置管理
+"""
+
+import json
+import os
+from typing import Any, Dict, List, Optional, Union
+from pydantic import AnyHttpUrl, PostgresDsn, field_validator, BeforeValidator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing_extensions import Annotated
+
+
+def parse_cors(v: Any) -> List[str]:
+    """解析 CORS origins"""
+    if isinstance(v, str):
+        # 处理空字符串
+        if not v or v.strip() == "":
+            return []
+        # 尝试作为 JSON 解析
+        try:
+            parsed = json.loads(v)
+            if isinstance(parsed, list):
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            pass
+        # 否则按逗号分隔
+        return [i.strip() for i in v.split(",") if i.strip()]
+    elif isinstance(v, list):
+        return v
+    return []
+
+
+class Settings(BaseSettings):
+    """应用配置类"""
+
+    # 检测是否在 Docker 环境中（通过检查是否存在环境变量）
+    _is_docker = os.getenv('POSTGRES_SERVER') and os.getenv('POSTGRES_SERVER') != 'localhost'
+
+    model_config = SettingsConfigDict(
+        # 在 Docker 环境中不读取 .env 文件，使用环境变量
+        env_file=None if _is_docker else ".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+        # 环境变量优先级高于 .env 文件
+        env_prefix="",
+    )
+
+    # 基础配置
+    PROJECT_NAME: str = "InspireEd"
+    VERSION: str = "1.0.0"
+    API_V1_STR: str = "/api/v1"
+
+    # 安全配置
+    SECRET_KEY: str = "your-secret-key-change-in-production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
+    # CORS - 允许局域网访问
+    # 在生产环境中，应该设置具体的域名而不是使用通配符
+    # 可以通过环境变量 BACKEND_CORS_ORIGINS 覆盖
+    # 支持格式：逗号分隔 或 JSON数组
+    # 例如：BACKEND_CORS_ORIGINS=http://localhost:5173,http://192.168.1.100:5173
+    # 或：BACKEND_CORS_ORIGINS=["http://localhost:5173","http://192.168.1.100:5173"]
+    BACKEND_CORS_ORIGINS: Annotated[List[str], BeforeValidator(parse_cors)] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        # 支持常见的局域网IP段 (192.168.x.x)
+        # 如需添加更多IP，请通过环境变量配置
+    ]
+
+    # 是否允许局域网访问（开发模式）
+    # 生产环境应设置为 False
+    ALLOW_LAN_ACCESS: bool = True
+
+    # 数据库配置
+    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "inspireed"
+    POSTGRES_PORT: int = 5432
+
+    DATABASE_URI: Optional[PostgresDsn] = None
+
+    @field_validator("DATABASE_URI", mode="before")
+    @classmethod
+    def assemble_db_connection(cls, v: Optional[str], info: Any) -> Any:
+        if isinstance(v, str):
+            return v
+        values = info.data
+        user = values.get("POSTGRES_USER") or ""
+        password = values.get("POSTGRES_PASSWORD") or ""
+        host = values.get("POSTGRES_SERVER") or "localhost"
+        port = values.get("POSTGRES_PORT") or 5432
+        database = values.get("POSTGRES_DB") or ""
+        return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{database}"
+
+    # Redis配置
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: Optional[str] = None
+
+    # MinIO配置
+    MINIO_ENDPOINT: str = "localhost:9000"
+    MINIO_ACCESS_KEY: str = "minioadmin"
+    MINIO_SECRET_KEY: str = "minioadmin"
+    MINIO_BUCKET: str = "inspireed"
+    MINIO_SECURE: bool = False
+
+    # Kafka配置
+    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
+    KAFKA_LESSON_LOGS_TOPIC: str = "lesson_logs"
+    KAFKA_QA_LOGS_TOPIC: str = "qa_logs"
+
+    # JupyterHub配置
+    JUPYTERHUB_URL: str = "http://localhost:8000"
+    JUPYTERHUB_API_TOKEN: str = "your-jupyterhub-token"
+
+    # OpenAI配置
+    # 注意：配置优先级（从高到低）：
+    # 1. 系统环境变量 > 2. .env 文件 > 3. 这里的默认值
+    # 推荐在 .env 文件中配置 OPENAI_API_KEY，而不是修改这里的默认值
+    OPENAI_API_KEY: str = ""  # 默认值为空，应在 .env 文件中配置
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    OPENAI_MODEL: str = "gpt-3.5-turbo"
+    DEFAULT_AI_MODEL: str = "gpt-3.5-turbo"
+    AI_MAX_TOKENS: int = 20000  # 增加到20000，确保有足够空间生成完整的教学设计方案
+    AI_TEMPERATURE: float = 0.7
+
+    # 邮件配置（可选）
+    SMTP_TLS: bool = True
+    SMTP_PORT: Optional[int] = None
+    SMTP_HOST: Optional[str] = None
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    EMAILS_FROM_EMAIL: Optional[str] = None
+    EMAILS_FROM_NAME: Optional[str] = None
+
+    # 超级管理员
+    FIRST_SUPERUSER: str = "admin@inspireed.com"
+    FIRST_SUPERUSER_PASSWORD: str = "admin123"
+
+    # 文件上传配置 (MVP)
+    UPLOAD_DIR: str = "storage"  # 上传文件存储目录
+    MAX_UPLOAD_SIZE: int = 100 * 1024 * 1024  # 100MB
+
+    # 资源URL配置
+    # 资源文件的相对路径前缀（数据库存储的是文件名，路径前缀在配置中）
+    RESOURCE_BASE_PATH: str = "/uploads/resources"
+    # 资源文件的完整基础URL（可选，不配置则从请求中自动获取）
+    # 例如：http://192.168.2.35:8000 或 http://localhost:8000
+    # 如果为空，则从 Request.base_url 自动获取
+    RESOURCE_BASE_URL: Optional[str] = None
+
+
+settings = Settings()

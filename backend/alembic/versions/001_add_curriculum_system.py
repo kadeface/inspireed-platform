@@ -1,0 +1,298 @@
+"""Add curriculum system
+
+Revision ID: 001
+Revises:
+Create Date: 2025-10-14
+
+"""
+
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy import inspect
+from datetime import datetime
+
+
+# revision identifiers, used by Alembic.
+revision: str = "001"
+down_revision: Union[str, None] = None
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Create curriculum tables and add course_id to lessons"""
+
+    # Create subjects table
+    op.create_table(
+        "subjects",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("name", sa.String(length=100), nullable=False),
+        sa.Column("code", sa.String(length=50), nullable=False),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column("display_order", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name"),
+        sa.UniqueConstraint("code"),
+    )
+    op.create_index(op.f("ix_subjects_id"), "subjects", ["id"], unique=False)
+
+    # Create grades table
+    op.create_table(
+        "grades",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("name", sa.String(length=50), nullable=False),
+        sa.Column("level", sa.Integer(), nullable=False),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name"),
+        sa.UniqueConstraint("level"),
+    )
+    op.create_index(op.f("ix_grades_id"), "grades", ["id"], unique=False)
+
+    # Create courses table
+    # Note: created_by foreign key will be added separately if users table exists
+    op.create_table(
+        "courses",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("subject_id", sa.Integer(), nullable=False),
+        sa.Column("grade_id", sa.Integer(), nullable=False),
+        sa.Column("name", sa.String(length=200), nullable=False),
+        sa.Column("code", sa.String(length=100), nullable=True),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
+        sa.Column("display_order", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("created_by", sa.Integer(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["subject_id"],
+            ["subjects.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["grade_id"],
+            ["grades.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("subject_id", "grade_id", name="uix_subject_grade"),
+    )
+    op.create_index(op.f("ix_courses_id"), "courses", ["id"], unique=False)
+    
+    # Add created_by foreign key if users table exists
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    if 'users' in inspector.get_table_names():
+        op.create_foreign_key(
+            "fk_courses_created_by",
+            "courses",
+            "users",
+            ["created_by"],
+            ["id"],
+        )
+
+    # Seed subjects data
+    op.execute(
+        """
+        INSERT INTO subjects (name, code, description, display_order) VALUES
+        ('数学', 'math', '数学学科', 1),
+        ('物理', 'physics', '物理学科', 2),
+        ('化学', 'chemistry', '化学学科', 3),
+        ('生物', 'biology', '生物学科', 4),
+        ('语文', 'chinese', '语文学科', 5),
+        ('英语', 'english', '英语学科', 6),
+        ('历史', 'history', '历史学科', 7),
+        ('地理', 'geography', '地理学科', 8),
+        ('政治', 'politics', '政治学科', 9),
+        ('信息技术', 'computer', '信息技术学科', 10)
+    """
+    )
+
+    # Seed grades data
+    op.execute(
+        """
+        INSERT INTO grades (name, level) VALUES
+        ('一年级', 1),
+        ('二年级', 2),
+        ('三年级', 3),
+        ('四年级', 4),
+        ('五年级', 5),
+        ('六年级', 6),
+        ('七年级', 7),
+        ('八年级', 8),
+        ('九年级', 9),
+        ('高一', 10),
+        ('高二', 11),
+        ('高三', 12)
+    """
+    )
+
+    # Create lessons table if it doesn't exist
+    # This is needed for fresh database deployments (e.g., on cloud servers)
+    # where init_db() hasn't been run before migrations
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    
+    if 'lessons' not in inspector.get_table_names():
+        # Create lessons table with basic structure
+        # Note: Some fields will be added by later migrations
+        op.create_table(
+            "lessons",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("title", sa.String(length=200), nullable=False),
+            sa.Column("description", sa.Text(), nullable=True),
+            # 教案创建者 (users table may not exist yet, so nullable initially)
+            sa.Column("creator_id", sa.Integer(), nullable=True),
+            # 所属课程 (will be set to NOT NULL in later migration)
+            sa.Column("course_id", sa.Integer(), nullable=True),
+            # 状态
+            sa.Column(
+                "status",
+                sa.Enum("draft", "published", "archived", name="lessonstatus"),
+                nullable=False,
+                server_default="draft",
+            ),
+            # 教案内容（JSON格式存储Cell配置）
+            sa.Column("content", sa.JSON(), nullable=False, server_default="[]"),
+            # 版本控制
+            sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
+            sa.Column("parent_id", sa.Integer(), nullable=True),
+            # 国家平台资源映射
+            sa.Column("national_resource_id", sa.String(length=100), nullable=True),
+            # 标签
+            sa.Column("tags", sa.JSON(), nullable=True),
+            # 封面图
+            sa.Column("cover_image_url", sa.String(length=500), nullable=True),
+            # 时间戳
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            ),
+            sa.Column("published_at", sa.DateTime(), nullable=True),
+            sa.PrimaryKeyConstraint("id"),
+        )
+        op.create_index(op.f("ix_lessons_id"), "lessons", ["id"], unique=False)
+        op.create_index(
+            op.f("ix_lessons_national_resource_id"), 
+            "lessons", 
+            ["national_resource_id"], 
+            unique=False
+        )
+        
+        # Add foreign keys if referenced tables exist
+        if 'users' in inspector.get_table_names():
+            op.create_foreign_key(
+                "fk_lessons_creator_id",
+                "lessons",
+                "users",
+                ["creator_id"],
+                ["id"],
+            )
+        
+        # Add course_id foreign key (courses table was just created above)
+        op.create_index(
+            op.f("ix_lessons_course_id"), "lessons", ["course_id"], unique=False
+        )
+        op.create_foreign_key(
+            "fk_lessons_course_id", "lessons", "courses", ["course_id"], ["id"]
+        )
+        
+        # Self-referential foreign key for parent_id
+        op.create_foreign_key(
+            "fk_lessons_parent_id",
+            "lessons",
+            "lessons",
+            ["parent_id"],
+            ["id"],
+        )
+    else:
+        # Table exists, just add course_id column if it doesn't exist
+        existing_columns = [col['name'] for col in inspector.get_columns('lessons')]
+        if 'course_id' not in existing_columns:
+            op.add_column("lessons", sa.Column("course_id", sa.Integer(), nullable=True))
+            op.create_index(
+                op.f("ix_lessons_course_id"), "lessons", ["course_id"], unique=False
+            )
+            op.create_foreign_key(
+                "fk_lessons_course_id", "lessons", "courses", ["course_id"], ["id"]
+            )
+
+
+def downgrade() -> None:
+    """Remove curriculum tables and course_id from lessons"""
+
+    # Remove course_id from lessons (if exists)
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    if 'lessons' in inspector.get_table_names():
+        try:
+            op.drop_constraint("fk_lessons_course_id", "lessons", type_="foreignkey")
+        except:
+            pass
+        try:
+            op.drop_index(op.f("ix_lessons_course_id"), table_name="lessons")
+        except:
+            pass
+        try:
+            op.drop_column("lessons", "course_id")
+        except:
+            pass
+
+    # Drop courses table
+    try:
+        op.drop_constraint("fk_courses_created_by", "courses", type_="foreignkey")
+    except:
+        pass
+    op.drop_index(op.f("ix_courses_id"), table_name="courses")
+    op.drop_table("courses")
+
+    # Drop grades table
+    op.drop_index(op.f("ix_grades_id"), table_name="grades")
+    op.drop_table("grades")
+
+    # Drop subjects table
+    op.drop_index(op.f("ix_subjects_id"), table_name="subjects")
+    op.drop_table("subjects")

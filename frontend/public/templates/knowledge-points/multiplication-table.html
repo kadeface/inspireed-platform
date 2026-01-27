@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>乘法口诀可视化</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 800px;
+      width: 100%;
+      padding: 40px;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+      text-align: center;
+      font-size: 2em;
+    }
+
+    .table-container {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 8px;
+      margin: 20px 0;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f0f0f0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .cell:hover {
+      background: #667eea;
+      color: white;
+      transform: scale(1.1);
+    }
+
+    .cell.header {
+      background: #333;
+      color: white;
+      cursor: default;
+    }
+
+    .cell.header:hover {
+      background: #333;
+      transform: none;
+    }
+
+    .cell.selected {
+      background: #f5576c;
+      color: white;
+      animation: pulse 0.5s ease;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    .info {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 18px;
+      color: #667eea;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔢 乘法口诀表</h1>
+    <div class="table-container" id="table"></div>
+    <div class="info" id="info">点击任意格子查看乘法口诀</div>
+  </div>
+
+  <script>
+    const table = document.getElementById('table');
+    const info = document.getElementById('info');
+
+    // 创建表头
+    const headerRow = ['×', 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    headerRow.forEach((val, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell header';
+      cell.textContent = val;
+      table.appendChild(cell);
+    });
+
+    // 创建乘法表
+    for (let i = 1; i <= 9; i++) {
+      // 行号
+      const rowHeader = document.createElement('div');
+      rowHeader.className = 'cell header';
+      rowHeader.textContent = i;
+      table.appendChild(rowHeader);
+
+      // 数据单元格
+      for (let j = 1; j <= 9; j++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.textContent = i * j;
+        cell.dataset.row = i;
+        cell.dataset.col = j;
+        
+        cell.addEventListener('click', function() {
+          // 移除之前的选中状态
+          document.querySelectorAll('.cell.selected').forEach(c => {
+            c.classList.remove('selected');
+          });
+          
+          // 添加选中状态
+          this.classList.add('selected');
+          
+          // 显示信息
+          info.textContent = `${i} × ${j} = ${i * j}`;
+        });
+        
+        table.appendChild(cell);
+      }
+    }
+  </script>
+</body>
+</html>

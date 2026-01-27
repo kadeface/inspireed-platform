@@ -1,0 +1,289 @@
+/**
+ * 课程体系 API 服务
+ */
+import api from './api'
+import type {
+  Subject,
+  Grade,
+  Course,
+  CourseCreate,
+  CourseUpdate,
+  CurriculumTree,
+  Chapter,
+  ChapterCreate,
+  ChapterUpdate,
+  CourseWithChapters,
+  CourseMergeRequest,
+  CourseMergeResponse
+} from '@/types/curriculum'
+
+export const curriculumService = {
+  // ==================== Subject APIs ====================
+
+  /**
+   * 获取学科列表
+   */
+  async getSubjects(includeInactive = false): Promise<Subject[]> {
+    return await api.get('/curriculum/subjects', {
+      params: { include_inactive: includeInactive }
+    })
+  },
+
+  /**
+   * 创建学科
+   */
+  async createSubject(data: {
+    name: string
+    code: string
+    description?: string
+    display_order?: number
+  }): Promise<Subject> {
+    return await api.post('/curriculum/subjects', data)
+  },
+
+  /**
+   * 更新学科
+   */
+  async updateSubject(
+    subjectId: number,
+    data: {
+      name?: string
+      code?: string
+      description?: string
+      display_order?: number
+    }
+  ): Promise<Subject> {
+    return await api.put(`/curriculum/subjects/${subjectId}`, data)
+  },
+
+  /**
+   * 删除学科
+   */
+  async deleteSubject(subjectId: number): Promise<void> {
+    return await api.delete(`/curriculum/subjects/${subjectId}`)
+  },
+
+  /**
+   * 启用/禁用学科
+   */
+  async toggleSubject(subjectId: number, isActive: boolean): Promise<Subject> {
+    return await api.patch(`/curriculum/subjects/${subjectId}/toggle`, {
+      is_active: isActive
+    })
+  },
+
+  // ==================== Grade APIs ====================
+
+  /**
+   * 获取年级列表
+   */
+  async getGrades(includeInactive = false): Promise<Grade[]> {
+    return await api.get('/curriculum/grades', {
+      params: { include_inactive: includeInactive }
+    })
+  },
+
+  /**
+   * 创建年级
+   */
+  async createGrade(data: {
+    name: string
+    level: number
+  }): Promise<Grade> {
+    return await api.post('/curriculum/grades', data)
+  },
+
+  /**
+   * 更新年级
+   */
+  async updateGrade(
+    gradeId: number,
+    data: {
+      name?: string
+      level?: number
+    }
+  ): Promise<Grade> {
+    return await api.put(`/curriculum/grades/${gradeId}`, data)
+  },
+
+  /**
+   * 删除年级
+   */
+  async deleteGrade(gradeId: number): Promise<void> {
+    return await api.delete(`/curriculum/grades/${gradeId}`)
+  },
+
+  /**
+   * 启用/禁用年级
+   */
+  async toggleGrade(gradeId: number, isActive: boolean): Promise<Grade> {
+    return await api.patch(`/curriculum/grades/${gradeId}/toggle`, {
+      is_active: isActive
+    })
+  },
+
+  // ==================== Course APIs ====================
+  
+  /**
+   * 获取课程列表
+   */
+  async getCourses(params?: {
+    subject_id?: number
+    grade_id?: number
+    include_inactive?: boolean
+  }): Promise<Course[]> {
+    return await api.get('/curriculum/courses', { params })
+  },
+
+  /**
+   * 创建课程
+   */
+  async createCourse(data: CourseCreate): Promise<Course> {
+    return await api.post('/curriculum/courses', data)
+  },
+
+  /**
+   * 更新课程
+   */
+  async updateCourse(courseId: number, data: CourseUpdate): Promise<Course> {
+    return await api.put(`/curriculum/courses/${courseId}`, data)
+  },
+
+  /**
+   * 删除课程
+   */
+  async deleteCourse(courseId: number): Promise<void> {
+    await api.delete(`/curriculum/courses/${courseId}`)
+  },
+
+  /**
+   * 获取课程详情及其章节（包含统计数据）
+   */
+  async getCourseWithChapters(courseId: number): Promise<CourseWithChapters> {
+    return await api.get(`/curriculum/courses/${courseId}/with-chapters`)
+  },
+
+  /**
+   * 根据课程代码查找所有具有相同代码的课程
+   */
+  async getCoursesByCode(courseCode: string): Promise<Course[]> {
+    return await api.get(`/curriculum/courses/by-code/${courseCode}`)
+  },
+
+  /**
+   * 合并课程
+   */
+  async mergeCourses(mergeRequest: CourseMergeRequest): Promise<CourseMergeResponse> {
+    return await api.post('/curriculum/courses/merge', mergeRequest)
+  },
+
+  // ==================== Curriculum Tree API ====================
+  
+  /**
+   * 获取完整的课程体系树形结构
+   */
+  async getCurriculumTree(includeInactive = false): Promise<CurriculumTree> {
+    return await api.get('/curriculum/tree', {
+      params: { include_inactive: includeInactive }
+    })
+  },
+
+  // ==================== Helper Functions ====================
+  
+  /**
+   * 根据学科ID和年级ID获取课程
+   */
+  async getCourseBySubjectAndGrade(
+    subjectId: number,
+    gradeId: number
+  ): Promise<Course[]> {
+    return await this.getCourses({ subject_id: subjectId, grade_id: gradeId })
+  },
+
+  /**
+   * 生成课程名称（学科名 + 年级名）
+   */
+  generateCourseName(subjectName: string, gradeName: string): string {
+    return `${gradeName}${subjectName}`
+  },
+
+  /**
+   * 生成课程代码（grade{level}-{subjectCode}）
+   */
+  generateCourseCode(subjectCode: string, gradeLevel: number): string {
+    return `grade${gradeLevel}-${subjectCode}`
+  },
+
+  // ==================== Chapter APIs ====================
+  
+  /**
+   * 获取课程的章节列表（树形结构）
+   */
+  async getCourseChapters(courseId: number, includeChildren = true): Promise<Chapter[]> {
+    return await api.get(`/chapters/courses/${courseId}/chapters`, {
+      params: { include_children: includeChildren }
+    })
+  },
+
+  /**
+   * 获取章节详情
+   */
+  async getChapter(chapterId: number): Promise<Chapter> {
+    return await api.get(`/chapters/${chapterId}`)
+  },
+
+  /**
+   * 创建章节
+   */
+  async createChapter(data: ChapterCreate): Promise<Chapter> {
+    return await api.post('/chapters', data)
+  },
+
+  /**
+   * 更新章节
+   */
+  async updateChapter(chapterId: number, data: ChapterUpdate): Promise<Chapter> {
+    return await api.put(`/chapters/${chapterId}`, data)
+  },
+
+  /**
+   * 删除章节
+   */
+  async deleteChapter(chapterId: number): Promise<void> {
+    await api.delete(`/chapters/${chapterId}`)
+  },
+
+  /**
+   * 批量导入章节
+   */
+  async batchImportChapters(
+    courseId: number,
+    file: File,
+    overwriteExisting = false
+  ): Promise<{ message: string; chapters: Chapter[] }> {
+    const formData = new FormData()
+    formData.append('course_id', courseId.toString())
+    formData.append('file', file)
+    formData.append('overwrite_existing', overwriteExisting ? 'true' : 'false')
+    
+    // 不要手动设置Content-Type，让浏览器自动设置multipart/form-data with boundary
+    return await api.post('/chapters/batch-import', formData)
+  },
+
+  /**
+   * 下载章节导入模板
+   */
+  async downloadChapterTemplate(): Promise<Blob> {
+    return await api.downloadFile('/chapters/export-template')
+  },
+
+  /**
+   * 获取课程及其章节树形结构（包含每个章节的教案数量）
+   */
+  async getCourseWithChapters(courseId: number): Promise<CourseWithChapters> {
+    return await api.get(`/curriculum/courses/${courseId}/with-chapters`)
+  }
+}
+
+export default curriculumService
+

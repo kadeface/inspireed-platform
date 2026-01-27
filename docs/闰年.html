@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>判断闰年 - 交互式流程图演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            gap: 30px;
+            height: calc(100vh - 40px);
+        }
+
+        /* 左侧交互区 */
+        .interactive-panel {
+            flex: 1;
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .panel-header {
+            text-align: center;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 20px;
+        }
+
+        .panel-header h1 {
+            color: #2c3e50;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .panel-header p {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        /* 输入控制区 */
+        .input-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #34495e;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .slider-container {
+            position: relative;
+            margin: 20px 0;
+        }
+
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #e0e0e0;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            background: #2980b9;
+            transform: scale(1.1);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .year-display {
+            text-align: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 结果展示区 */
+        .result-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .result-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .result-icon {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .calendar-icon {
+            width: 100%;
+            height: 100%;
+            background: white;
+            border-radius: 12px;
+            position: relative;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .calendar-icon::before {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 20%;
+            background: #e74c3c;
+            border-radius: 4px 4px 0 0;
+        }
+
+        .calendar-icon::after {
+            content: attr(data-day);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .result-text {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-detail {
+            font-size: 18px;
+            opacity: 0.9;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 右侧流程图 */
+        .flowchart-panel {
+            flex: 1.5;
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: auto;
+        }
+
+        .flowchart-header {
+            text-align: center;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .flowchart-header h2 {
+            color: #2c3e50;
+            font-size: 24px;
+        }
+
+        .flowchart {
+            position: relative;
+            min-height: 800px;
+            padding: 20px;
+        }
+
+        /* 流程图节点样式 */
+        .flow-node {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: #2c3e50;
+            background: white;
+            border: 2px solid #34495e;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        /* 开始/结束节点 - 圆角矩形 */
+        .flow-node.start,
+        .flow-node.end {
+            width: 120px;
+            height: 50px;
+            border-radius: 25px;
+            background: #ecf0f1;
+        }
+
+        /* 输入输出节点 - 平行四边形 */
+        .flow-node.input,
+        .flow-node.output {
+            width: 140px;
+            height: 50px;
+            transform: skewX(-15deg);
+            background: #e8f4f8;
+        }
+
+        .flow-node.input > span,
+        .flow-node.output > span {
+            transform: skewX(15deg);
+            display: block;
+        }
+
+        /* 判断节点 - 菱形 */
+        .flow-node.decision {
+            width: 0;
+            height: 0;
+            border: none;
+            background: transparent;
+            position: relative;
+        }
+
+        .flow-node.decision::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(45deg);
+            width: 100px;
+            height: 100px;
+            background: #fff3cd;
+            border: 2px solid #34495e;
+            border-radius: 4px;
+        }
+
+        .flow-node.decision > span {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            z-index: 1;
+        }
+
+        /* 激活状态 */
+        .flow-node.active {
+            background: #ff6b6b !important;
+            border-color: #c92a2a !important;
+            border-width: 3px !important;
+            color: white !important;
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.6);
+            z-index: 20;
+        }
+
+        .flow-node.decision.active::before {
+            background: #ff6b6b !important;
+            border-color: #c92a2a !important;
+            border-width: 3px !important;
+        }
+
+        /* 连线样式 */
+        .flow-line {
+            position: absolute;
+            background: #34495e;
+            z-index: 5;
+            transition: all 0.3s ease;
+        }
+
+        .flow-line.active {
+            background: #ff6b6b;
+            z-index: 15;
+            box-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+        }
+
+        /* 水平线 */
+        .flow-line.horizontal {
+            height: 3px;
+        }
+
+        /* 垂直线 */
+        .flow-line.vertical {
+            width: 3px;
+        }
+
+        /* 标签 */
+        .flow-label {
+            position: absolute;
+            font-size: 12px;
+            color: #7f8c8d;
+            background: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            z-index: 12;
+            transition: all 0.3s ease;
+        }
+
+        .flow-label.active {
+            color: #ff6b6b;
+            border-color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        /* 响应式 */
+        @media (max-width: 1200px) {
+            .container {
+                flex-direction: column;
+                height: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧交互区 -->
+        <div class="interactive-panel">
+            <div class="panel-header">
+                <h1>📅 判断闰年</h1>
+                <p>通过滑块调整年份，观察流程图的执行路径</p>
+            </div>
+
+            <div class="input-section">
+                <div class="input-group">
+                    <label>选择年份</label>
+                    <div class="slider-container">
+                        <input type="range" 
+                               id="yearSlider" 
+                               class="slider" 
+                               min="1900" 
+                               max="2100" 
+                               value="2024"
+                               step="1">
+                    </div>
+                    <div class="year-display" id="yearDisplay">2024</div>
+                </div>
+            </div>
+
+            <div class="result-section" id="resultSection">
+                <div class="result-icon">
+                    <div class="calendar-icon" id="calendarIcon" data-day="29"></div>
+                </div>
+                <div class="result-text" id="resultText">闰年</div>
+                <div class="result-detail" id="resultDetail">该年份有366天</div>
+            </div>
+        </div>
+
+        <!-- 右侧流程图 -->
+        <div class="flowchart-panel">
+            <div class="flowchart-header">
+                <h2>GB1526-89 标准流程图</h2>
+            </div>
+            <div class="flowchart" id="flowchart"></div>
+        </div>
+    </div>
+
+    <script>
+        // 流程图节点配置
+        const flowchartConfig = {
+            nodes: [
+                { id: 'start', type: 'start', text: '开始', x: 250, y: 30 },
+                { id: 'input', type: 'input', text: '输入年份', x: 230, y: 100 },
+                { id: 'check4', type: 'decision', text: '能被4整除?', x: 250, y: 180 },
+                { id: 'check100', type: 'decision', text: '能被100整除?', x: 250, y: 320 },
+                { id: 'check400', type: 'decision', text: '能被400整除?', x: 250, y: 460 },
+                { id: 'output_yes', type: 'output', text: '输出: 是闰年', x: 450, y: 380 },
+                { id: 'output_no1', type: 'output', text: '输出: 不是闰年', x: 450, y: 240 },
+                { id: 'output_no2', type: 'output', text: '输出: 不是闰年', x: 450, y: 520 },
+                { id: 'end', type: 'end', text: '结束', x: 250, y: 640 }
+            ],
+            lines: [
+                // 开始 -> 输入
+                { from: 'start', to: 'input', type: 'vertical' },
+                // 输入 -> 判断4
+                { from: 'input', to: 'check4', type: 'vertical' },
+                // 判断4 -> 判断100 (是)
+                { from: 'check4', to: 'check100', type: 'vertical', label: '是', labelX: 270, labelY: 250 },
+                // 判断4 -> 输出否1 (否)
+                { from: 'check4', to: 'output_no1', type: 'horizontal', label: '否', labelX: 350, labelY: 210 },
+                // 判断100 -> 判断400 (是)
+                { from: 'check100', to: 'check400', type: 'vertical', label: '是', labelX: 270, labelY: 390 },
+                // 判断100 -> 输出是 (否)
+                { from: 'check100', to: 'output_yes', type: 'horizontal', label: '否', labelX: 350, labelY: 350 },
+                // 判断400 -> 输出否2 (否)
+                { from: 'check400', to: 'output_no2', type: 'horizontal', label: '否', labelX: 350, labelY: 490 },
+                // 判断400 -> 输出是 (是)
+                { from: 'check400', to: 'output_yes', type: 'horizontal', label: '是', labelX: 350, labelY: 510 },
+                // 输出是 -> 结束
+                { from: 'output_yes', to: 'end', type: 'vertical', via: [{ x: 520, y: 380 }, { x: 520, y: 640 }, { x: 310, y: 640 }] },
+                // 输出否1 -> 结束
+                { from: 'output_no1', to: 'end', type: 'vertical', via: [{ x: 520, y: 240 }, { x: 520, y: 640 }, { x: 310, y: 640 }] },
+                // 输出否2 -> 结束
+                { from: 'output_no2', to: 'end', type: 'vertical', via: [{ x: 520, y: 520 }, { x: 520, y: 640 }, { x: 310, y: 640 }] }
+            ]
+        };
+
+        // 初始化流程图
+        function initFlowchart() {
+            const flowchart = document.getElementById('flowchart');
+            
+            // 创建节点
+            flowchartConfig.nodes.forEach(node => {
+                const nodeEl = document.createElement('div');
+                nodeEl.className = `flow-node ${node.type}`;
+                nodeEl.id = `node-${node.id}`;
+                nodeEl.style.left = `${node.x}px`;
+                nodeEl.style.top = `${node.y}px`;
+                
+                if (node.type === 'decision') {
+                    nodeEl.style.width = '100px';
+                    nodeEl.style.height = '100px';
+                }
+                
+                const span = document.createElement('span');
+                span.textContent = node.text;
+                nodeEl.appendChild(span);
+                flowchart.appendChild(nodeEl);
+            });
+
+            // 创建连线和标签
+            flowchartConfig.lines.forEach((line, index) => {
+                const fromNode = flowchartConfig.nodes.find(n => n.id === line.from);
+                const toNode = flowchartConfig.nodes.find(n => n.id === line.to);
+                
+                if (!fromNode || !toNode) return;
+
+                // 计算节点连接点
+                const getConnectionPoint = (node, lineType, isFrom) => {
+                    let centerX = node.x;
+                    let centerY = node.y;
+                    
+                    if (node.type === 'decision') {
+                        // 菱形节点：根据连线类型确定连接点
+                        if (lineType === 'vertical') {
+                            if (isFrom) {
+                                centerY = node.y + 50; // 从底部出发
+                            } else {
+                                centerY = node.y - 50; // 到达顶部
+                            }
+                        } else if (lineType === 'horizontal') {
+                            if (isFrom) {
+                                centerX = node.x + 50; // 从右侧出发
+                            } else {
+                                centerX = node.x - 50; // 从左侧到达
+                            }
+                            centerY = node.y;
+                        } else {
+                            centerX = node.x;
+                            centerY = node.y;
+                        }
+                    } else if (node.type === 'input') {
+                        centerX = node.x + 70;
+                        centerY = node.y + 25;
+                    } else if (node.type === 'output') {
+                        // 输出节点
+                        if (lineType === 'horizontal' && !isFrom) {
+                            // 从左侧接收水平连线
+                            centerX = node.x;
+                            centerY = node.y + 25;
+                        } else if (lineType === 'vertical' && isFrom) {
+                            // 从底部出发垂直连线
+                            centerX = node.x + 70;
+                            centerY = node.y + 50;
+                        } else {
+                            centerX = node.x + 70;
+                            centerY = node.y + 25;
+                        }
+                    } else {
+                        centerX = node.x + 60;
+                        centerY = node.y + 25;
+                    }
+                    return { x: centerX, y: centerY };
+                };
+
+                const fromCenter = getConnectionPoint(fromNode, line.type, true);
+                const toCenter = getConnectionPoint(toNode, line.type, false);
+
+                // 构建折线路径点
+                let points = [];
+                if (line.via && line.via.length > 0) {
+                    // 使用配置的via点
+                    points = [fromCenter, ...line.via, toCenter];
+                } else {
+                    // 自动生成折线路径（横平竖直）
+                    if (line.type === 'vertical') {
+                        // 垂直线：直接连接
+                        points = [fromCenter, toCenter];
+                    } else {
+                        // 水平线：先垂直，再水平，再垂直
+                        const midY = (fromCenter.y + toCenter.y) / 2;
+                        points = [
+                            fromCenter,
+                            { x: fromCenter.x, y: midY },
+                            { x: toCenter.x, y: midY },
+                            toCenter
+                        ];
+                    }
+                }
+                
+                // 创建折线的每一段
+                for (let i = 0; i < points.length - 1; i++) {
+                    const p1 = points[i];
+                    const p2 = points[i + 1];
+                    
+                    const lineEl = document.createElement('div');
+                    lineEl.className = 'flow-line';
+                    lineEl.id = `line-${line.from}-${line.to}-${i}`;
+                    lineEl.dataset.from = line.from;
+                    lineEl.dataset.to = line.to;
+                    lineEl.dataset.index = index;
+                    lineEl.dataset.segment = i;
+                    
+                    if (Math.abs(p1.x - p2.x) < 1) {
+                        // 垂直线
+                        lineEl.className += ' vertical';
+                        lineEl.style.left = `${p1.x - 1.5}px`;
+                        lineEl.style.top = `${Math.min(p1.y, p2.y)}px`;
+                        lineEl.style.width = '3px';
+                        lineEl.style.height = `${Math.abs(p2.y - p1.y)}px`;
+                    } else {
+                        // 水平线
+                        lineEl.className += ' horizontal';
+                        lineEl.style.left = `${Math.min(p1.x, p2.x)}px`;
+                        lineEl.style.top = `${p1.y - 1.5}px`;
+                        lineEl.style.width = `${Math.abs(p2.x - p1.x)}px`;
+                        lineEl.style.height = '3px';
+                    }
+                    
+                    flowchart.appendChild(lineEl);
+                }
+
+                // 创建标签
+                if (line.label) {
+                    const labelEl = document.createElement('div');
+                    labelEl.className = 'flow-label';
+                    labelEl.id = `label-${line.from}-${line.to}`;
+                    labelEl.textContent = line.label;
+                    labelEl.style.left = `${line.labelX || fromCenter.x + 10}px`;
+                    labelEl.style.top = `${line.labelY || fromCenter.y - 10}px`;
+                    labelEl.dataset.from = line.from;
+                    labelEl.dataset.to = line.to;
+                    flowchart.appendChild(labelEl);
+                }
+            });
+        }
+
+        // 判断是否为闰年
+        function isLeapYear(year) {
+            if (year % 400 === 0) return true;
+            if (year % 100 === 0) return false;
+            if (year % 4 === 0) return true;
+            return false;
+        }
+
+        // 获取执行路径
+        function getExecutionPath(year) {
+            const path = {
+                nodes: ['start', 'input'],
+                lines: ['start-input'],
+                labels: []
+            };
+
+            // 判断4
+            path.nodes.push('check4');
+            path.lines.push('input-check4');
+
+            if (year % 4 !== 0) {
+                // 不能被4整除 -> 不是闰年
+                path.nodes.push('output_no1');
+                path.lines.push('check4-output_no1');
+                path.labels.push({ from: 'check4', to: 'output_no1', label: '否' });
+                path.nodes.push('end');
+                path.lines.push('output_no1-end');
+                return path;
+            }
+
+            // 能被4整除 -> 继续判断100
+            path.nodes.push('check100');
+            path.lines.push('check4-check100');
+            path.labels.push({ from: 'check4', to: 'check100', label: '是' });
+
+            if (year % 100 !== 0) {
+                // 不能被100整除 -> 是闰年
+                path.nodes.push('output_yes');
+                path.lines.push('check100-output_yes');
+                path.labels.push({ from: 'check100', to: 'output_yes', label: '否' });
+                path.nodes.push('end');
+                path.lines.push('output_yes-end');
+                return path;
+            }
+
+            // 能被100整除 -> 继续判断400
+            path.nodes.push('check400');
+            path.lines.push('check100-check400');
+            path.labels.push({ from: 'check100', to: 'check400', label: '是' });
+
+            if (year % 400 === 0) {
+                // 能被400整除 -> 是闰年
+                path.nodes.push('output_yes');
+                path.lines.push('check400-output_yes');
+                path.labels.push({ from: 'check400', to: 'output_yes', label: '是' });
+                path.nodes.push('end');
+                path.lines.push('output_yes-end');
+            } else {
+                // 不能被400整除 -> 不是闰年
+                path.nodes.push('output_no2');
+                path.lines.push('check400-output_no2');
+                path.labels.push({ from: 'check400', to: 'output_no2', label: '否' });
+                path.nodes.push('end');
+                path.lines.push('output_no2-end');
+            }
+
+            return path;
+        }
+
+        // 高亮执行路径
+        function highlightPath(year) {
+            // 清除所有高亮
+            document.querySelectorAll('.flow-node').forEach(node => {
+                node.classList.remove('active');
+            });
+            document.querySelectorAll('.flow-line').forEach(line => {
+                line.classList.remove('active');
+            });
+            document.querySelectorAll('.flow-label').forEach(label => {
+                label.classList.remove('active');
+            });
+
+            // 获取执行路径
+            const path = getExecutionPath(year);
+
+            // 高亮节点
+            path.nodes.forEach(nodeId => {
+                const node = document.getElementById(`node-${nodeId}`);
+                if (node) {
+                    node.classList.add('active');
+                }
+            });
+
+            // 高亮连线 - 通过data属性匹配
+            path.lines.forEach(lineId => {
+                const [from, to] = lineId.split('-');
+                // 查找所有匹配的连线段
+                document.querySelectorAll('.flow-line').forEach(line => {
+                    if (line.dataset.from === from && line.dataset.to === to) {
+                        line.classList.add('active');
+                    }
+                });
+            });
+
+            // 高亮标签
+            path.labels.forEach(labelInfo => {
+                const label = document.getElementById(`label-${labelInfo.from}-${labelInfo.to}`);
+                if (label && label.textContent === labelInfo.label) {
+                    label.classList.add('active');
+                }
+            });
+        }
+
+        // 更新结果显示
+        function updateResult(year) {
+            const isLeap = isLeapYear(year);
+            const yearDisplay = document.getElementById('yearDisplay');
+            const resultText = document.getElementById('resultText');
+            const resultDetail = document.getElementById('resultDetail');
+            const calendarIcon = document.getElementById('calendarIcon');
+            const resultSection = document.getElementById('resultSection');
+
+            yearDisplay.textContent = year;
+
+            if (isLeap) {
+                resultText.textContent = '闰年';
+                resultDetail.textContent = '该年份有366天';
+                calendarIcon.setAttribute('data-day', '29');
+                resultSection.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            } else {
+                resultText.textContent = '不是闰年';
+                resultDetail.textContent = '该年份有365天';
+                calendarIcon.setAttribute('data-day', '28');
+                resultSection.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+            }
+
+            // 高亮路径
+            highlightPath(year);
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initFlowchart();
+            
+            const yearSlider = document.getElementById('yearSlider');
+            const initialYear = parseInt(yearSlider.value);
+            updateResult(initialYear);
+
+            // 监听滑块变化
+            yearSlider.addEventListener('input', function() {
+                const year = parseInt(this.value);
+                updateResult(year);
+            });
+        });
+    </script>
+</body>
+</html>

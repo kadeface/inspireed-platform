@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>图形认知互动</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 900px;
+      width: 100%;
+      padding: 40px;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+      text-align: center;
+      font-size: 2em;
+    }
+
+    .shapes-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 20px;
+      margin: 30px 0;
+    }
+
+    .shape-card {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 3px solid transparent;
+    }
+
+    .shape-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      border-color: #667eea;
+    }
+
+    .shape-card.selected {
+      border-color: #f5576c;
+      background: #fff5f5;
+    }
+
+    .shape {
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .circle {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: #667eea;
+    }
+
+    .square {
+      width: 100px;
+      height: 100px;
+      background: #f5576c;
+    }
+
+    .triangle {
+      width: 0;
+      height: 0;
+      border-left: 50px solid transparent;
+      border-right: 50px solid transparent;
+      border-bottom: 87px solid #48bb78;
+    }
+
+    .rectangle {
+      width: 120px;
+      height: 80px;
+      background: #ed8936;
+    }
+
+    .shape-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .info {
+      text-align: center;
+      margin-top: 30px;
+      padding: 20px;
+      background: #f0f0f0;
+      border-radius: 8px;
+      font-size: 16px;
+      min-height: 60px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔷 认识基本图形</h1>
+    <div class="shapes-container">
+      <div class="shape-card" data-shape="圆形">
+        <div class="shape">
+          <div class="circle"></div>
+        </div>
+        <div class="shape-name">圆形</div>
+      </div>
+      <div class="shape-card" data-shape="正方形">
+        <div class="shape">
+          <div class="square"></div>
+        </div>
+        <div class="shape-name">正方形</div>
+      </div>
+      <div class="shape-card" data-shape="三角形">
+        <div class="shape">
+          <div class="triangle"></div>
+        </div>
+        <div class="shape-name">三角形</div>
+      </div>
+      <div class="shape-card" data-shape="长方形">
+        <div class="shape">
+          <div class="rectangle"></div>
+        </div>
+        <div class="shape-name">长方形</div>
+      </div>
+    </div>
+    <div class="info" id="info">点击图形了解它的特点</div>
+  </div>
+
+  <script>
+    const shapes = {
+      '圆形': '圆形没有角，所有点到圆心的距离都相等。',
+      '正方形': '正方形有四条相等的边，四个角都是直角。',
+      '三角形': '三角形有三条边和三个角。',
+      '长方形': '长方形有两条长边和两条短边，四个角都是直角。'
+    };
+
+    document.querySelectorAll('.shape-card').forEach(card => {
+      card.addEventListener('click', function() {
+        // 移除之前的选中状态
+        document.querySelectorAll('.shape-card').forEach(c => {
+          c.classList.remove('selected');
+        });
+        
+        // 添加选中状态
+        this.classList.add('selected');
+        
+        // 显示信息
+        const shapeName = this.dataset.shape;
+        document.getElementById('info').textContent = shapes[shapeName];
+      });
+    });
+  </script>
+</body>
+</html>

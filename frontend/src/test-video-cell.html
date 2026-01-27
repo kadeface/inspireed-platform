@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频Cell测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .video-test {
+            width: 100%;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <h1>视频Cell功能测试</h1>
+    
+    <div class="test-section">
+        <h2>测试1: 基础视频播放</h2>
+        <p>测试视频URL输入和播放功能</p>
+        <video class="video-test" controls>
+            <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
+            您的浏览器不支持视频播放
+        </video>
+    </div>
+
+    <div class="test-section">
+        <h2>测试2: 视频配置选项</h2>
+        <p>测试自动播放、循环、静音等配置</p>
+        <video class="video-test" controls autoplay muted loop>
+            <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
+            您的浏览器不支持视频播放
+        </video>
+    </div>
+
+    <div class="test-section">
+        <h2>测试3: 本地视频文件</h2>
+        <p>测试本地视频文件上传功能</p>
+        <input type="file" accept="video/*" id="videoUpload">
+        <video class="video-test" controls id="localVideo" style="display: none;">
+            您的浏览器不支持视频播放
+        </video>
+    </div>
+
+    <script>
+        // 测试本地视频上传
+        document.getElementById('videoUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const video = document.getElementById('localVideo');
+                const url = URL.createObjectURL(file);
+                video.src = url;
+                video.style.display = 'block';
+            }
+        });
+
+        // 测试视频事件
+        const videos = document.querySelectorAll('video');
+        videos.forEach((video, index) => {
+            video.addEventListener('loadedmetadata', () => {
+                console.log(`视频 ${index + 1} 加载完成，时长: ${video.duration}秒`);
+            });
+            
+            video.addEventListener('timeupdate', () => {
+                if (video.currentTime > 0 && video.currentTime % 5 < 0.1) {
+                    console.log(`视频 ${index + 1} 播放进度: ${video.currentTime.toFixed(1)}秒`);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

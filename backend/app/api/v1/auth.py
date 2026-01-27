@@ -1,0 +1,199 @@
+"""
+认证API路由
+"""
+
+from datetime import datetime, timedelta
+from typing import Any, cast
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.security import create_access_token, verify_password, get_password_hash
+from app.models import User
+from app.schemas.user import UserCreate, UserResponse
+from app.schemas.token import Token
+
+router = APIRouter()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+) -> User:
+    """获取当前用户"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="无法验证凭据",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        user_id = payload.get("sub")
+        if not isinstance(user_id, str):
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    result = await db.execute(
+        select(User)
+        .options(
+            selectinload(User.region),
+            selectinload(User.school),
+            selectinload(User.grade),
+        )
+        .where(User.id == int(user_id))
+    )
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise credentials_exception
+
+    if not cast(bool, user.is_active):
+        raise HTTPException(status_code=400, detail="用户未激活")
+
+    # 预先填充组织信息，方便序列化
+    user.region_name = user.region.name if user.region else None  # type: ignore[attr-defined]
+    user.school_name = user.school.name if user.school else None  # type: ignore[attr-defined]
+    user.grade_name = user.grade.name if user.grade else None  # type: ignore[attr-defined]
+
+    return user
+
+
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """获取当前活跃用户"""
+    if not cast(bool, current_user.is_active):
+        raise HTTPException(status_code=400, detail="用户未激活")
+    return current_user
+
+
+@router.post(
+    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
+async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)) -> Any:
+    """用户注册"""
+    # 检查邮箱是否已存在
+    result = await db.execute(select(User).where(User.email == user_in.email))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="该邮箱已被注册")
+
+    # 检查用户名是否已存在
+    result = await db.execute(select(User).where(User.username == user_in.username))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="该用户名已被使用")
+
+    # 创建新用户
+    user = User(
+        email=user_in.email,
+        username=user_in.username,
+        hashed_password=get_password_hash(user_in.password),
+        full_name=user_in.full_name,
+        role=user_in.role,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return user
+
+
+@router.post("/login", response_model=Token)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
+) -> Any:
+    """用户登录"""
+    import traceback
+    
+    try:
+        # 查找用户（支持邮箱或用户名登录）
+        result = await db.execute(
+            select(User).where(
+                (User.email == form_data.username) | (User.username == form_data.username)
+            )
+        )
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="用户名或密码错误",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # 验证密码（添加错误处理）
+        try:
+            password_valid = verify_password(form_data.password, cast(str, user.hashed_password))
+        except Exception as e:
+            print(f"❌ 密码验证错误: {type(e).__name__}: {e}")
+            print(traceback.format_exc())
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"密码验证失败: {str(e)}",
+            )
+        
+        if not password_valid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="用户名或密码错误",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # 检查用户激活状态
+        is_active = cast(bool, user.is_active)
+        if not is_active:
+            raise HTTPException(
+                status_code=400,
+                detail=f"用户未激活，请联系管理员。用户ID: {user.id}, 用户名: {user.username}, 角色: {user.role}",
+            )
+
+        # 更新最后登录时间
+        try:
+            user.last_login = datetime.utcnow()  # type: ignore[assignment]
+            await db.commit()
+        except Exception as e:
+            print(f"⚠️ 更新最后登录时间失败: {e}")
+            # 不阻止登录，继续执行
+
+        # 创建访问令牌
+        try:
+            access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                subject=user.id, expires_delta=access_token_expires
+            )
+        except Exception as e:
+            print(f"❌ 创建访问令牌错误: {type(e).__name__}: {e}")
+            print(traceback.format_exc())
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"创建访问令牌失败: {str(e)}",
+            )
+
+        return {"access_token": access_token, "token_type": "bearer"}
+    except HTTPException:
+        # 重新抛出 HTTP 异常
+        raise
+    except Exception as e:
+        # 捕获所有其他异常
+        print(f"❌ 登录过程发生未预期的错误: {type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"登录失败: {str(e)}",
+        )
+
+
+@router.get("/me", response_model=UserResponse)
+async def read_users_me(
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """获取当前用户信息"""
+    return current_user

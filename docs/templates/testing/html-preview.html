@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML 实时预览编辑器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+
+        .header {
+            background: #2d2d30;
+            padding: 12px 20px;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #cccccc;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 6px 16px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #1177bb;
+        }
+
+        .btn-secondary {
+            background: #3e3e42;
+        }
+
+        .btn-secondary:hover {
+            background: #505050;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .editor-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #3e3e42;
+            background: #1e1e1e;
+        }
+
+        .preview-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+
+        .panel-header {
+            background: #252526;
+            padding: 8px 16px;
+            font-size: 12px;
+            color: #cccccc;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .preview-panel .panel-header {
+            background: #f3f3f3;
+            color: #333;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .editor {
+            flex: 1;
+            width: 100%;
+            padding: 16px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: none;
+            resize: none;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            outline: none;
+            overflow-y: auto;
+        }
+
+        .editor::placeholder {
+            color: #6a6a6a;
+        }
+
+        .preview {
+            flex: 1;
+            border: none;
+            width: 100%;
+            background: white;
+        }
+
+        .status {
+            padding: 8px 16px;
+            background: #007acc;
+            color: white;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status.success {
+            background: #4caf50;
+        }
+
+        .status.error {
+            background: #f44336;
+        }
+
+        .splitter {
+            width: 4px;
+            background: #3e3e42;
+            cursor: col-resize;
+            transition: background 0.2s;
+        }
+
+        .splitter:hover {
+            background: #007acc;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .editor-panel {
+                border-right: none;
+                border-bottom: 1px solid #3e3e42;
+            }
+
+            .splitter {
+                width: 100%;
+                height: 4px;
+                cursor: row-resize;
+            }
+        }
+
+        /* 代码高亮样式（简单版本） */
+        .editor {
+            tab-size: 2;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📝 HTML 实时预览编辑器</h1>
+        <div class="toolbar">
+            <button class="btn btn-secondary" onclick="clearEditor()">清空</button>
+            <button class="btn btn-secondary" onclick="loadTemplate()">加载模板</button>
+            <button class="btn" onclick="updatePreview()">刷新预览</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="editor-panel">
+            <div class="panel-header">📝 HTML 代码编辑器</div>
+            <textarea 
+                id="htmlEditor" 
+                class="editor" 
+                placeholder="在这里输入你的 HTML 代码...
+
+示例：
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;我的页面&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Hello World!&lt;/h1&gt;
+&lt;/body&gt;
+&lt;/html&gt;"
+                spellcheck="false"
+            ></textarea>
+        </div>
+
+        <div class="splitter" id="splitter"></div>
+
+        <div class="preview-panel">
+            <div class="panel-header">👁️ 实时预览</div>
+            <iframe id="preview" class="preview" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+    </div>
+
+    <div class="status" id="status">
+        <span>✅ 就绪 - 输入 HTML 代码即可实时预览</span>
+        <span id="charCount">0 字符</span>
+    </div>
+
+    <script>
+        const editor = document.getElementById('htmlEditor');
+        const preview = document.getElementById('preview');
+        const status = document.getElementById('status');
+        const charCount = document.getElementById('charCount');
+        const splitter = document.getElementById('splitter');
+
+        // 实时预览功能
+        let updateTimeout;
+        function updatePreview() {
+            clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(() => {
+                const html = editor.value;
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                preview.src = url;
+
+                // 更新字符计数
+                charCount.textContent = `${html.length} 字符`;
+
+                // 更新状态
+                if (html.trim()) {
+                    status.className = 'status success';
+                    status.innerHTML = '<span>✅ 预览已更新</span><span id="charCount">' + charCount.innerHTML + '</span>';
+                    document.getElementById('charCount').textContent = charCount.textContent;
+                } else {
+                    status.className = 'status';
+                    status.innerHTML = '<span>✅ 就绪 - 输入 HTML 代码即可实时预览</span><span id="charCount">0 字符</span>';
+                }
+
+                // 清理旧的 URL
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+            }, 300); // 防抖：300ms 后更新
+        }
+
+        // 监听编辑器输入
+        editor.addEventListener('input', updatePreview);
+        editor.addEventListener('paste', () => {
+            setTimeout(updatePreview, 100);
+        });
+
+        // 清空编辑器
+        function clearEditor() {
+            if (confirm('确定要清空所有内容吗？')) {
+                editor.value = '';
+                updatePreview();
+            }
+        }
+
+        // 加载模板
+        function loadTemplate() {
+            const template = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <h1>🎉 欢迎使用 HTML 预览编辑器</h1>
+    <div class="card">
+        <h2>开始编辑</h2>
+        <p>在左侧编辑器中修改代码，右侧会实时显示预览效果。</p>
+    </div>
+    <div class="card">
+        <h2>功能特点</h2>
+        <ul>
+            <li>✨ 实时预览</li>
+            <li>📝 代码编辑</li>
+            <li>🎨 支持 CSS 和 JavaScript</li>
+        </ul>
+    </div>
+</body>
+</html>`;
+            editor.value = template;
+            updatePreview();
+        }
+
+        // 分割条拖拽功能
+        let isDragging = false;
+        splitter.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const container = document.querySelector('.container');
+            const editorPanel = document.querySelector('.editor-panel');
+            const containerRect = container.getBoundingClientRect();
+            const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+            
+            if (newWidth > 20 && newWidth < 80) {
+                editorPanel.style.flex = `0 0 ${newWidth}%`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
+
+        // 键盘快捷键
+        editor.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + S: 更新预览
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                updatePreview();
+            }
+            // Ctrl/Cmd + K: 清空
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                clearEditor();
+            }
+        });
+
+        // 初始化：加载示例（可选）
+        // loadTemplate();
+    </script>
+</body>
+</html>

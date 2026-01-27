@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>《开平长师附属小学抽象数学可视化探究》 - 合理安排：煎饼问题</title>
+    <style>
+        :root {
+            --primary-background: #FFFFFF;
+            --text-color: #000000;
+            --border-color: #E0E0E0;
+            --main-color: #FF6600;
+            --main-color-light: #FF9933;
+            --accent-color: #4CAF50;
+            --error-color: #D32F2F;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--primary-background);
+            color: var(--text-color);
+            font-family: 'Arial', 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--main-color) 0%, var(--main-color-light) 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        header h2 {
+            font-size: 20px;
+            font-weight: normal;
+            opacity: 0.95;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        #visualization-area {
+            display: flex;
+            gap: 20px;
+            min-height: 600px;
+            margin-bottom: 20px;
+        }
+
+        .left-panel {
+            flex: 0 0 40%;
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .right-panel {
+            flex: 0 0 58%;
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .panel-title {
+            color: var(--main-color);
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--main-color);
+        }
+
+        #pan-container {
+            position: relative;
+            width: 100%;
+            height: 250px;
+            background: linear-gradient(135deg, #333 0%, #555 100%);
+            border-radius: 50%;
+            margin: 20px auto;
+            box-shadow: inset 0 5px 20px rgba(0,0,0,0.5), 0 5px 15px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pancake {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            border-radius: 50%;
+            border: 3px solid #CC8400;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #8B4513;
+            cursor: pointer;
+            transition: transform 0.5s ease, background 0.5s ease;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .pancake.cooking {
+            animation: sizzle 0.3s infinite;
+        }
+
+        .pancake.flipped {
+            background: linear-gradient(135deg, #D2691E 0%, #8B4513 100%);
+        }
+
+        @keyframes sizzle {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.02) rotate(1deg); }
+        }
+
+        .pancake-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            pointer-events: none;
+        }
+
+        #control-panel {
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--text-color);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            background: var(--border-color);
+            outline: none;
+            border-radius: 5px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            width: 20px;
+            height: 20px;
+            background: var(--main-color);
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .value-display {
+            display: inline-block;
+            background: var(--accent-color);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        button {
+            background: var(--main-color);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            box-shadow: 0 3px 10px rgba(255, 102, 0, 0.3);
+        }
+
+        button:hover {
+            background: var(--main-color-light);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 102, 0, 0.4);
+        }
+
+        button.reset {
+            background: #757575;
+        }
+
+        button.reset:hover {
+            background: #616161;
+        }
+
+        #instructions {
+            background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+            border-left: 5px solid var(--main-color);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        #feedback {
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        }
+
+        #feedback.success {
+            background: var(--accent-color);
+            color: white;
+            display: block;
+        }
+
+        #feedback.error {
+            background: var(--error-color);
+            color: white;
+            display: block;
+        }
+
+        #timeline {
+            margin-top: 20px;
+        }
+
+        .timeline-step {
+            background: #f5f5f5;
+            padding: 10px 15px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border-left: 4px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .timeline-step.active {
+            background: #E8F5E9;
+            border-left-color: var(--accent-color);
+            transform: translateX(5px);
+        }
+
+        .timeline-step.completed {
+            background: #C8E6C9;
+            border-left-color: var(--accent-color);
+        }
+
+        #logic-diagram {
+            width: 100%;
+            height: 500px;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            gap: 10px;
+        }
+
+        .stat-item {
+            flex: 1;
+            background: linear-gradient(135deg, var(--accent-color) 0%, #45a049 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .stat-item .number {
+            font-size: 32px;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-item .label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .strategy-highlight {
+            background: #FFF9C4;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border: 2px dashed var(--main-color);
+        }
+
+        .strategy-highlight strong {
+            color: var(--main-color);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>《开平长师附属小学抽象数学可视化探究》</h1>
+        <h2>合理安排：煎饼问题</h2>
+    </header>
+
+    <div class="container">
+        <div id="instructions">
+            <h3 style="color: var(--main-color); margin-bottom: 10px;">📖 问题情境</h3>
+            <p><strong>基本规则：</strong>一个锅可以同时放<strong>两张饼</strong>，每张饼需要煎<strong>正反两面</strong>，煎一面需要<strong>1分钟</strong>。</p>
+            <p><strong>核心挑战：</strong>如何安排煎饼顺序，让锅的空间得到充分利用，用最短时间煎完所有饼？</p>
+            <p>💡 <strong>操作提示：</strong>调节滑块选择煎饼数量，点击"开始模拟"观看最优方案的演示过程！</p>
+        </div>
+
+        <div id="control-panel">
+            <div class="control-group">
+                <label>
+                    🥞 煎饼数量：<span class="value-display" id="pancake-count-display">3</span>张
+                </label>
+                <input type="range" id="pancake-count" min="1" max="8" value="3" step="1">
+            </div>
+            <button id="start-btn">▶️ 开始模拟</button>
+            <button id="reset-btn" class="reset">🔄 重置</button>
+            
+            <div class="stat-box" id="stats">
+                <div class="stat-item">
+                    <span class="number" id="total-time">3</span>
+                    <span class="label">总耗时（分钟）</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="total-steps">6</span>
+                    <span class="label">操作步骤数</span>
+                </div>
+            </div>
+
+            <div id="feedback"></div>
+        </div>
+
+        <div id="visualization-area">
+            <div class="left-panel">
+                <div class="panel-title">🍳 煎锅实景模拟</div>
+                <div id="pan-container"></div>
+                <div id="timeline">
+                    <h4 style="color: var(--main-color); margin-bottom: 10px;">⏱️ 操作时间轴</h4>
+                    <div id="timeline-container"></div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="panel-title">📊 优化逻辑分析</div>
+                <svg id="logic-diagram"></svg>
+                <div class="strategy-highlight" id="strategy-text">
+                    <strong>💡 优化策略：</strong>当煎3张饼时，采用交叉煎法，确保锅内始终有2张饼在煎，避免空间浪费！
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局状态
+        let pancakeCount = 3;
+        let isSimulating = false;
+        let currentStep = 0;
+        let animationTimeout;
+
+        // DOM元素
+        const pancakeCountSlider = document.getElementById('pancake-count');
+        const pancakeCountDisplay = document.getElementById('pancake-count-display');
+        const startBtn = document.getElementById('start-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const panContainer = document.getElementById('pan-container');
+        const timelineContainer = document.getElementById('timeline-container');
+        const totalTimeDisplay = document.getElementById('total-time');
+        const totalStepsDisplay = document.getElementById('total-steps');
+        const feedbackDiv = document.getElementById('feedback');
+        const logicDiagram = document.getElementById('logic-diagram');
+        const strategyText = document.getElementById('strategy-text');
+
+        // 初始化
+        pancakeCountSlider.addEventListener('input', (e) => {
+            pancakeCount = parseInt(e.target.value);
+            pancakeCountDisplay.textContent = pancakeCount;
+            updateStatistics();
+            drawLogicDiagram();
+        });
+
+        startBtn.addEventListener('click', startSimulation);
+        resetBtn.addEventListener('click', resetSimulation);
+
+        // 计算最优时间和步骤
+        function calculateOptimalTime(n) {
+            if (n === 1) return 2;
+            if (n === 2) return 2;
+            return n; // n >= 3时，最优时间为n分钟
+        }
+
+        function calculateSteps(n) {
+            return n * 2; // 每张饼需要煎两次
+        }
+
+        // 更新统计数据
+        function updateStatistics() {
+            const time = calculateOptimalTime(pancakeCount);
+            const steps = calculateSteps(pancakeCount);
+            totalTimeDisplay.textContent = time;
+            totalStepsDisplay.textContent = steps;
+        }
+
+        // 生成煎饼方案
+        function generatePancakeSchedule(n) {
+            const schedule = [];
+            
+            if (n === 1) {
+                schedule.push({ time: 1, pancakes: [{ id: 1, side: '正面' }] });
+                schedule.push({ time: 2, pancakes: [{ id: 1, side: '反面' }] });
+            } else if (n === 2) {
+                schedule.push({ time: 1, pancakes: [{ id: 1, side: '正面' }, { id: 2, side: '正面' }] });
+                schedule.push({ time: 2, pancakes: [{ id: 1, side: '反面' }, { id: 2, side: '反面' }] });
+            } else {
+                // n >= 3, 采用最优交叉煎法
+                schedule.push({ time: 1, pancakes: [{ id: 1, side: '正面' }, { id: 2, side: '正面' }] });
+                schedule.push({ time: 2, pancakes: [{ id: 1, side: '反面' }, { id: 3, side: '正面' }] });
+                schedule.push({ time: 3, pancakes: [{ id: 2, side: '反面' }, { id: 3, side: '反面' }] });
+                
+                // 对于4张及以上，按2张一组处理
+                for (let i = 4; i <= n; i += 2) {
+                    if (i < n) {
+                        schedule.push({ time: i, pancakes: [{ id: i, side: '正面' }, { id: i + 1, side: '正面' }] });
+                        schedule.push({ time: i + 1, pancakes: [{ id: i, side: '反面' }, { id: i + 1, side: '反面' }] });
+                    } else {
+                        schedule.push({ time: i, pancakes: [{ id: i, side: '正面' }, { id: i - 1, side: '反面' }] });
+                    }
+                }
+            }
+            
+            return schedule;
+        }
+
+        // 渲染时间轴
+        function renderTimeline() {
+            const schedule = generatePancakeSchedule(pancakeCount);
+            timelineContainer.innerHTML = '';
+            
+            schedule.forEach((step, index) => {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'timeline-step';
+                stepDiv.id = `step-${index}`;
+                
+                const pancakeInfo = step.pancakes.map(p => 
+                    `饼${p.id}(${p.side})`
+                ).join(' + ');
+                
+                stepDiv.innerHTML = `<strong>第${step.time}分钟：</strong>${pancakeInfo}`;
+                timelineContainer.appendChild(stepDiv);
+            });
+        }
+
+        // 开始模拟
+        async function startSimulation() {
+            if (isSimulating) return;
+            
+            isSimulating = true;
+            currentStep = 0;
+            startBtn.disabled = true;
+            feedbackDiv.className = '';
+            feedbackDiv.style.display = 'none';
+            
+            const schedule = generatePancakeSchedule(pancakeCount);
+            renderTimeline();
+            
+            for (let i = 0; i < schedule.length; i++) {
+                currentStep = i;
+                await simulateStep(schedule[i], i);
+                await sleep(1500);
+            }
+            
+            showFeedback('success', `🎉 完成！用最优方案在${calculateOptimalTime(pancakeCount)}分钟内煎完${pancakeCount}张饼！`);
+            isSimulating = false;
+            startBtn.disabled = false;
+        }
+
+        // 模拟单个步骤
+        async function simulateStep(step, stepIndex) {
+            // 高亮时间轴
+            document.querySelectorAll('.timeline-step').forEach((el, idx) => {
+                if (idx < stepIndex) {
+                    el.className = 'timeline-step completed';
+                } else if (idx === stepIndex) {
+                    el.className = 'timeline-step active';
+                } else {
+                    el.className = 'timeline-step';
+                }
+            });
+            
+            // 渲染锅中的饼
+            panContainer.innerHTML = '';
+            step.pancakes.forEach((pancake, index) => {
+                const pancakeDiv = document.createElement('div');
+                pancakeDiv.className = 'pancake cooking';
+                if (pancake.side === '反面') {
+                    pancakeDiv.classList.add('flipped');
+                }
+                pancakeDiv.innerHTML = `
+                    <div class="pancake-label">
+                        ${pancake.id}<br>
+                        <span style="font-size: 14px;">${pancake.side}</span>
+                    </div>
+                `;
+                panContainer.appendChild(pancakeDiv);
+            });
+            
+            // 高亮逻辑图中的对应路径
+            highlightLogicPath(stepIndex);
+        }
+
+        // 重置模拟
+        function resetSimulation() {
+            isSimulating = false;
+            currentStep = 0;
+            startBtn.disabled = false;
+            clearTimeout(animationTimeout);
+            panContainer.innerHTML = '';
+            timelineContainer.innerHTML = '';
+            feedbackDiv.className = '';
+            feedbackDiv.style.display = 'none';
+            drawLogicDiagram();
+        }
+
+        // 显示反馈
+        function showFeedback(type, message) {
+            feedbackDiv.className = type;
+            feedbackDiv.textContent = message;
+            feedbackDiv.style.display = 'block';
+        }
+
+        // 工具函数：延迟
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // 绘制逻辑流程图
+        function drawLogicDiagram() {
+            const svg = logicDiagram;
+            const width = svg.clientWidth;
+            const height = svg.clientHeight;
+            
+            svg.innerHTML = '';
+            
+            // 设置SVG命名空间
+            const svgNS = "http://www.w3.org/2000/svg";
+            
+            // 标题
+            const title = document.createElementNS(svgNS, 'text');
+            title.setAttribute('x', width / 2);
+            title.setAttribute('y', 30);
+            title.setAttribute('text-anchor', 'middle');
+            title.setAttribute('fill', '#FF6600');
+            title.setAttribute('font-size', '18');
+            title.setAttribute('font-weight', 'bold');
+            title.textContent = `煎${pancakeCount}张饼的最优方案流程`;
+            svg.appendChild(title);
+            
+            const schedule = generatePancakeSchedule(pancakeCount);
+            const stepHeight = Math.min(60, (height - 80) / schedule.length);
+            const startY = 60;
+            
+            schedule.forEach((step, index) => {
+                const y = startY + index * stepHeight;
+                
+                // 绘制步骤框
+                const rect = document.createElementNS(svgNS, 'rect');
+                rect.setAttribute('x', 50);
+                rect.setAttribute('y', y);
+                rect.setAttribute('width', width - 100);
+                rect.setAttribute('height', stepHeight - 10);
+                rect.setAttribute('fill', '#F5F5F5');
+                rect.setAttribute('stroke', '#E0E0E0');
+                rect.setAttribute('stroke-width', '2');
+                rect.setAttribute('rx', '8');
+                rect.setAttribute('id', `logic-step-${index}`);
+                svg.appendChild(rect);
+                
+                // 绘制步骤文字
+                const text = document.createElementNS(svgNS, 'text');
+                text.setAttribute('x', width / 2);
+                text.setAttribute('y', y + stepHeight / 2);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('dominant-baseline', 'middle');
+                text.setAttribute('fill', '#000000');
+                text.setAttribute('font-size', '14');
+                
+                const pancakeInfo = step.pancakes.map(p => 
+                    `饼${p.id}(${p.side})`
+                ).join(' + ');
+                text.textContent = `第${step.time}分钟：${pancakeInfo}`;
+                svg.appendChild(text);
+                
+                // 绘制连接箭头
+                if (index < schedule.length - 1) {
+                    const arrow = document.createElementNS(svgNS, 'path');
+                    const arrowY = y + stepHeight - 5;
+                    arrow.setAttribute('d', `M ${width / 2} ${arrowY} L ${width / 2} ${arrowY + 10} M ${width / 2 - 5} ${arrowY + 5} L ${width / 2} ${arrowY + 10} L ${width / 2 + 5} ${arrowY + 5}`);
+                    arrow.setAttribute('stroke', '#999');
+                    arrow.setAttribute('stroke-width', '2');
+                    arrow.setAttribute('fill', 'none');
+                    arrow.setAttribute('id', `arrow-${index}`);
+                    svg.appendChild(arrow);
+                }
+            });
+            
+            // 更新策略说明
+            updateStrategyText();
+        }
+
+        // 高亮逻辑路径
+        function highlightLogicPath(stepIndex) {
+            const allSteps = logicDiagram.querySelectorAll('rect[id^="logic-step-"]');
+            const allArrows = logicDiagram.querySelectorAll('path[id^="arrow-"]');
+            
+            allSteps.forEach((rect, idx) => {
+                if (idx === stepIndex) {
+                    rect.setAttribute('fill', '#E8F5E9');
+                    rect.setAttribute('stroke', '#4CAF50');
+                    rect.setAttribute('stroke-width', '3');
+                } else if (idx < stepIndex) {
+                    rect.setAttribute('fill', '#C8E6C9');
+                    rect.setAttribute('stroke', '#4CAF50');
+                    rect.setAttribute('stroke-width', '2');
+                } else {
+                    rect.setAttribute('fill', '#F5F5F5');
+                    rect.setAttribute('stroke', '#E0E0E0');
+                    rect.setAttribute('stroke-width', '2');
+                }
+            });
+            
+            allArrows.forEach((arrow, idx) => {
+                if (idx < stepIndex) {
+                    arrow.setAttribute('stroke', '#4CAF50');
+                    arrow.setAttribute('stroke-width', '3');
+                } else {
+                    arrow.setAttribute('stroke', '#999');
+                    arrow.setAttribute('stroke-width', '2');
+                }
+            });
+        }
+
+        // 更新策略说明
+        function updateStrategyText() {
+            let strategy = '';
+            
+            if (pancakeCount === 1) {
+                strategy = '<strong>💡 优化策略：</strong>1张饼需要2分钟，先煎正面，再煎反面。';
+            } else if (pancakeCount === 2) {
+                strategy = '<strong>💡 优化策略：</strong>2张饼需要2分钟，两张饼同时放入锅中，充分利用空间，第1分钟煎正面，第2分钟煎反面。';
+            } else if (pancakeCount === 3) {
+                strategy = '<strong>💡 优化策略：</strong>3张饼需要3分钟！<br>关键在于<strong>交叉煎法</strong>：第1分钟煎饼1、2的正面；第2分钟煎饼1的反面和饼3的正面；第3分钟煎饼2、3的反面。这样确保锅内始终有2张饼，没有空间浪费！';
+            } else if (pancakeCount % 2 === 0) {
+                strategy = `<strong>💡 优化策略：</strong>${pancakeCount}张饼需要${pancakeCount}分钟。<br>采用<strong>分组策略</strong>：每2张饼为一组，每组需要2分钟。${pancakeCount / 2}组共需${pancakeCount}分钟，锅的空间始终充分利用！`;
+            } else {
+                strategy = `<strong>💡 优化策略：</strong>${pancakeCount}张饼需要${pancakeCount}分钟。<br>采用<strong>混合策略</strong>：前3张用交叉煎法（3分钟），剩余${pancakeCount - 3}张按每2张一组处理。总时间为${pancakeCount}分钟，保证锅的空间高效利用！`;
+            }
+            
+            strategyText.innerHTML = strategy;
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', () => {
+            updateStatistics();
+            drawLogicDiagram();
+        });
+    </script>
+</body>
+</html>

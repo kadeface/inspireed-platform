@@ -1,0 +1,24 @@
+# 前端开发模式 Dockerfile - 用于 CloudStudio 等需要热重载的环境
+FROM node:20-alpine
+
+# 安装 pnpm
+RUN npm install -g pnpm
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制 package.json
+COPY package.json ./
+
+# 安装依赖
+RUN pnpm install
+
+# 复制源代码
+COPY . ./
+
+# 暴露端口（Vite 开发服务器默认端口）
+EXPOSE 5173
+
+# 启动开发服务器（允许外部访问）
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]
+
