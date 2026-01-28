@@ -5,10 +5,10 @@ services:
     container_name: inspireed-postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: c85083a73b90e7195f47f759ee8f4ae3ffab52bdfce67d6185b42763a7f08a90
       POSTGRES_DB: inspireed
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,11 +22,13 @@ services:
 
   # Redis 缓存
   redis:
+    env_file:
+      - .env.prod
     image: redis:7-alpine
     container_name: inspireed-redis
-    command: redis-server
+    command: redis-server --requirepass 0d5ebe5357d012034607ee0be9d9374db8398c3e2bdd2ef884035ba0382a0413
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -45,10 +47,10 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_PASSWORD: 053efb8f4957862b5d009399f3a6013361b8e3b43dce999494c184fdfa7340ec
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
     healthcheck:
