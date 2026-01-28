@@ -144,3 +144,6 @@ GIT_*.md
 # Git Worktrees
 .worktrees/
 .env.prod
+
+# Backups
+backups/
