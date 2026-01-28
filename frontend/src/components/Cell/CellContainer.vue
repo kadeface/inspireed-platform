@@ -137,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch, inject, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, nextTick, watch, inject, onMounted, type ComputedRef, type Ref } from 'vue'
 import type { Cell } from '../../types/cell'
 import { CellType } from '../../types/cell'
 import TextCell from './TextCell.vue'

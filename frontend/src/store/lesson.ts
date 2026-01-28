@@ -12,7 +12,7 @@ import { createLogger } from '../utils/logger'
 
 const logger = createLogger('LESSON')
 import { lessonService } from '../services/lesson'
-import { isContentWithSections, sectionsToContent } from '../utils/lessonContent'
+import { isContentWithSections, sectionsToContent, sectionsToFlatCells } from '../utils/lessonContent'
 
 export const useLessonStore = defineStore('lesson', () => {
   const currentLesson = ref<Lesson | null>(null)
@@ -208,18 +208,25 @@ export const useLessonStore = defineStore('lesson', () => {
       const lesson = await lessonService.fetchLessonById(id)
 
       // 调试日志：记录加载的数据（仅在开发环境）
+      // 处理 content 可能是数组或 sections 格式
+      const contentCells = Array.isArray(lesson.content)
+        ? lesson.content
+        : isContentWithSections(lesson.content)
+        ? sectionsToFlatCells(lesson.content.sections || [])
+        : []
+      
       logger.debug('加载教案:', {
         lessonId: lesson.id,
         title: lesson.title,
-        contentLength: lesson.content?.length || 0,
-        contentDetails: (lesson.content || []).map((cell: any, idx: number) => ({
+        contentLength: contentCells.length,
+        contentDetails: contentCells.map((cell: any, idx: number) => ({
           index: idx,
           id: cell?.id,
           type: cell?.type,
           order: cell?.order,
           hasContent: !!cell?.content,
         })),
-        contentPreview: lesson.content?.slice(0, 2) || [],
+        contentPreview: contentCells.slice(0, 2),
         version: lesson.version,
         updatedAt: lesson.updated_at,
       })
@@ -317,10 +324,17 @@ export const useLessonStore = defineStore('lesson', () => {
         }
       } else {
         // 创建新教案（理论上不会到这里，因为创建用 createNewLesson）
+        // LessonCreate.content 只接受 Cell[]，需要转换 sections 格式
+        const contentForCreate = Array.isArray(currentLesson.value.content)
+          ? currentLesson.value.content
+          : isContentWithSections(currentLesson.value.content)
+          ? sectionsToFlatCells(currentLesson.value.content.sections || [])
+          : []
+        
         savedLesson = await lessonService.createLesson({
           title: currentLesson.value.title,
           description: currentLesson.value.description,
-          content: currentLesson.value.content,
+          content: contentForCreate,
           tags: currentLesson.value.tags,
           course_id: currentLesson.value.course_id,
           chapter_id: currentLesson.value.chapter_id,
