@@ -3,10 +3,13 @@ services:
   postgres:
     image: timescale/timescaledb:latest-pg16
     container_name: inspireed-postgres
+    env_file:
+      - .env.dev
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres  # 硬编码密码，与 docker-compose.yml 保持一致
-      POSTGRES_DB: inspireed
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-inspireed}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
     ports:
       - "5432:5432"
     volumes:
@@ -24,7 +27,16 @@ services:
   redis:
     image: redis:7-alpine
     container_name: inspireed-redis
-    command: redis-server  # 不使用密码，与 docker-compose.yml 保持一致
+    env_file:
+      - .env.dev
+    command: >
+      sh -c "
+      if [ -n \"$$REDIS_PASSWORD\" ]; then
+        redis-server --requirepass \"$$REDIS_PASSWORD\"
+      else
+        redis-server
+      fi
+      "
     ports:
       - "6379:6379"
     volumes:
@@ -42,10 +54,12 @@ services:
   minio:
     image: minio/minio:latest
     container_name: inspireed-minio
+    env_file:
+      - .env.dev
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin  # 硬编码密码，与 docker-compose.yml 保持一致
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -66,25 +80,26 @@ services:
       context: ../backend
       dockerfile: Dockerfile
     container_name: inspireed-backend
-    # backend/.env 通过 volume mount 挂载到容器中，应用会自动读取
-    # 但需要覆盖一些 Docker 网络相关的配置
+    env_file:
+      - .env.dev
     environment:
       # 数据库配置（Docker 网络中使用服务名，覆盖 backend/.env 中的 localhost）
-      POSTGRES_SERVER: postgres  # Docker 网络中使用服务名
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: inspireed
-      POSTGRES_PORT: 5432
+      POSTGRES_SERVER: ${POSTGRES_SERVER:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-inspireed}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       # Redis 配置（Docker 网络中使用服务名）
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       # MinIO 配置（Docker 网络中使用服务名）
-      MINIO_ENDPOINT: minio:9000
-      MINIO_SECURE: "false"
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
       # CORS 配置 - CloudStudio 环境需要允许所有来源
       # 确保 ALLOW_LAN_ACCESS 为 True，这样会使用正则表达式匹配所有 CloudStudio 域名
-      ALLOW_LAN_ACCESS: "true"
-      BACKEND_CORS_ORIGINS: '["*"]'
+      ALLOW_LAN_ACCESS: ${ALLOW_LAN_ACCESS:-true}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-'["*"]'}
     ports:
       - "8000:8000"
     volumes:
@@ -113,14 +128,15 @@ services:
       context: ../frontend
       dockerfile: Dockerfile.dev  # 使用开发模式 Dockerfile
     container_name: inspireed-frontend
+    env_file:
+      - .env.dev
     ports:
       - "5173:5173"  # CloudStudio 需要端口 5173
-    # ⚠️ 不设置 VITE_API_BASE_URL 环境变量，让前端代码完全自动检测 CloudStudio 环境
-    # 前端代码会自动检测 cloudstudio.club 域名并使用 HTTPS
-    # 如果需要设置，可以通过外部环境变量传入：export VITE_API_BASE_URL=...
-    # 但代码会自动处理 localhost 并转换为正确的 CloudStudio HTTPS URL
-    # environment:
-    #   - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
+    environment:
+      # ⚠️ 不设置 VITE_API_BASE_URL 环境变量，让前端代码完全自动检测 CloudStudio 环境
+      # 前端代码会自动检测 cloudstudio.club 域名并使用 HTTPS
+      # 如果需要设置，可以通过 .env.dev 文件传入
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     volumes:
       - ../frontend:/app
       - /app/node_modules

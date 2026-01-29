@@ -3,10 +3,13 @@ services:
   postgres:
     image: timescale/timescaledb:latest-pg16
     container_name: inspireed-postgres
+    env_file:
+      - .env.prod
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: c85083a73b90e7195f47f759ee8f4ae3ffab52bdfce67d6185b42763a7f08a90
-      POSTGRES_DB: inspireed
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-inspireed}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -26,7 +29,14 @@ services:
       - .env.prod
     image: redis:7-alpine
     container_name: inspireed-redis
-    command: redis-server --requirepass 0d5ebe5357d012034607ee0be9d9374db8398c3e2bdd2ef884035ba0382a0413
+    command: >
+      sh -c "
+      if [ -n \"$$REDIS_PASSWORD\" ]; then
+        redis-server --requirepass \"$$REDIS_PASSWORD\"
+      else
+        redis-server
+      fi
+      "
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
@@ -44,10 +54,12 @@ services:
   minio:
     image: minio/minio:latest
     container_name: inspireed-minio
+    env_file:
+      - .env.prod
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: 053efb8f4957862b5d009399f3a6013361b8e3b43dce999494c184fdfa7340ec
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
@@ -69,14 +81,22 @@ services:
       dockerfile: Dockerfile
     container_name: inspireed-backend
     env_file:
+      - .env.prod
       - ../backend/.env.prod
     environment:
       # 覆盖 .env.prod 中的服务地址（Docker 网络内部通信）
-      POSTGRES_SERVER: postgres
-      REDIS_HOST: redis
-      MINIO_ENDPOINT: minio:9000
-      MINIO_SECURE: "false"
-      ALLOW_LAN_ACCESS: "true"
+      POSTGRES_SERVER: ${POSTGRES_SERVER:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-inspireed}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      ALLOW_LAN_ACCESS: ${ALLOW_LAN_ACCESS:-true}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-'["*"]'}
     ports:
       - "8000:8000"
     volumes:
@@ -107,6 +127,8 @@ services:
         # 构建时传入API地址，留空则自动检测
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     container_name: inspireed-frontend
+    env_file:
+      - .env.prod
     ports:
       - "80:80"  # Nginx默认端口
     depends_on:
