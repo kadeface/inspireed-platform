@@ -89,7 +89,10 @@
           <div v-if="editable" class="add-cell-menu-container">
             <AddCellMenu
               :insert-index="index"
-              @add="(t, i) => $emit('add-cell', sectionIndex, i, t)"
+              @add="(t, i) => {
+                console.log('SectionContainer: 发出 add-cell 事件', { sectionIndex, indexInSection: i, cellType: t })
+                $emit('add-cell', sectionIndex, i, t)
+              }"
             />
           </div>
           <CellContainer
@@ -110,7 +113,10 @@
         <div v-if="editable" class="add-cell-menu-container">
           <AddCellMenu
             :insert-index="section.cells.length"
-            @add="(t, i) => $emit('add-cell', sectionIndex, i, t)"
+            @add="(t, i) => {
+              console.log('SectionContainer: 发出 add-cell 事件（末尾）', { sectionIndex, indexInSection: i, cellType: t })
+              $emit('add-cell', sectionIndex, i, t)
+            }"
           />
         </div>
       </div>

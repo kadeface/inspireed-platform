@@ -42,8 +42,9 @@ export function normalizeContentToSections(
       const sec = { ...s, cells: s.cells || [] }
       if (sec.id) seen.add(String(sec.id))
       result.push(sec)
-      if (DEFAULT_SECTION_NAMES.includes(s.name as any)) {
-        defaultMap.set(s.name, { ...defaultMap.get(s.name)!, filled: true })
+      if ((DEFAULT_SECTION_NAMES as readonly string[]).includes(s.name)) {
+        const sectionName = s.name as typeof DEFAULT_SECTION_NAMES[number]
+        defaultMap.set(sectionName, { ...defaultMap.get(sectionName)!, filled: true })
       }
     }
 

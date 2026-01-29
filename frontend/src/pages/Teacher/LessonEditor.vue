@@ -46,7 +46,10 @@
       :cell-list-ref="cellListRef"
       :tabs-container-ref="tabsContainerRef"
       @toggle-toolbar-collapsed="toolbarCollapsed = !toolbarCollapsed"
-      @add-cell-to-end="handleAddCellToEnd"
+      @add-cell-to-end="(cellType) => {
+        console.log('LessonEditor: 收到 add-cell-to-end 事件', { cellType })
+        handleAddCellToEnd(cellType as CellType)
+      }"
       @back="handleBack"
       @cover-image-error="coverImageLoadError = true"
       @cover-image-load="coverImageLoadError = false"
@@ -61,7 +64,14 @@
       @delete-section="handleSectionDelete"
       @add-section="handleAddSection"
       @update-section="({ index, payload }) => handleSectionUpdate(index, payload)"
-      @add-cell-in-section="(data) => handleAddCellInSection(data.sectionIndex, data.indexInSection, data.cellType)"
+      @add-cell-in-section="(data) => {
+        console.log('LessonEditor: 收到 add-cell-in-section 事件', { data })
+        if (!data || typeof data !== 'object') {
+          console.error('LessonEditor: add-cell-in-section 数据格式错误', { data })
+          return
+        }
+        handleAddCellInSection(data.sectionIndex, data.indexInSection, data.cellType)
+      }"
       @cell-update="handleCellUpdate"
       @cell-delete="handleDeleteCell"
       @cell-move-up="handleMoveUp"
