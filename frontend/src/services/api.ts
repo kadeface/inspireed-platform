@@ -6,25 +6,7 @@ import type { AxiosInstance, AxiosRequestConfig } from 'axios'
  * 根据当前访问的主机名自动适配后端地址
  */
 function getApiBaseUrl(): string {
-  // 优先使用环境变量中的 API 地址（如果已配置）
-  if (import.meta.env.VITE_API_BASE_URL) {
-    let envApiUrl = import.meta.env.VITE_API_BASE_URL
-
-    // 如果是 HTTPS 页面，强制使用 HTTPS API（防止混合内容错误）
-    const protocol = window.location.protocol
-    if (protocol === 'https:' && envApiUrl.startsWith('http://')) {
-      if (import.meta.env.DEV) {
-        console.warn('⚠️ [API] 环境变量使用 HTTP，但在 HTTPS 页面中强制转换为 HTTPS')
-      }
-      envApiUrl = envApiUrl.replace('http://', 'https://')
-    }
-    if (import.meta.env.DEV) {
-      console.log('🔧 [API] 使用环境变量配置的 API 地址:', envApiUrl)
-    }
-    return envApiUrl
-  }
-
-  // 如果没有配置环境变量，使用动态检测
+  // 动态获取当前主机名（优先于环境变量，确保 CloudStudio 环境能正确检测）
   const hostname = window.location.hostname
   // 确保使用与当前页面相同的协议（HTTPS 或 HTTP）
   // 在 CloudStudio 中，前端通常是 HTTPS，后端也应该是 HTTPS
@@ -42,6 +24,11 @@ function getApiBaseUrl(): string {
       console.log('✅ [API] 生产环境，使用当前域名:', apiUrl)
     }
     return apiUrl
+  }
+
+  if (import.meta.env.DEV) {
+    console.log('🔍 [API] 检测环境 - hostname:', hostname, 'protocol:', protocol, 'port:', port, 'full URL:', window.location.href)
+    console.log('🔍 [API] VITE_API_BASE_URL 环境变量:', import.meta.env.VITE_API_BASE_URL)
   }
 
   // 优先检测 Cloud Studio 环境：如果 hostname 包含 cloudstudio.club 或 coding.net
@@ -74,6 +61,48 @@ function getApiBaseUrl(): string {
       }
       return apiUrl
     }
+  }
+
+  // 如果环境变量中配置了API地址，检查并处理
+  if (import.meta.env.VITE_API_BASE_URL) {
+    let envApiUrl = import.meta.env.VITE_API_BASE_URL
+
+    // 在 CloudStudio 环境中，如果环境变量包含 localhost，完全忽略它
+    // 重新计算 CloudStudio 的 URL 并返回
+    if ((hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) &&
+        (envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1'))) {
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ [API] 环境变量包含 localhost，在 CloudStudio 环境中已忽略，使用自动检测的地址')
+      }
+      // 重新计算 CloudStudio 的 URL
+      if (hostname.includes('--')) {
+        const backendHostname = hostname.replace(/--\d+/, '--8000')
+        const apiUrl = `https://${backendHostname}/api/v1`
+        if (import.meta.env.DEV) {
+          console.log('✅ [API] 使用 CloudStudio 自动检测的地址:', apiUrl)
+        }
+        return apiUrl
+      } else {
+        const backendHostname = hostname.replace(/5173/, '8000')
+        const apiUrl = `https://${backendHostname}/api/v1`
+        if (import.meta.env.DEV) {
+          console.log('✅ [API] 使用 CloudStudio 自动检测的地址（备用）:', apiUrl)
+        }
+        return apiUrl
+      }
+    }
+
+    // 如果是 HTTPS 页面，强制使用 HTTPS API（防止混合内容错误）
+    if (protocol === 'https:' && envApiUrl.startsWith('http://')) {
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ [API] 环境变量使用 HTTP，但在 HTTPS 页面中强制转换为 HTTPS')
+      }
+      envApiUrl = envApiUrl.replace('http://', 'https://')
+    }
+    if (import.meta.env.DEV) {
+      console.log('🔧 [API] 使用环境变量配置的 API 地址:', envApiUrl)
+    }
+    return envApiUrl
   }
 
   // 本地开发环境：前端端口5173 -> 后端端口8000
