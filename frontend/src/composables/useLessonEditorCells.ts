@@ -144,8 +144,35 @@ export function useLessonEditorCells(
   }
 
   function handleAddCellToEnd(cellType: CellTypeValue) {
+    // 如果 sections 为空，创建一个默认的 section
+    if (sections.value.length === 0) {
+      sections.value.push({
+        id: 'sec-default-1',
+        name: '教学过程',
+        type: 'default',
+        order: 1,
+        is_collapsed: false,
+        cells: [],
+      })
+      activeSectionIndex.value = 0
+    }
+
+    // 确保 activeSectionIndex 有效
+    if (activeSectionIndex.value < 0 || activeSectionIndex.value >= sections.value.length) {
+      activeSectionIndex.value = Math.max(0, sections.value.length - 1)
+    }
+
     const activeSec = sections.value[activeSectionIndex.value]
-    if (!activeSec) return
+    if (!activeSec) {
+      console.error('无法添加模块：找不到活动的大环节', {
+        sectionsCount: sections.value.length,
+        activeSectionIndex: activeSectionIndex.value,
+        sections: sections.value,
+      })
+      showToast('error', '无法添加模块：请先选择或创建一个大环节')
+      return
+    }
+
     const idx = (activeSec.cells?.length ?? 0)
     const newCell = getDefaultCell(cellType, idx)
     if (!activeSec.cells) activeSec.cells = []
@@ -158,16 +185,118 @@ export function useLessonEditorCells(
   }
 
   function handleAddCellInSection(sectionIndex: number, indexInSection: number, cellType: CellTypeValue) {
+    // 验证参数
+    if (sectionIndex === undefined || sectionIndex === null || typeof sectionIndex !== 'number') {
+      console.error('无法添加模块：sectionIndex 参数无效', {
+        sectionIndex,
+        indexInSection,
+        cellType,
+        sectionsCount: sections.value.length,
+      })
+      showToast('error', '无法添加模块：参数错误，请刷新页面重试')
+      return
+    }
+
+    if (indexInSection === undefined || indexInSection === null || typeof indexInSection !== 'number') {
+      console.error('无法添加模块：indexInSection 参数无效', {
+        sectionIndex,
+        indexInSection,
+        cellType,
+      })
+      showToast('error', '无法添加模块：参数错误，请刷新页面重试')
+      return
+    }
+
+    // 如果 sections 为空，创建一个默认的 section
+    if (sections.value.length === 0) {
+      sections.value.push({
+        id: 'sec-default-1',
+        name: '教学过程',
+        type: 'default',
+        order: 1,
+        is_collapsed: false,
+        cells: [],
+      })
+      activeSectionIndex.value = 0
+    }
+
+    // 确保 sectionIndex 有效
+    if (sectionIndex < 0 || sectionIndex >= sections.value.length) {
+      console.error('无法添加模块：无效的大环节索引', {
+        sectionIndex,
+        sectionsCount: sections.value.length,
+        sections: sections.value.map((s, i) => ({ index: i, id: s.id, name: s.name })),
+      })
+      showToast('error', '无法添加模块：无效的大环节索引')
+      return
+    }
+
     const sec = sections.value[sectionIndex]
-    if (!sec) return
-    if (!sec.cells) sec.cells = []
-    const newCell = getDefaultCell(cellType, indexInSection)
-    sec.cells.splice(indexInSection, 0, newCell)
-    sec.cells.forEach((c, i) => { c.order = i })
-    showToast('success', `已添加${getCellTypeName(cellType)}`)
-    const globalIndex =
-      sections.value.slice(0, sectionIndex).reduce((a, s) => a + (s.cells?.length || 0), 0) + indexInSection
-    nextTick(() => scrollToNewCell(globalIndex))
+    if (!sec) {
+      console.error('无法添加模块：找不到指定的大环节', {
+        sectionIndex,
+        sectionsCount: sections.value.length,
+      })
+      showToast('error', '无法添加模块：找不到指定的大环节')
+      return
+    }
+
+    // 确保 cells 数组存在且是响应式的
+    if (!sec.cells) {
+      sec.cells = []
+    }
+    
+    // 确保 indexInSection 在有效范围内
+    const maxIndex = sec.cells.length
+    const safeIndex = Math.max(0, Math.min(indexInSection, maxIndex))
+    
+    try {
+      const newCell = getDefaultCell(cellType, safeIndex)
+      
+      // 验证新创建的 cell 对象
+      if (!newCell || !newCell.id || !newCell.type) {
+        throw new Error('创建的 cell 对象无效')
+      }
+      
+      // 确保 cells 数组是响应式的（通过重新赋值触发响应式更新）
+      const currentCells = [...(sec.cells || [])]
+      
+      // 使用更安全的方式添加 cell
+      if (safeIndex === maxIndex) {
+        // 添加到末尾
+        currentCells.push(newCell)
+      } else {
+        // 插入到指定位置
+        currentCells.splice(safeIndex, 0, newCell)
+      }
+      
+      // 更新所有 cell 的 order
+      currentCells.forEach((c, i) => { 
+        if (c) c.order = i 
+      })
+      
+      // 重新赋值以触发响应式更新
+      sec.cells = currentCells
+      
+      showToast('success', `已添加${getCellTypeName(cellType)}`)
+      const globalIndex =
+        sections.value.slice(0, sectionIndex).reduce((a, s) => a + (s.cells?.length || 0), 0) + safeIndex
+      nextTick(() => scrollToNewCell(globalIndex))
+    } catch (error) {
+      console.error('添加模块时出错:', error, {
+        sectionIndex,
+        indexInSection: safeIndex,
+        cellType,
+        cellsLength: sec.cells?.length || 0,
+        section: {
+          id: sec.id,
+          name: sec.name,
+          cellsCount: sec.cells?.length || 0,
+        },
+        errorStack: error instanceof Error ? error.stack : undefined,
+      })
+      showToast('error', `添加模块失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
   }
 
   function handleAddCellAt(cellType: CellTypeValue, index: number) {

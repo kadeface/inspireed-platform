@@ -12,7 +12,7 @@ import { createLogger } from '../utils/logger'
 
 const logger = createLogger('LESSON')
 import { lessonService } from '../services/lesson'
-import { isContentWithSections, sectionsToContent } from '../utils/lessonContent'
+import { isContentWithSections, sectionsToContent, sectionsToFlatCells, normalizeContentToSections } from '../utils/lessonContent'
 
 export const useLessonStore = defineStore('lesson', () => {
   const currentLesson = ref<Lesson | null>(null)
@@ -208,18 +208,26 @@ export const useLessonStore = defineStore('lesson', () => {
       const lesson = await lessonService.fetchLessonById(id)
 
       // 调试日志：记录加载的数据（仅在开发环境）
+      // 处理 content 可能是数组或对象（sections）的情况
+      const contentCells = Array.isArray(lesson.content)
+        ? lesson.content
+        : isContentWithSections(lesson.content)
+          ? sectionsToFlatCells(normalizeContentToSections(lesson.content))
+          : []
+      
       logger.debug('加载教案:', {
         lessonId: lesson.id,
         title: lesson.title,
-        contentLength: lesson.content?.length || 0,
-        contentDetails: (lesson.content || []).map((cell: any, idx: number) => ({
+        contentLength: contentCells.length,
+        contentType: Array.isArray(lesson.content) ? 'array' : isContentWithSections(lesson.content) ? 'sections' : 'unknown',
+        contentDetails: contentCells.map((cell: any, idx: number) => ({
           index: idx,
           id: cell?.id,
           type: cell?.type,
           order: cell?.order,
           hasContent: !!cell?.content,
         })),
-        contentPreview: lesson.content?.slice(0, 2) || [],
+        contentPreview: contentCells.slice(0, 2),
         version: lesson.version,
         updatedAt: lesson.updated_at,
       })
