@@ -135,6 +135,154 @@
       @scroll-to-top="scrollToTop"
     />
 
+    <!-- 隐藏的文件输入框，用于上传封面图片 -->
+    <input
+      ref="coverImageInput"
+      type="file"
+      accept="image/*"
+      class="hidden"
+      @change="handleCoverImageSelect"
+    />
+
+    <!-- 封面图片预览和编辑对话框 -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="showCoverImagePreview"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          @click.self="cancelCoverImageEdit"
+          @keydown.esc="cancelCoverImageEdit"
+        >
+          <div
+            class="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            @click.stop
+          >
+            <!-- 标题栏 -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-900">预览和调整封面图片</h3>
+              <button
+                @click="cancelCoverImageEdit"
+                class="text-gray-400 hover:text-gray-600 transition-colors"
+                title="关闭 (Esc)"
+              >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- 预览区域 -->
+            <div class="flex-1 overflow-y-auto p-6">
+              <div class="flex flex-col lg:flex-row gap-6">
+                <!-- 图片预览 -->
+                <div class="flex-1">
+                  <div class="relative aspect-video bg-gray-100 rounded-xl overflow-hidden">
+                    <img
+                      ref="coverImagePreview"
+                      :src="coverImagePreviewUrl"
+                      alt="封面预览"
+                      class="w-full h-full object-contain"
+                    />
+                  </div>
+                </div>
+
+                <!-- 调整选项 -->
+                <div class="w-full lg:w-80 space-y-6">
+                  <!-- 图片质量 -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      图片质量: {{ imageQuality }}%
+                    </label>
+                    <input
+                      v-model.number="imageQuality"
+                      type="range"
+                      min="60"
+                      max="100"
+                      step="5"
+                      class="w-full"
+                    />
+                    <p class="mt-1 text-xs text-gray-500">质量越高，文件越大</p>
+                  </div>
+
+                  <!-- 最大尺寸 -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      最大宽度: {{ maxImageWidth }}px
+                    </label>
+                    <input
+                      v-model.number="maxImageWidth"
+                      type="range"
+                      min="800"
+                      max="3840"
+                      step="80"
+                      class="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      最大高度: {{ maxImageHeight }}px
+                    </label>
+                    <input
+                      v-model.number="maxImageHeight"
+                      type="range"
+                      min="600"
+                      max="2160"
+                      step="60"
+                      class="w-full"
+                    />
+                  </div>
+
+                  <!-- 说明 -->
+                  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p class="text-sm text-blue-800">
+                      <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      提示：调整质量和尺寸可以优化图片文件大小，建议质量85%，尺寸1920×1080。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <button
+                @click="cancelCoverImageEdit"
+                :disabled="isUploadingCoverImage"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                取消
+              </button>
+              <button
+                @click="processAndUploadCoverImage"
+                :disabled="isUploadingCoverImage"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+              >
+                <svg
+                  v-if="isUploadingCoverImage"
+                  class="animate-spin w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                {{ isUploadingCoverImage ? '上传中...' : '确认上传' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
