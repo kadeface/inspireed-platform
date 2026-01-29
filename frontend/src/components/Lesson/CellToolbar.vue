@@ -174,8 +174,12 @@ const cellTypes = [
 ]
 
 async function handleAddCell(cellType: CellType) {
-  if (isAdding.value) return
+  if (isAdding.value) {
+    console.warn('CellToolbar: 正在添加中，忽略重复点击')
+    return
+  }
   
+  console.log('CellToolbar: 开始添加模块', { cellType })
   isAdding.value = true
   addingCellType.value = cellType
   
@@ -183,7 +187,10 @@ async function handleAddCell(cellType: CellType) {
     // 添加短暂延迟以显示加载状态
     await new Promise(resolve => setTimeout(resolve, 300))
     
+    console.log('CellToolbar: 发出 addCell 事件', { cellType })
     emit('addCell', cellType)
+  } catch (error) {
+    console.error('CellToolbar: 添加模块时出错', error)
   } finally {
     // 延迟重置状态以显示成功反馈
     setTimeout(() => {

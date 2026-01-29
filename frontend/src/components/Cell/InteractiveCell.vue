@@ -380,7 +380,7 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLElement | null>(null)
 const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)
 
-const localContent = ref({ ...props.cell.content })
+const localContent = ref({ ...(props.cell.content || {}) })
 const localConfig = ref<InteractiveCell['config']>({ 
   allowFullscreen: true,
   height: '800px',
@@ -389,14 +389,14 @@ const localConfig = ref<InteractiveCell['config']>({
 
 const urlError = ref<string | null>(null)
 const sourceMode = ref<'library' | 'html' | 'url'>(
-  props.cell.content.asset_id ? 'library' : (props.cell.content.html_code ? 'html' : 'url')
+  (props.cell.content?.asset_id) ? 'library' : ((props.cell.content?.html_code) ? 'html' : 'url')
 )
 const showLibraryPicker = ref(false)
 const selectedAsset = ref<LibraryAssetSummary | null>(null)
 const assetPicker = ref<InstanceType<typeof AssetPicker>>()
 
 // HTML代码相关状态
-const htmlCode = ref<string>(props.cell.content.html_code || '')
+const htmlCode = ref<string>(props.cell.content?.html_code || '')
 const htmlError = ref<string | null>(null)
 const isGeneratingHtml = ref(false)
 const htmlBlobUrl = ref<string | null>(null)
@@ -461,7 +461,7 @@ const displayUrl = computed(() => {
   } else {
     // 非编辑模式：从 cell.content 获取
     if (props.cell.content?.url) {
-      url = props.cell.content.url
+      url = props.cell.content?.url
     } else if (props.cell.content?.html_code && displayHtmlBlobUrl.value) {
       // 如果有HTML代码，使用已生成的Blob URL
       url = displayHtmlBlobUrl.value
@@ -784,7 +784,7 @@ async function loadAssetDetail(assetId: number) {
 // 监听 props.cell 的变化，同步到本地状态
 watch(() => props.cell, (newCell) => {
   if (newCell) {
-    localContent.value = { ...newCell.content }
+    localContent.value = { ...(newCell.content || {}) }
     localConfig.value = {
       allowFullscreen: true,
       height: '800px',
@@ -792,7 +792,7 @@ watch(() => props.cell, (newCell) => {
     }
     
     // 同步HTML代码
-    if (newCell.content.html_code) {
+    if (newCell.content?.html_code) {
       htmlCode.value = newCell.content.html_code
       if (props.editable) {
         if (htmlBlobUrl.value) {
@@ -819,12 +819,12 @@ watch(() => props.cell, (newCell) => {
     }
     
     // 如果 cell 有 asset_id，需要加载资产信息
-    if (newCell.content.asset_id && !selectedAsset.value) {
+    if (newCell.content?.asset_id && !selectedAsset.value) {
       loadAssetDetail(newCell.content.asset_id)
       sourceMode.value = 'library'
-    } else if (newCell.content.html_code) {
+    } else if (newCell.content?.html_code) {
       sourceMode.value = 'html'
-    } else if (newCell.content.url) {
+    } else if (newCell.content?.url) {
       sourceMode.value = 'url'
     }
   }
@@ -857,10 +857,10 @@ onMounted(() => {
     sourceMode.value = 'library'
   } else if (props.cell.content?.html_code) {
     sourceMode.value = 'html'
-    htmlCode.value = props.cell.content.html_code
-    if (props.editable) {
+    htmlCode.value = props.cell.content?.html_code || ''
+    if (props.editable && props.cell.content?.html_code) {
       htmlBlobUrl.value = generateBlobUrlFromHtml(props.cell.content.html_code)
-    } else {
+    } else if (props.cell.content?.html_code) {
       // 非编辑模式，生成显示用的Blob URL
       displayHtmlBlobUrl.value = generateBlobUrlFromHtml(props.cell.content.html_code)
     }

@@ -4,7 +4,10 @@
     <CellToolbar
       v-if="!isPreviewMode && !isFullscreenPreview"
       :collapsed="toolbarCollapsed"
-      @add-cell="(cellType) => emit('add-cell-to-end', cellType)"
+      @add-cell="(cellType) => {
+        console.log('LessonEditorMainContent: 收到 add-cell 事件', { cellType })
+        emit('add-cell-to-end', cellType)
+      }"
       @toggle-collapsed="emit('toggle-toolbar-collapsed')"
     />
 
@@ -228,7 +231,7 @@
             <!-- 编辑模式：当前选中大环节的内容 -->
             <template v-if="!isPreviewMode && sections[activeSectionIndex]">
               <SectionContainer
-                :key="sections[activeSectionIndex].id"
+                :key="`${sections[activeSectionIndex].id}-${sections[activeSectionIndex].cells?.length || 0}`"
                 :section="sections[activeSectionIndex]"
                 :section-index="activeSectionIndex"
                 :cell-offset="sections.slice(0, activeSectionIndex).reduce((a, s) => a + (s.cells?.length || 0), 0)"
@@ -237,7 +240,7 @@
                 :lesson-id="currentLesson?.id"
                 :show-header="false"
                 @update:section="(p) => emit('update-section', { index: activeSectionIndex, payload: p })"
-                @add-cell="(data) => emit('add-cell-in-section', data)"
+                @add-cell="(sectionIndex, indexInSection, cellType) => emit('add-cell-in-section', { sectionIndex, indexInSection, cellType })"
                 @cell-update="emit('cell-update', $event)"
                 @cell-delete="emit('cell-delete', $event)"
                 @cell-move-up="emit('cell-move-up', $event)"
@@ -249,7 +252,7 @@
             <template v-else-if="isPreviewMode">
               <SectionContainer
                 v-for="(sec, si) in sections"
-                :key="sec.id"
+                :key="`${sec.id}-${sec.cells?.length || 0}`"
                 :section="sec"
                 :section-index="si"
                 :cell-offset="sections.slice(0, si).reduce((a, s) => a + (s.cells?.length || 0), 0)"
@@ -258,7 +261,7 @@
                 :lesson-id="currentLesson?.id"
                 :show-header="true"
                 @update:section="(p) => emit('update-section', { index: si, payload: p })"
-                @add-cell="(data) => emit('add-cell-in-section', data)"
+                @add-cell="(sectionIndex, indexInSection, cellType) => emit('add-cell-in-section', { sectionIndex, indexInSection, cellType })"
                 @cell-update="emit('cell-update', $event)"
                 @cell-delete="emit('cell-delete', $event)"
                 @cell-move-up="emit('cell-move-up', $event)"
