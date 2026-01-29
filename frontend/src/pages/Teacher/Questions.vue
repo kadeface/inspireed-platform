@@ -513,6 +513,7 @@ import type {
 } from '@/types/activity'
 import type { QuestionListItem, QuestionStats } from '@/types/question'
 import type { Cell } from '@/types/cell'
+import { sectionsToFlatCells } from '@/utils/lessonContent'
 
 interface ActivitySummary {
   cellId: number
@@ -585,7 +586,7 @@ const loadOverview = async (lessonId: number) => {
     const lesson = await lessonService.fetchLessonById(lessonId)
     selectedLesson.value = lesson
 
-    const cells = (lesson.content || []).filter((cell: Cell) =>
+    const cells = sectionsToFlatCells(lesson.content?.sections || []).filter((cell: Cell) =>
       ['activity', 'flowchart'].includes(cell.type)
     )
 

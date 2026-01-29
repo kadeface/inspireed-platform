@@ -151,7 +151,7 @@
         :srcdoc="cell.content.code" 
         class="w-full border rounded bg-white overflow-hidden"
         :style="{ height: iframeHeight }"
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts"
         @load="handleIframeLoad"
       ></iframe>
     </div>

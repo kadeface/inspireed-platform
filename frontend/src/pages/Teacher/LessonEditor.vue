@@ -225,18 +225,23 @@ const classroomPanelData = computed(() => {
   if (!isPreviewMode.value || !teacherControlPanelRef.value) {
     return null
   }
-  const panel = teacherControlPanelRef.value as any
-  return {
-    session: panel.session?.value,
-    activeStudents: panel.activeStudents?.value || [],
-    totalStudents: panel.totalStudents?.value || 0,
-    displayDuration: panel.displayDuration?.value || 0,
-    remainingTime: panel.remainingTime?.value || 0,
-    formatDuration: panel.formatDuration,
-    formatRemainingTime: panel.formatRemainingTime,
-    handleToggleDisplayMode: panel.handleToggleDisplayMode,
-    handlePause: panel.handlePause,
-    handleEnd: panel.handleEnd,
+  try {
+    const panel = teacherControlPanelRef.value as any
+    return {
+      session: panel.session?.value,
+      activeStudents: panel.activeStudents?.value || [],
+      totalStudents: panel.totalStudents?.value || 0,
+      displayDuration: panel.displayDuration?.value || 0,
+      remainingTime: panel.remainingTime?.value || 0,
+      formatDuration: panel.formatDuration,
+      formatRemainingTime: panel.formatRemainingTime,
+      handleToggleDisplayMode: panel.handleToggleDisplayMode,
+      handlePause: panel.handlePause,
+      handleEnd: panel.handleEnd,
+    }
+  } catch (e) {
+    // 组件可能已销毁，返回 null
+    return null
   }
 })
 

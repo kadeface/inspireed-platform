@@ -116,7 +116,7 @@
                   v-else-if="asset.asset_type === 'interactive' && asset.public_url"
                   :src="getFullUrl(asset.public_url)"
                   class="w-full h-full border-0"
-                  sandbox="allow-scripts allow-same-origin"
+                  sandbox="allow-scripts"
                   loading="lazy"
                 ></iframe>
                 <!-- 其他类型没有缩略图时显示图标 -->

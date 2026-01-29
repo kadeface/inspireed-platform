@@ -5,6 +5,7 @@
 
 import { ref, computed } from 'vue'
 import type { ActivityCell } from '../types/cell'
+import api from '../services/api'
 
 interface UseCellIdResolverOptions {
   cell: ActivityCell
@@ -89,9 +90,8 @@ export function useCellIdResolver(options: UseCellIdResolverOptions) {
     try {
       resolvingCellId.value = true
       console.log('🔍 Resolving UUID to numeric ID:', uuid, 'for lesson:', lessonId)
-      
+
       // 首先尝试从 API 获取 lesson 的所有 cells
-      const { api } = await import('../services/api')
       let response: any
       try {
         response = await api.get(`/cells/lesson/${lessonId}`)

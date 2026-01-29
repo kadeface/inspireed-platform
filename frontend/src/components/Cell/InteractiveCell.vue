@@ -236,7 +236,7 @@
           }"
           frameborder="0"
           allowfullscreen
-          :sandbox="displayConfig?.sandbox?.join(' ') || 'allow-scripts allow-same-origin allow-forms allow-popups'"
+          :sandbox="displayConfig?.sandbox?.join(' ') || 'allow-scripts allow-forms allow-popups'"
         ></iframe>
       </div>
     </div>

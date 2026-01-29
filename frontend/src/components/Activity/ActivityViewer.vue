@@ -111,6 +111,7 @@ import { useActivityState } from '../../composables/useActivityState'
 import { useActivitySubmission } from '../../composables/useActivitySubmission'
 import { useOfflineActivity } from '../../composables/useOfflineActivity'
 import ItemRenderer from './ItemTypes/ItemRenderer.vue'
+import api from '../../services/api'
 
 interface Props {
   cell: ActivityCell
@@ -252,9 +253,8 @@ async function resolveCellIdFromApi(uuid: string): Promise<number | null> {
 
   try {
     resolvingCellId.value = true
-    
+
     // 首先尝试从 API 获取 lesson 的所有 cells
-    const { api } = await import('../../services/api')
     let response
     try {
       response = await api.get(`/cells/lesson/${lessonId.value}`)

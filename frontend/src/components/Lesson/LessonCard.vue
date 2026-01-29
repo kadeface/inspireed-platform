@@ -306,6 +306,7 @@ import { computed, ref, watch, nextTick } from 'vue'
 import dayjs from 'dayjs'
 import type { Lesson } from '../../types/lesson'
 import { LessonStatus } from '../../types/lesson'
+import { sectionsToFlatCells } from '../../utils/lessonContent'
 import { getServerBaseUrl } from '../../utils/url'
 import courseExportService from '../../services/courseExport'
 import { useToast } from '@/composables/useToast'
@@ -405,7 +406,7 @@ const cellCount = computed(() => {
   if (typeof props.lesson.cell_count === 'number') {
     return props.lesson.cell_count
   }
-  return props.lesson.content?.length ?? 0
+  return sectionsToFlatCells(props.lesson.content?.sections || []).length
 })
 
 const displayTags = computed(() => {
