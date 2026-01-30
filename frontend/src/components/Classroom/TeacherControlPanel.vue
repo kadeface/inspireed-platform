@@ -9,7 +9,7 @@
             <h2 class="panel-title">InspireEd 教师导播台</h2>
             <!-- 模式切换按钮 -->
             <button
-              v-if="lesson && lesson.content && lesson.content.length > 0"
+              v-if="lessonContentCells.length > 0"
               type="button"
               @click="toggleSelectionMode"
               :disabled="loading"
@@ -38,10 +38,10 @@
             </span>
           </div>
           <!-- 模块数量显示 -->
-          <div v-if="lesson && lesson.content" class="module-count-info">
+          <div v-if="lessonContentCells.length > 0" class="module-count-info">
             <span class="module-count-icon">📚</span>
             <span class="module-count-text">
-              <span class="module-count-value">{{ lesson.content.length }}</span>
+              <span class="module-count-value">{{ lessonContentCells.length }}</span>
               <span class="module-count-label">个模块</span>
             </span>
           </div>
@@ -176,7 +176,7 @@
       <!-- 左侧：教学模块 -->
       <div class="panel teaching-modules teaching-modules-fullwidth" :class="{ 'module-panel-fullscreen': modulePanelFullscreen }">
         <!-- 导航控制栏（固定在顶部，始终可见） -->
-        <div class="module-navigation-bar" v-if="lesson && lesson.content && lesson.content.length > 0">
+        <div class="module-navigation-bar" v-if="lessonContentCells.length > 0">
           <!-- 上一模块按钮 -->
           <button
             class="module-nav-btn module-nav-btn-prev"
@@ -206,10 +206,10 @@
           </button>
         </div>
         
-        <div class="module-list" ref="moduleListRef" v-if="lesson && lesson.content && lesson.content.length > 0">
+        <div class="module-list" ref="moduleListRef" v-if="lessonContentCells.length > 0">
           <!-- 课程模块列表 -->
           <div 
-            v-for="(cell, index) in lesson.content" 
+            v-for="(cell, index) in lessonContentCells" 
             :key="cell.id || index"
             :ref="el => setModuleItemRef(el, index)"
             :data-module-index="index"
@@ -273,6 +273,7 @@ import ClassroomControlBoard from './ClassroomControlBoard.vue'
 import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
 import activityService from '../../services/activity'
 import logger from '@/utils/logger'
+import { isContentWithSections, sectionsToFlatCells, normalizeContentToSections } from '../../utils/lessonContent'
 
 // Cell类型图标组件 - 使用更明显的图标设计
 const CellTypeIcon = (props: { type: string }) => {
@@ -399,6 +400,24 @@ const displayStudents = computed(() => {
   return activeStudents.value.slice(0, 8)
 })
 
+// 将 lesson.content 转换为 flat cells 数组（支持新旧两种格式）
+const lessonContentCells = computed(() => {
+  if (!props.lesson?.content) return []
+  
+  // 如果已经是数组格式（旧格式），直接返回
+  if (Array.isArray(props.lesson.content)) {
+    return props.lesson.content
+  }
+  
+  // 如果是 sections 格式（新格式），转换为 flat cells
+  if (isContentWithSections(props.lesson.content)) {
+    const sections = normalizeContentToSections(props.lesson.content)
+    return sectionsToFlatCells(sections)
+  }
+  
+  return []
+})
+
 // 学生状态类
 function getStudentStatusClass(student: any): string {
   // 如果当前是活动模块，根据提交状态显示颜色
@@ -488,13 +507,13 @@ const averageScore = computed(() => {
 
 
 const currentCell = computed(() => {
-  if (!props.lesson?.content || !session.value) {
+  if (!lessonContentCells.value.length || !session.value) {
     return null
   }
   
   // 如果 selectedCellIndex 有效，优先使用它
-  if (selectedCellIndex.value >= 0 && selectedCellIndex.value < props.lesson.content.length) {
-    return props.lesson.content[selectedCellIndex.value]
+  if (selectedCellIndex.value >= 0 && selectedCellIndex.value < lessonContentCells.value.length) {
+    return lessonContentCells.value[selectedCellIndex.value]
   }
   
   // 否则使用 current_cell_id 查找
@@ -504,7 +523,7 @@ const currentCell = computed(() => {
   }
   
   // 查找匹配的Cell
-  const foundCell = props.lesson.content.find((cell, index) => {
+  const foundCell = lessonContentCells.value.find((cell, index) => {
     const cellId = getCellId(cell)
     // 尝试匹配数字ID
     if (typeof cellId === 'number' && cellId === currentId) return true
@@ -536,12 +555,12 @@ const displayCellOrders = computed(() => {
 
 // 获取当前选中模块的索引
 const currentModuleIndex = computed(() => {
-  if (!props.lesson?.content) return -1
+  if (!lessonContentCells.value.length) return -1
   
   // 多选模式：使用 displayCellOrders 中的第一个
   if (displayCellOrders.value !== undefined && Array.isArray(displayCellOrders.value) && displayCellOrders.value.length > 0) {
     const firstOrder = displayCellOrders.value[0]
-    const index = props.lesson.content.findIndex((cell, idx) => {
+    const index = lessonContentCells.value.findIndex((cell, idx) => {
       const cellOrder = cell.order !== undefined ? cell.order : idx
       return cellOrder === firstOrder
     })
@@ -549,7 +568,7 @@ const currentModuleIndex = computed(() => {
   }
   
   // 单选模式：直接使用 selectedCellIndex（它会在点击时立即更新）
-  if (selectedCellIndex.value >= 0 && selectedCellIndex.value < props.lesson.content.length) {
+  if (selectedCellIndex.value >= 0 && selectedCellIndex.value < lessonContentCells.value.length) {
     return selectedCellIndex.value
   }
   
@@ -558,7 +577,7 @@ const currentModuleIndex = computed(() => {
     const currentId = session.value.current_cell_id
     if (currentId === 0) return -1
     
-    const index = props.lesson.content.findIndex((cell, idx) => {
+    const index = lessonContentCells.value.findIndex((cell, idx) => {
       const cellId = getCellId(cell)
       if (typeof cellId === 'number' && cellId === currentId) return true
       if (typeof cellId === 'string') {
@@ -582,8 +601,8 @@ const canGoPrev = computed(() => {
 
 // 判断是否可以下一模块
 const canGoNext = computed(() => {
-  if (!props.lesson?.content) return false
-  return currentModuleIndex.value >= 0 && currentModuleIndex.value < props.lesson.content.length - 1
+  if (!lessonContentCells.value.length) return false
+  return currentModuleIndex.value >= 0 && currentModuleIndex.value < lessonContentCells.value.length - 1
 })
 
 const currentActivityDbCell = computed(() => {
@@ -739,9 +758,9 @@ function handleModuleItemClick(cell: Cell, index: number) {
 
 // 导航到上一模块
 function handlePrevModule() {
-  if (!canGoPrev.value || !props.lesson?.content) return
+  if (!canGoPrev.value || !lessonContentCells.value.length) return
   const prevIndex = currentModuleIndex.value - 1
-  const prevCell = props.lesson.content[prevIndex]
+  const prevCell = lessonContentCells.value[prevIndex]
   if (prevCell) {
     handleModuleItemClick(prevCell, prevIndex)
   }
@@ -749,9 +768,9 @@ function handlePrevModule() {
 
 // 导航到下一模块
 function handleNextModule() {
-  if (!canGoNext.value || !props.lesson?.content) return
+  if (!canGoNext.value || !lessonContentCells.value.length) return
   const nextIndex = currentModuleIndex.value + 1
-  const nextCell = props.lesson.content[nextIndex]
+  const nextCell = lessonContentCells.value[nextIndex]
   if (nextCell) {
     handleModuleItemClick(nextCell, nextIndex)
   }
@@ -844,8 +863,8 @@ function getModuleTooltip(cell: Cell, index: number): string {
 
 // 获取当前模块索引
 function getCurrentModuleIndex(): number {
-  if (!props.lesson?.content || !currentCell.value) return -1
-  return props.lesson.content.findIndex(cell => {
+  if (!lessonContentCells.value.length || !currentCell.value) return -1
+  return lessonContentCells.value.findIndex(cell => {
     const cellId = getCellId(cell)
     const currentId = session.value?.current_cell_id
     if (!currentId) return false
@@ -1066,8 +1085,8 @@ function scrollToQuestions() {
 
 // 根据 order 获取 Cell
 function getCellByOrder(order: number): Cell | null {
-  if (!props.lesson?.content) return null
-  return props.lesson.content.find((cell, index) => {
+  if (!lessonContentCells.value.length) return null
+  return lessonContentCells.value.find((cell, index) => {
     const cellOrder = cell.order !== undefined ? cell.order : index
     return cellOrder === order
   }) || null
@@ -1472,13 +1491,14 @@ async function toggleSelectionMode() {
   // 如果从多选切换到单选，且当前有多个选中项，只保留第一个
   if (!isMultiSelectMode.value && wasMultiSelect && displayCellOrders.value.length > 1) {
     const firstOrder = displayCellOrders.value[0]
-    const cell = props.lesson?.content.find((cell, idx) => {
+    const cell = lessonContentCells.value.find((cell, idx) => {
       const cellOrder = cell.order !== undefined ? cell.order : idx
       return cellOrder === firstOrder
     })
     if (cell) {
       const id = getCellId(cell)
-      const order = cell.order !== undefined ? cell.order : props.lesson!.content.indexOf(cell)
+      const cellIndex = lessonContentCells.value.indexOf(cell)
+      const order = cell.order !== undefined ? cell.order : cellIndex
       // 切换到单选模式，只显示第一个选中的项
       await handleControlBoardNavigate(id, order, 'toggle', false)
     }
@@ -1489,6 +1509,22 @@ async function toggleSelectionMode() {
 // 隐藏所有内容（通过导播台的"隐藏"节点调用）
 async function handleHideAll() {
   if (!session.value) return
+  
+  // 🆕 检查会话状态：导航功能要求会话状态必须是 ACTIVE
+  if (session.value.status !== 'active') {
+    const statusMessages: Record<string, string> = {
+      'pending': '请先点击"开始上课"按钮，等待教师开始上课',
+      'paused': '会话已暂停，请先继续会话',
+      'ended': '会话已结束，无法隐藏内容'
+    }
+    const message = statusMessages[session.value.status] || '会话状态不正确，无法隐藏内容'
+    alert(message)
+    console.warn('隐藏内容失败：会话状态不是 ACTIVE', {
+      currentStatus: session.value.status,
+      sessionId: session.value.id
+    })
+    return
+  }
   
   loading.value = true
   try {
@@ -1558,6 +1594,22 @@ async function handleControlBoardNavigate(
     return
   }
   
+  // 🆕 检查会话状态：导航功能要求会话状态必须是 ACTIVE
+  if (session.value.status !== 'active') {
+    const statusMessages: Record<string, string> = {
+      'pending': '请先点击"开始上课"按钮，等待教师开始上课',
+      'paused': '会话已暂停，请先继续会话',
+      'ended': '会话已结束，无法导航'
+    }
+    const message = statusMessages[session.value.status] || '会话状态不正确，无法导航'
+    alert(message)
+    console.warn('导航失败：会话状态不是 ACTIVE', {
+      currentStatus: session.value.status,
+      sessionId: session.value.id
+    })
+    return
+  }
+  
   loading.value = true
   try {
     // 🆕 新方式：使用 display_cell_orders（推荐）
@@ -1566,12 +1618,16 @@ async function handleControlBoardNavigate(
     const currentSettings = session.value.settings as any
     if (currentSettings?.display_cell_orders) {
       displayOrders = [...currentSettings.display_cell_orders]
-    } else if (currentSettings?.display_cell_ids && props.lesson?.content) {
+    } else if (currentSettings?.display_cell_ids && lessonContentCells.value.length > 0) {
       // 向后兼容：如果只有 display_cell_ids，转换成 orders
       displayOrders = currentSettings.display_cell_ids
         .map((id: number) => {
-          const cell = props.lesson!.content.find((c: any) => getCellId(c) === id)
-          return cell ? (cell.order !== undefined ? cell.order : props.lesson!.content.indexOf(cell)) : -1
+          const cell = lessonContentCells.value.find((c: any) => getCellId(c) === id)
+          if (cell) {
+            const cellIndex = lessonContentCells.value.indexOf(cell)
+            return cell.order !== undefined ? cell.order : cellIndex
+          }
+          return -1
         })
         .filter((order: number) => order >= 0)
     }
@@ -1618,8 +1674,8 @@ async function handleControlBoardNavigate(
     loadParticipants()
     
     // 🆕 如果点击的是活动模块，确保数据库记录存在
-    if (cellOrder !== null && props.lesson?.content) {
-      const clickedCell = props.lesson.content.find((cell, idx) => {
+    if (cellOrder !== null && lessonContentCells.value.length > 0) {
+      const clickedCell = lessonContentCells.value.find((cell, idx) => {
         const cellOrderValue = cell.order !== undefined ? cell.order : idx
         return cellOrderValue === cellOrder
       })
@@ -1646,9 +1702,9 @@ async function handleControlBoardNavigate(
     // 更新selectedCellIndex
     if (cellId === 0) {
       selectedCellIndex.value = -1
-    } else if (cellOrder !== null && cellOrder !== undefined && props.lesson?.content) {
+    } else if (cellOrder !== null && cellOrder !== undefined && lessonContentCells.value.length > 0) {
       // 🆕 通过 cellOrder 查找对应的数组索引（而不是直接使用 cellOrder）
-      const index = props.lesson.content.findIndex((cell, idx) => {
+      const index = lessonContentCells.value.findIndex((cell, idx) => {
         const cellOrderValue = cell.order !== undefined ? cell.order : idx
         return cellOrderValue === cellOrder
       })
@@ -1656,11 +1712,11 @@ async function handleControlBoardNavigate(
         selectedCellIndex.value = index
       } else {
         // 如果找不到，尝试使用 cellOrder 作为索引（向后兼容）
-        selectedCellIndex.value = cellOrder < props.lesson.content.length ? cellOrder : -1
+        selectedCellIndex.value = cellOrder < lessonContentCells.value.length ? cellOrder : -1
       }
-    } else if (cellId && props.lesson?.content) {
+    } else if (cellId && lessonContentCells.value.length > 0) {
       // 通过 cellId 查找索引
-      const index = props.lesson.content.findIndex((cell) => {
+      const index = lessonContentCells.value.findIndex((cell) => {
         const id = getCellId(cell)
         if (typeof id === 'number' && id === cellId) return true
         if (typeof id === 'string') {
@@ -1675,7 +1731,7 @@ async function handleControlBoardNavigate(
         // 如果找不到，尝试使用返回的 currentCellId 对应的索引
         if (updatedSession?.currentCellId) {
           const currentId = updatedSession.currentCellId
-          const foundIndex = props.lesson.content.findIndex((cell) => {
+          const foundIndex = lessonContentCells.value.findIndex((cell) => {
             const id = getCellId(cell)
             return id === currentId || (typeof id === 'string' && String(id) === String(currentId))
           })
@@ -1844,7 +1900,7 @@ watch(() => session.value, (newSession) => {
     // 如果有选中的 orders，使用第一个的索引
     if (orders.length > 0) {
       // 🆕 通过 order 查找对应的数组索引
-      const index = props.lesson.content.findIndex((cell, idx) => {
+      const index = lessonContentCells.value.findIndex((cell, idx) => {
         const cellOrder = cell.order !== undefined ? cell.order : idx
         return cellOrder === orders[0]
       })
@@ -1861,7 +1917,7 @@ watch(() => session.value, (newSession) => {
   }
   
   // 查找匹配的Cell
-  const index = props.lesson.content.findIndex(cell => {
+  const index = lessonContentCells.value.findIndex(cell => {
     const id = getCellId(cell)
     // 尝试匹配数字ID
     if (typeof id === 'number' && id === cellId) return true

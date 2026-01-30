@@ -20,6 +20,8 @@ from app.models.classroom_session import (
 from app.models.lesson import Lesson
 from app.models.cell import Cell
 from app.models.organization import Classroom
+from app.models.classroom_assistant import ClassroomMembership
+from app.core.classroom_utils import get_user_classroom_ids, check_user_in_classroom
 from app.schemas.classroom_session import (
     ClassSessionCreate,
     ClassSessionUpdate,
@@ -262,9 +264,30 @@ async def start_session(
     session.status = ClassSessionStatus.ACTIVE # type: ignore[comparison-overlap]
     session.actual_start = datetime.utcnow() # type: ignore[comparison-overlap]
 
-    # 默认不显示任何Cell，等待教师手动切换
-    # 这样更符合实际教学流程：教师可以先准备，然后再切换给学生看
-    session.current_cell_id = None # type: ignore[comparison-overlap]
+    # 🆕 自动初始化 display_cell_orders：显示第一个 cell
+    # 这样学生端在开始上课后就能看到内容，而不是等待教师手动切换
+    session_lesson_id = cast(int, session.lesson_id)
+    
+    # 查找第一个 cell（按 order 升序，如果 order 相同则按 id 升序）
+    result = await db.execute(
+        select(Cell).where(
+            Cell.lesson_id == session_lesson_id
+        ).order_by(Cell.order.asc(), Cell.id.asc()).limit(1)
+    )
+    first_cell = result.scalar_one_or_none()
+    
+    if first_cell:
+        # 找到第一个 cell，初始化 display_cell_orders
+        first_cell_order = first_cell.order if first_cell.order is not None else 0
+        new_settings = dict(session.settings) if session.settings else {} # type: ignore[assignment]
+        new_settings["display_cell_orders"] = [first_cell_order] # type: ignore[assignment]
+        setattr(session, "settings", new_settings)
+        session.current_cell_id = cast(int, first_cell.id) # type: ignore[comparison-overlap]
+        print(f"✅ 开始上课时自动显示第一个 cell: order={first_cell_order}, cell_id={first_cell.id}")
+    else:
+        # 如果没有找到 cell，保持为空（等待教师手动切换）
+        session.current_cell_id = None # type: ignore[comparison-overlap]
+        print(f"⚠️ 课程 {session_lesson_id} 没有 cell，等待教师手动切换")
 
     await db.commit()
     await db.refresh(session)
@@ -283,6 +306,46 @@ async def start_session(
         session_id=session_id
     )
     print(f"📢 已广播会话状态变化（会话 {session_id}）：pending -> active")
+    
+    # 🆕 如果初始化了 display_cell_orders，也广播内容变化消息
+    if first_cell:
+        # 安全地获取 settings 和 display_cell_orders
+        # 使用 getattr 和类型检查来避免 SQLAlchemy Column 类型问题
+        settings_value = getattr(session, 'settings', None)
+        if settings_value is not None:
+            # 确保 settings 是字典类型
+            if isinstance(settings_value, dict):
+                settings_dict = settings_value
+            else:
+                # 如果是其他类型（如 SQLAlchemy Column），尝试转换
+                try:
+                    settings_dict = dict(settings_value) if hasattr(settings_value, '__iter__') else {}
+                except (TypeError, ValueError):
+                    settings_dict = {}
+        else:
+            settings_dict = {}
+        
+        display_cell_orders = settings_dict.get("display_cell_orders", []) if isinstance(settings_dict, dict) else []
+        
+        if display_cell_orders:
+            broadcast_message = {
+                "type": "cell_changed",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": {
+                    "action": "navigate",
+                    "display_cell_orders": display_cell_orders,
+                    "current_cell_id": session.current_cell_id,
+                    "changed_by": {
+                        "user_id": current_user.id,
+                        "user_name": current_user.full_name or current_user.username,
+                    }
+                }
+            }
+            await manager.broadcast_to_session(
+                message=broadcast_message,
+                session_id=session_id,
+            )
+            print(f"📢 已广播内容初始化（会话 {session_id}），显示第一个 cell")
 
     return session
 
@@ -763,11 +826,15 @@ async def join_session(
     if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
         raise HTTPException(status_code=400, detail="会话已结束")
 
-    # 检查学生是否属于该班级
+    # 🆕 使用统一函数检查学生是否属于该班级
     classroom_id = cast(int, session.classroom_id)
-    student_classroom_id = cast(Optional[int], current_user.classroom_id)
-    if student_classroom_id != classroom_id:
-        raise HTTPException(status_code=403, detail="无权加入该会话")
+    has_access = await check_user_in_classroom(db, current_user, classroom_id)
+    
+    if not has_access:
+        raise HTTPException(
+            status_code=403, 
+            detail=f"无权加入该会话：学生不属于该班级（classroom_id={classroom_id}）"
+        )
 
     # 检查是否已加入
     result = await db.execute(
@@ -881,9 +948,28 @@ async def get_student_pending_sessions(
     if current_role != UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="仅学生可访问此接口")
 
-    # 获取学生所在班级ID
+    # 🆕 获取学生所在班级ID（同时检查 User.classroom_id 和 ClassroomMembership）
+    student_classroom_ids = set()
+    
+    # 方式1：检查 User.classroom_id（向后兼容）
     student_classroom_id = cast(Optional[int], current_user.classroom_id)
-    if not student_classroom_id:
+    if student_classroom_id:
+        student_classroom_ids.add(student_classroom_id)
+    
+    # 方式2：检查 ClassroomMembership（支持多班级）
+    membership_result = await db.execute(
+        select(ClassroomMembership).where(
+            and_(
+                ClassroomMembership.user_id == current_user.id,
+                ClassroomMembership.is_active == True,
+            )
+        )
+    )
+    memberships = membership_result.scalars().all()
+    for membership in memberships:
+        student_classroom_ids.add(membership.classroom_id)
+    
+    if not student_classroom_ids:
         # 如果学生没有分配班级，返回空列表
         return []
 
@@ -893,7 +979,7 @@ async def get_student_pending_sessions(
     # 查询学生所在班级的最近48小时内的pending状态会话
     query = (
         select(ClassSession)
-        .where(ClassSession.classroom_id == student_classroom_id)
+        .where(ClassSession.classroom_id.in_(list(student_classroom_ids)))
         .where(ClassSession.status == ClassSessionStatus.PENDING)
         .where(ClassSession.created_at >= cutoff_time)  # 只返回最近48小时内的会话
         .options(
@@ -949,9 +1035,10 @@ async def get_student_active_sessions(
     if current_role != UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="仅学生可访问此接口")
 
-    # 获取学生所在班级ID
-    student_classroom_id = cast(Optional[int], current_user.classroom_id)
-    if not student_classroom_id:
+    # 🆕 使用统一函数获取学生所在班级ID
+    student_classroom_ids = await get_user_classroom_ids(db, current_user)
+    
+    if not student_classroom_ids:
         # 如果学生没有分配班级，返回空列表
         return []
 
@@ -963,7 +1050,7 @@ async def get_student_active_sessions(
     # 使用COALESCE：优先使用actual_start，如果没有则使用created_at
     query = (
         select(ClassSession)
-        .where(ClassSession.classroom_id == student_classroom_id)
+        .where(ClassSession.classroom_id.in_(list(student_classroom_ids)))
         .where(ClassSession.status == ClassSessionStatus.ACTIVE)
         .where(
             # 使用actual_start或created_at，只要有一个在40分钟内即可
@@ -1241,12 +1328,13 @@ async def websocket_endpoint(
             await websocket.close(code=1008, reason="Session has ended")
             return
         
-        # 验证学生属于该班级
+        # 🆕 使用统一函数验证学生属于该班级
         classroom_id = cast(int, session.classroom_id)
-        student_classroom_id = cast(Optional[int], current_user.classroom_id)
-        if student_classroom_id != classroom_id:
-            print(f"❌ 权限验证失败: student_classroom_id={student_classroom_id}, session_classroom_id={classroom_id}")
-            await websocket.close(code=1008, reason="Access denied")
+        has_access = await check_user_in_classroom(db, current_user, classroom_id)
+        
+        if not has_access:
+            print(f"❌ 权限验证失败: session_classroom_id={classroom_id}")
+            await websocket.close(code=1008, reason="Access denied: Student does not belong to this classroom")
             return
         
         print(f"✅ 所有验证通过，开始建立连接: session_id={session_id}, student_id={current_user.id}")

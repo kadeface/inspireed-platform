@@ -785,9 +785,19 @@ async def list_shared_lessons(
             if db_cell_count > 0:
                 response.lesson_cell_count = db_cell_count
             else:
-                # 如果数据库中的 cell_count 为 0，从 content 字段动态计算
-                content_list = lesson.content if isinstance(lesson.content, list) else []
-                response.lesson_cell_count = len(content_list)
+                # 如果数据库中的 cell_count 为 0，从 content 字段动态计算（支持新旧格式）
+                def _calculate_cell_count(content: Any) -> int:
+                    """计算 content 中的 cell 数量，支持 List[dict] 或 {sections:[{cells:[]}]}"""
+                    if content is None:
+                        return 0
+                    if isinstance(content, list):
+                        return len(content)
+                    if isinstance(content, dict) and "sections" in content:
+                        sections = content.get("sections", [])
+                        return sum(len(s.get("cells", [])) for s in sections)
+                    return 0
+                
+                response.lesson_cell_count = _calculate_cell_count(lesson.content)
             response.lesson_estimated_duration = (
                 cast(int, lesson.estimated_duration)
                 if lesson.estimated_duration is not None

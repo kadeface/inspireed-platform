@@ -182,7 +182,7 @@
 
         <!-- 课堂模式：等待教师切换内容（全屏显示） -->
         <div 
-          v-if="isInClassroomMode && !hasDisplayableContent && lesson.content && lesson.content.length > 0" 
+          v-if="isInClassroomMode && !hasDisplayableContent && lessonContentCells.length > 0" 
           class="mx-6 my-8 text-center py-24 bg-gradient-to-br from-emerald-50/80 via-teal-50/80 to-cyan-50/80 rounded-2xl border-2 border-dashed border-emerald-300/50 backdrop-blur-sm shadow-lg"
         >
           <div class="max-w-md mx-auto">
@@ -211,7 +211,7 @@
               :key="cell.id"
               :cell="cell"
               :cellIndex="index"
-              :allCells="lesson.content"
+              :allCells="lessonContentCells"
               :completedCellIds="completedCells"
               @complete="markCellAsCompleted"
             >
@@ -440,6 +440,7 @@ import StudentClassroomSync from '@/components/Classroom/StudentClassroomSync.vu
 import { useClassroomSession } from '@/composables/useClassroomSession'
 import classroomSessionService from '@/services/classroomSession'
 import type { ClassSession } from '@/types/classroomSession'
+import { isContentWithSections, normalizeContentToSections, sectionsToFlatCells } from '@/utils/lessonContent'
 
 const route = useRoute()
 const router = useRouter()
@@ -571,6 +572,24 @@ const {
   updateProgress,  // 🆕 导入进度更新函数
 } = useClassroomSession(lessonId.value, handleFullscreenRequest)
 
+// 🆕 统一处理 lesson.content：支持 Cell[] 和 LessonContentWithSections 两种格式
+const lessonContentCells = computed(() => {
+  if (!lesson.value?.content) return []
+  
+  // 如果已经是数组格式（旧格式），直接返回
+  if (Array.isArray(lesson.value.content)) {
+    return lesson.value.content
+  }
+  
+  // 如果是 sections 格式（新格式），转换为 flat cells
+  if (isContentWithSections(lesson.value.content)) {
+    const sections = normalizeContentToSections(lesson.value.content)
+    return sectionsToFlatCells(sections)
+  }
+  
+  return []
+})
+
 // 处理退出课堂
 async function handleExitClassroom() {
   if (!classroomSession.value) return
@@ -606,7 +625,8 @@ let lastErrorLogTime = 0
 const ERROR_LOG_DEBOUNCE = 5000 // 5秒内不重复输出相同错误
 
 const progress = computed(() => {
-  if (!lesson.value?.content || lesson.value.content.length === 0) {
+  const cells = lessonContentCells.value
+  if (!cells || cells.length === 0) {
     return 0
   }
   
@@ -617,7 +637,7 @@ const progress = computed(() => {
     
     if (displayOrders && Array.isArray(displayOrders)) {
       const checkedModules = displayOrders.length
-      const totalModules = lesson.value.content.length
+      const totalModules = cells.length
       const progressValue = Math.round((checkedModules / totalModules) * 100)
       return progressValue
     }
@@ -625,13 +645,14 @@ const progress = computed(() => {
   
   // 非课堂模式：基于已完成的cell数
   const completed = completedCells.value.size
-  const total = lesson.value.content.length
+  const total = cells.length
   return Math.round((completed / total) * 100)
 })
 
 const lessonOutline = computed(() => {
-  if (!lesson.value?.content) return ''
-  return lesson.value.content
+  const cells = lessonContentCells.value
+  if (!cells || cells.length === 0) return ''
+  return cells
     .slice(0, 6)
     .map((cell, index) => summarizeCell(cell, index))
     .filter((item): item is string => Boolean(item))
@@ -643,7 +664,8 @@ let lastFilterState = ''
 
 // 过滤Cells：在课堂模式下只显示教师指定的Cell
 const filteredCells = computed(() => {
-  if (!lesson.value?.content) return []
+  const cells = lessonContentCells.value
+  if (!cells || cells.length === 0) return []
   
   // 只在状态变化时输出日志
   const currentState = JSON.stringify({
@@ -658,7 +680,7 @@ const filteredCells = computed(() => {
   
   // 如果不在课堂模式，显示所有Cell
   if (!isInClassroomMode.value) {
-    return lesson.value.content
+    return cells
   }
   
   // 课堂模式：严格同步，只显示教师指定的Cell
@@ -674,7 +696,7 @@ const filteredCells = computed(() => {
       }
       
       // 直接根据 order 过滤，无需映射，无需 dbCells
-      const filteredByOrders = lesson.value.content.filter((cell, index) => {
+      const filteredByOrders = cells.filter((cell, index) => {
         const cellOrder = cell.order !== undefined ? cell.order : index
         return displayOrders.includes(cellOrder)
       })
@@ -687,7 +709,7 @@ const filteredCells = computed(() => {
   }
   
   // 非严格同步模式，显示所有Cell
-  return lesson.value.content
+  return cells
 })
 
 // ========== 旧代码（已废弃）==========
@@ -1016,10 +1038,11 @@ const markCellAsCompleted = (cellId: string) => {
 }
 
 const markAsCompleted = () => {
-  if (!lesson.value?.content) return
+  const cells = lessonContentCells.value
+  if (!cells || cells.length === 0) return
   
   // 标记所有 Cell 为完成
-  lesson.value.content.forEach(cell => {
+  cells.forEach(cell => {
     completedCells.value.add(String(cell.id))
   })
   
@@ -1069,9 +1092,10 @@ watch(
       
       // 将 orders 转换为 cellIds（用于 updateProgress）
       const completedCellIds: number[] = []
-      if (lesson.value?.content) {
+      const cells = lessonContentCells.value
+      if (cells && cells.length > 0) {
         newOrders.forEach((order: number) => {
-          const cell = lesson.value!.content.find(
+          const cell = cells.find(
             (c, idx) => (c.order !== undefined ? c.order : idx) === order
           )
           if (cell) {

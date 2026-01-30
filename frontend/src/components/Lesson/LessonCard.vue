@@ -402,10 +402,22 @@ const displayDescription = computed(() => {
 })
 
 const cellCount = computed(() => {
-  if (typeof props.lesson.cell_count === 'number') {
+  // 优先使用后端返回的 cell_count
+  if (typeof props.lesson.cell_count === 'number' && props.lesson.cell_count > 0) {
     return props.lesson.cell_count
   }
-  return props.lesson.content?.length ?? 0
+  // 如果 cell_count 不存在或为 0，从 content 计算（兼容新旧格式）
+  const content = props.lesson.content
+  if (!content) return 0
+  if (Array.isArray(content)) {
+    return content.length
+  }
+  // 新格式：{ sections: [{ cells: [] }] }
+  if (content && typeof content === 'object' && 'sections' in content) {
+    const sections = (content as any).sections || []
+    return sections.reduce((sum: number, s: any) => sum + (s.cells?.length || 0), 0)
+  }
+  return 0
 })
 
 const displayTags = computed(() => {

@@ -232,6 +232,21 @@
         您的浏览器不支持视频播放
       </video>
       
+      <!-- 视频加载错误提示 -->
+      <div v-if="videoLoadError" class="video-error-overlay">
+        <div class="video-error-content">
+          <svg class="video-error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="video-error-message">{{ videoLoadError }}</p>
+          <div class="video-error-actions">
+            <button @click="retryVideoLoad" class="video-retry-btn" :disabled="isCheckingVideo">
+              {{ isCheckingVideo ? '检查中...' : '重试' }}
+            </button>
+          </div>
+        </div>
+      </div>
+      
       <!-- 视频信息显示 -->
       <div v-if="displayContent.title || displayContent.description" class="video-info-display">
         <h3 v-if="displayContent.title">{{ displayContent.title }}</h3>
@@ -388,6 +403,10 @@ const blobUrl = ref<string | null>(null)
 const isUploading = ref(false)
 const uploadProgress = ref(0)
 const uploadError = ref<string | null>(null)
+
+// 视频加载错误状态
+const videoLoadError = ref<string | null>(null)
+const isCheckingVideo = ref(false)
 
 // 标志位：是否正在从 props 同步数据（避免循环触发）
 let isUpdatingFromProps = false
@@ -771,32 +790,96 @@ function handleVideoEnded() {
   // 视频播放结束处理
 }
 
-function handleVideoError(event: Event) {
+async function handleVideoError(event: Event) {
   const video = event.target as HTMLVideoElement
+  const videoUrl = video.src
+  
   console.error('视频加载错误:', {
     error: video.error,
     networkState: video.networkState,
     readyState: video.readyState,
-    src: video.src
+    src: videoUrl
   })
+  
+  // 清除之前的错误
+  videoLoadError.value = null
   
   if (video.error) {
     let errorMessage = '视频加载失败'
-    switch (video.error.code) {
+    let errorCode = video.error.code
+    
+    switch (errorCode) {
       case video.error.MEDIA_ERR_ABORTED:
         errorMessage = '视频加载被中止'
         break
       case video.error.MEDIA_ERR_NETWORK:
         errorMessage = '网络错误导致视频加载失败'
+        // 检查文件是否存在
+        await checkVideoFileExists(videoUrl)
         break
       case video.error.MEDIA_ERR_DECODE:
-        errorMessage = '视频解码失败'
+        errorMessage = '视频解码失败，可能是文件损坏或格式不支持'
         break
       case video.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
         errorMessage = '视频格式不支持或源不可用'
+        // 检查文件是否存在
+        await checkVideoFileExists(videoUrl)
         break
     }
-    console.error(errorMessage)
+    
+    // 如果 networkState 是 3 (NETWORK_NO_SOURCE)，可能是文件不存在
+    if (video.networkState === 3) {
+      errorMessage = '视频文件不存在或无法访问'
+      await checkVideoFileExists(videoUrl)
+    }
+    
+    videoLoadError.value = errorMessage
+    console.error(errorMessage, { errorCode, networkState: video.networkState, url: videoUrl })
+  }
+}
+
+// 检查视频文件是否存在
+async function checkVideoFileExists(videoUrl: string) {
+  if (!videoUrl || videoUrl.startsWith('blob:') || videoUrl.startsWith('data:')) {
+    return
+  }
+  
+  isCheckingVideo.value = true
+  try {
+    const response = await fetch(videoUrl, { method: 'HEAD' })
+    if (!response.ok) {
+      if (response.status === 404) {
+        videoLoadError.value = '视频文件不存在（404错误），请检查文件是否已上传'
+      } else if (response.status === 403) {
+        videoLoadError.value = '无权访问视频文件（403错误）'
+      } else {
+        videoLoadError.value = `视频文件访问失败（HTTP ${response.status}）`
+      }
+    } else {
+      // 文件存在，可能是格式或解码问题
+      if (!videoLoadError.value) {
+        videoLoadError.value = '视频文件存在但无法播放，可能是格式不支持或文件损坏'
+      }
+    }
+  } catch (error: any) {
+    console.error('检查视频文件失败:', error)
+    if (error.message?.includes('CORS')) {
+      videoLoadError.value = '视频文件访问被CORS策略阻止，请检查服务器配置'
+    } else if (error.message?.includes('Failed to fetch')) {
+      videoLoadError.value = '无法连接到服务器，请检查网络连接'
+    } else {
+      videoLoadError.value = `检查视频文件时出错: ${error.message || '未知错误'}`
+    }
+  } finally {
+    isCheckingVideo.value = false
+  }
+}
+
+// 重试加载视频
+function retryVideoLoad() {
+  videoLoadError.value = null
+  if (videoPlayer.value) {
+    videoPlayer.value.load()
   }
 }
 
@@ -874,11 +957,36 @@ onBeforeUnmount(() => {
 }
 
 .video-player {
-  @apply w-full;
+  @apply w-full relative;
 }
 
 .video-player video {
   @apply w-full max-w-full rounded-lg shadow-lg;
+}
+
+.video-error-overlay {
+  @apply absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-lg;
+  z-index: 10;
+}
+
+.video-error-content {
+  @apply bg-white rounded-lg p-6 max-w-md mx-4 text-center;
+}
+
+.video-error-icon {
+  @apply w-12 h-12 text-red-500 mx-auto mb-4;
+}
+
+.video-error-message {
+  @apply text-gray-800 mb-4 text-sm;
+}
+
+.video-error-actions {
+  @apply flex justify-center gap-2;
+}
+
+.video-retry-btn {
+  @apply px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors;
 }
 
 .video-info-display {

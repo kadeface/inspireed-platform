@@ -152,6 +152,25 @@ def _lesson_to_response(lesson: Lesson, request: Optional[Request] = None) -> Le
         if not k.startswith("_") and k not in {"lesson_classrooms", "creator"}
     }
     
+    # 如果 cell_count 为 0，从 content 动态计算（支持新旧格式）
+    def _calculate_cell_count(content: Any) -> int:
+        """计算 content 中的 cell 数量，支持 List[dict] 或 {sections:[{cells:[]}]}"""
+        if content is None:
+            return 0
+        if isinstance(content, list):
+            return len(content)
+        if isinstance(content, dict) and "sections" in content:
+            sections = content.get("sections", [])
+            return sum(len(s.get("cells", [])) for s in sections)
+        return 0
+    
+    db_cell_count = cast(int, lesson.cell_count) if lesson.cell_count is not None else 0
+    if db_cell_count == 0:
+        # 如果数据库中的 cell_count 为 0，从 content 动态计算
+        calculated_count = _calculate_cell_count(lesson.content)
+        if calculated_count > 0:
+            lesson_data["cell_count"] = calculated_count
+    
     # 获取原始 content 数据
     raw_content = lesson.content or []
     raw_content_length = len(raw_content) if isinstance(raw_content, list) else 0

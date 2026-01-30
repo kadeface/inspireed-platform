@@ -102,6 +102,19 @@ export function error(message: any, ...args: any[]) {
   console.error(message, ...args)
 }
 
+/**
+ * 轮询日志（用于频繁调用的轮询操作，默认静默，仅在详细调试模式下输出）
+ * 避免控制台噪音（轮询时每3-5秒调用一次）
+ */
+export function poll(message: any, ...args: any[]) {
+  // 只在 DEBUG 级别且启用了调试日志时才输出
+  // 可以通过环境变量 VITE_ENABLE_POLL_LOGS=true 强制启用
+  const enablePollLogs = import.meta.env.VITE_ENABLE_POLL_LOGS === 'true'
+  if (enablePollLogs && shouldLog(LogLevel.DEBUG)) {
+    console.debug('[POLL]', message, ...args)
+  }
+}
+
 // 模块化日志导出
 export const createLogger = (moduleName: string) => ({
   debug: (message: any, ...args: any[]) => {
@@ -128,6 +141,13 @@ export const createLogger = (moduleName: string) => ({
       console.log(`${emoji} ${getPrefix(moduleName)}`, message, ...args)
     }
   },
+  // 轮询日志方法
+  poll: (message: any, ...args: any[]) => {
+    const enablePollLogs = import.meta.env.VITE_ENABLE_POLL_LOGS === 'true'
+    if (enablePollLogs && shouldLog(LogLevel.DEBUG, moduleName)) {
+      console.debug(`[POLL] ${getPrefix(moduleName)}`, message, ...args)
+    }
+  },
 })
 
 // 默认导出
@@ -137,5 +157,6 @@ export default {
   logWithEmoji,
   warn,
   error,
+  poll,
   createLogger,
 }
