@@ -184,3 +184,43 @@ The platform automatically detects local network access:
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs (Swagger UI)
 - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
+
+## Branch Management & Deployment
+
+### Branch Strategy
+
+- **`dev` branch**: Development environment for daily development and experimental features
+- **`production-deploy` branch**: Production environment, only contains tested and stable code
+
+### Deployment Workflow
+
+**CRITICAL RULE**: Never merge the entire `dev` branch into `production-deploy`. Always use selective deployment methods:
+
+1. **Cherry-pick commits** (recommended):
+   ```bash
+   git checkout production-deploy
+   git cherry-pick <commit-hash>
+   git push origin production-deploy
+   ```
+
+2. **Selective file sync**:
+   ```bash
+   git checkout production-deploy
+   git checkout dev -- path/to/file1 path/to/file2
+   git add .
+   git commit -m "fix: sync files to production"
+   git push origin production-deploy
+   ```
+
+3. **Use deployment scripts**:
+   ```bash
+   ./scripts/deploy-to-production.sh <commit-hash>
+   ./scripts/sync-files-to-production.sh <file1> <file2>
+   ```
+
+**Forbidden operations**:
+- ❌ `git merge dev` into `production-deploy`
+- ❌ Direct development on `production-deploy` branch
+- ❌ Force push to `production-deploy` (unless necessary)
+
+See `.cursor/rules/DEPLOYMENT_WORKFLOW.md` for detailed deployment workflow rules.
