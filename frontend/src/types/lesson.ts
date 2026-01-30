@@ -65,7 +65,7 @@ export interface LessonCreate {
   description?: string
   course_id: number
   chapter_id?: number  // 所属章节ID
-  content?: Cell[]
+  content?: Cell[] | LessonContentWithSections
   tags?: string[]
   reference_materials?: LessonReferenceMaterialInput[]
 }

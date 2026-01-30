@@ -1,34 +1,22 @@
 <template>
-  <div
-    class="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50 relative overflow-hidden"
-  >
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50 relative overflow-hidden">
     <!-- 装饰性背景元素 -->
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div
-        class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-emerald-200/40 to-teal-200/40 rounded-full blur-3xl"
-      ></div>
-      <div
-        class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-cyan-200/40 to-blue-200/40 rounded-full blur-3xl"
-      ></div>
+      <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-emerald-200/40 to-teal-200/40 rounded-full blur-3xl"></div>
+      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-cyan-200/40 to-blue-200/40 rounded-full blur-3xl"></div>
     </div>
 
     <!-- 加载状态 -->
     <div v-if="loading" class="flex items-center justify-center min-h-screen relative z-10">
-      <div
-        class="text-center bg-white/80 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white/50"
-      >
-        <div
-          class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"
-        ></div>
+      <div class="text-center bg-white/80 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white/50">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
         <p class="mt-4 text-gray-700 font-medium">加载中...</p>
       </div>
     </div>
 
     <!-- 错误状态 -->
     <div v-else-if="error" class="flex items-center justify-center min-h-screen relative z-10">
-      <div
-        class="bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-2xl p-6 max-w-md shadow-xl"
-      >
+      <div class="bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-2xl p-6 max-w-md shadow-xl">
         <p class="text-red-600 mb-4 font-medium">{{ error }}</p>
         <button
           @click="router.back()"
@@ -53,25 +41,13 @@
             <div class="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
               <div class="flex items-center gap-4 mb-4">
                 <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
-                  <svg
-                    class="w-6 h-6 text-emerald-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                    />
+                  <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                   </svg>
                 </div>
                 <div>
                   <h3 class="text-lg font-semibold text-gray-900">教师要求进入全屏模式</h3>
-                  <p class="text-sm text-gray-600">
-                    点击下方按钮进入全屏，以便更好地集中注意力学习
-                  </p>
+                  <p class="text-sm text-gray-600">点击下方按钮进入全屏，以便更好地集中注意力学习</p>
                 </div>
               </div>
               <div class="flex gap-3">
@@ -93,9 +69,7 @@
         </Transition>
 
         <!-- 顶部导航栏 -->
-        <header
-          class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-10 border-b border-gray-100"
-        >
+        <header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-10 border-b border-gray-100">
           <div class="px-4 md:px-6 py-3">
             <div class="flex items-center justify-between gap-4">
               <!-- 左侧：返回按钮 + 课程信息 -->
@@ -106,89 +80,49 @@
                   title="返回"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                    />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                 </button>
                 <div class="min-w-0 flex-1">
                   <!-- 课堂模式标签 -->
-                  <div
-                    v-if="isInClassroomMode && classroomSession"
-                    class="flex items-center gap-2 mb-1"
-                  >
-                    <span
-                      class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-xs font-medium"
-                    >
+                  <div v-if="isInClassroomMode && classroomSession" class="flex items-center gap-2 mb-1">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-xs font-medium">
                       🎓 正在上课
                     </span>
                   </div>
                   <!-- 课程标题 -->
-                  <h1
-                    class="text-lg md:text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent truncate"
-                  >
+                  <h1 class="text-lg md:text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent truncate">
                     {{ lesson.title }}
                   </h1>
                   <!-- 课程信息 -->
                   <div class="flex items-center gap-2 mt-0.5 flex-wrap">
                     <template v-if="isInClassroomMode && classroomSession">
-                      <span v-if="lesson.course" class="text-xs text-gray-500">{{
-                        lesson.course.name
-                      }}</span>
-                      <span
-                        v-if="lesson.course && classroomSession.teacherName"
-                        class="text-xs text-gray-400"
-                        >·</span
-                      >
+                      <span v-if="lesson.course" class="text-xs text-gray-500">{{ lesson.course.name }}</span>
+                      <span v-if="lesson.course && classroomSession.teacherName" class="text-xs text-gray-400">·</span>
                       <span v-if="classroomSession.teacherName" class="text-xs text-gray-500">
-                        授课教师：<span class="font-medium text-gray-700">{{
-                          classroomSession.teacherName
-                        }}</span>
+                        授课教师：<span class="font-medium text-gray-700">{{ classroomSession.teacherName }}</span>
                       </span>
                     </template>
                     <template v-else>
-                      <span v-if="lesson.course" class="text-xs text-gray-500">{{
-                        lesson.course.name
-                      }}</span>
-                      <span v-if="lesson.course && lesson.chapter" class="text-xs text-gray-400"
-                        >/</span
-                      >
-                      <span v-if="lesson.chapter" class="text-xs text-gray-500">{{
-                        lesson.chapter.name
-                      }}</span>
+                      <span v-if="lesson.course" class="text-xs text-gray-500">{{ lesson.course.name }}</span>
+                      <span v-if="lesson.course && lesson.chapter" class="text-xs text-gray-400">/</span>
+                      <span v-if="lesson.chapter" class="text-xs text-gray-500">{{ lesson.chapter.name }}</span>
                     </template>
                   </div>
                 </div>
               </div>
-
+              
               <!-- 右侧：操作按钮组 -->
               <div class="flex items-center gap-2 flex-shrink-0">
                 <!-- 课堂模式状态组 -->
                 <template v-if="isInClassroomMode && classroomSession">
                   <!-- 同步状态 -->
-                  <div
-                    class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
-                    :class="
-                      isWebSocketConnected
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-gray-100 text-gray-600 border-gray-200'
-                    "
-                  >
-                    <div
-                      class="w-1.5 h-1.5 rounded-full"
-                      :class="isWebSocketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'"
-                    ></div>
-                    <span class="text-xs font-medium">{{
-                      isWebSocketConnected ? '同步' : '轮询'
-                    }}</span>
+                  <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border" :class="isWebSocketConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-200'">
+                    <div class="w-1.5 h-1.5 rounded-full" :class="isWebSocketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'"></div>
+                    <span class="text-xs font-medium">{{ isWebSocketConnected ? '同步' : '轮询' }}</span>
                   </div>
                   <!-- 进度 -->
-                  <div
-                    class="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100"
-                  >
+                  <div class="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100">
                     <span class="text-xs font-medium text-emerald-600">进度</span>
                   </div>
                   <!-- 退出按钮 -->
@@ -198,12 +132,7 @@
                     title="退出上课"
                   >
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                     <span>退出</span>
                   </button>
@@ -214,27 +143,23 @@
                   class="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
                   :title="sidebarVisible ? '隐藏学习空间' : '显示学习空间'"
                 >
-                  <svg
-                    v-if="sidebarVisible"
-                    class="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
+                  <svg 
+                    v-if="sidebarVisible" 
+                    class="w-5 h-5" 
+                    fill="none" 
+                    stroke="currentColor" 
                     viewBox="0 0 24 24"
                   >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M9 5l7 7-7 7"
-                    />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                   </svg>
-                  <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M15 19l-7-7 7-7"
-                    />
+                  <svg 
+                    v-else 
+                    class="w-5 h-5" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
               </div>
@@ -243,15 +168,12 @@
         </header>
 
         <!-- 课程描述 -->
-        <div
-          v-if="lesson.description && !isInClassroomMode"
-          class="bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500 px-6 py-4"
-        >
+        <div v-if="lesson.description && !isInClassroomMode" class="bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500 px-6 py-4">
           <p class="text-gray-700 font-medium">{{ lesson.description }}</p>
         </div>
 
         <!-- 课堂模式提示 -->
-        <StudentClassroomSync
+        <StudentClassroomSync 
           v-if="classroomSession"
           :lesson-id="lessonId"
           :session="classroomSession"
@@ -259,40 +181,23 @@
         />
 
         <!-- 课堂模式：等待教师切换内容（全屏显示） -->
-        <div
-          v-if="
-            isInClassroomMode &&
-            !hasDisplayableContent &&
-            flatCells.value &&
-            flatCells.value.length > 0
-          "
+        <div 
+          v-if="isInClassroomMode && !hasDisplayableContent && lessonContentCells.length > 0" 
           class="mx-6 my-8 text-center py-24 bg-gradient-to-br from-emerald-50/80 via-teal-50/80 to-cyan-50/80 rounded-2xl border-2 border-dashed border-emerald-300/50 backdrop-blur-sm shadow-lg"
         >
           <div class="max-w-md mx-auto">
-            <div
-              class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30"
-            >
-              <svg
-                class="h-10 w-10 text-white animate-pulse"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
+            <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <svg class="h-10 w-10 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3
-              class="text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-3"
-            >
-              等待教师切换内容
-            </h3>
-            <p class="text-sm text-gray-700 font-medium mb-2">教师正在准备课程内容，请稍候...</p>
-            <p class="text-xs text-gray-600">教师切换内容后，这里将显示相应的学习模块</p>
+            <h3 class="text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-3">等待教师切换内容</h3>
+            <p class="text-sm text-gray-700 font-medium mb-2">
+              教师正在准备课程内容，请稍候...
+            </p>
+            <p class="text-xs text-gray-600">
+              教师切换内容后，这里将显示相应的学习模块
+            </p>
           </div>
         </div>
 
@@ -306,7 +211,7 @@
               :key="cell.id"
               :cell="cell"
               :cellIndex="index"
-              :allCells="flatCells.value"
+              :allCells="lessonContentCells"
               :completedCellIds="completedCells"
               @complete="markCellAsCompleted"
             >
@@ -321,25 +226,9 @@
           </div>
 
           <!-- 空状态 -->
-          <div
-            v-if="
-              !isInClassroomMode ||
-              (isInClassroomMode && hasDisplayableContent && filteredCells.length === 0)
-            "
-            class="text-center py-12"
-          >
-            <svg
-              class="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
+          <div v-if="!isInClassroomMode || (isInClassroomMode && hasDisplayableContent && filteredCells.length === 0)" class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <p class="mt-4 text-lg text-gray-600">该课程暂无内容</p>
           </div>
@@ -353,18 +242,8 @@
           <div class="mt-8 mb-8 border-t border-gray-200 pt-8">
             <div class="flex items-center justify-between mb-6">
               <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                <svg
-                  class="w-6 h-6 text-emerald-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                  />
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
                 课程问答
               </h2>
@@ -373,12 +252,7 @@
                 class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/30"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
                 我要提问
               </button>
@@ -407,123 +281,101 @@
 
       <!-- 右侧：学习空间 -->
       <Transition name="slide-sidebar">
-        <div
-          v-if="sidebarVisible"
+        <div 
+          v-if="sidebarVisible" 
           :class="[
             'bg-white/80 backdrop-blur-sm shadow-lg flex flex-col relative z-40',
-            isMobile
-              ? 'fixed inset-y-0 right-0 w-full max-w-sm'
-              : 'w-96 border-l border-gray-200 flex-shrink-0',
+            isMobile 
+              ? 'fixed inset-y-0 right-0 w-full max-w-sm' 
+              : 'w-96 border-l border-gray-200 flex-shrink-0'
           ]"
         >
-          <div class="px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <svg
-                  class="w-5 h-5 text-emerald-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-                学习空间
-              </h2>
-              <div class="flex items-center gap-2">
-                <span
-                  class="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100"
-                  >当前进度 {{ progress }}%</span
-                >
-                <!-- 关闭按钮 -->
-                <button
-                  @click="toggleSidebar"
-                  class="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
-                  title="隐藏学习空间"
-                >
-                  <svg
-                    class="w-4 h-4 text-gray-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="mt-3 flex gap-2">
+        <div class="px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              学习空间
+            </h2>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">当前进度 {{ progress }}%</span>
+              <!-- 关闭按钮 -->
               <button
-                type="button"
-                @click="activeSidebarTab = 'notes'"
-                :class="[
-                  'rounded-md px-3 py-1.5 text-sm font-medium transition',
-                  activeSidebarTab === 'notes'
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
-                    : 'bg-white/80 backdrop-blur-sm text-gray-600 border border-gray-200 hover:bg-gray-50',
-                ]"
+                @click="toggleSidebar"
+                class="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+                title="隐藏学习空间"
               >
-                学习笔记
-              </button>
-              <button
-                type="button"
-                @click="activeSidebarTab = 'assistant'"
-                :class="[
-                  'rounded-md px-3 py-1.5 text-sm font-medium transition flex items-center gap-2',
-                  activeSidebarTab === 'assistant'
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
-                    : 'bg-white/80 backdrop-blur-sm text-emerald-600 border border-emerald-300 hover:bg-emerald-50',
-                ]"
-              >
-                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path
-                    d="M10 2a6 6 0 00-6 6v1.586l-.707.707A1 1 0 004 12h1v1a4 4 0 004 4v1h2v-1a4 4 0 004-4v-1h1a1 1 0 00.707-1.707L16 9.586V8a6 6 0 00-6-6z"
-                  />
+                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
-                AI 助手
               </button>
             </div>
           </div>
-
-          <div class="flex-1 overflow-hidden">
-            <div v-if="activeSidebarTab === 'notes'" class="flex h-full flex-col">
-              <div class="flex-1 overflow-hidden px-6 py-4">
-                <MarkdownEditor
-                  v-model="notes"
-                  @update:modelValue="handleNotesUpdate"
-                  placeholder="支持 Markdown 格式，使用工具栏快速插入格式..."
-                />
-              </div>
-              <div class="px-6 py-3 border-t border-gray-200 bg-white/80 backdrop-blur-sm">
-                <div class="flex items-center justify-between text-xs text-gray-600">
-                  <span v-if="notesSaving" class="text-emerald-600">保存中...</span>
-                  <span v-else-if="notesSaved" class="text-emerald-600 font-medium">✓ 已保存</span>
-                  <span v-else class="text-gray-500">未保存</span>
-                  <span class="text-gray-500">{{ notes.length }} 字符</span>
-                </div>
-              </div>
-            </div>
-            <StudentAiAssistantPanel
-              v-else
-              :lesson-title="lesson?.title || ''"
-              :lesson-outline="lessonOutline"
-              :progress="progress"
-              :lesson-id="lesson?.id"
-              @append-note="appendNoteFromAssistant"
-            />
+          <div class="mt-3 flex gap-2">
+            <button
+              type="button"
+              @click="activeSidebarTab = 'notes'"
+              :class="[
+                'rounded-md px-3 py-1.5 text-sm font-medium transition',
+                activeSidebarTab === 'notes'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
+                  : 'bg-white/80 backdrop-blur-sm text-gray-600 border border-gray-200 hover:bg-gray-50'
+              ]"
+            >
+              学习笔记
+            </button>
+            <button
+              type="button"
+              @click="activeSidebarTab = 'assistant'"
+              :class="[
+                'rounded-md px-3 py-1.5 text-sm font-medium transition flex items-center gap-2',
+                activeSidebarTab === 'assistant'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
+                  : 'bg-white/80 backdrop-blur-sm text-emerald-600 border border-emerald-300 hover:bg-emerald-50'
+              ]"
+            >
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2a6 6 0 00-6 6v1.586l-.707.707A1 1 0 004 12h1v1a4 4 0 004 4v1h2v-1a4 4 0 004-4v-1h1a1 1 0 00.707-1.707L16 9.586V8a6 6 0 00-6-6z" />
+              </svg>
+              AI 助手
+            </button>
           </div>
         </div>
-      </Transition>
 
+        <div class="flex-1 overflow-hidden">
+          <div
+            v-if="activeSidebarTab === 'notes'"
+            class="flex h-full flex-col"
+          >
+            <div class="flex-1 overflow-hidden px-6 py-4">
+              <MarkdownEditor
+                v-model="notes"
+                @update:modelValue="handleNotesUpdate"
+                placeholder="支持 Markdown 格式，使用工具栏快速插入格式..."
+              />
+            </div>
+            <div class="px-6 py-3 border-t border-gray-200 bg-white/80 backdrop-blur-sm">
+              <div class="flex items-center justify-between text-xs text-gray-600">
+                <span v-if="notesSaving" class="text-emerald-600">保存中...</span>
+                <span v-else-if="notesSaved" class="text-emerald-600 font-medium">✓ 已保存</span>
+                <span v-else class="text-gray-500">未保存</span>
+                <span class="text-gray-500">{{ notes.length }} 字符</span>
+              </div>
+            </div>
+          </div>
+          <StudentAiAssistantPanel
+            v-else
+            :lesson-title="lesson?.title || ''"
+            :lesson-outline="lessonOutline"
+            :progress="progress"
+            :lesson-id="lesson?.id"
+            @append-note="appendNoteFromAssistant"
+          />
+        </div>
+        </div>
+      </Transition>
+      
       <!-- 浮动按钮（侧边栏隐藏时显示） -->
       <Transition name="fade">
         <button
@@ -531,17 +383,14 @@
           @click="toggleSidebar"
           :class="[
             'fixed z-30 p-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all hover:scale-110',
-            isMobile ? 'right-4 bottom-20' : 'right-4 bottom-4',
+            isMobile 
+              ? 'right-4 bottom-20' 
+              : 'right-4 bottom-4'
           ]"
           title="显示学习空间"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-            />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
           </svg>
         </button>
       </Transition>
@@ -591,19 +440,13 @@ import StudentClassroomSync from '@/components/Classroom/StudentClassroomSync.vu
 import { useClassroomSession } from '@/composables/useClassroomSession'
 import classroomSessionService from '@/services/classroomSession'
 import type { ClassSession } from '@/types/classroomSession'
-import { sectionsToFlatCells } from '@/utils/lessonContent'
+import { isContentWithSections, normalizeContentToSections, sectionsToFlatCells } from '@/utils/lessonContent'
 
 const route = useRoute()
 const router = useRouter()
 
 // 计算属性（需要在使用前定义）
 const lessonId = computed(() => Number(route.params.id))
-
-// 🔧 扁平化的 cells 数组（兼容新旧两种数据格式）
-const flatCells = computed(() => {
-  if (!lesson.value?.content) return []
-  return sectionsToFlatCells(lesson.value.content?.sections || [])
-})
 
 // 状态
 const loading = ref(false)
@@ -620,12 +463,10 @@ const isMobile = ref(false)
 const checkMobile = () => {
   // 检测屏幕宽度和用户代理
   const screenWidth = window.innerWidth
-  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent
-  )
+  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
   const wasMobile = isMobile.value
   isMobile.value = screenWidth < 768 || isMobileDevice
-
+  
   // 如果从桌面切换到移动端，或进入课堂模式，自动隐藏侧边栏
   if (isMobile.value && (!wasMobile || isInClassroomMode.value)) {
     sidebarVisible.value = false
@@ -643,7 +484,7 @@ const hasMoreQuestions = ref(false)
 const questionsPage = ref(1)
 
 // 课堂会话相关状态
-const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([]) // 数据库中的 Cell 记录
+const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录
 
 // 全屏提示状态
 const showFullscreenPrompt = ref(false)
@@ -713,32 +554,50 @@ function handleFullscreenChange() {
     (document as any).mozFullScreenElement ||
     (document as any).msFullscreenElement
   )
-
+  
   // 如果用户手动退出全屏，但教师端仍设置为全屏模式，可以重新进入全屏
   // 但为了避免循环，这里只记录状态，不自动重新进入
   console.log('📺 浏览器全屏状态变化:', isCurrentlyFullscreen ? '全屏' : '窗口')
 }
 
 const {
-  session: classroomSession, // 直接使用 composable 返回的 session（会通过 WebSocket 实时更新）
+  session: classroomSession,  // 直接使用 composable 返回的 session（会通过 WebSocket 实时更新）
   isInClassroomMode,
-  isWebSocketConnected, // WebSocket 连接状态
+  isWebSocketConnected,  // WebSocket 连接状态
   displayCellId,
   shouldSyncDisplay,
   hasDisplayableContent,
   findAndJoinSession,
   leaveSession,
-  updateProgress, // 🆕 导入进度更新函数
+  updateProgress,  // 🆕 导入进度更新函数
 } = useClassroomSession(lessonId.value, handleFullscreenRequest)
+
+// 🆕 统一处理 lesson.content：支持 Cell[] 和 LessonContentWithSections 两种格式
+const lessonContentCells = computed(() => {
+  if (!lesson.value?.content) return []
+  
+  // 如果已经是数组格式（旧格式），直接返回
+  if (Array.isArray(lesson.value.content)) {
+    return lesson.value.content
+  }
+  
+  // 如果是 sections 格式（新格式），转换为 flat cells
+  if (isContentWithSections(lesson.value.content)) {
+    const sections = normalizeContentToSections(lesson.value.content)
+    return sectionsToFlatCells(sections)
+  }
+  
+  return []
+})
 
 // 处理退出课堂
 async function handleExitClassroom() {
   if (!classroomSession.value) return
-
+  
   if (!confirm('确定要退出上课吗？退出后您将无法继续接收教师的实时同步内容。')) {
     return
   }
-
+  
   try {
     await leaveSession()
     console.log('✅ 已成功退出上课')
@@ -749,17 +608,13 @@ async function handleExitClassroom() {
 }
 
 // 🔍 调试：监听 classroomSession 变化
-watch(
-  classroomSession,
-  (newSession) => {
-    console.log('🔍 LessonView classroomSession 变化:', {
-      sessionId: newSession?.id,
-      status: newSession?.status,
-      lessonId: newSession?.lesson_id,
-    })
-  },
-  { immediate: true, deep: true }
-)
+watch(classroomSession, (newSession) => {
+  console.log('🔍 LessonView classroomSession 变化:', {
+    sessionId: newSession?.id,
+    status: newSession?.status,
+    lessonId: newSession?.lesson_id,
+  })
+}, { immediate: true, deep: true })
 
 // 自动保存定时器
 let notesAutoSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -770,32 +625,34 @@ let lastErrorLogTime = 0
 const ERROR_LOG_DEBOUNCE = 5000 // 5秒内不重复输出相同错误
 
 const progress = computed(() => {
-  if (!lesson.value?.content || flatCells.value.length === 0) {
+  const cells = lessonContentCells.value
+  if (!cells || cells.length === 0) {
     return 0
   }
-
+  
   // 🆕 在课堂模式下，进度基于教师勾选的模块数（display_cell_orders）
   if (isInClassroomMode.value && classroomSession.value?.settings) {
     const settings = classroomSession.value.settings as any
     const displayOrders = settings?.display_cell_orders
-
+    
     if (displayOrders && Array.isArray(displayOrders)) {
       const checkedModules = displayOrders.length
-      const totalModules = flatCells.value.length
+      const totalModules = cells.length
       const progressValue = Math.round((checkedModules / totalModules) * 100)
       return progressValue
     }
   }
-
+  
   // 非课堂模式：基于已完成的cell数
   const completed = completedCells.value.size
-  const total = flatCells.value.length
+  const total = cells.length
   return Math.round((completed / total) * 100)
 })
 
 const lessonOutline = computed(() => {
-  if (!lesson.value?.content) return ''
-  return flatCells.value
+  const cells = lessonContentCells.value
+  if (!cells || cells.length === 0) return ''
+  return cells
     .slice(0, 6)
     .map((cell, index) => summarizeCell(cell, index))
     .filter((item): item is string => Boolean(item))
@@ -807,28 +664,29 @@ let lastFilterState = ''
 
 // 过滤Cells：在课堂模式下只显示教师指定的Cell
 const filteredCells = computed(() => {
-  if (!lesson.value?.content) return []
-
+  const cells = lessonContentCells.value
+  if (!cells || cells.length === 0) return []
+  
   // 只在状态变化时输出日志
   const currentState = JSON.stringify({
     isInClassroomMode: isInClassroomMode.value,
     displayCellId: displayCellId.value,
     displayCellOrders: classroomSession.value?.settings?.display_cell_orders,
   })
-
+  
   if (currentState !== lastFilterState) {
     lastFilterState = currentState
   }
-
+  
   // 如果不在课堂模式，显示所有Cell
   if (!isInClassroomMode.value) {
-    return flatCells.value
+    return cells
   }
-
+  
   // 课堂模式：严格同步，只显示教师指定的Cell
   if (shouldSyncDisplay.value) {
     const settings = classroomSession.value?.settings
-
+    
     // 🆕 新方式：优先使用 display_cell_orders（推荐）
     const displayOrders = settings?.display_cell_orders
     if (displayOrders && Array.isArray(displayOrders)) {
@@ -836,22 +694,22 @@ const filteredCells = computed(() => {
       if (displayOrders.length === 0) {
         return []
       }
-
+      
       // 直接根据 order 过滤，无需映射，无需 dbCells
-      const filteredByOrders = flatCells.value.filter((cell, index) => {
+      const filteredByOrders = cells.filter((cell, index) => {
         const cellOrder = cell.order !== undefined ? cell.order : index
         return displayOrders.includes(cellOrder)
       })
-
+      
       return filteredByOrders
     }
-
+    
     // 如果没有 display_cell_orders，返回空数组（隐藏所有Cell）
     return []
   }
-
+  
   // 非严格同步模式，显示所有Cell
-  return flatCells.value
+  return cells
 })
 
 // ========== 旧代码（已废弃）==========
@@ -860,8 +718,8 @@ const filteredCells = computed(() => {
       const idToIndexMap = new Map<number, number>()
       dbCells.value.forEach((dbCell: any) => {
         if (dbCell.id && dbCell.order !== undefined) {
-          // 通过 order 在 flatCells.value 中查找对应的索引
-          const index = flatCells.value.findIndex((cell: any, idx: number) => {
+          // 通过 order 在 lesson.content 中查找对应的索引
+          const index = lesson.value.content.findIndex((cell: any, idx: number) => {
             const cellOrder = cell.order !== undefined ? cell.order : idx
             return cellOrder === dbCell.order
           })
@@ -876,7 +734,7 @@ const filteredCells = computed(() => {
         console.warn('⚠️ dbCells 为空！无法进行 ID 到索引的映射。')
         console.warn('当前状态:', {
           lessonId: lessonId.value,
-          lessonContentCount: flatCells.value.length,
+          lessonContentCount: lesson.value.content.length,
           multiSelectIds: multiSelectIds,
           sessionId: classroomSession.value?.id,
         })
@@ -891,10 +749,10 @@ const filteredCells = computed(() => {
           targetIndices.add(index)
         } else {
           // 如果 dbCells 为空，尝试通过 cell.order 直接匹配
-          // 假设 flatCells.value 中的 order 值与数据库中的 order 值一致
+          // 假设 lesson.content 中的 order 值与数据库中的 order 值一致
           if (dbCells.value.length === 0) {
-              // 遍历 flatCells.value，查找 order 值对应的索引
-              flatCells.value.forEach((cell: any, idx: number) => {
+              // 遍历 lesson.content，查找 order 值对应的索引
+              lesson.value.content.forEach((cell: any, idx: number) => {
                 const cellOrder = cell.order !== undefined ? cell.order : idx
                 // 如果这个 cell 的 order 值在某个范围内，尝试匹配
                 // 注意：这个 fallback 假设 order 值与索引一致，可能不准确
@@ -903,7 +761,7 @@ const filteredCells = computed(() => {
           }
         })
       
-      const matchedCells = flatCells.value.filter((cell, index) => {
+      const matchedCells = lesson.value.content.filter((cell, index) => {
         // 优先使用索引匹配（最可靠，与导播台一致）
         if (targetIndices.has(index)) {
           return true
@@ -930,10 +788,10 @@ const filteredCells = computed(() => {
         return false
       })
       
-      // 确保按 flatCells.value 的索引顺序排序（与导播台一致）
+      // 确保按 lesson.content 的索引顺序排序（与导播台一致）
       const sortedCells = matchedCells.sort((a, b) => {
-        const indexA = flatCells.value.indexOf(a)
-        const indexB = flatCells.value.indexOf(b)
+        const indexA = lesson.value.content.indexOf(a)
+        const indexB = lesson.value.content.indexOf(b)
         return indexA - indexB
       })
       
@@ -961,7 +819,7 @@ const filteredCells = computed(() => {
           console.error('这可能是因为：')
           console.error('1. dbCells 未正确加载 (当前数量:', dbCells.value.length, ')')
           console.error('2. ID 到 order 的映射失败')
-          console.error('3. flatCells.value 中的 order 与数据库不一致')
+          console.error('3. lesson.content 中的 order 与数据库不一致')
           console.error('调试信息:', {
             multiSelectIds,
             dbCellsCount: dbCells.value.length,
@@ -987,7 +845,7 @@ const filteredCells = computed(() => {
     
     // 先尝试通过数字 ID 查找匹配的 Cell（后端返回的是数据库 ID）
     // 然后通过 order 或索引匹配（当 ID 不匹配时使用）
-    const matchedCells = flatCells.value.filter((cell, index) => {
+    const matchedCells = lesson.value.content.filter((cell, index) => {
       // 1. 直接匹配 cell.id（数字或字符串）
       if (cell.id === currentId) return true
       
@@ -1012,8 +870,8 @@ const filteredCells = computed(() => {
       // 5. 通过索引匹配（如果 currentId 是顺序索引）
       // 注意：如果后端返回的是数据库 ID（不是索引），这个匹配可能会失败
       if (typeof currentId === 'number') {
-        // 如果 currentId 小于 flatCells.value.length，可能是索引
-        if (index === currentId && currentId < flatCells.value.length) {
+        // 如果 currentId 小于 lesson.content.length，可能是索引
+        if (index === currentId && currentId < lesson.value.content.length) {
           // 但需要确认这不是数据库 ID
           // 如果 currentId 很大（大于内容数量），应该是数据库 ID，不是索引
           return true
@@ -1025,8 +883,8 @@ const filteredCells = computed(() => {
     
     // 如果通过 ID 没有匹配到，尝试使用索引作为 fallback
     if (matchedCells.length === 0 && typeof currentId === 'number') {
-      if (currentId >= 0 && currentId < flatCells.value.length) {
-        const cellByIndex = flatCells.value[currentId]
+      if (currentId >= 0 && currentId < lesson.value.content.length) {
+        const cellByIndex = lesson.value.content[currentId]
         if (cellByIndex) {
           return [cellByIndex]
         }
@@ -1037,7 +895,7 @@ const filteredCells = computed(() => {
   }
   
   // 如果sync_mode不是strict，显示所有Cell（允许学生自由浏览）
-  return flatCells.value
+  return lesson.value.content
 */
 // ========== 旧代码全部结束 ==========
 
@@ -1066,33 +924,31 @@ const loadLesson = async () => {
   try {
     // 从服务器获取最新教案数据（不使用缓存）
     lesson.value = await lessonService.fetchLessonById(lessonId.value)
-
+    
     // 检查教案版本是否更新
     checkLessonVersionUpdate()
-
+    
     // 加载该课程的完成状态（这些是本地操作，不阻塞）
     loadCompletedCells()
     loadNotes()
-
+    
     // 先显示页面内容，再异步加载其他数据
     loading.value = false
-
+    
     // 异步加载数据库中的 Cell 记录（用于 ID 匹配）
-    loadDbCells().catch((err) => {
+    loadDbCells().catch(err => {
       console.warn('加载Cell记录失败，但不影响页面显示:', err)
     })
-
+    
     // 异步查找并加入课堂会话（不阻塞页面显示）
-    findAndJoinSession()
-      .then((session) => {
-        if (!session) {
-          console.log('ℹ️ 当前没有可加入的课堂会话，学生可以自主学习')
-        }
-      })
-      .catch((err) => {
-        console.warn('⚠️ 加入会话失败，但不影响页面显示:', err)
-        // 不显示错误提示，因为可能是正常的（没有正在进行的会话）
-      })
+    findAndJoinSession().then(session => {
+      if (!session) {
+        console.log('ℹ️ 当前没有可加入的课堂会话，学生可以自主学习')
+      }
+    }).catch(err => {
+      console.warn('⚠️ 加入会话失败，但不影响页面显示:', err)
+      // 不显示错误提示，因为可能是正常的（没有正在进行的会话）
+    })
   } catch (e: any) {
     error.value = e.message || '加载课程失败'
     console.error('Failed to load lesson:', e)
@@ -1107,15 +963,15 @@ const initDisplayCellIdsWatcher = () => {
     stopWatchDisplayCellIds()
     stopWatchDisplayCellIds = null
   }
-
+  
   // 创建新的监听器
   stopWatchDisplayCellIds = watch(
-    () => classroomSession.value?.settings?.display_cell_ids,
+    () => classroomSession.value?.settings?.display_cell_ids, 
     async (newIds, oldIds) => {
       if (newIds && newIds.length > 0 && JSON.stringify(newIds) !== JSON.stringify(oldIds)) {
         await loadDbCells()
       }
-    },
+    }, 
     { deep: true, immediate: false }
   )
 }
@@ -1124,7 +980,7 @@ const initDisplayCellIdsWatcher = () => {
 const loadDbCells = async () => {
   try {
     const response = await api.get(`/cells/lesson/${lessonId.value}`)
-    dbCells.value = Array.isArray(response) ? response : (response as any)?.data || []
+    dbCells.value = Array.isArray(response) ? response : ((response as any)?.data || [])
   } catch (error: any) {
     console.error('Failed to load cell records:', error)
     dbCells.value = []
@@ -1134,10 +990,10 @@ const loadDbCells = async () => {
 // 检查教案版本是否更新
 const checkLessonVersionUpdate = () => {
   if (!lesson.value) return
-
+  
   const versionKey = `lesson_${lessonId.value}_version`
   const lastKnownVersion = localStorage.getItem(versionKey)
-
+  
   if (lastKnownVersion) {
     const lastVersion = parseInt(lastKnownVersion, 10)
     if (lesson.value.version > lastVersion) {
@@ -1145,11 +1001,11 @@ const checkLessonVersionUpdate = () => {
       const completedCellsKey = `lesson_${lessonId.value}_completed_cells`
       localStorage.removeItem(completedCellsKey)
       completedCells.value = new Set()
-
+      
       // 教案已更新，清除旧的完成状态
     }
   }
-
+  
   // 保存当前版本号
   localStorage.setItem(versionKey, String(lesson.value.version))
 }
@@ -1171,7 +1027,7 @@ const saveCompletedCells = () => {
   const key = `lesson_${lessonId.value}_completed_cells`
   const cellIds = Array.from(completedCells.value)
   localStorage.setItem(key, JSON.stringify(cellIds))
-
+  
   // 更新总体学习进度
   updateLessonProgress()
 }
@@ -1182,13 +1038,14 @@ const markCellAsCompleted = (cellId: string) => {
 }
 
 const markAsCompleted = () => {
-  if (!lesson.value?.content) return
-
+  const cells = lessonContentCells.value
+  if (!cells || cells.length === 0) return
+  
   // 标记所有 Cell 为完成
-  flatCells.value.forEach((cell) => {
+  cells.forEach(cell => {
     completedCells.value.add(String(cell.id))
   })
-
+  
   saveCompletedCells()
 }
 
@@ -1222,22 +1079,23 @@ watch(
   async (newOrders, oldOrders) => {
     // 只在课堂模式下且 display_cell_orders 发生变化时更新
     if (!isInClassroomMode.value || !classroomSession.value) return
-
+    
     const newOrdersStr = JSON.stringify(newOrders || [])
     const oldOrdersStr = JSON.stringify(oldOrders || [])
-
+    
     if (newOrdersStr !== oldOrdersStr && Array.isArray(newOrders)) {
       // 更新学生进度
       // 计算已勾选的模块数
       const checkedModules = newOrders.length
-      const totalModules = flatCells.value.length || 1
+      const totalModules = lesson.value?.content.length || 1
       const progressPercentage = Math.round((checkedModules / totalModules) * 100)
-
+      
       // 将 orders 转换为 cellIds（用于 updateProgress）
       const completedCellIds: number[] = []
-      if (flatCells.value) {
+      const cells = lessonContentCells.value
+      if (cells && cells.length > 0) {
         newOrders.forEach((order: number) => {
-          const cell = flatCells.value.find(
+          const cell = cells.find(
             (c, idx) => (c.order !== undefined ? c.order : idx) === order
           )
           if (cell) {
@@ -1248,7 +1106,7 @@ watch(
           }
         })
       }
-
+      
       // 更新进度（通过 WebSocket 发送到后端）
       if (updateProgress) {
         await updateProgress(completedCellIds, undefined, progressPercentage)
@@ -1268,7 +1126,7 @@ const updateLessonProgress = () => {
   const key = 'student_lesson_progress'
   const saved = localStorage.getItem(key)
   let progressData: Record<number, number> = {}
-
+  
   if (saved) {
     try {
       progressData = JSON.parse(saved)
@@ -1276,16 +1134,13 @@ const updateLessonProgress = () => {
       console.error('Failed to load progress data:', e)
     }
   }
-
+  
   progressData[lessonId.value] = progress.value
   localStorage.setItem(key, JSON.stringify(progressData))
 }
 
 const stripHtmlTags = (html: string) =>
-  html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 
 const summarizeCell = (cell: any, index: number): string | null => {
   const orderLabel = `第${index + 1}单元`
@@ -1350,7 +1205,7 @@ const saveNotes = () => {
   localStorage.setItem(key, notes.value)
   notesSaved.value = true
   notesSaving.value = false
-
+  
   // 3秒后隐藏"已保存"提示
   setTimeout(() => {
     notesSaved.value = false
@@ -1360,12 +1215,12 @@ const saveNotes = () => {
 const autoSaveNotes = () => {
   notesSaved.value = false
   notesSaving.value = true
-
+  
   // 清除之前的定时器
   if (notesAutoSaveTimer) {
     clearTimeout(notesAutoSaveTimer)
   }
-
+  
   // 1秒后自动保存
   notesAutoSaveTimer = setTimeout(() => {
     saveNotes()
@@ -1381,15 +1236,15 @@ const handleReviewUpdated = () => {
 // 问答相关方法
 const loadQuestions = async () => {
   if (questionsLoading.value) return
-
+  
   try {
     questionsLoading.value = true
     const response = await questionService.getLessonQuestions(lessonId.value, {
       sort: 'recent',
       page: questionsPage.value,
-      page_size: 10,
+      page_size: 10
     })
-
+    
     questions.value = response.items
     hasMoreQuestions.value = response.has_more
   } catch (err: any) {
@@ -1401,16 +1256,16 @@ const loadQuestions = async () => {
 
 const loadMoreQuestions = async () => {
   if (!hasMoreQuestions.value || questionsLoading.value) return
-
+  
   questionsPage.value++
   try {
     questionsLoading.value = true
     const response = await questionService.getLessonQuestions(lessonId.value, {
       sort: 'recent',
       page: questionsPage.value,
-      page_size: 10,
+      page_size: 10
     })
-
+    
     questions.value = [...questions.value, ...response.items]
     hasMoreQuestions.value = response.has_more
   } catch (err: any) {
@@ -1437,7 +1292,7 @@ onMounted(async () => {
   // 检测移动设备
   checkMobile()
   window.addEventListener('resize', checkMobile)
-
+  
   // 恢复侧边栏显示状态（从localStorage，但手机端默认隐藏）
   const savedSidebarVisible = localStorage.getItem('student_sidebar_visible')
   if (isMobile.value) {
@@ -1450,12 +1305,12 @@ onMounted(async () => {
     // 桌面端默认显示
     sidebarVisible.value = true
   }
-
+  
   loadLesson()
   loadQuestions()
   // 初始化 display_cell_ids 监听器
   initDisplayCellIdsWatcher()
-
+  
   // 监听浏览器全屏状态变化
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
@@ -1468,21 +1323,21 @@ onUnmounted(() => {
   if (notes.value) {
     saveNotes()
   }
-
+  
   // 清理定时器
   if (notesAutoSaveTimer) {
     clearTimeout(notesAutoSaveTimer)
   }
-
+  
   // 清理 watch 监听器
   if (stopWatchDisplayCellIds) {
     stopWatchDisplayCellIds()
     stopWatchDisplayCellIds = null
   }
-
+  
   // 移除窗口大小变化监听器
   window.removeEventListener('resize', checkMobile)
-
+  
   // 移除全屏状态监听器
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
   document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
@@ -1495,9 +1350,7 @@ onUnmounted(() => {
 /* 侧边栏滑动动画 */
 .slide-sidebar-enter-active,
 .slide-sidebar-leave-active {
-  transition:
-    transform 0.3s ease-in-out,
-    opacity 0.3s ease-in-out;
+  transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
 }
 
 .slide-sidebar-enter-from {
@@ -1528,9 +1381,7 @@ onUnmounted(() => {
 /* 浮动按钮淡入淡出动画 */
 .fade-enter-active,
 .fade-leave-active {
-  transition:
-    opacity 0.3s ease-in-out,
-    transform 0.3s ease-in-out;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
 }
 
 .fade-enter-from {
