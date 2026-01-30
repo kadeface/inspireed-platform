@@ -140,18 +140,25 @@ def _convert_content_urls(content: Any, request: Optional[Request] = None) -> An
         return content
 
 
-def _lesson_to_response(lesson: Lesson, request: Optional[Request] = None) -> LessonResponse:
-    """将教案对象转换为响应字典，并转换URL为完整URL"""
+def _lesson_to_response(lesson: Lesson, request: Optional[Request] = None, skip_content_conversion: bool = False, include_content: bool = True) -> LessonResponse:
+    """将教案对象转换为响应字典，并转换URL为完整URL
+
+    Args:
+        lesson: 教案对象
+        request: FastAPI请求对象
+        skip_content_conversion: 是否跳过content字段的URL转换（用于列表API优化性能）
+        include_content: 是否包含完整的content字段（列表API设为False以减少响应大小）
+    """
     # 导入日志记录器
     import logging
     logger = logging.getLogger(__name__)
-    
+
     lesson_data = {
         k: v
         for k, v in lesson.__dict__.items()
         if not k.startswith("_") and k not in {"lesson_classrooms", "creator"}
     }
-    
+
     # 如果 cell_count 为 0，从 content 动态计算（支持新旧格式）
     def _calculate_cell_count(content: Any) -> int:
         """计算 content 中的 cell 数量，支持 List[dict] 或 {sections:[{cells:[]}]}"""
@@ -163,23 +170,29 @@ def _lesson_to_response(lesson: Lesson, request: Optional[Request] = None) -> Le
             sections = content.get("sections", [])
             return sum(len(s.get("cells", [])) for s in sections)
         return 0
-    
+
     db_cell_count = cast(int, lesson.cell_count) if lesson.cell_count is not None else 0
     if db_cell_count == 0:
         # 如果数据库中的 cell_count 为 0，从 content 动态计算
         calculated_count = _calculate_cell_count(lesson.content)
         if calculated_count > 0:
             lesson_data["cell_count"] = calculated_count
-    
-    # 获取原始 content 数据
-    raw_content = lesson.content or []
-    raw_content_length = len(raw_content) if isinstance(raw_content, list) else 0
-    
-    # 转换content中的URL（文件名 → 完整URL）
-    converted_content = _convert_content_urls(raw_content, request)
-    
-    # 确保转换后的content被设置到lesson_data中
-    lesson_data["content"] = converted_content
+
+    # 性能优化：列表API可以完全不返回content，只返回元数据
+    # 这样可以将响应大小从27MB降到几百KB
+    if not include_content:
+        # 不返回content，只返回cell_count供前端显示
+        lesson_data["content"] = []
+    elif skip_content_conversion:
+        # 跳过URL转换，直接返回原始content
+        raw_content = lesson.content or []
+        lesson_data["content"] = raw_content
+    else:
+        # 转换content中的URL（文件名 → 完整URL）
+        raw_content = lesson.content or []
+        converted_content = _convert_content_urls(raw_content, request)
+        # 确保转换后的content被设置到lesson_data中
+        lesson_data["content"] = converted_content
     lesson_data.setdefault("tags", lesson.tags or [])
     
     # 转换cover_image_url
@@ -422,7 +435,9 @@ async def list_lessons(
     paginated_query = ordered_query.offset((page - 1) * page_size).limit(page_size)
 
     lessons = (await db.execute(paginated_query)).scalars().all()
-    serialized_lessons = [_lesson_to_response(lesson, request) for lesson in lessons]
+    # 性能优化：列表API完全不返回content，将响应大小从27MB降到几百KB
+    # content会在详情API(get_lesson)中返回
+    serialized_lessons = [_lesson_to_response(lesson, request, include_content=False) for lesson in lessons]
 
     return LessonListResponse(
         items=serialized_lessons,
@@ -467,7 +482,8 @@ async def get_recommended_lessons(
     result = await db.execute(query)
     lessons = result.scalars().all()
 
-    lesson_responses = [_lesson_to_response(lesson, request) for lesson in lessons]
+    # 性能优化：推荐课程列表不返回content，减少响应大小
+    lesson_responses = [_lesson_to_response(lesson, request, include_content=False) for lesson in lessons]
 
     if (
         current_user
@@ -1457,7 +1473,8 @@ async def get_chapter_lessons(
     paginated_query = ordered_query.offset((page - 1) * page_size).limit(page_size)
 
     lessons = (await db.execute(paginated_query)).scalars().all()
-    serialized_lessons = [_lesson_to_response(lesson, request) for lesson in lessons]
+    # 性能优化：章节教案列表不返回content，减少响应大小
+    serialized_lessons = [_lesson_to_response(lesson, request, include_content=False) for lesson in lessons]
 
     return LessonListResponse(
         items=serialized_lessons,
