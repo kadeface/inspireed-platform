@@ -3,9 +3,11 @@
 包括区域、学校等组织单位
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, JSON, select
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Optional
 from app.core.database import Base
 
 
@@ -93,11 +95,14 @@ class Classroom(Base):
         Integer, ForeignKey("grades.id"), nullable=False, comment="所属年级ID"
     )
     enrollment_year = Column(Integer, nullable=True, comment="入学年份/届别")
+
+    # ✅ DEPRECATED: These fields are kept for backward compatibility
+    # but should not be used for new code. Use ClassroomMembership instead.
     head_teacher_id = Column(
-        Integer, ForeignKey("users.id"), nullable=True, comment="正班主任ID"
+        Integer, ForeignKey("users.id"), nullable=True, comment="正班主任ID (已弃用，请使用ClassroomMembership)"
     )
     deputy_head_teacher_id = Column(
-        Integer, ForeignKey("users.id"), nullable=True, comment="副班主任ID"
+        Integer, ForeignKey("users.id"), nullable=True, comment="副班主任ID (已弃用，请使用ClassroomMembership)"
     )
     settings = Column(
         JSON,
@@ -124,3 +129,76 @@ class Classroom(Base):
     students = relationship(
         "User", back_populates="classroom", foreign_keys="User.classroom_id"
     )
+
+    async def get_head_teacher(self, db: AsyncSession) -> Optional["User"]:
+        """
+        Get head teacher from ClassroomMembership (single source of truth).
+
+        This method queries ClassroomMembership instead of using head_teacher_id.
+        The head_teacher_id field is deprecated.
+
+        Args:
+            db: Database session
+
+        Returns:
+            User object if head teacher exists, None otherwise
+        """
+        from app.models.classroom_assistant import ClassroomMembership, RoleInClass
+        from app.models.user import User
+
+        result = await db.execute(
+            select(User).join(ClassroomMembership).where(
+                ClassroomMembership.classroom_id == self.id,
+                ClassroomMembership.role_in_class == RoleInClass.HEAD_TEACHER_PRIMARY,
+                ClassroomMembership.is_active == True
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_deputy_head_teacher(self, db: AsyncSession) -> Optional["User"]:
+        """
+        Get deputy head teacher from ClassroomMembership (single source of truth).
+
+        Args:
+            db: Database session
+
+        Returns:
+            User object if deputy exists, None otherwise
+        """
+        from app.models.classroom_assistant import ClassroomMembership, RoleInClass
+        from app.models.user import User
+
+        result = await db.execute(
+            select(User).join(ClassroomMembership).where(
+                ClassroomMembership.classroom_id == self.id,
+                ClassroomMembership.role_in_class == RoleInClass.HEAD_TEACHER_DEPUTY,
+                ClassroomMembership.is_active == True
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_teachers(self, db: AsyncSession) -> List["User"]:
+        """
+        Get all teachers associated with this classroom via ClassroomMembership.
+
+        Args:
+            db: Database session
+
+        Returns:
+            List of User objects with teacher roles
+        """
+        from app.models.classroom_assistant import ClassroomMembership, RoleInClass
+        from app.models.user import User
+
+        result = await db.execute(
+            select(User).join(ClassroomMembership).where(
+                ClassroomMembership.classroom_id == self.id,
+                ClassroomMembership.role_in_class.in_([
+                    RoleInClass.HEAD_TEACHER_PRIMARY,
+                    RoleInClass.HEAD_TEACHER_DEPUTY,
+                    RoleInClass.SUBJECT_TEACHER,
+                ]),
+                ClassroomMembership.is_active == True
+            )
+        )
+        return list(result.scalars().all())
