@@ -22,12 +22,12 @@ def upgrade() -> None:
     
     # 确保 classsessionstatus 枚举存在
     op.execute("""
-        DO $$ 
+        DO $$
         BEGIN
             IF NOT EXISTS (
                 SELECT 1 FROM pg_type WHERE typname = 'classsessionstatus'
             ) THEN
-                CREATE TYPE classsessionstatus AS ENUM ('pending', 'active', 'paused', 'ended');
+                CREATE TYPE classsessionstatus AS ENUM ('PENDING', 'ACTIVE', 'PAUSED', 'ENDED');
             END IF;
         END $$;
     """)
@@ -40,7 +40,7 @@ def upgrade() -> None:
             sa.Column('lesson_id', sa.Integer(), nullable=False),
             sa.Column('classroom_id', sa.Integer(), nullable=False),
             sa.Column('teacher_id', sa.Integer(), nullable=False),
-            sa.Column('status', postgresql.ENUM('pending', 'active', 'paused', 'ended', name='classsessionstatus', create_type=False), nullable=False),
+            sa.Column('status', postgresql.ENUM('PENDING', 'ACTIVE', 'PAUSED', 'ENDED', name='classsessionstatus', create_type=False), nullable=False),
             sa.Column('scheduled_start', sa.DateTime(), nullable=True),
             sa.Column('actual_start', sa.DateTime(), nullable=True),
             sa.Column('ended_at', sa.DateTime(), nullable=True),
