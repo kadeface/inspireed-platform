@@ -37,6 +37,7 @@ from app.api.v1.auth import get_current_active_user
 from app.api.deps import get_current_user_optional
 from pydantic import BaseModel, Field
 from app.utils.resource_url import filename_to_url, url_to_filename
+from app.services.classroom_service import ClassroomQueryService
 
 router = APIRouter()
 
@@ -628,27 +629,25 @@ async def get_available_classrooms(
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """获取教师可选的班级列表"""
+    from app.models import UserRole
+
+    # Validate user role
     role_value = cast(str, getattr(current_user.role, "value", current_user.role))
     try:
         user_role = UserRole(role_value)
     except ValueError:
         raise HTTPException(status_code=403, detail="当前用户角色无效")
 
-    query = select(Classroom).where(Classroom.is_active.is_(True))
-
-    if user_role == UserRole.TEACHER:
-        if current_user.school_id is None:
-            raise HTTPException(status_code=400, detail="教师未关联学校，无法获取班级列表")
-        query = query.where(Classroom.school_id == current_user.school_id)
-    elif user_role in {UserRole.ADMIN, UserRole.RESEARCHER}:
-        # 管理员或教研员可以查看全部激活班级
-        pass
-    else:
+    # Only teachers, admins, and researchers can publish lessons
+    if user_role not in {UserRole.TEACHER, UserRole.ADMIN, UserRole.RESEARCHER}:
         raise HTTPException(status_code=403, detail="仅教师或管理员可查看班级列表")
 
-    query = query.order_by(Classroom.grade_id, Classroom.name)
+    # Use unified service to get active classrooms only
+    service = ClassroomQueryService()
+    classrooms = await service.get_classrooms_for_user(
+        db, current_user, is_active=True
+    )
 
-    classrooms = (await db.execute(query)).scalars().all()
     return [
         LessonClassroomInfo.model_validate(classroom) for classroom in classrooms
     ]
@@ -1137,15 +1136,19 @@ async def publish_lesson(
     if not classroom_ids:
         raise HTTPException(status_code=400, detail="发布教案时必须指定至少一个班级")
 
+    # Use ClassroomQueryService to validate classrooms (checks is_active)
     classrooms_result = await db.execute(
-        select(Classroom).where(Classroom.id.in_(classroom_ids))
+        select(Classroom).where(
+            Classroom.id.in_(classroom_ids),
+            Classroom.is_active == True  # ✅ Explicitly check is_active
+        )
     )
     classrooms = classrooms_result.scalars().all()
     existing_classroom_ids = {cast(int, classroom.id) for classroom in classrooms}
     missing_ids = classroom_ids - existing_classroom_ids
     if missing_ids:
         missing_str = ", ".join(str(cid) for cid in sorted(missing_ids))
-        raise HTTPException(status_code=404, detail=f"班级不存在: {missing_str}")
+        raise HTTPException(status_code=404, detail=f"班级不存在或未激活: {missing_str}")
 
     role_value = cast(str, getattr(current_user.role, "value", current_user.role))
     try:
