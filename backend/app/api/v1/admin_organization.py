@@ -1083,79 +1083,42 @@ async def get_classrooms(
     current_user: User = Depends(get_current_admin),
 ) -> Any:
     """获取班级列表"""
+    from app.services.classroom_service import ClassroomQueryService
 
-    # 如果需要搜索学校名称或按区域/学段筛选，需要JOIN School表
-    needs_join = search is not None or region_id is not None or school_type is not None
-    
-    if needs_join:
-        # 需要JOIN School表以支持搜索学校名称或区域筛选
-        query = select(Classroom).join(School, Classroom.school_id == School.id)
-        count_query = select(func.count(Classroom.id)).select_from(
-            join(Classroom, School, Classroom.school_id == School.id)
-        )
-    else:
-        query = select(Classroom)
-        count_query = select(func.count(Classroom.id))
+    # Use unified service
+    service = ClassroomQueryService()
 
-    if school_id is not None:
-        query = query.where(Classroom.school_id == school_id)
-        count_query = count_query.where(Classroom.school_id == school_id)
-    if grade_id is not None:
-        query = query.where(Classroom.grade_id == grade_id)
-        count_query = count_query.where(Classroom.grade_id == grade_id)
-    if region_id is not None:
-        # 通过School表筛选区域
-        if not needs_join:
-            # 如果还没有JOIN，需要JOIN School表
-            query = query.join(School, Classroom.school_id == School.id)
-            count_query = select(func.count(Classroom.id)).select_from(
-                join(Classroom, School, Classroom.school_id == School.id)
-            )
-            needs_join = True  # 标记已JOIN
-        query = query.where(School.region_id == region_id)
-        count_query = count_query.where(School.region_id == region_id)
+    # Get filtered classrooms
+    all_classrooms = await service.get_classrooms_for_user(
+        db,
+        current_user,
+        grade_id=grade_id,
+        school_id=school_id,
+        region_id=region_id,
+        is_active=is_active,
+        search=search,
+    )
+
+    # Apply school_type filter (not in service, need to filter after)
     if school_type is not None:
-        # 通过School表筛选学段
-        if not needs_join:
-            # 如果还没有JOIN，需要JOIN School表
-            query = query.join(School, Classroom.school_id == School.id)
-            count_query = select(func.count(Classroom.id)).select_from(
-                join(Classroom, School, Classroom.school_id == School.id)
-            )
-            needs_join = True  # 标记已JOIN
-        query = query.where(School.school_type == school_type)
-        count_query = count_query.where(School.school_type == school_type)
-    if is_active is not None:
-        query = query.where(Classroom.is_active == is_active)
-        count_query = count_query.where(Classroom.is_active == is_active)
-    if search:
-        if not needs_join:
-            # 如果还没有JOIN，需要JOIN School表
-            query = query.join(School, Classroom.school_id == School.id)
-            count_query = select(func.count(Classroom.id)).select_from(
-                join(Classroom, School, Classroom.school_id == School.id)
-            )
-        search_filter = or_(
-            Classroom.name.ilike(f"%{search}%"),
-            Classroom.code.ilike(f"%{search}%"),
-            Classroom.description.ilike(f"%{search}%"),
-            School.name.ilike(f"%{search}%"),  # 支持搜索学校名称
+        from sqlalchemy import select
+        # Get schools of this type
+        schools_result = await db.execute(
+            select(School.id).where(School.school_type == school_type)
         )
-        query = query.where(search_filter)
-        count_query = count_query.where(search_filter)
+        school_ids = set(s[0] for s in schools_result.all())
+        all_classrooms = [c for c in all_classrooms if c.school_id in school_ids]
 
-    total = (await db.execute(count_query)).scalar() or 0
+    # Pagination (in-memory since we already have the list)
+    total = len(all_classrooms)
+    total_pages = (total + size - 1) // size
 
     offset = (page - 1) * size
-    query = query.offset(offset).limit(size).order_by(Classroom.name)
-
-    classrooms = (await db.execute(query)).scalars().all()
-
-    total_pages = (total + size - 1) // size
+    paginated_classrooms = all_classrooms[offset:offset + size]
 
     return ClassroomListResponse(
         classrooms=[
-            ClassroomResponse.model_validate(classroom) for classroom in classrooms
+            ClassroomResponse.model_validate(classroom) for classroom in paginated_classrooms
         ],
         total=total,
         page=page,
