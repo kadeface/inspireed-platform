@@ -347,18 +347,30 @@ async def list_lessons(
     )
 
     if user_role == UserRole.STUDENT:
-        classroom_id = current_user.classroom_id
-        if classroom_id is None:
+        # UPDATED: Get ALL active classroom memberships, not just User.classroom_id
+        from app.models.classroom_assistant import ClassroomMembership, RoleInClass
+
+        memberships_result = await db.execute(
+            select(ClassroomMembership).where(
+                ClassroomMembership.user_id == current_user.id,
+                ClassroomMembership.role_in_class == RoleInClass.STUDENT,
+                ClassroomMembership.is_active == True
+            )
+        )
+        classroom_ids = [m.classroom_id for m in memberships_result.scalars()]
+
+        if not classroom_ids:
             return LessonListResponse(
                 items=[],
                 total=0,
                 page=page,
                 page_size=page_size,
             )
+
         base_query = (
             base_query.join(LessonClassroom)
             .where(Lesson.status == LessonStatus.PUBLISHED)
-            .where(LessonClassroom.classroom_id == classroom_id)
+            .where(LessonClassroom.classroom_id.in_(classroom_ids))
             .distinct(Lesson.id)
         )
     else:
@@ -491,12 +503,23 @@ async def get_recommended_lessons(
         and isinstance(current_user.role, UserRole)
         and cast(UserRole, current_user.role) == UserRole.STUDENT
     ):
-        classroom_id = current_user.classroom_id
-        if classroom_id is not None:
+        # UPDATED: Get ALL active classroom memberships for student
+        from app.models.classroom_assistant import ClassroomMembership, RoleInClass
+
+        memberships_result = await db.execute(
+            select(ClassroomMembership).where(
+                ClassroomMembership.user_id == current_user.id,
+                ClassroomMembership.role_in_class == RoleInClass.STUDENT,
+                ClassroomMembership.is_active == True
+            )
+        )
+        student_classroom_ids = {m.classroom_id for m in memberships_result.scalars()}
+
+        if student_classroom_ids:
             lesson_responses = [
                 lesson
                 for lesson in lesson_responses
-                if classroom_id in lesson.classroom_ids
+                if student_classroom_ids.intersection(lesson.classroom_ids)
             ]
 
     return LessonListResponse(
@@ -661,6 +684,9 @@ async def get_lesson(
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
     """获取教案详情"""
+    from app.models.classroom_assistant import ClassroomMembership, RoleInClass
+    from app.services.permission_service import PermissionService
+
     lesson = await _get_lesson_with_relations(db, lesson_id)
 
     if not lesson:
@@ -678,11 +704,12 @@ async def get_lesson(
     if user_role == UserRole.STUDENT:
         if lesson_status != LessonStatus.PUBLISHED:
             raise HTTPException(status_code=403, detail="无权访问该教案")
-        classroom_id = current_user.classroom_id
-        assigned_classroom_ids = {
-            relation.classroom_id for relation in lesson.lesson_classrooms
-        }
-        if classroom_id is None or classroom_id not in assigned_classroom_ids:
+
+        # Use PermissionService to check access via ClassroomMembership
+        permission_service = PermissionService()
+        has_access = await permission_service.can_student_view_lesson(db, current_user, lesson_id)
+
+        if not has_access:
             raise HTTPException(status_code=403, detail="该教案未分配到你的班级")
     elif user_role in {UserRole.ADMIN, UserRole.RESEARCHER}:
         # 管理员和教研员可以查看所有教案（包括草稿状态）
@@ -1157,14 +1184,12 @@ async def publish_lesson(
         raise HTTPException(status_code=403, detail="当前用户角色无效")
 
     if user_role == UserRole.TEACHER:
-        if current_user.school_id is None:
-            raise HTTPException(status_code=400, detail="教师缺少所属学校信息，无法分配班级")
+        from app.services.permission_service import PermissionService
+
+        permission_service = PermissionService()
         for classroom in classrooms:
-            classroom_school_id = cast(Optional[int], classroom.school_id)
-            classroom_head_teacher_id = cast(Optional[int], classroom.head_teacher_id)
-            if (
-                classroom_school_id != current_user.school_id
-                and classroom_head_teacher_id != current_user.id
+            if not await permission_service.can_teacher_publish_to_classroom(
+                db, current_user, classroom
             ):
                 raise HTTPException(
                     status_code=403,
