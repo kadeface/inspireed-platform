@@ -18,6 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
     SmallInteger,
+    text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -136,6 +137,14 @@ class ClassroomMembership(Base):
         UniqueConstraint("classroom_id", "user_id", name="uq_classroom_user"),
         Index("idx_membership_user_active", "user_id", "is_active"),
         Index("idx_membership_classroom_role", "classroom_id", "role_in_class"),
+
+        # NEW: Ensure only one HEAD_TEACHER_PRIMARY per classroom (partial unique index)
+        Index(
+            "uq_classroom_head_teacher",
+            "classroom_id",
+            unique=True,
+            postgresql_where=text("role_in_class = 'head_teacher_primary' AND is_active = TRUE")
+        ),
     )
 
 
