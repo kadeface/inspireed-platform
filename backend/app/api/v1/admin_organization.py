@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from app.core.database import get_db
-from app.models import User, Region, School, Grade, Classroom, UserRole
+from app.models import User, Region, School, Grade, Classroom, UserRole, LessonClassroom
 from app.api.deps import get_current_admin, get_current_admin_or_staff
 
 logger = logging.getLogger(__name__)
@@ -1390,6 +1390,20 @@ async def delete_classroom(
     if not classroom:
         raise HTTPException(status_code=404, detail="班级不存在")
 
+    # Check lesson assignments BEFORE allowing delete
+    lesson_assignment_count = await db.execute(
+        select(func.count()).select_from(LessonClassroom).where(
+            LessonClassroom.classroom_id == classroom_id
+        )
+    )
+    lesson_count = lesson_assignment_count.scalar() or 0
+
+    if lesson_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无法删除班级：该班级有 {lesson_count} 个教案关联。请先取消发布相关教案，或使用停用接口。"
+        )
+
     student_count_result = await db.execute(
         select(func.count()).select_from(User).where(User.classroom_id == classroom_id)
     )
@@ -1401,6 +1415,33 @@ async def delete_classroom(
     await db.commit()
 
     return {"message": "班级删除成功"}
+
+
+@router.post("/classrooms/{classroom_id}/deactivate", status_code=200)
+async def deactivate_classroom(
+    classroom_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """安全停用班级（保留教案关联历史）
+
+    相比硬删除，停用班级：
+    - 保留教案分配历史
+    - 保留学生考勤和行为记录
+    - 防止数据丢失
+    """
+    classroom = await db.scalar(select(Classroom).where(Classroom.id == classroom_id))
+    if not classroom:
+        raise HTTPException(status_code=404, detail="班级不存在")
+
+    classroom.is_active = False
+    await db.commit()
+
+    return {
+        "message": "班级已停用",
+        "classroom_id": classroom_id,
+        "lesson_assignments_preserved": True
+    }
 
 
 # ==================== Tree Structure Endpoints ====================
