@@ -89,6 +89,7 @@ from app.models.teacher import (
     TeachingAssignmentType,
 )
 from app.models.teacher_position import TeacherPositionType
+from app.models.exam_room import ExamRoom, ExamRoomStudent, ExamProctor
 
 __all__ = [
     "User",
@@ -183,4 +184,8 @@ __all__ = [
     "TeachingAssignmentType",
     # 教师职务类型
     "TeacherPositionType",
+    # 考场
+    "ExamRoom",
+    "ExamRoomStudent",
+    "ExamProctor",
 ]
