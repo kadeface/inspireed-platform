@@ -217,6 +217,17 @@ import logger from '@/utils/logger'
 import { isContentWithSections, sectionsToFlatCells, normalizeContentToSections } from '../../utils/lessonContent'
 import { useLessonStore } from '../../store/lesson'
 import type { LessonClassroom } from '../../types/lesson'
+// v2.0: 导入学生监控工具函数
+import {
+  getStudentStatusClass,
+  getStudentTooltip,
+  getStudentAccount,
+  calculateParticipationRate,
+  calculateAverageScore,
+  calculateStudentsBehindCount,
+  hasAlerts as checkHasAlerts,
+  checkLowSubmissionRate
+} from './studentMonitoring'
 
 interface Props {
   lessonId: number
@@ -344,90 +355,24 @@ const lessonContentCells = computed(() => {
   return []
 })
 
-// 学生状态类
-function getStudentStatusClass(student: any): string {
-  // 如果当前是活动模块，根据提交状态显示颜色
-  if (currentCell.value && currentCell.value.type === 'activity' && studentSubmissionStatus.value.size > 0) {
-    // 尝试多种可能的ID字段
-    const studentId = student.id || student.userId || student.user_id || student.studentId || student.student_id
-    const submissionStatus = studentId ? studentSubmissionStatus.value.get(String(studentId)) : null
-    
-    // 已提交：绿色
-    if (submissionStatus === 'submitted' || submissionStatus === 'graded') {
-      return 'indicator-green'
-    }
-    // 未提交（包括 not_started, draft）：红色
-    if (submissionStatus === 'not_started' || submissionStatus === 'draft' || !submissionStatus) {
-      return 'indicator-red'
-    }
-    // 其他状态：黄色
-    return 'indicator-yellow'
-  }
-  
-  // 非活动模块，根据进度显示颜色
-  const progress = student.progressPercentage || student.progress_percentage || 0
-  if (progress >= 80) return 'indicator-green'
-  if (progress >= 50) return 'indicator-yellow'
-  return 'indicator-red'
-}
-
-// 获取学生提示信息
-function getStudentTooltip(student: any): string {
-  const name = student.studentName || student.student_name || '学生'
-  const account = getStudentAccount(student)
-  const progress = Math.round(student.progressPercentage || student.progress_percentage || 0)
-  
-  // 如果当前是活动模块，添加提交状态信息
-  if (currentCell.value && currentCell.value.type === 'activity' && studentSubmissionStatus.value.size > 0) {
-    // 尝试多种可能的ID字段
-    const studentId = student.id || student.userId || student.user_id || student.studentId || student.student_id
-    const submissionStatus = studentId ? studentSubmissionStatus.value.get(String(studentId)) : null
-    const statusLabels: Record<string, string> = {
-      'not_started': '未开始',
-      'draft': '草稿',
-      'submitted': '已提交',
-      'graded': '已评分',
-      'returned': '已退回',
-    }
-    const statusLabel = submissionStatus ? statusLabels[submissionStatus] || submissionStatus : '未开始'
-    return `${name} (${account}) - 进度: ${progress}% - 提交状态: ${statusLabel}`
-  }
-  
-  return `${name} (${account}) - 进度: ${progress}%`
-}
-
-// 获取学生登录账号
-function getStudentAccount(student: any): string {
-  // 尝试多种可能的字段名，但不包括姓名字段
-  return student.username || 
-         student.account || 
-         student.loginAccount || 
-         student.login_account ||
-         student.userAccount ||
-         student.user_account ||
-         student.email ||
-         student.user_id?.toString() ||
-         student.id?.toString() ||
-         '未知账号'
-}
+// v2.0: 学生监控工具函数已移至 studentMonitoring.ts
+// getStudentStatusClass, getStudentTooltip, getStudentAccount 现在从工具文件导入
 
 // 参与度（基于在线学生和总学生的比例，以及平均进度）
 const participationRate = computed(() => {
   if (totalStudents.value === 0) return 0
-  const onlineRatio = (activeStudents.value.length / totalStudents.value) * 100
   const avgProgress = sessionStatistics.value?.average_progress || 0
-  // 综合在线率和平均进度
-  return Math.round((onlineRatio * 0.6 + avgProgress * 0.4))
+  return calculateParticipationRate(activeStudents.value, totalStudents.value, avgProgress)
 })
 
 // 平均得分
 const averageScore = computed(() => {
   if (sessionStatistics.value?.average_score !== undefined) {
-    return Math.round(sessionStatistics.value.average_score)
+    return calculateAverageScore(sessionStatistics.value.average_score, 0)
   }
   // 如果没有得分数据，基于进度估算
   const avgProgress = sessionStatistics.value?.average_progress || 0
-  return Math.round(avgProgress * 0.8) // 假设进度和得分有一定相关性
+  return calculateAverageScore(undefined, avgProgress)
 })
 
 
@@ -800,24 +745,15 @@ function getCurrentModuleIndex(): number {
 
 // 计算进度落后学生数量（进度 < 50%）
 const studentsBehindCount = computed(() => {
-  return activeStudents.value.filter(s => {
-    const progress = s.progressPercentage || s.progress_percentage || 0
-    return progress < 50
-  }).length
+  return calculateStudentsBehindCount(activeStudents.value)
 })
 
 // 是否有预警（用于高亮预警栏）
 const hasAlerts = computed(() => {
-  return studentsBehindCount.value > 0 || hasLowSubmissionRate.value
-})
-
-// 是否有低提交率（活动模块）
-const hasLowSubmissionRate = computed(() => {
-  if (!currentCell.value || currentCell.value.type !== 'activity') return false
-  if (!sessionStatistics.value) return false
-  // 假设如果提交率低于 50% 且总学生数 > 5，则显示预警
-  // 这里需要根据实际的提交统计数据来判断
-  return false // TODO: 根据实际数据实现
+  return checkHasAlerts(
+    studentsBehindCount.value,
+    checkLowSubmissionRate(currentCell.value, sessionStatistics.value)
+  )
 })
 
 // 活动统计相关
