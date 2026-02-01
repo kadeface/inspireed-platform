@@ -224,6 +224,7 @@ import { useDurationTimer } from './composables/useDurationTimer'
 import { useNavigation } from './composables/useNavigation'
 import { useDataLoader } from './composables/useDataLoader'
 import { useFullscreen } from './composables/useFullscreen'
+import { useSelectionMode } from './composables/useSelectionMode'
 // v2.0: 导入学生监控工具函数
 import {
   getStudentStatusClass,
@@ -357,6 +358,18 @@ const {
   cleanupFullscreenListeners,
 } = fullscreenManager
 
+// v2.0: 使用composables管理选择模式（需要在 navigationManager 之前初始化，因为它提供 isMultiSelectMode）
+const selectionModeManager = useSelectionMode({
+  loading,
+  session,
+  displayCellOrders,
+  lessonContentCells,
+  // handleControlBoardNavigate 将在 navigationManager 初始化后可用
+})
+
+// 从 selectionModeManager 解构
+const { isMultiSelectMode, toggleSelectionMode } = selectionModeManager
+
 // v2.0: 使用composables管理导航（需要在 dataLoader 之后，因为它依赖 dataLoader 的函数）
 const navigationManager = useNavigation({
   session,
@@ -373,6 +386,19 @@ const navigationManager = useNavigation({
   loadDbCells,
   dbCells,
 })
+
+// 从 navigationManager 解构导航相关方法
+const {
+  canGoPrev,
+  canGoNext,
+  handleControlBoardNavigate,
+  handleModuleItemClick,
+  handlePrevModule,
+  handleNextModule,
+  handleModuleCheckboxClick,
+  handleModuleCheckboxChange,
+  handleHideAll,
+} = navigationManager
 
 // 从 composable 解构会话相关状态和方法
 const {
@@ -426,7 +452,8 @@ watch(session, (newSession) => {
 // const loadingStudents, const sessionStatistics, const activityStatistics
 // const studentSubmissionStatus, const loadingActivityStats
 // 现在从 dataLoader 导入
-const isMultiSelectMode = ref(false) // 多选模式：false=单选，true=多选
+// v2.0: 以下状态已移至 useSelectionMode composable
+// const isMultiSelectMode 现在从 selectionModeManager 导入
 const selectedCellIndex = ref(-1)  // -1表示隐藏所有内容
 const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录（用于 ID 匹配）
 // v2.0: 以下状态已移至 useFullscreen composable
@@ -713,30 +740,9 @@ function scrollToQuestions() {
 // function toggleModulePanelFullscreen, togglePanelFullscreen, handleFullscreenChange
 // 现在从 fullscreenManager 导入
 
-// 切换选择模式（单选/多选）
-async function toggleSelectionMode() {
-  if (loading.value || !session.value) return
-  
-  const wasMultiSelect = isMultiSelectMode.value
-  isMultiSelectMode.value = !isMultiSelectMode.value
-  
-  // 如果从多选切换到单选，且当前有多个选中项，只保留第一个
-  if (!isMultiSelectMode.value && wasMultiSelect && displayCellOrders.value.length > 1) {
-    const firstOrder = displayCellOrders.value[0]
-    const cell = lessonContentCells.value.find((cell, idx) => {
-      const cellOrder = cell.order !== undefined ? cell.order : idx
-      return cellOrder === firstOrder
-    })
-    if (cell) {
-      const id = getCellId(cell)
-      const cellIndex = lessonContentCells.value.indexOf(cell)
-      const order = cell.order !== undefined ? cell.order : cellIndex
-      // 切换到单选模式，只显示第一个选中的项
-      await handleControlBoardNavigate(id, order, 'toggle', false)
-    }
-  }
-  // 如果从单选切换到多选，且当前有选中项，保持选中状态（已经是多选模式，可以继续添加）
-}
+// v2.0: 切换选择模式函数已移至 useSelectionMode composable
+// async function toggleSelectionMode(...) {...}
+// 现在从 selectionModeManager 导入
 
 // 隐藏所有内容（通过导播台的"隐藏"节点调用）
 // v2.0: 已移至 useNavigation composable
@@ -772,18 +778,8 @@ watch(selectedCellIndex, (newIndex, oldIndex) => {
   }
 })
 
-// 监听 displayCellOrders 变化，自动同步多选模式状态
-watch(displayCellOrders, (orders) => {
-  if (Array.isArray(orders) && orders.length > 1) {
-    // 如果有多个选中项，自动切换到多选模式
-    if (!isMultiSelectMode.value) {
-      isMultiSelectMode.value = true
-    }
-  } else if (Array.isArray(orders) && orders.length <= 1) {
-    // 如果只有一个或没有选中项，可以保持当前模式（不强制切换）
-    // 这样用户可以手动选择模式
-  }
-}, { immediate: true })
+// v2.0: 监听 displayCellOrders 变化已移至 useSelectionMode composable
+// watch(displayCellOrders, ...) {...}
 
 // 监听session变化，更新selectedCellIndex和displayCellIds
 watch(() => session.value, (newSession) => {
