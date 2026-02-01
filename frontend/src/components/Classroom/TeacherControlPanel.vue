@@ -222,6 +222,7 @@ import { useSessionManager } from './composables/useSessionManager'
 import { usePolling } from './composables/usePolling'
 import { useDurationTimer } from './composables/useDurationTimer'
 import { useNavigation } from './composables/useNavigation'
+import { useDataLoader } from './composables/useDataLoader'
 // v2.0: 导入学生监控工具函数
 import {
   getStudentStatusClass,
@@ -315,7 +316,34 @@ const durationTimer = useDurationTimer({
 // 监听会话状态变化，自动启动/停止计时器
 durationTimer.watchSessionStatus(sessionManager.normalizedSessionStatus)
 
-// v2.0: 使用composables管理导航
+// v2.0: 使用composables管理数据加载
+const dataLoader = useDataLoader({
+  session,
+  lessonId: props.lessonId,
+  currentCell,
+  currentActivityDbCell,
+  containerRef,
+  pollingManager,
+  dbCells,
+})
+
+// 从 dataLoader 解构数据加载相关状态和方法
+const {
+  loadingStudents,
+  loadingActivityStats,
+  activeStudents,
+  sessionStatistics,
+  activityStatistics,
+  studentSubmissionStatus,
+  loadParticipants,
+  loadStatistics,
+  loadActivityStatistics,
+  loadDbCells,
+  ensureActivityCellExists,
+  watchCurrentCell,
+} = dataLoader
+
+// v2.0: 使用composables管理导航（需要在 dataLoader 之后，因为它依赖 dataLoader 的函数）
 const navigationManager = useNavigation({
   session,
   loading,
@@ -361,7 +389,10 @@ const {
 const containerRef = ref<HTMLElement | null>(null) // 用于检查组件是否在 DOM 中
 const moduleListRef = ref<HTMLElement | null>(null) // 模块列表容器
 const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map()) // 模块项引用
-const activeStudents = ref<any[]>([]) // 保留activeStudents，因为它在组件中被使用
+// v2.0: 以下状态已移至 useDataLoader composable
+// const activeStudents, const loadingStudents, const sessionStatistics
+// const activityStatistics, const studentSubmissionStatus, const loadingActivityStats
+// 现在从 dataLoader 导入
 
 // 🔧 提供 sessionId 给子组件（通过 provide/inject）
 provide('classroomSessionId', computed(() => session.value?.id))
@@ -377,9 +408,11 @@ watch(session, (newSession) => {
   emit('session-changed', newSession)
 }, { immediate: true, deep: true })
 
-const loadingStudents = ref(false)
+// v2.0: 以下状态已移至 useDataLoader composable
+// const loadingStudents, const sessionStatistics, const activityStatistics
+// const studentSubmissionStatus, const loadingActivityStats
+// 现在从 dataLoader 导入
 const isMultiSelectMode = ref(false) // 多选模式：false=单选，true=多选
-const sessionStatistics = ref<any>(null)
 const selectedCellIndex = ref(-1)  // -1表示隐藏所有内容
 const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录（用于 ID 匹配）
 const modulePanelFullscreen = ref(false)  // 模块面板全屏状态
@@ -645,81 +678,10 @@ const hasAlerts = computed(() => {
   )
 })
 
-// 活动统计相关
-const activityStatistics = ref({
-  totalStudents: 0,
-  submittedCount: 0,
-  itemStatistics: null as Record<string, any> | null,
-})
-
-const loadingActivityStats = ref(false)
-
-// 学生提交状态映射（studentId -> submissionStatus）
-const studentSubmissionStatus = ref<Map<number | string, string>>(new Map())
-
-// 加载活动统计
-async function loadActivityStatistics() {
-  if (!currentCell.value || currentCell.value.type !== 'activity' || !currentActivityDbCell.value || !session.value) {
-    activityStatistics.value = {
-      totalStudents: 0,
-      submittedCount: 0,
-      itemStatistics: null,
-    }
-    studentSubmissionStatus.value.clear()
-    return
-  }
-  
-  loadingActivityStats.value = true
-  try {
-    const numericCellId = typeof currentActivityDbCell.value.id === 'number' 
-      ? currentActivityDbCell.value.id 
-      : toNumericId(currentActivityDbCell.value.id)
-    
-    if (numericCellId === null) {
-      console.warn('⚠️ CellId 是 UUID，无法获取统计数据（需要数字 ID）')
-      return
-    }
-    
-    // 并行加载统计数据和提交列表
-    const [stats, submissions] = await Promise.all([
-      activityService.getStatistics(
-        numericCellId,
-        session.value.id,
-        props.lessonId
-      ),
-      activityService.getCellSubmissions(
-        numericCellId,
-        undefined, // 不过滤状态
-        session.value.id,
-        props.lessonId
-      ).catch(() => []) // 如果失败，返回空数组
-    ])
-    
-    // 转换 API 返回的格式
-    const statsAny = stats as any
-    activityStatistics.value = {
-      totalStudents: stats.totalStudents || statsAny.total_students || 0,
-      submittedCount: stats.submittedCount || statsAny.submitted_count || 0,
-      itemStatistics: stats.itemStatistics ?? statsAny.item_statistics ?? null,
-    }
-    
-    // 建立学生ID到提交状态的映射
-    // 支持多种ID字段：studentId, student_id, userId, user_id
-    studentSubmissionStatus.value.clear()
-    submissions.forEach((submission: any) => {
-      const studentId = submission.studentId || submission.student_id || submission.userId || submission.user_id
-      if (studentId !== null && studentId !== undefined) {
-        const status = submission.status || 'not_started'
-        // 使用字符串作为key，确保类型一致
-        studentSubmissionStatus.value.set(String(studentId), status)
-      }
-    })
-  } catch (error: any) {
-    console.error('❌ 加载活动统计失败:', error)
-  } finally {
-    loadingActivityStats.value = false
-  }
-}
+// v2.0: 以下状态和函数已移至 useDataLoader composable
+// const activityStatistics, const loadingActivityStats, const studentSubmissionStatus
+// function loadActivityStatistics, loadParticipants, loadStatistics, loadDbCells, ensureActivityCellExists
+// 现在从 dataLoader 导入
 
 // 滚动到提问区域
 function scrollToQuestions() {
@@ -836,67 +798,9 @@ async function toggleSelectionMode() {
 // 隐藏所有内容（通过导播台的"隐藏"节点调用）
 // v2.0: 已移至 useNavigation composable
 
-// 加载数据
-async function loadParticipants() {
-  // 🔧 首先检查组件是否还在 DOM 中（如果被 v-if 隐藏，不应该执行）
-  if (!containerRef.value || !containerRef.value.isConnected) {
-    console.log('⏸️ loadParticipants: 组件不在 DOM 中，跳过加载并清理轮询')
-    pollingManager.clearAllPollingIntervals()
-    return
-  }
-  
-  if (!session.value) {
-    console.warn('⏸️ loadParticipants: 会话不存在，跳过加载')
-    return
-  }
-  
-  loadingStudents.value = true
-  try {
-    console.log('🔄 开始加载学生列表，sessionId:', session.value.id)
-    // 获取所有在线学生（is_active=true）
-    const participants = await classroomSessionService.getParticipants(session.value.id, true)
-    console.log('📥 获取到参与者数据:', participants)
-    
-    // 确保是数组且只包含在线学生
-    const activeParticipants = Array.isArray(participants) 
-      ? participants.filter(p => p.isActive !== false)
-      : []
-    
-    console.log('✅ 过滤后的在线学生:', activeParticipants.length, '人', activeParticipants.map(s => ({
-      id: s.id,
-      name: s.studentName || s.student_name,
-      isActive: s.isActive ?? s.is_active,
-    })))
-    
-    activeStudents.value = activeParticipants
-    
-    // 更新会话统计中的在线学生数
-    if (session.value) {
-      session.value.activeStudents = activeStudents.value.length
-      console.log('📊 更新会话统计，在线学生数:', session.value.activeStudents)
-    }
-  } catch (error: any) {
-    console.error('❌ 加载学生列表失败:', error)
-    console.error('错误详情:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-    })
-    activeStudents.value = []
-  } finally {
-    loadingStudents.value = false
-  }
-}
-
-async function loadStatistics() {
-  if (!session.value) return
-  
-  try {
-    sessionStatistics.value = await classroomSessionService.getStatistics(session.value.id)
-  } catch (error) {
-    console.error('Failed to load statistics:', error)
-  }
-}
+// v2.0: 以下函数已移至 useDataLoader composable
+// function loadParticipants, loadStatistics, loadDbCells, ensureActivityCellExists
+// 现在从 dataLoader 导入
 
 // v2.0: 定时器管理已移至 useDurationTimer composable
 
@@ -987,95 +891,29 @@ watch(() => session.value, (newSession) => {
   }
 }, { immediate: true, deep: true })
 
-// 监听 currentCell 变化，自动加载活动统计
-watch([currentCell, currentActivityDbCell, session], () => {
-  if (currentCell.value && currentCell.value.type === 'activity' && currentActivityDbCell.value && session.value) {
-    loadActivityStatistics()
-  } else {
-    // 如果不是活动模块，清空统计数据
-    activityStatistics.value = {
-      totalStudents: 0,
-      submittedCount: 0,
-      itemStatistics: null,
-    }
-    studentSubmissionStatus.value.clear()
-  }
-}, { immediate: true })
+// v2.0: 监听 currentCell 的逻辑已移至 useDataLoader composable
+// 现在通过 dataLoader.watchCurrentCell() 调用
 
-// 加载数据库中的 Cell 记录
-async function loadDbCells() {
-  try {
-    const { api } = await import('../../services/api')
-    const response = await api.get(`/cells/lesson/${props.lessonId}`)
-    dbCells.value = Array.isArray(response) ? response : ([] as any)
-  } catch (error: any) {
-    console.warn('加载数据库 Cell 记录失败:', error)
-    dbCells.value = []
-  }
-}
-
-// 🆕 确保活动模块的数据库记录存在
-async function ensureActivityCellExists(cell: Cell, order: number): Promise<number | null> {
-  // 如果 dbCells 中已经有匹配的记录，直接返回
-  const existing = dbCells.value.find(dbCell => 
-    dbCell.order === order && 
-    (dbCell.cell_type === 'ACTIVITY' || dbCell.cell_type === 'activity' || dbCell.cell_type?.toUpperCase() === 'ACTIVITY')
-  )
-  if (existing) {
-    return existing.id
-  }
-  
-  // 尝试创建数据库记录
-  try {
-    const { api } = await import('../../services/api')
-    // ActivityCell 有可选的 config 属性
-    const activityCell = cell as ActivityCell
-    const cellCreateData = {
-      lesson_id: props.lessonId,
-      cell_type: 'ACTIVITY',  // 后端使用大写枚举值
-      title: cell.title || '',
-      content: cell.content || {},
-      config: activityCell.config || {},
-      order: order,
-      editable: cell.editable ?? false,
-    }
-    
-    const createResponse = await api.post<{ id: number | string }>('/cells', cellCreateData)
-    const newCell = createResponse
-    
-    if (newCell && newCell.id) {
-      const cellId = typeof newCell.id === 'number' ? newCell.id : parseInt(newCell.id, 10)
-      if (!isNaN(cellId)) {
-        // 添加到 dbCells 数组
-        dbCells.value.push({
-          id: cellId,
-          order: order,
-          cell_type: 'ACTIVITY',
-        })
-        
-        return cellId
-      }
-    }
-  } catch (error: any) {
-    console.error('创建活动模块数据库记录失败:', error)
-  }
-  
-  return null
-}
+// v2.0: 以下函数已移至 useDataLoader composable
+// function loadDbCells, ensureActivityCellExists
+// 现在从 dataLoader 导入
 
 // 初始化
 onMounted(async () => {
   // 静默执行，不输出日志
-  
+
   // 监听浏览器全屏状态变化
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
   document.addEventListener('mozfullscreenchange', handleFullscreenChange)
   document.addEventListener('MSFullscreenChange', handleFullscreenChange)
-  
+
   // 加载数据库 Cell 记录（用于 ID 匹配）
   await loadDbCells()
-  
+
+  // v2.0: 监听 currentCell 变化，自动加载活动统计
+  watchCurrentCell()
+
   // ✅ 重要：不自动加载会话和启动轮询
   // 只有在用户明确点击"创建课堂"或"准备上课"时才加载会话
   // 这样可以避免在非授课模式下不必要的轮询
