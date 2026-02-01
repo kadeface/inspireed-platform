@@ -219,6 +219,7 @@ import { useLessonStore } from '../../store/lesson'
 import type { LessonClassroom } from '../../types/lesson'
 // v2.0: 导入composables
 import { useSessionManager } from './composables/useSessionManager'
+import { usePolling } from './composables/usePolling'
 // v2.0: 导入学生监控工具函数
 import {
   getStudentStatusClass,
@@ -269,9 +270,6 @@ const sessionManager = useSessionManager({
     // 立即加载一次学生列表
     loadParticipants()
     console.log('✅ 初始学生列表加载完成，学生数:', activeStudents.value.length)
-    // 启动轮询（根据会话状态）
-    startPollingIfNeeded()
-    console.log('✅ 已启动轮询，状态:', sessionManager.normalizedSessionStatus.value)
   },
   onSessionStarted: (updatedSession) => {
     // 开始计时
@@ -281,14 +279,23 @@ const sessionManager = useSessionManager({
     }
     // 加载统计信息
     loadStatistics()
-    // 启动轮询
-    startPollingIfNeeded()
   },
   onSessionEnded: () => {
     stopDurationTimer()
-    clearAllPollingIntervals()
+    pollingManager.clearAllPollingIntervals()
     activeStudents.value = []
   },
+})
+
+// v2.0: 使用composables管理轮询
+const pollingManager = usePolling({
+  isComponentVisible: () => containerRef.value?.isConnected ?? false,
+  getSessionStatus: () => sessionManager.normalizedSessionStatus.value,
+  hasSession: () => !!session.value,
+  loadParticipants,
+  loadStatistics,
+  loadActivityStatistics,
+  isCurrentCellActivity: () => currentCell.value?.type === 'activity' && !!currentActivityDbCell.value,
 })
 
 // 从 composable 解构会话相关状态和方法
@@ -1150,7 +1157,7 @@ async function loadParticipants() {
   // 🔧 首先检查组件是否还在 DOM 中（如果被 v-if 隐藏，不应该执行）
   if (!containerRef.value || !containerRef.value.isConnected) {
     console.log('⏸️ loadParticipants: 组件不在 DOM 中，跳过加载并清理轮询')
-    clearAllPollingIntervals()
+    pollingManager.clearAllPollingIntervals()
     return
   }
   
@@ -1254,6 +1261,19 @@ watch(() => session.value?.status, (status, oldStatus) => {
     stopDurationTimer()
   }
 }, { immediate: true })
+
+// v2.0: 监听会话状态变化，自动启动/停止轮询
+watch(() => sessionManager.normalizedSessionStatus.value, (status, oldStatus) => {
+  // 当会话被创建或状态改变时，启动轮询
+  if (status && status !== oldStatus) {
+    pollingManager.startPollingIfNeeded()
+    console.log('✅ 会话状态变化，已启动轮询，新状态:', status)
+  }
+  // 当会话结束时，清理轮询
+  if (status === 'ended' || status === null) {
+    pollingManager.clearAllPollingIntervals()
+  }
+}, { immediate: false })
 
 // 监听 selectedCellIndex 变化，自动滚动到对应模块
 watch(selectedCellIndex, (newIndex, oldIndex) => {
@@ -1405,83 +1425,6 @@ async function ensureActivityCellExists(cell: Cell, order: number): Promise<numb
   return null
 }
 
-// 统一管理所有轮询定时器
-const pollingIntervals = ref<Array<ReturnType<typeof setInterval>>>([])
-
-// 清理所有轮询定时器
-function clearAllPollingIntervals() {
-  pollingIntervals.value.forEach(interval => {
-    clearInterval(interval)
-  })
-  pollingIntervals.value = []
-}
-
-// 启动轮询（只在会话存在且需要时启动）
-function startPollingIfNeeded() {
-  // 🔧 检查组件是否真的可见（通过检查 DOM 元素）
-  // 如果组件被 v-if 隐藏，不应该启动轮询
-  console.log('🔍 startPollingIfNeeded 被调用，检查是否应该启动轮询')
-  
-  // 先清理旧的定时器
-  clearAllPollingIntervals()
-  
-  if (!session.value) {
-    return
-  }
-  
-  // 静默启动轮询
-  
-  // 根据会话状态启动不同的轮询
-  const status = normalizedSessionStatus.value
-  if (status === 'preparing') {
-    // PENDING 状态：只轮询参与者列表（每3秒）
-    const interval = setInterval(() => {
-      // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
-      if (!containerRef.value || !containerRef.value.isConnected) {
-        console.log('🛑 停止轮询：组件不在 DOM 中')
-        clearAllPollingIntervals()
-        return
-      }
-      // 检查会话是否还存在且状态正确
-      const currentStatus = normalizedSessionStatus.value
-      if (!session.value || currentStatus !== 'pending') {
-        clearAllPollingIntervals()
-        return
-      }
-      // 只在有会话时才加载
-      loadParticipants()
-    }, 3000)
-    pollingIntervals.value.push(interval)
-  } else {
-    const currentStatus = normalizedSessionStatus.value
-    if (currentStatus === 'active' || currentStatus === 'paused') {
-      // ACTIVE/PAUSED 状态：轮询参与者列表和统计（每5秒）
-      const interval = setInterval(() => {
-        // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
-        if (!containerRef.value || !containerRef.value.isConnected) {
-          clearAllPollingIntervals()
-          return
-        }
-        // 检查会话是否还存在且状态正确
-        const checkStatus = normalizedSessionStatus.value
-        if (!session.value || (checkStatus !== 'active' && checkStatus !== 'paused')) {
-          clearAllPollingIntervals()
-          return
-        }
-        // 只在有会话时才加载
-        loadParticipants()
-        loadStatistics()
-        // 如果当前是活动模块，也刷新活动统计
-        if (currentCell.value && currentCell.value.type === 'activity' && currentActivityDbCell.value) {
-          loadActivityStatistics()
-        }
-      }, 5000)
-      pollingIntervals.value.push(interval)
-    }
-  }
-  // 其他状态不启动轮询
-}
-
 // 初始化
 onMounted(async () => {
   // 静默执行，不输出日志
@@ -1498,21 +1441,21 @@ onMounted(async () => {
   // ✅ 重要：不自动加载会话和启动轮询
   // 只有在用户明确点击"创建课堂"或"准备上课"时才加载会话
   // 这样可以避免在非授课模式下不必要的轮询
-  
+
   // 确保没有遗留的轮询定时器
-  clearAllPollingIntervals()
+  pollingManager.clearAllPollingIntervals()
 })
 
 // 组件卸载前清理
 onBeforeUnmount(() => {
-  clearAllPollingIntervals()
+  pollingManager.clearAllPollingIntervals()
 })
 
 onUnmounted(() => {
   stopDurationTimer()
-  
+
   // 清理所有轮询定时器（双重保险）
-  clearAllPollingIntervals()
+  pollingManager.clearAllPollingIntervals()
   
   // 移除全屏状态监听器
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
