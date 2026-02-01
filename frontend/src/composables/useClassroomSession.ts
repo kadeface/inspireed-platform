@@ -1,5 +1,10 @@
 /**
  * 课堂会话 Composable（学生端）
+ *
+ * v2.0 更新：
+ * - 移除 PAUSED 状态相关逻辑
+ * - 使用状态映射工具处理大写/小写状态
+ * - 简化状态比较逻辑
  */
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
@@ -10,6 +15,7 @@ import { getAuthToken } from '../utils/auth'
 import { useUserStore } from '../store/user'
 import type { ClassSession, StudentParticipation } from '../types/classroomSession'
 import logger from '../utils/logger'
+import { normalizeSessionStatus, isSessionActive } from '../utils/sessionStatus'
 
 export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mode: 'fullscreen' | 'window') => void) {
   const route = useRoute()
@@ -17,8 +23,9 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
   const participation = ref<StudentParticipation | null>(null)
   const currentCellId = ref<number | null>(null)
   const isInClassroomMode = computed(() => {
-    // 在 PENDING 和 ACTIVE 状态下都认为是课堂模式
-    return session.value?.status === 'ACTIVE' || session.value?.status === 'PENDING'
+    // v2.0: 在 PREPARING 和 TEACHING 状态下都认为是课堂模式
+    if (!session.value?.status) return false
+    return isSessionActive(session.value.status)
   })
   
   // 轮询定时器（用于定期获取会话状态）- 降级方案
@@ -38,22 +45,26 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
     
     try {
       console.log(`🔍 [${retryCount + 1}/3] 开始查找会话，lessonId: ${lessonId}`)
-      
-      // 🆕 获取该教案的所有会话（包括 pending 和 active 状态）
-      // 先尝试查找 ACTIVE 状态的会话
-      let sessions = await classroomSessionService.listSessions(lessonId, 'ACTIVE')
-      console.log(`📋 找到 ${sessions.length} 个 ACTIVE 状态的会话`)
 
-      // 如果没有 ACTIVE 状态的会话，尝试查找 PENDING 状态的会话
+      // v2.0: 获取该教案的所有会话（包括 preparing 和 teaching 状态）
+      // 先尝试查找 TEACHING 状态的会话
+      let sessions = await classroomSessionService.listSessions(lessonId, 'TEACHING')
+      console.log(`📋 找到 ${sessions.length} 个 TEACHING 状态的会话`)
+
+      // 如果没有 TEACHING 状态的会话，尝试查找 PREPARING 状态的会话
       if (sessions.length === 0) {
         const allSessions = await classroomSessionService.listSessions(lessonId)
         console.log(`📋 找到 ${allSessions.length} 个所有状态的会话`)
-        sessions = allSessions.filter(s => s.status === 'PENDING' || s.status === 'ACTIVE')
-        console.log(`📋 过滤后找到 ${sessions.length} 个 PENDING 或 ACTIVE 状态的会话`)
+        // v2.0: 使用状态映射工具比较，兼容大写和小写
+        sessions = allSessions.filter(s => {
+          const normalized = normalizeSessionStatus(s.status)
+          return normalized === 'preparing' || normalized === 'teaching'
+        })
+        console.log(`📋 过滤后找到 ${sessions.length} 个 PREPARING 或 TEACHING 状态的会话`)
       }
-      
+
       if (sessions.length > 0) {
-        // 🆕 按创建时间或ID排序，选择最新的会话（避免加入旧会话）
+        // 按创建时间或ID排序，选择最新的会话（避免加入旧会话）
         const sortedSessions = sessions.sort((a, b) => {
           // 优先按 ID 降序排序（ID越大越新）
           if (a.id && b.id) {
@@ -65,19 +76,23 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
           }
           return 0
         })
-        
-        // 找到最新的可加入会话（优先 ACTIVE，其次 PENDING）
-        const activeSession = sortedSessions.find(s => s.status === 'ACTIVE') || sortedSessions[0]
-        
+
+        // v2.0: 找到最新的可加入会话（优先 TEACHING，其次 PREPARING）
+        const activeSession = sortedSessions.find(s => {
+          const normalized = normalizeSessionStatus(s.status)
+          return normalized === 'teaching'
+        }) || sortedSessions[0]
+
         console.log('🔍 会话选择:', {
           totalSessions: sessions.length,
           selectedSessionId: activeSession.id,
           selectedStatus: activeSession.status,
           allSessionIds: sortedSessions.map(s => ({ id: s.id, status: s.status }))
         })
-        
-        // 🆕 检查会话状态
-        if (activeSession.status === 'ended') {
+
+        // v2.0: 检查会话状态（使用状态映射工具）
+        const normalizedStatus = normalizeSessionStatus(activeSession.status)
+        if (normalizedStatus === 'ended') {
           console.warn('⚠️ 会话已结束，无法加入')
           return null
         }
@@ -658,28 +673,30 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
    * 是否有可显示的内容
    * 在课堂模式下，如果教师还未切换到任何Cell，则没有内容可显示
    * 支持新方式（display_cell_orders）和旧方式（display_cell_ids）
-   * 在 PENDING 状态下，学生不能看到内容（等待教师开始上课）
+   * v2.0: 在 PREPARING 状态下，学生不能看到内容（等待教师开始上课）
    */
   const hasDisplayableContent = computed(() => {
     if (!isInClassroomMode.value) {
       return true  // 非课堂模式，显示所有内容
     }
-    
-    // 🆕 PENDING 状态下，学生不能看到内容
-    if (session.value?.status === 'PENDING') {
+
+    // v2.0: PREPARING 状态下，学生不能看到内容
+    const normalized = normalizeSessionStatus(session.value?.status || 'ended')
+    if (normalized === 'preparing') {
       return false
     }
 
     const settings = session.value?.settings
 
-    // 🆕 优先检查新方式：display_cell_orders
+    // 优先检查新方式：display_cell_orders
     const displayOrders = settings?.display_cell_orders
     if (displayOrders && Array.isArray(displayOrders)) {
-      // 🆕 修复：即使是空数组，在 ACTIVE/PAUSED 状态下也认为"有内容可显示"
-      // 因为这可能只是教师暂时取消了所有选择，而不是课程未开始
-      // 空数组会导致 filteredCells 为空，页面会显示空状态提示而不是"等待教师切换"
-      if (session.value?.status === 'ACTIVE' || session.value?.status === 'PAUSED') {
-        return true  // ACTIVE/PAUSED 状态下，认为"有内容可显示"（即使是空数组）
+      // v2.0: 移除PAUSED状态，只检查TEACHING状态
+      const currentStatus = normalizeSessionStatus(session.value?.status || 'ended')
+      // 在 TEACHING 状态下，即使display_cell_orders为空也认为"有内容可显示"
+      // v2.0: 移除PAUSED状态，只在TEACHING状态下认为"有内容可显示"
+      if (currentStatus === 'teaching') {
+        return true  // TEACHING 状态下，认为"有内容可显示"（即使是空数组）
       }
       // 在其他状态下，空数组表示没有内容
       return displayOrders.length > 0
