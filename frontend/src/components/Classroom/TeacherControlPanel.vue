@@ -77,7 +77,7 @@
         </button>
         
         <!-- PENDING 状态：等待学生登录 -->
-        <template v-if="session && session.status === 'PENDING'">
+        <template v-if="session && session.status === 'PREPARING'">
           <button 
             @click="handleBeginClass"
             :disabled="loading || activeStudents.length === 0"
@@ -99,7 +99,7 @@
         </template>
         
         <!-- ACTIVE 状态：上课中 -->
-        <template v-if="session && (session.status === 'active' || session.status === 'ACTIVE')">
+        <template v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')">
           <!-- 显示模式切换按钮 -->
           <div class="display-mode-controls">
             <button 
@@ -135,7 +135,7 @@
         </template>
         
         <!-- PAUSED 状态：已暂停 -->
-        <template v-if="session && (session.status === 'paused' || session.status === 'PAUSED')">
+        <template v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')">
           <!-- 显示模式切换按钮 -->
           <div class="display-mode-controls">
             <button 
@@ -175,7 +175,7 @@
     
     <!-- PENDING 状态：等待学生加入提示区域 -->
     <div
-      v-if="session && session.status === 'PENDING'"
+      v-if="session && session.status === 'PREPARING'"
       class="waiting-students-banner"
     >
       <div class="waiting-banner-content">
@@ -2170,7 +2170,7 @@ function stopDurationTimer() {
 
 // 监听session状态变化，自动启动/停止计时器
 watch(() => session.value?.status, (status, oldStatus) => {
-  if (status === 'active') {
+  if (status === 'teaching') {
     // 当状态变为 active 时，启动计时器
     if (!durationInterval.value) {
       // 如果计时器还没有启动
@@ -2181,7 +2181,7 @@ watch(() => session.value?.status, (status, oldStatus) => {
       }
       startDurationTimer()
     }
-  } else if (status === 'paused') {
+  } else if (status === 'teaching') {
     // 当状态变为 paused 时，停止计时器（但保持当前时长）
     stopDurationTimer()
   } else if (status === 'ended') {
@@ -2371,7 +2371,7 @@ function startPollingIfNeeded() {
   
   // 根据会话状态启动不同的轮询
   const status = normalizedSessionStatus.value
-  if (status === 'pending') {
+  if (status === 'preparing') {
     // PENDING 状态：只轮询参与者列表（每3秒）
     const interval = setInterval(() => {
       // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
