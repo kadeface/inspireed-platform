@@ -223,6 +223,7 @@ import { usePolling } from './composables/usePolling'
 import { useDurationTimer } from './composables/useDurationTimer'
 import { useNavigation } from './composables/useNavigation'
 import { useDataLoader } from './composables/useDataLoader'
+import { useFullscreen } from './composables/useFullscreen'
 // v2.0: 导入学生监控工具函数
 import {
   getStudentStatusClass,
@@ -343,6 +344,19 @@ const {
   watchCurrentCell,
 } = dataLoader
 
+// v2.0: 使用composables管理全屏控制
+const fullscreenManager = useFullscreen()
+
+// 从 fullscreenManager 解构全屏相关状态和方法
+const {
+  modulePanelFullscreen,
+  isPanelFullscreen,
+  toggleModulePanelFullscreen,
+  togglePanelFullscreen,
+  setupFullscreenListeners,
+  cleanupFullscreenListeners,
+} = fullscreenManager
+
 // v2.0: 使用composables管理导航（需要在 dataLoader 之后，因为它依赖 dataLoader 的函数）
 const navigationManager = useNavigation({
   session,
@@ -415,8 +429,9 @@ watch(session, (newSession) => {
 const isMultiSelectMode = ref(false) // 多选模式：false=单选，true=多选
 const selectedCellIndex = ref(-1)  // -1表示隐藏所有内容
 const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录（用于 ID 匹配）
-const modulePanelFullscreen = ref(false)  // 模块面板全屏状态
-const isPanelFullscreen = ref(false)  // 整个导播台全屏状态
+// v2.0: 以下状态已移至 useFullscreen composable
+// const modulePanelFullscreen, const isPanelFullscreen
+// 现在从 fullscreenManager 导入
 
 // v2.0: 从 durationTimer composable 获取 sessionDuration
 const { sessionDuration } = durationTimer
@@ -694,81 +709,9 @@ function scrollToQuestions() {
 // function getCodePreview(cell): string
 // function handleThumbnailError(event): void
 
-// 切换模块面板全屏
-function toggleModulePanelFullscreen() {
-  modulePanelFullscreen.value = !modulePanelFullscreen.value
-}
-
-// 切换整个导播台全屏
-async function togglePanelFullscreen() {
-  if (!isPanelFullscreen.value) {
-    // 进入全屏
-    try {
-      const element = document.documentElement
-      if (element.requestFullscreen) {
-        await element.requestFullscreen()
-      } else if ((element as any).webkitRequestFullscreen) {
-        await (element as any).webkitRequestFullscreen()
-      } else if ((element as any).mozRequestFullScreen) {
-        await (element as any).mozRequestFullScreen()
-      } else if ((element as any).msRequestFullscreen) {
-        await (element as any).msRequestFullscreen()
-      }
-      isPanelFullscreen.value = true
-    } catch (error: any) {
-      console.error('进入全屏失败:', error)
-      // 如果浏览器全屏失败，使用CSS全屏模式
-      isPanelFullscreen.value = true
-    }
-  } else {
-    // 退出全屏
-    try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen()
-      } else if ((document as any).webkitExitFullscreen) {
-        await (document as any).webkitExitFullscreen()
-      } else if ((document as any).mozCancelFullScreen) {
-        await (document as any).mozCancelFullScreen()
-      } else if ((document as any).msExitFullscreen) {
-        await (document as any).msExitFullscreen()
-      }
-      isPanelFullscreen.value = false
-    } catch (error: any) {
-      console.error('退出全屏失败:', error)
-      isPanelFullscreen.value = false
-    }
-  }
-}
-
-// 监听浏览器全屏状态变化
-function handleFullscreenChange() {
-  const isCurrentlyFullscreen = !!(
-    document.fullscreenElement ||
-    (document as any).webkitFullscreenElement ||
-    (document as any).mozFullScreenElement ||
-    (document as any).msFullscreenElement
-  )
-  
-  if (!isCurrentlyFullscreen && isPanelFullscreen.value) {
-    isPanelFullscreen.value = false
-  }
-}
-
-
-// 会话操作
-// v2.0: 以下方法已移至 useSessionManager composable
-// - handleCreateSession (创建会话)
-// - handleClassroomSelectConfirm (确认班级选择)
-// - handleClassroomSelectCancel (取消班级选择)
-// - createSessionWithClassroom (使用指定班级创建会话)
-// - handleBeginClass (开始上课)
-// - handleCancelSession (取消课堂)
-// - handlePause (暂停会话)
-// - handleResume (继续会话)
-// - handleToggleDisplayMode (切换显示模式)
-// - handleEnd (结束会话)
-// - handleStartActivity (开始活动)
-// - handleEndActivity (结束活动)
+// v2.0: 以下函数已移至 useFullscreen composable
+// function toggleModulePanelFullscreen, togglePanelFullscreen, handleFullscreenChange
+// 现在从 fullscreenManager 导入
 
 // 切换选择模式（单选/多选）
 async function toggleSelectionMode() {
@@ -902,11 +845,8 @@ watch(() => session.value, (newSession) => {
 onMounted(async () => {
   // 静默执行，不输出日志
 
-  // 监听浏览器全屏状态变化
-  document.addEventListener('fullscreenchange', handleFullscreenChange)
-  document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
-  document.addEventListener('mozfullscreenchange', handleFullscreenChange)
-  document.addEventListener('MSFullscreenChange', handleFullscreenChange)
+  // v2.0: 设置全屏监听器
+  setupFullscreenListeners()
 
   // 加载数据库 Cell 记录（用于 ID 匹配）
   await loadDbCells()
@@ -933,12 +873,9 @@ onUnmounted(() => {
 
   // 清理所有轮询定时器（双重保险）
   pollingManager.clearAllPollingIntervals()
-  
-  // 移除全屏状态监听器
-  document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
-  document.removeEventListener('mozfullscreenchange', handleFullscreenChange)
-  document.removeEventListener('MSFullscreenChange', handleFullscreenChange)
+
+  // v2.0: 清理全屏监听器
+  cleanupFullscreenListeners()
 })
 
 // 🔧 暴露 session 给父组件（LessonEditor）使用
