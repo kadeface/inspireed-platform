@@ -228,6 +228,21 @@ import {
   hasAlerts as checkHasAlerts,
   checkLowSubmissionRate
 } from './studentMonitoring'
+// v2.0: 导入Cell工具函数
+import {
+  getCellTypeLabel,
+  getCellTypeEmoji,
+  isModuleActive,
+  isModuleActivityActive,
+  getModuleTooltip,
+  getCurrentModuleIndex,
+  getCellByOrder,
+  getTextPreview,
+  getCodePreview,
+  handleThumbnailError,
+  setModuleItemRef,
+  scrollToSelectedModule
+} from './cellUtils'
 
 interface Props {
   lessonId: number
@@ -503,104 +518,48 @@ const currentActivityDbCell = computed(() => {
 })
 
 
+// v2.0: Cell工具函数已移至 cellUtils.ts
+// getCellId, getCellTypeLabel, getCellTypeEmoji, isModuleActive, isModuleActivityActive,
+// getModuleTooltip, getCurrentModuleIndex, getCellByOrder, getTextPreview, getCodePreview,
+// handleThumbnailError, setModuleItemRef, scrollToSelectedModule
+// 现在从工具文件导入
+
 // 方法
 // 使用工具函数获取 Cell ID（保留此函数名以兼容现有代码）
 function getCellId(cell: Cell): number | string | null {
   return getCellIdUtil(cell)
 }
 
-function getCellTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    text: '文本',
-    code: '代码',
-    activity: '活动',
-    video: '视频',
-    flowchart: '流程图',
-    qa: '问答',
-  }
-  return labels[type] || type
+// v2.0: 以下函数已移至 cellUtils.ts
+// function getCellTypeLabel(type: string): string
+// function getCellTypeEmoji(type: string): string
+// function isModuleActiveWrapper(cell, index): boolean
+// function isModuleActivityActive(cell, index): boolean
+// function setModuleItemRef(el, index): void
+// function scrollToSelectedModuleWrapper(): void
+// function getModuleTooltip(cell, index): string
+// function getCurrentModuleIndex(): number
+// function getCellByOrder(order): Cell | null
+// function getTextPreview(cell, maxLength): string
+// function getCodePreview(cell): string
+// function handleThumbnailError(event): void
+
+// v2.0: 包装函数 - 调用cellUtils中的工具函数
+function isModuleActiveWrapper(cell: Cell, index: number): boolean {
+  return isModuleActive(cell, index, session.value, displayCellOrders.value, selectedCellIndex.value)
 }
 
-function getCellTypeEmoji(type: string): string {
-  const emojis: Record<string, string> = {
-    text: '📄',
-    code: '💻',
-    activity: '📝',
-    video: '📹',
-    flowchart: '📊',
-    qa: '❓',
-  }
-  return emojis[type] || '📦'
+function isModuleActivityActiveWrapper(cell: Cell, index: number): boolean {
+  return isModuleActivityActive(cell, index, session.value)
 }
 
-// 判断模块是否激活
-function isModuleActive(cell: Cell, index: number): boolean {
-  if (!session.value) return false
-  
-  // 多选模式：优先使用 displayCellOrders
-  if (displayCellOrders.value !== undefined && Array.isArray(displayCellOrders.value)) {
-    const cellOrder = cell.order !== undefined ? cell.order : index
-    return displayCellOrders.value.includes(cellOrder)
-  }
-  
-  // 单选模式：使用 current_cell_id 或 selectedCellIndex
-  if (selectedCellIndex.value >= 0 && selectedCellIndex.value === index) {
-    return true
-  }
-  
-  const currentId = session.value.current_cell_id
-  if (!currentId || currentId === 0) return false
-  
-  const cellId = getCellId(cell)
-  if (typeof cellId === 'number' && cellId === currentId) return true
-  if (typeof cellId === 'string') {
-    const numId = parseInt(cellId)
-    if (!isNaN(numId) && numId === currentId) return true
-  }
-  
-  return false
+function getModuleTooltipWrapper(cell: Cell, index: number): string {
+  const isActive = isModuleActiveWrapper(cell, index)
+  return getModuleTooltip(cell, index, isActive)
 }
 
-// 判断活动模块是否激活
-function isModuleActivityActive(cell: Cell, index: number): boolean {
-  if (cell.type !== 'activity') return false
-  if (!session.value?.current_activity_id) return false
-  
-  const cellId = getCellId(cell)
-  if (typeof cellId === 'number' && cellId === session.value.current_activity_id) return true
-  if (typeof cellId === 'string') {
-    const numId = parseInt(cellId)
-    if (!isNaN(numId) && numId === session.value.current_activity_id) return true
-  }
-  return false
-}
-
-// 设置模块项引用
-function setModuleItemRef(el: any, index: number) {
-  if (el) {
-    // 处理 Vue 组件实例
-    const element = (el as any).$el || el
-    if (element instanceof HTMLElement) {
-      moduleItemRefs.value.set(index, element)
-    }
-  } else {
-    moduleItemRefs.value.delete(index)
-  }
-}
-
-// 滚动到选中的模块
-function scrollToSelectedModule() {
-  if (selectedCellIndex.value < 0 || !moduleListRef.value) return
-  
-  const moduleElement = moduleItemRefs.value.get(selectedCellIndex.value)
-  if (moduleElement) {
-    // 使用平滑滚动，将模块滚动到视口中心
-    moduleElement.scrollIntoView({ 
-      behavior: 'smooth', 
-      block: 'center',
-      inline: 'nearest'
-    })
-  }
+function scrollToSelectedModuleWrapper() {
+  scrollToSelectedModule(moduleListRef, moduleItemRefs.value, selectedCellIndex.value)
 }
 
 // 处理模块项点击
@@ -655,7 +614,7 @@ function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
     return
   }
   
-  const isCurrentlyActive = isModuleActive(cell, index)
+  const isCurrentlyActive = isModuleActiveWrapper(cell, index)
   const cellId = getCellId(cell)
   const cellOrder = cell.order !== undefined ? cell.order : index
   
@@ -724,24 +683,10 @@ function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
 }
 
 // 获取模块提示信息
-function getModuleTooltip(cell: Cell, index: number): string {
-  const typeLabel = getCellTypeLabel(cell.type)
-  const title = cell.title || `模块 ${index + 1}`
-  const isActiveCell = isModuleActive(cell, index)
-  const status = isActiveCell ? ' (已选中)' : ''
-  return `${index + 1}. ${title} - ${typeLabel}${status}`
-}
+// v2.0: 已移至 cellUtils.ts as getModuleTooltip
 
 // 获取当前模块索引
-function getCurrentModuleIndex(): number {
-  if (!lessonContentCells.value.length || !currentCell.value) return -1
-  return lessonContentCells.value.findIndex(cell => {
-    const cellId = getCellId(cell)
-    const currentId = session.value?.current_cell_id
-    if (!currentId) return false
-    return cellId === currentId || (typeof cellId === 'string' && parseInt(cellId) === currentId)
-  })
-}
+// v2.0: 已移至 cellUtils.ts as getCurrentModuleIndex
 
 // 计算进度落后学生数量（进度 < 50%）
 const studentsBehindCount = computed(() => {
@@ -832,69 +777,16 @@ async function loadActivityStatistics() {
   }
 }
 
-// 滚动到落后学生区域
-function scrollToStudentsBehind() {
-  // 实现滚动逻辑，可以给落后学生添加特殊标记
-  const element = document.querySelector('.students-behind-section')
-  if (element) {
-    element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }
-}
-
 // 滚动到提问区域
 function scrollToQuestions() {
   // TODO: 实现滚动到提问列表的逻辑
 }
 
-// 根据 order 获取 Cell
-function getCellByOrder(order: number): Cell | null {
-  if (!lessonContentCells.value.length) return null
-  return lessonContentCells.value.find((cell, index) => {
-    const cellOrder = cell.order !== undefined ? cell.order : index
-    return cellOrder === order
-  }) || null
-}
-
-// 获取文本预览（去除HTML标签，截取前N字符）
-function getTextPreview(cell: Cell, maxLength: number = 100): string {
-  if (cell.type !== 'text') return ''
-  const content = (cell as any).content
-  if (!content?.html) return '文本内容'
-  
-  // 去除HTML标签
-  const text = content.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-  return text.slice(0, maxLength) + (text.length > maxLength ? '...' : '')
-}
-
-// 获取代码预览（截取前50行）
-function getCodePreview(cell: Cell): string {
-  if (cell.type !== 'code') return ''
-  const content = (cell as any).content
-  if (!content?.code) return '// 代码内容'
-  
-  const lines = content.code.split('\n')
-  return lines.slice(0, 10).join('\n') + (lines.length > 10 ? '\n...' : '')
-}
-
-// 处理缩略图加载错误
-function handleThumbnailError(event: Event) {
-  const img = event.target as HTMLImageElement
-  if (img) {
-    img.style.display = 'none'
-    // 显示默认图标
-    const parent = img.parentElement
-    if (parent && !parent.querySelector('.preview-thumbnail-content')) {
-      const content = document.createElement('div')
-      content.className = 'preview-thumbnail-content'
-      content.innerHTML = `
-        <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-      `
-      parent.appendChild(content)
-    }
-  }
-}
+// v2.0: 以下函数已移至 cellUtils.ts
+// function getCellByOrder(order): Cell | null
+// function getTextPreview(cell, maxLength): string
+// function getCodePreview(cell): string
+// function handleThumbnailError(event): void
 
 // 切换模块面板全屏
 function toggleModulePanelFullscreen() {
@@ -1653,7 +1545,7 @@ async function handleControlBoardNavigate(
     // 使用 nextTick 确保 DOM 已更新
     await nextTick()
     setTimeout(() => {
-      scrollToSelectedModule()
+      scrollToSelectedModuleWrapper()
     }, 100)
   } catch (error: any) {
     console.error('Failed to navigate from control board:', error)
@@ -1780,7 +1672,7 @@ watch(selectedCellIndex, (newIndex, oldIndex) => {
     // 延迟滚动，确保 DOM 已更新
     nextTick(() => {
       setTimeout(() => {
-        scrollToSelectedModule()
+        scrollToSelectedModuleWrapper()
       }, 150)
     })
   }
