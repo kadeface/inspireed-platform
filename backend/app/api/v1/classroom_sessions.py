@@ -354,7 +354,8 @@ async def create_class_session(
             and_(
                 ClassSession.lesson_id == lesson_id,
                 ClassSession.classroom_id == data.classroom_id,
-                ClassSession.status.in_([ClassSessionStatus.PREPARING, ClassSessionStatus.TEACHING, ClassSessionStatus.PAUSED]),
+                # v2.0: 移除PAUSED状态，只检查PREPARING和TEACHING
+                ClassSession.status.in_([ClassSessionStatus.PREPARING, ClassSessionStatus.TEACHING]),
             )
         )
     )
@@ -1381,65 +1382,10 @@ from app.services.websocket_manager import manager
 
 # ========== 会话清理和检查 ==========
 
-
-@router.post("/sessions/{session_id}/check-teacher-status")
-async def check_teacher_status(
-    session_id: int,
-    db: AsyncSession = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
-) -> Any:
-    """
-    检查会话的教师连接状态（用于定期检查）
-    如果没有教师连接且会话处于活跃状态，自动结束会话
-    """
-    
-    session = await db.get(ClassSession, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="会话不存在")
-    
-    # 权限检查：教师可以检查自己的会话，管理员可以检查所有会话
-    current_role = cast(UserRole, current_user.role)
-    session_teacher_id = cast(int, session.teacher_id)
-    current_user_id = cast(int, current_user.id)
-    
-    if current_role == UserRole.TEACHER and session_teacher_id != current_user_id:
-        raise HTTPException(status_code=403, detail="无权访问该会话")
-    
-    # 如果会话已结束，直接返回
-    if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
-        return {
-            "session_id": session_id,
-            "status": "ended",
-            "has_teacher_connection": False,
-            "message": "会话已结束"
-        }
-    
-    # 检查是否有教师连接
-    has_teacher = manager.has_teacher_connection("session", session_id)
-    
-    # 🚫 已禁用自动结束逻辑：教师应该主动点击"结束授课"按钮来结束会话
-    # WebSocket 断开不等于教师离开（可能是网络波动、页面刷新等）
-    # 过于激进的自动结束会导致误操作和用户体验问题
-    
-    # 🔍 仅检查和返回状态，不自动结束会话
-    if not has_teacher and session.status in [ClassSessionStatus.TEACHING, ClassSessionStatus.PAUSED]:  # type: ignore[comparison-overlap]
-        print(f"⚠️ 会话 {session_id} 当前没有教师 WebSocket 连接（状态：{session.status}），但不会自动结束")
-        # 返回警告状态，但不结束会话
-        return {
-            "session_id": session_id,
-            "status": session.status,
-            "has_teacher_connection": False,
-            "warning": True,
-            "message": "会话正常运行，但教师 WebSocket 未连接"
-        }
-    
-    return {
-        "session_id": session_id,
-        "status": session.status,
-        "has_teacher_connection": has_teacher,
-        "message": "会话状态正常" if has_teacher else "会话正常但无教师连接"
-    }
-
+# 🚫 v2.0: 移除HTTP轮询端点 check-teacher-status
+# v2.0 采用纯WebSocket通信，不需要HTTP轮询降级
+# 教师连接状态通过WebSocket实时获取，无需定期HTTP检查
+# 原 check_teacher_status 函数已删除（line 1385-1441, 共57行）
 
 @router.websocket("/sessions/{session_id}/ws")
 async def websocket_endpoint(
@@ -1449,111 +1395,61 @@ async def websocket_endpoint(
     db: AsyncSession = Depends(deps.get_db),
 ):
     """
-    WebSocket 连接端点
-    
+    WebSocket 连接端点（学生端）
+
     连接URL: ws://api/v1/classroom-sessions/sessions/{session_id}/ws?token={jwt}
     """
-    
-    print(f"🔌 WebSocket连接请求: session_id={session_id}, token_length={len(token) if token else 0}")
-    
-    # 🆕 手动处理 WebSocket CORS（CORSMiddleware 对 WebSocket 支持有限）
-    origin = websocket.headers.get("origin")
-    print(f"🔍 WebSocket Origin: {origin}")
-    
-    # 验证 Origin（允许局域网访问和 Cloud Studio 域名）
-    allowed = False
-    if origin:
-        import re
-        # 匹配 localhost、局域网 IP 和 Cloud Studio 域名
-        # Cloud Studio URL 格式：https://{id}--{port}.{region}.cloudstudio.club
-        pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
-        if re.match(pattern, origin):
-            allowed = True
-            print(f"✅ Origin 验证通过: {origin}")
-        else:
-            print(f"❌ Origin 验证失败: {origin}")
-    else:
-        # 如果没有 Origin 头（某些客户端可能不发送），也允许连接
-        allowed = True
-        print("⚠️ 没有 Origin 头，允许连接")
-    
-    # 先接受连接（必须先accept才能close并发送关闭原因）
+
+    logger.info(f"🔌 学生WebSocket连接请求: session_id={session_id}")
+
+    # 初始化 student_id 避免未绑定错误
+    student_id: Optional[int] = None
+
+    # 先接受连接
     await websocket.accept()
-    
-    # 如果 CORS 验证失败，立即关闭连接
-    if not allowed:
-        print(f"❌ CORS 验证失败，关闭 WebSocket 连接")
+
+    # 使用辅助函数验证Origin
+    if not await validate_websocket_origin(websocket):
         await websocket.close(code=1008, reason="CORS validation failed")
         return
-    
-    # 🆕 初始化 student_id 避免未绑定错误
-    student_id: Optional[int] = None
-    
+
     try:
-        # 1. 验证Token并获取用户信息
-        try:
-            current_user = await deps.get_current_user_from_token(token, db)
-            if not current_user:
-                print(f"❌ Token验证失败: 用户不存在")
-                await websocket.close(code=1008, reason="Invalid token")
-                return
-            print(f"✅ Token验证成功: user_id={current_user.id}, role={current_user.role}")
-        except Exception as e:
-            print(f"❌ Token验证异常: {str(e)}")
-            await websocket.close(code=1008, reason=f"Auth failed: {str(e)}")
+        # 使用辅助函数验证Token并获取用户信息
+        current_user = await authenticate_websocket_token(token, db)
+        if not current_user:
+            await websocket.close(code=1008, reason="Invalid token")
             return
-        
-        # 2. 验证用户角色（只允许学生连接，教师端使用HTTP API）
-        current_role = cast(UserRole, current_user.role)
-        if current_role != UserRole.STUDENT:
-            print(f"❌ 角色验证失败: 只允许学生连接，当前角色={current_role}")
-            await websocket.close(code=1008, reason="Only students can connect via WebSocket")
-            return
-        
-        # 3. 验证会话存在性和权限
+
+        # 验证会话存在性
         session = await db.get(ClassSession, session_id)
         if not session:
-            print(f"❌ 会话不存在: session_id={session_id}")
+            logger.error(f"❌ 会话不存在: session_id={session_id}")
             await websocket.close(code=1008, reason="Session not found")
             return
-        
-        # 🆕 检查会话状态
-        if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
-            print(f"❌ 会话已结束: session_id={session_id}, status={session.status}")
-            await websocket.close(code=1008, reason="Session has ended")
+
+        # 使用辅助函数验证学生访问权限（角色 + 状态 + 班级权限）
+        if not await validate_student_websocket_access(current_user, session, db):
+            await websocket.close(code=1008, reason="Access denied")
             return
-        
-        # 🆕 使用统一函数验证学生属于该班级
-        classroom_id = cast(int, session.classroom_id)
-        has_access = await check_user_in_classroom(db, current_user, classroom_id)
-        
-        if not has_access:
-            print(f"❌ 权限验证失败: session_classroom_id={classroom_id}")
-            await websocket.close(code=1008, reason="Access denied: Student does not belong to this classroom")
-            return
-        
-        print(f"✅ 所有验证通过，开始建立连接: session_id={session_id}, student_id={current_user.id}")
+
         student_id = cast(int, current_user.id)
-        
-        # 5. 注册连接
+        logger.info(f"✅ 学生验证通过: user_id={student_id}, session_id={session_id}")
+
+        # 注册连接
         await manager.connect(websocket, session_id, student_id)
-        print(f"✅ 连接已注册到管理器: session_id={session_id}, student_id={student_id}")
-        
-        # 6. 发送初始状态（当前会话状态）
+        logger.info(f"✅ 连接已注册: session_id={session_id}, student_id={student_id}")
+
+        # 发送初始状态
         await send_initial_state(websocket, session, db)
-        print(f"✅ 初始状态已发送: session_id={session_id}")
-        
-        # 7. 更新学生在线状态（数据库）
+
+        # 更新学生在线状态
         await update_student_online_status(db, session_id, student_id, is_online=True)
-        print(f"✅ 学生在线状态已更新: session_id={session_id}, student_id={student_id}")
-        
-        # 8. 监听客户端消息
+
+        # 监听客户端消息
         while True:
-            # 接收文本消息
             data = await websocket.receive_text()
             message = json.loads(data)
-            
-            # 处理不同类型的消息
+
             await handle_client_message(
                 message=message,
                 session_id=session_id,
@@ -1561,59 +1457,22 @@ async def websocket_endpoint(
                 websocket=websocket,
                 db=db,
             )
-    
+
     except WebSocketDisconnect:
-        # 客户端主动断开
-        print(f"🔌 学生断开连接（会话 {session_id}），student_id={student_id if student_id else 'unknown'}")
-    
+        logger.info(f"🔌 学生断开连接: session_id={session_id}, student_id={student_id}")
     except Exception as e:
-        # 异常断开
+        logger.error(f"❌ WebSocket异常: {str(e)}")
         import traceback
-        print(f"❌ WebSocket异常: {str(e)}")
-        print(traceback.format_exc())
-    
+        traceback.print_exc()
     finally:
-        # 9. 清理：移除连接、更新状态
-        # 🆕 修复：确保 student_id 已定义再使用
+        # 清理连接
         if student_id is not None:
             try:
                 await manager.disconnect(session_id, student_id)
                 await update_student_online_status(db, session_id, student_id, is_online=False)
-                print(f"✅ 学生 {student_id} 连接已清理（会话 {session_id}）")
+                logger.info(f"✅ 连接已清理: session_id={session_id}, student_id={student_id}")
             except Exception as e:
-                print(f"⚠️ 清理连接时出错: {str(e)}")
-
-
-async def send_initial_state(websocket: WebSocket, session: ClassSession, db: AsyncSession):
-    """发送初始状态给新连接的客户端"""
-    
-    # 确保 Lesson 已导入（防止作用域问题）
-    from app.models.lesson import Lesson
-    
-    # 加载关联信息（教师、课程、班级）
-    session_lesson = await db.get(Lesson, cast(int, session.lesson_id))
-    session_teacher = await db.get(User, cast(int, session.teacher_id))
-    session_classroom = await db.get(Classroom, cast(int, session.classroom_id))
-    
-    message = {
-        "type": "connected",
-        "timestamp": datetime.utcnow().isoformat(),
-        "data": {
-            "session_id": session.id,
-            "current_state": {
-                "status": session.status.value if hasattr(session.status, 'value') else str(session.status),
-                "display_cell_orders": (session.settings or {}).get("display_cell_orders", []),
-                "current_cell_id": session.current_cell_id,
-                "current_activity_id": session.current_activity_id,
-                # 🆕 添加教师和课程信息
-                "teacher_name": session_teacher.full_name or session_teacher.username if session_teacher else None,
-                "lesson_title": session_lesson.title if session_lesson else None,
-                "classroom_name": session_classroom.name if session_classroom else None,
-            }
-        }
-    }
-    
-    await websocket.send_text(json.dumps(message))
+                logger.error(f"⚠️ 清理连接时出错: {str(e)}")
 
 
 async def handle_client_message(
@@ -1719,228 +1578,138 @@ async def websocket_teacher_session_endpoint(
 ):
     """
     教师端 WebSocket 连接端点（课堂模式）
-    
+
     连接URL: ws://api/v1/classroom-sessions/sessions/{session_id}/ws/teacher?token={jwt}
-    
+
     用于接收课堂实时通知：
     - 学生提交活动
     - 提交统计更新
     - 学生答题进度
     """
-    
-    # 🆕 手动处理 WebSocket CORS（CORSMiddleware 对 WebSocket 支持有限）
-    origin = websocket.headers.get("origin")
-    print(f"🔍 [教师WebSocket] Origin: {origin}")
-    
-    # 验证 Origin（允许局域网访问和 Cloud Studio 域名）
-    allowed = False
-    if origin:
-        import re
-        # 匹配 localhost、局域网 IP 和 Cloud Studio 域名
-        pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
-        if re.match(pattern, origin):
-            allowed = True
-            print(f"✅ [教师WebSocket] Origin 验证通过: {origin}")
-        else:
-            print(f"❌ [教师WebSocket] Origin 验证失败: {origin}")
-    else:
-        allowed = True  # 没有 Origin 头也允许
-        print("⚠️ [教师WebSocket] 没有 Origin 头，允许连接")
-    
-    # 先接受连接（必须先accept才能close）
+
+    logger.info(f"🔌 教师WebSocket连接请求（课堂）: session_id={session_id}")
+
+    # 初始化 teacher_id
+    teacher_id: Optional[int] = None
+
+    # 先接受连接
     await websocket.accept()
-    
-    if not allowed:
-        print(f"❌ [教师WebSocket] CORS 验证失败")
+
+    # 使用辅助函数验证Origin
+    if not await validate_websocket_origin(websocket):
         await websocket.close(code=1008, reason="CORS validation failed")
         return
-    
-    # 1. 验证Token并获取用户信息
+
     try:
-        current_user = await deps.get_current_user_from_token(token, db)
+        # 使用辅助函数验证Token并获取用户信息
+        current_user = await authenticate_websocket_token(token, db)
         if not current_user:
             await websocket.close(code=1008, reason="Invalid token")
             return
-    except Exception as e:
-        await websocket.close(code=1008, reason=f"Auth failed: {str(e)}")
-        return
-    
-    # 2. 验证用户角色（只允许教师连接）
-    current_role = cast(UserRole, current_user.role)
-    if current_role != UserRole.TEACHER:
-        await websocket.close(code=1008, reason="Only teachers can connect to this endpoint")
-        return
-    
-    # 3. 验证会话存在性和权限
-    session = await db.get(ClassSession, session_id)
-    if not session:
-        await websocket.close(code=1008, reason="Session not found")
-        return
-    
-    # 验证教师是该会话的授课教师
-    teacher_id = cast(int, current_user.id)
-    session_teacher_id = cast(int, session.teacher_id)
-    if session_teacher_id != teacher_id:
-        await websocket.close(code=1008, reason="Access denied: Not the session teacher")
-        return
-    
-    # 5. 注册连接
-    await manager.connect_v2(
-        websocket=websocket,
-        scope="session",
-        channel_id=session_id,
-        user_id=teacher_id,
-        role=UserRole.TEACHER
-    )
-    
-    # 6. 发送初始连接确认
-    await websocket.send_text(json.dumps({
-        "type": "teacher_connected",
-        "timestamp": datetime.utcnow().isoformat(),
-        "data": {
-            "session_id": session_id,
-            "teacher_id": teacher_id,
-        }
-    }))
-    
-    try:
-        # 7. 监听客户端消息（心跳、请求统计等）
+
+        # 验证会话存在性
+        session = await db.get(ClassSession, session_id)
+        if not session:
+            logger.error(f"❌ 会话不存在: session_id={session_id}")
+            await websocket.close(code=1008, reason="Session not found")
+            return
+
+        # 使用辅助函数验证教师访问权限（角色 + 是否是会话创建者）
+        if not await validate_teacher_websocket_access(current_user, session):
+            await websocket.close(code=1008, reason="Access denied")
+            return
+
+        teacher_id = cast(int, current_user.id)
+        logger.info(f"✅ 教师验证通过: teacher_id={teacher_id}, session_id={session_id}")
+
+        # 注册连接
+        await manager.connect_v2(
+            websocket=websocket,
+            scope="session",
+            channel_id=session_id,
+            user_id=teacher_id,
+            role=UserRole.TEACHER
+        )
+        logger.info(f"✅ 教师连接已注册: session_id={session_id}")
+
+        # 发送初始连接确认
+        await websocket.send_text(json.dumps({
+            "type": "teacher_connected",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "session_id": session_id,
+                "teacher_id": teacher_id,
+            }
+        }))
+
+        # 监听客户端消息（心跳、请求统计等）
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
             message_type = message.get("type")
-            
+
             if message_type == "ping":
                 # 心跳响应
                 await websocket.send_text(json.dumps({
                     "type": "pong",
                     "timestamp": datetime.utcnow().isoformat(),
                 }))
-            
+
             elif message_type == "request_statistics":
                 # 请求统计信息
                 from app.services.realtime import get_submission_statistics, build_event, Channel
                 from app.api.v1.activities import get_cell_uuid_from_db_id
-                
+
                 cell_id = message.get("data", {}).get("cell_id")  # 可能是 UUID 字符串或数字
                 lesson_id = message.get("data", {}).get("lesson_id")
-                
+
                 if cell_id and lesson_id:
                     # get_submission_statistics 现在支持 UUID 字符串
                     stats = await get_submission_statistics(
                         db,
-                        cell_id=cell_id,  # 支持 UUID 字符串
+                        cell_id=cell_id,
                         lesson_id=lesson_id,
                         session_id=session_id
                     )
-                    
+
                     # 确保返回的 cell_id 是 UUID 格式（前端使用 UUID）
                     stats_cell_id = stats.get("cell_id")
                     if stats_cell_id is not None:
-                        # 如果是数字 ID，转换为 UUID
                         try:
                             numeric_id = int(stats_cell_id)
-                            # 是数字 ID，需要转换为 UUID
                             cell_uuid = await get_cell_uuid_from_db_id(db, numeric_id, lesson_id)
                             stats["cell_id"] = cell_uuid
                         except (ValueError, TypeError):
-                            # 已经是 UUID 字符串，保持不变
                             pass
-                    
+
                     event = build_event(
                         type="submission_statistics_updated",
                         channel=Channel(scope="session", id=session_id),
                         delivery_mode="unicast",
                         data=stats
                     )
-                    
+
                     await websocket.send_text(json.dumps(event))
-    
+
     except WebSocketDisconnect:
-        print(f"🔌 教师 {teacher_id} 断开连接（会话 {session_id}）")
-        
-        # 🆕 检查是否还有其他教师连接（排除当前正在断开的教师）
-        # 注意：此时连接还未断开，所以检查时需要排除当前教师
-        has_other_teacher = manager.has_teacher_connection("session", session_id, exclude_user_id=teacher_id)
-        
-        # 🆕 修复：不要立即结束会话，因为教师可能只是WebSocket暂时断开（如网络波动、页面刷新等）
-        # 会话应该由教师主动点击"结束课程"按钮来结束，或者由定时清理任务处理长时间无人的会话
-        # 这样可以避免误结束正在进行的课程
-        if not has_other_teacher:
-            print(f"⚠️ 教师 WebSocket 断开，但不会自动结束会话 {session_id}（教师可能正在重连）")
-            # 不自动结束会话，让教师有机会重新连接
-            # 如果真的需要结束，教师可以主动点击"结束课程"按钮
-            
-            # 注释掉自动结束逻辑
-            """
-            try:
-                # 重新获取会话最新状态
-                session = await db.get(ClassSession, session_id)
-                if session and session.status in [ClassSessionStatus.TEACHING, ClassSessionStatus.PAUSED]:
-                    print(f"⚠️ 教师异常退出，自动结束会话 {session_id}（状态：{session.status}）")
-                    
-                    # 更新会话状态为已结束
-                    session.status = ClassSessionStatus.ENDED  # type: ignore[assignment]
-                    session.ended_at = datetime.utcnow()  # type: ignore[assignment]
-                    
-                    # 计算时长
-                    if session.actual_start:  # type: ignore[comparison-overlap]
-                        duration = (session.ended_at - session.actual_start).total_seconds() / 60  # type: ignore[union-attr]
-                        session.duration_minutes = int(duration)  # type: ignore[assignment]
-                    
-                    # 更新所有学生参与记录为离线
-                    result = await db.execute(
-                        select(StudentSessionParticipation).where(
-                            and_(
-                                StudentSessionParticipation.session_id == session_id,
-                                StudentSessionParticipation.is_active == True,
-                            )
-                        )
-                    )
-                    participations = result.scalars().all()
-                    for participation in participations:
-                        participation.is_active = False  # type: ignore[assignment]
-                        participation.left_at = datetime.utcnow()  # type: ignore[assignment]
-                    
-                    await db.commit()
-                    await db.refresh(session)
-                    
-                    # 通知所有学生会话已结束
-                    await manager.broadcast_to_session(
-                        message={
-                            "type": "session_ended",
-                            "timestamp": datetime.utcnow().isoformat(),
-                            "data": {
-                                "session_id": session_id,
-                                "ended_at": session.ended_at.isoformat() if session.ended_at else None,  # type: ignore[union-attr]
-                                "reason": "teacher_disconnected",
-                                "message": "教师已断开连接，课程已自动结束"
-                            }
-                        },
-                        session_id=session_id
-                    )
-                    
-                    print(f"✅ 已自动结束会话 {session_id} 并通知学生")
-            except Exception as end_error:
-                print(f"❌ 自动结束会话失败: {str(end_error)}")
-                import traceback
-                traceback.print_exc()
-            """  # 自动结束逻辑已注释，避免误结束会话
-    
+        logger.info(f"🔌 教师断开连接: teacher_id={teacher_id}, session_id={session_id}")
     except Exception as e:
-        print(f"❌ 教师 WebSocket 异常: {str(e)}")
+        logger.error(f"❌ 教师 WebSocket 异常: {str(e)}")
         import traceback
         traceback.print_exc()
-    
     finally:
-        # 8. 清理：移除连接
-        await manager.disconnect_v2(
-            scope="session",
-            channel_id=session_id,
-            user_id=teacher_id,
-            role=UserRole.TEACHER
-        )
-        print(f"✅ 教师 {teacher_id} 连接已清理（会话 {session_id}）")
+        # 清理连接
+        if teacher_id is not None:
+            try:
+                await manager.disconnect_v2(
+                    scope="session",
+                    channel_id=session_id,
+                    user_id=teacher_id,
+                    role=UserRole.TEACHER
+                )
+                logger.info(f"✅ 教师连接已清理: teacher_id={teacher_id}, session_id={session_id}")
+            except Exception as e:
+                logger.error(f"⚠️ 清理教师连接时出错: {str(e)}")
 
 
 @router.websocket("/lessons/{lesson_id}/ws/teacher")
@@ -1952,158 +1721,147 @@ async def websocket_teacher_lesson_endpoint(
 ):
     """
     教师端 WebSocket 连接端点（课后模式）
-    
+
     连接URL: ws://api/v1/classroom-sessions/lessons/{lesson_id}/ws/teacher?token={jwt}
-    
+
     用于接收课后实时通知：
     - 学生提交活动
     - 提交统计更新
     """
-    
-    # 🆕 手动处理 WebSocket CORS（CORSMiddleware 对 WebSocket 支持有限）
-    origin = websocket.headers.get("origin")
-    print(f"🔍 [教师WebSocket-课后] Origin: {origin}")
-    
-    # 验证 Origin（允许局域网访问）
-    allowed = False
-    if origin:
-        import re
-        pattern = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$"
-        if re.match(pattern, origin):
-            allowed = True
-    else:
-        allowed = True
-    
-    # 先接受连接（必须先accept才能close）
+
+    logger.info(f"🔌 教师WebSocket连接请求（课后）: lesson_id={lesson_id}")
+
+    # 初始化 teacher_id
+    teacher_id: Optional[int] = None
+
+    # 先接受连接
     await websocket.accept()
-    
-    if not allowed:
-        print(f"❌ [教师WebSocket-课后] CORS 验证失败")
+
+    # 使用辅助函数验证Origin
+    if not await validate_websocket_origin(websocket):
         await websocket.close(code=1008, reason="CORS validation failed")
         return
-    
-    # 1. 验证Token并获取用户信息
+
     try:
-        current_user = await deps.get_current_user_from_token(token, db)
+        # 使用辅助函数验证Token并获取用户信息
+        current_user = await authenticate_websocket_token(token, db)
         if not current_user:
             await websocket.close(code=1008, reason="Invalid token")
             return
-    except Exception as e:
-        await websocket.close(code=1008, reason=f"Auth failed: {str(e)}")
-        return
-    
-    # 2. 验证用户角色（只允许教师连接）
-    current_role = cast(UserRole, current_user.role)
-    if current_role != UserRole.TEACHER:
-        await websocket.close(code=1008, reason="Only teachers can connect to this endpoint")
-        return
-    
-    # 3. 验证教案存在性和权限
-    # 确保 Lesson 已导入（防止作用域问题）
-    from app.models.lesson import Lesson
-    
-    lesson = await db.get(Lesson, lesson_id)
-    if not lesson:
-        await websocket.close(code=1008, reason="Lesson not found")
-        return
-    
-    # 验证教师有权访问该教案（通过班级或教案创建者）
-    teacher_id = cast(int, current_user.id)
-    from app.services.realtime import fetch_teachers_by_lesson
-    
-    authorized_teacher_ids = await fetch_teachers_by_lesson(db, lesson_id)
-    if teacher_id not in authorized_teacher_ids:
-        await websocket.close(code=1008, reason="Access denied: Not authorized for this lesson")
-        return
-    
-    # 5. 注册连接
-    await manager.connect_v2(
-        websocket=websocket,
-        scope="lesson",
-        channel_id=lesson_id,
-        user_id=teacher_id,
-        role=UserRole.TEACHER
-    )
-    
-    # 6. 发送初始连接确认
-    await websocket.send_text(json.dumps({
-        "type": "teacher_connected",
-        "timestamp": datetime.utcnow().isoformat(),
-        "data": {
-            "lesson_id": lesson_id,
-            "teacher_id": teacher_id,
-        }
-    }))
-    
-    try:
-        # 7. 监听客户端消息（心跳、请求统计等）
+
+        # 验证用户角色（只允许教师连接）
+        current_role = cast(UserRole, current_user.role)
+        if current_role != UserRole.TEACHER:
+            await websocket.close(code=1008, reason="Only teachers can connect to this endpoint")
+            return
+
+        # 验证教案存在性
+        lesson = await db.get(Lesson, lesson_id)
+        if not lesson:
+            logger.error(f"❌ 教案不存在: lesson_id={lesson_id}")
+            await websocket.close(code=1008, reason="Lesson not found")
+            return
+
+        # 验证教师有权访问该教案（通过班级或教案创建者）
+        teacher_id = cast(int, current_user.id)
+        from app.services.realtime import fetch_teachers_by_lesson
+
+        authorized_teacher_ids = await fetch_teachers_by_lesson(db, lesson_id)
+        if teacher_id not in authorized_teacher_ids:
+            logger.warning(f"❌ 教师无权访问该教案: teacher_id={teacher_id}, lesson_id={lesson_id}")
+            await websocket.close(code=1008, reason="Access denied: Not authorized for this lesson")
+            return
+
+        logger.info(f"✅ 教师验证通过（课后）: teacher_id={teacher_id}, lesson_id={lesson_id}")
+
+        # 注册连接
+        await manager.connect_v2(
+            websocket=websocket,
+            scope="lesson",
+            channel_id=lesson_id,
+            user_id=teacher_id,
+            role=UserRole.TEACHER
+        )
+        logger.info(f"✅ 教师连接已注册（课后）: lesson_id={lesson_id}")
+
+        # 发送初始连接确认
+        await websocket.send_text(json.dumps({
+            "type": "teacher_connected",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "lesson_id": lesson_id,
+                "teacher_id": teacher_id,
+            }
+        }))
+
+        # 监听客户端消息（心跳、请求统计等）
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
             message_type = message.get("type")
-            
+
             if message_type == "ping":
                 # 心跳响应
                 await websocket.send_text(json.dumps({
                     "type": "pong",
                     "timestamp": datetime.utcnow().isoformat(),
                 }))
-            
+
             elif message_type == "request_statistics":
                 # 请求统计信息
                 from app.services.realtime import get_submission_statistics, build_event, Channel
                 from app.api.v1.activities import get_cell_uuid_from_db_id
-                
-                cell_id = message.get("data", {}).get("cell_id")  # 可能是 UUID 字符串或数字
+
+                cell_id = message.get("data", {}).get("cell_id")
                 lesson_id_param = message.get("data", {}).get("lesson_id")
-                
+
                 # 使用参数中的 lesson_id 或路径中的 lesson_id
                 actual_lesson_id = lesson_id_param or lesson_id
-                
+
                 if cell_id and actual_lesson_id:
-                    # get_submission_statistics 现在支持 UUID 字符串
                     stats = await get_submission_statistics(
                         db,
-                        cell_id=cell_id,  # 支持 UUID 字符串
+                        cell_id=cell_id,
                         lesson_id=actual_lesson_id,
                         session_id=None
                     )
-                    
-                    # 确保返回的 cell_id 是 UUID 格式（前端使用 UUID）
+
+                    # 确保返回的 cell_id 是 UUID 格式
                     stats_cell_id = stats.get("cell_id")
                     if stats_cell_id is not None:
-                        # 如果是数字 ID，转换为 UUID
                         try:
                             numeric_id = int(stats_cell_id)
-                            # 是数字 ID，需要转换为 UUID
                             cell_uuid = await get_cell_uuid_from_db_id(db, numeric_id, actual_lesson_id)
                             stats["cell_id"] = cell_uuid
                         except (ValueError, TypeError):
-                            # 已经是 UUID 字符串，保持不变
                             pass
-                    
+
                     event = build_event(
                         type="submission_statistics_updated",
                         channel=Channel(scope="lesson", id=actual_lesson_id),
                         delivery_mode="unicast",
                         data=stats
                     )
-                    
+
                     await websocket.send_text(json.dumps(event))
-    
+
     except WebSocketDisconnect:
-        print(f"🔌 教师 {teacher_id} 断开连接（教案 {lesson_id}）")
-    
+        logger.info(f"🔌 教师断开连接（课后）: teacher_id={teacher_id}, lesson_id={lesson_id}")
     except Exception as e:
-        print(f"❌ 教师 WebSocket 异常: {str(e)}")
-    
+        logger.error(f"❌ 教师 WebSocket 异常（课后）: {str(e)}")
+        import traceback
+        traceback.print_exc()
     finally:
-        # 8. 清理：移除连接
-        await manager.disconnect_v2(
-            scope="lesson",
-            channel_id=lesson_id,
-            user_id=teacher_id,
-            role=UserRole.TEACHER
-        )
-        print(f"✅ 教师 {teacher_id} 连接已清理（教案 {lesson_id}）")
+        # 清理连接
+        if teacher_id is not None:
+            try:
+                await manager.disconnect_v2(
+                    scope="lesson",
+                    channel_id=lesson_id,
+                    user_id=teacher_id,
+                    role=UserRole.TEACHER
+                )
+                logger.info(f"✅ 教师连接已清理（课后）: teacher_id={teacher_id}, lesson_id={lesson_id}")
+            except Exception as e:
+                logger.error(f"⚠️ 清理教师连接时出错（课后）: {str(e)}")
 
