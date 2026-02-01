@@ -193,13 +193,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, h, provide, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, provide, nextTick } from 'vue'
 import type { Lesson } from '../../types/lesson'
 import type { Cell, ActivityCell } from '../../types/cell'
 import classroomSessionService from '../../services/classroomSession'
-import ClassroomSwitcher from './ClassroomSwitcher.vue'
-import ClassroomControlBoard from './ClassroomControlBoard.vue'
 // v2.0: 导入新拆分的子组件
 import SessionDurationDisplay from './SessionDurationDisplay.vue'
 import StudentCountDisplay from './StudentCountDisplay.vue'
@@ -211,7 +208,7 @@ import ModuleList from './ModuleList.vue'
 import ClassroomSelectModal from './ClassroomSelectModal.vue'
 import ActivityStatisticsPanel from './ActivityStatisticsPanel.vue'
 import CellTypeIcon from './CellTypeIcon.vue'
-import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
+import { getCellId as getCellIdUtil, toNumericId, isUUID } from '../../utils/cellId'
 import activityService from '../../services/activity'
 import logger from '@/utils/logger'
 import { isContentWithSections, sectionsToFlatCells, normalizeContentToSections } from '../../utils/lessonContent'
@@ -269,7 +266,6 @@ const emit = defineEmits<{
   'session-changed': [session: any | null]
 }>()
 
-const route = useRoute()
 const lessonStore = useLessonStore()
 
 // v2.0: 使用composables管理会话状态
@@ -721,16 +717,6 @@ const hasAlerts = computed(() => {
 })
 
 // v2.0: 以下状态和函数已移至 useDataLoader composable
-// const activityStatistics, const loadingActivityStats, const studentSubmissionStatus
-// function loadActivityStatistics, loadParticipants, loadStatistics, loadDbCells, ensureActivityCellExists
-// 现在从 dataLoader 导入
-
-// 滚动到提问区域
-function scrollToQuestions() {
-  // TODO: 实现滚动到提问列表的逻辑
-}
-
-// v2.0: 以下函数已移至 cellUtils.ts
 // function getCellByOrder(order): Cell | null
 // function getTextPreview(cell, maxLength): string
 // function getCodePreview(cell): string
