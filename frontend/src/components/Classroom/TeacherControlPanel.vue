@@ -220,6 +220,7 @@ import type { LessonClassroom } from '../../types/lesson'
 // v2.0: 导入composables
 import { useSessionManager } from './composables/useSessionManager'
 import { usePolling } from './composables/usePolling'
+import { useDurationTimer } from './composables/useDurationTimer'
 // v2.0: 导入学生监控工具函数
 import {
   getStudentStatusClass,
@@ -277,16 +278,13 @@ const sessionManager = useSessionManager({
     console.log('✅ 初始学生列表加载完成，学生数:', activeStudents.value.length)
   },
   onSessionStarted: (updatedSession) => {
-    // 开始计时
-    if (!durationInterval.value) {
-      sessionDuration.value = 0
-      startDurationTimer()
-    }
+    // v2.0: 使用 durationTimer composable 管理计时
+    durationTimer.startDurationTimer()
     // 加载统计信息
     loadStatistics()
   },
   onSessionEnded: () => {
-    stopDurationTimer()
+    durationTimer.stopDurationTimer()
     pollingManager.clearAllPollingIntervals()
     activeStudents.value = []
   },
@@ -302,6 +300,19 @@ const pollingManager = usePolling({
   loadActivityStatistics,
   isCurrentCellActivity: () => currentCell.value?.type === 'activity' && !!currentActivityDbCell.value,
 })
+
+// v2.0: 使用composables管理计时器
+const durationTimer = useDurationTimer({
+  getSessionStatus: () => sessionManager.normalizedSessionStatus.value,
+  lessonDuration: 40 * 60, // 40分钟
+  onTimerStateChange: (isRunning) => {
+    // 可选：在计时器状态变化时执行操作
+    console.log('⏱️ 计时器状态:', isRunning ? '运行中' : '已停止')
+  },
+})
+
+// 监听会话状态变化，自动启动/停止计时器
+durationTimer.watchSessionStatus(sessionManager.normalizedSessionStatus)
 
 // 从 composable 解构会话相关状态和方法
 const {
@@ -352,30 +363,26 @@ const loadingStudents = ref(false)
 const isMultiSelectMode = ref(false) // 多选模式：false=单选，true=多选
 const sessionStatistics = ref<any>(null)
 const selectedCellIndex = ref(-1)  // -1表示隐藏所有内容
-const sessionDuration = ref(0)
-const durationInterval = ref<number | null>(null)
 const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录（用于 ID 匹配）
 const modulePanelFullscreen = ref(false)  // 模块面板全屏状态
 const isPanelFullscreen = ref(false)  // 整个导播台全屏状态
+
+// v2.0: 从 durationTimer composable 获取 sessionDuration
+const { sessionDuration } = durationTimer
 
 // 一节课的标准时长（40分钟 = 2400秒）
 const LESSON_DURATION = 40 * 60
 
 // 显示的课程时长（只有在 active 状态才显示实际时长）
 const displayDuration = computed(() => {
-  // 如果会话不存在或不是 active 状态，显示 0
-  const status = sessionManager.normalizedSessionStatus.value
-  if (!session.value || status !== 'active') {
-    return 0
-  }
-  return sessionDuration.value || 0
+  // v2.0: 使用 durationTimer composable 的方法
+  return durationTimer.getDisplayDuration()
 })
 
 // 计算剩余时间
 const remainingTime = computed(() => {
-  if (sessionDuration.value === null || sessionDuration.value === undefined) return LESSON_DURATION
-  const remaining = LESSON_DURATION - sessionDuration.value
-  return remaining > 0 ? remaining : 0
+  // v2.0: 使用 durationTimer composable 的方法
+  return durationTimer.getRemainingTime()
 })
 
 // v2.0: 以下computed属性已移至 useSessionManager.ts
@@ -1206,53 +1213,7 @@ async function loadStatistics() {
   }
 }
 
-// 定时器
-function startDurationTimer() {
-  if (durationInterval.value) return
-  
-  // 如果还没有开始计时（值为0或未定义），从0开始
-  // 如果已经有值（比如暂停后继续），保持当前值继续计时
-  if (sessionDuration.value === 0 || sessionDuration.value === null || sessionDuration.value === undefined) {
-    sessionDuration.value = 0
-  }
-  
-  // 每秒递增，直到达到课程时长
-  durationInterval.value = window.setInterval(() => {
-    sessionDuration.value = Math.min(sessionDuration.value + 1, LESSON_DURATION)
-  }, 1000)
-}
-
-function stopDurationTimer() {
-  if (durationInterval.value) {
-    clearInterval(durationInterval.value)
-    durationInterval.value = null
-  }
-}
-
-// 监听session状态变化，自动启动/停止计时器
-watch(() => session.value?.status, (status, oldStatus) => {
-  if (status === 'teaching') {
-    // 当状态变为 active 时，启动计时器
-    if (!durationInterval.value) {
-      // 如果计时器还没有启动
-      // 只有在从 pending 状态变为 active（新开始）时，才重置为0
-      // 如果是从 paused 恢复（继续），保持当前时长继续计时
-      if (oldStatus === 'pending' || sessionDuration.value === 0) {
-        sessionDuration.value = 0
-      }
-      startDurationTimer()
-    }
-  } else if (status === 'teaching') {
-    // 当状态变为 paused 时，停止计时器（但保持当前时长）
-    stopDurationTimer()
-  } else if (status === 'ended') {
-    // 当状态变为 ended 时，停止计时器
-    stopDurationTimer()
-  } else {
-    // 其他状态（如 pending），停止计时器
-    stopDurationTimer()
-  }
-}, { immediate: true })
+// v2.0: 定时器管理已移至 useDurationTimer composable
 
 // v2.0: 监听会话状态变化，自动启动/停止轮询
 watch(() => sessionManager.normalizedSessionStatus.value, (status, oldStatus) => {
@@ -1444,7 +1405,8 @@ onBeforeUnmount(() => {
 })
 
 onUnmounted(() => {
-  stopDurationTimer()
+  // v2.0: 使用 durationTimer composable 停止计时
+  durationTimer.stopDurationTimer()
 
   // 清理所有轮询定时器（双重保险）
   pollingManager.clearAllPollingIntervals()
