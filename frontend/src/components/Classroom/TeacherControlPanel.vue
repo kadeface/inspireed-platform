@@ -154,88 +154,19 @@
     <div class="main-layout" :class="{ 'module-fullscreen-mode': modulePanelFullscreen }">
       <!-- 左侧：教学模块 -->
       <div class="panel teaching-modules teaching-modules-fullwidth" :class="{ 'module-panel-fullscreen': modulePanelFullscreen }">
-        <!-- 导航控制栏（固定在顶部，始终可见） -->
-        <div class="module-navigation-bar" v-if="lessonContentCells.length > 0">
-          <!-- 上一模块按钮 -->
-          <button
-            class="module-nav-btn module-nav-btn-prev"
-            :class="{ 'module-nav-btn-disabled': !canGoPrev }"
-            :disabled="!canGoPrev"
-            @click="handlePrevModule"
-            :title="canGoPrev ? '上一模块' : '已经是第一个模块'"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>上一模块</span>
-          </button>
-          
-          <!-- 下一模块按钮 -->
-          <button
-            class="module-nav-btn module-nav-btn-next"
-            :class="{ 'module-nav-btn-disabled': !canGoNext }"
-            :disabled="!canGoNext"
-            @click="handleNextModule"
-            :title="canGoNext ? '下一模块' : '已经是最后一个模块'"
-          >
-            <span>下一模块</span>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-        
-        <div class="module-list" ref="moduleListRef" v-if="lessonContentCells.length > 0">
-          <!-- 课程模块列表 -->
-          <div 
-            v-for="(cell, index) in lessonContentCells" 
-            :key="cell.id || index"
-            :ref="el => setModuleItemRef(el, index)"
-            :data-module-index="index"
-            class="module-item"
-            :class="{
-              'module-item-active': isModuleActive(cell, index),
-              [`module-item-type-${cell.type}`]: true,
-              'module-item-disabled': loading,
-            }"
-            :title="loading ? '切换中，请稍候...' : getModuleTooltip(cell, index)"
-          >
-            <!-- 单选框/复选框 -->
-            <div class="module-item-checkbox" @click.stop="!loading && handleModuleCheckboxClick(cell, index, $event)">
-              <input 
-                :type="isMultiSelectMode ? 'checkbox' : 'radio'"
-                :name="isMultiSelectMode ? `module-display-checkbox-${index}` : 'module-display-radio'"
-                :checked="isModuleActive(cell, index)"
-                :disabled="loading"
-                @change.stop="!loading && handleModuleCheckboxChange(cell, index, $event)"
-                @click.stop
-                class="checkbox-input"
-              />
-            </div>
-            
-            <!-- 模块序号 -->
-            <div class="module-item-number">{{ index + 1 }}</div>
-            
-            <!-- 模块图标 -->
-            <div class="module-item-icon" :class="`icon-${cell.type}`" @click="!loading && handleModuleItemClick(cell, index)">
-              <CellTypeIcon :type="cell.type" />
-            </div>
-            
-            <!-- 模块信息 -->
-            <div class="module-item-content" @click="!loading && handleModuleItemClick(cell, index)">
-              <div class="module-item-title">{{ cell.title || getCellTypeLabel(cell.type) || `模块 ${index + 1}` }}</div>
-              <div class="module-item-subtitle">{{ getCellTypeLabel(cell.type) }}</div>
-            </div>
-            
-            <!-- 活动状态标记 -->
-            <div v-if="cell.type === 'activity' && isModuleActivityActive(cell, index)" class="module-item-activity-badge">
-              🎯
-            </div>
-          </div>
-        </div>
-        <div v-else class="module-empty">
-          <p>暂无课程模块</p>
-        </div>
+        <ModuleList
+          :cells="lessonContentCells"
+          :current-module-index="currentModuleIndex"
+          :loading="loading"
+          :is-multi-select-mode="isMultiSelectMode"
+          :display-cell-orders="displayCellOrders"
+          :session-current-activity-id="session?.current_activity_id"
+          @item-click="handleModuleItemClick"
+          @checkbox-click="handleModuleCheckboxClick"
+          @checkbox-change="handleModuleCheckboxChange"
+          @prev-module="handlePrevModule"
+          @next-module="handleNextModule"
+        />
       </div>
     </div>
   </div>
@@ -348,6 +279,7 @@ import SessionControlButtons from './SessionControlButtons.vue'
 import ModuleCountDisplay from './ModuleCountDisplay.vue'
 import WaitingForStudentsBanner from './WaitingForStudentsBanner.vue'
 import JoinedStudentsList from './JoinedStudentsList.vue'
+import ModuleList from './ModuleList.vue'
 import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
 import activityService from '../../services/activity'
 import logger from '@/utils/logger'
