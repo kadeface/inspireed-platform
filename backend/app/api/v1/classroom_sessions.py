@@ -32,16 +32,84 @@ from app.schemas.classroom_session import (
     NavigateToCellRequest,
     StartActivityRequest,
     StartSessionRequest,
-    PauseSessionRequest,
-    ResumeSessionRequest,
     EndSessionRequest,
-    UpdateDisplayModeRequest,
     SessionStatistics,
     StudentPendingSessionResponse,
+)
+from app.services.session_state_machine import (
+    SessionStateMachine,
+    SessionStatus,
+    InvalidStateTransitionError,
 )
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+# ========== 状态机辅助函数 ==========
+
+
+def map_to_session_status(status: ClassSessionStatus) -> SessionStatus:
+    """将ClassSessionStatus映射到SessionStatus"""
+    status_map = {
+        ClassSessionStatus.PREPARING: SessionStatus.PREPARING,
+        ClassSessionStatus.TEACHING: SessionStatus.TEACHING,
+        ClassSessionStatus.ENDED: SessionStatus.ENDED,
+    }
+    return status_map[status]
+
+
+def map_to_class_session_status(status: SessionStatus) -> ClassSessionStatus:
+    """将SessionStatus映射到ClassSessionStatus"""
+    status_map = {
+        SessionStatus.PREPARING: ClassSessionStatus.PREPARING,
+        SessionStatus.TEACHING: ClassSessionStatus.TEACHING,
+        SessionStatus.ENDED: ClassSessionStatus.ENDED,
+    }
+    return status_map[status]
+
+
+async def transition_session_state(
+    session: ClassSession,
+    new_status: ClassSessionStatus,
+) -> ClassSession:
+    """
+    使用状态机执行状态转换
+
+    Args:
+        session: 会话对象
+        new_status: 新状态
+
+    Returns:
+        更新后的会话对象
+
+    Raises:
+        HTTPException: 如果状态转换不合法
+    """
+    try:
+        # 转换为SessionStatus枚举
+        current_status = map_to_session_status(session.status)  # type: ignore[arg-type]
+        target_status = map_to_session_status(new_status)
+
+        # 创建状态机并执行转换
+        state_machine = SessionStateMachine(initial_status=current_status)
+        state_machine.transition_to(target_status)
+
+        # 更新会话状态
+        session.status = new_status  # type: ignore[assignment]
+
+        logger.info(
+            f"状态转换成功: session_id={session.id}, "
+            f"{current_status.value} → {target_status.value}"
+        )
+
+        return session
+
+    except InvalidStateTransitionError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"非法状态转换: {e.current_status.value} → {e.new_status.value}"
+        )
 
 
 # ========== 课堂会话 CRUD ==========
@@ -122,7 +190,7 @@ async def create_class_session(
             and_(
                 ClassSession.lesson_id == lesson_id,
                 ClassSession.classroom_id == data.classroom_id,
-                ClassSession.status.in_([ClassSessionStatus.PENDING, ClassSessionStatus.ACTIVE, ClassSessionStatus.PAUSED]),
+                ClassSession.status.in_([ClassSessionStatus.PREPARING, ClassSessionStatus.TEACHING, ClassSessionStatus.PAUSED]),
             )
         )
     )
@@ -150,7 +218,7 @@ async def create_class_session(
         teacher_id=current_user_id,
         scheduled_start=data.scheduled_start,
         settings=session_settings,
-        status=ClassSessionStatus.PENDING,
+        status=ClassSessionStatus.PREPARING,
         total_students=0,
         active_students=0,
         current_cell_id=None,  # 初始不显示任何Cell，等待教师手动切换
@@ -307,11 +375,12 @@ async def start_session(
     if session_teacher_id != current_user_id:
         raise HTTPException(status_code=403, detail="无权操作")
 
-    if session.status != ClassSessionStatus.PENDING:  # type: ignore[comparison-overlap]
-        raise HTTPException(status_code=400, detail=f"会话状态为 {session.status}，无法开始")
 
-    # 更新状态
-    session.status = ClassSessionStatus.ACTIVE # type: ignore[comparison-overlap]
+    # 使用状态机转换状态
+    await transition_session_state(session, ClassSessionStatus.TEACHING)
+
+    # 更新开始时间
+    session.actual_start = datetime.utcnow() # type: ignore[assignment]
     session.actual_start = datetime.utcnow() # type: ignore[comparison-overlap]
 
     # 🆕 自动初始化 display_cell_orders：显示第一个 cell
@@ -401,86 +470,6 @@ async def start_session(
 
 
 @router.post("/sessions/{session_id}/pause", response_model=ClassSessionResponse)
-async def pause_session(
-    session_id: int,
-    db: AsyncSession = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
-) -> Any:
-    """暂停课堂会话"""
-
-    session = await db.get(ClassSession, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="会话不存在")
-
-    session_teacher_id = cast(int, session.teacher_id)
-    current_user_id = cast(int, current_user.id)
-    if session_teacher_id != current_user_id:
-        raise HTTPException(status_code=403, detail="无权操作")
-
-    if session.status != ClassSessionStatus.ACTIVE:  # type: ignore[comparison-overlap]
-        raise HTTPException(status_code=400, detail="只能暂停进行中的会话")
-
-    session.status = ClassSessionStatus.PAUSED # type: ignore[comparison-overlap]
-    await db.commit()
-    await db.refresh(session)
-
-    # 🆕 通过 WebSocket 通知所有学生会话状态已变化
-    await manager.broadcast_to_session(
-        message={
-            "type": "session_status_changed",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "session_id": session_id,
-                "status": session.status.value if hasattr(session.status, 'value') else str(session.status),
-            }
-        },
-        session_id=session_id
-    )
-    print(f"📢 已广播会话状态变化（会话 {session_id}）：active -> paused")
-
-    return session
-
-
-@router.post("/sessions/{session_id}/resume", response_model=ClassSessionResponse)
-async def resume_session(
-    session_id: int,
-    db: AsyncSession = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
-) -> Any:
-    """继续课堂会话"""
-
-    session = await db.get(ClassSession, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="会话不存在")
-
-    session_teacher_id = cast(int, session.teacher_id)
-    current_user_id = cast(int, current_user.id)
-    if session_teacher_id != current_user_id:
-        raise HTTPException(status_code=403, detail="无权操作")
-
-    if session.status != ClassSessionStatus.PAUSED:  # type: ignore[comparison-overlap]
-        raise HTTPException(status_code=400, detail="只能继续已暂停的会话")
-
-    session.status = ClassSessionStatus.ACTIVE # type: ignore[comparison-overlap]
-    await db.commit()
-    await db.refresh(session)
-
-    # 🆕 通过 WebSocket 通知所有学生会话状态已变化
-    await manager.broadcast_to_session(
-        message={
-            "type": "session_status_changed",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "session_id": session_id,
-                "status": session.status.value if hasattr(session.status, 'value') else str(session.status),
-            }
-        },
-        session_id=session_id
-    )
-    print(f"📢 已广播会话状态变化（会话 {session_id}）：paused -> active")
-
-    return session
-
 
 @router.post("/sessions/{session_id}/end", response_model=ClassSessionResponse)
 async def end_session(
@@ -505,10 +494,20 @@ async def end_session(
         print(f"ℹ️ 会话 {session_id} 已经是 ENDED 状态，直接返回（幂等操作）")
         return session
 
-    # 更新状态
-    old_status = session.status
-    session.status = ClassSessionStatus.ENDED # type: ignore[comparison-overlap]
-    session.ended_at = datetime.utcnow() # type: ignore[comparison-overlap]
+    # 使用状态机转换状态（保留幂等性）
+    try:
+        old_status = session.status
+        await transition_session_state(session, ClassSessionStatus.ENDED)
+    except HTTPException as e:
+        # 如果已经是ENDED状态，则忽略（幂等操作）
+        if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
+            print(f"ℹ️ 会话 {session_id} 已经是 ENDED 状态，直接返回（幂等操作）")
+            return session
+        # 其他错误则抛出
+        raise e
+
+    # 更新结束时间
+    session.ended_at = datetime.utcnow() # type: ignore[assignment]
 
     # 计算时长
     if session.actual_start: # type: ignore[comparison-overlap]
@@ -597,7 +596,7 @@ async def navigate_to_cell(
         if session_teacher_id != current_user_id:
             raise HTTPException(status_code=403, detail="无权操作")
 
-        if session.status != ClassSessionStatus.ACTIVE:  # type: ignore[comparison-overlap]
+        if session.status != ClassSessionStatus.TEACHING:  # type: ignore[comparison-overlap]
             raise HTTPException(
                 status_code=400, 
                 detail=f"请先点击“开始上课”按钮，等待教师开始上课"
@@ -689,76 +688,6 @@ async def navigate_to_cell(
         )
 
 
-@router.post("/sessions/{session_id}/display-mode", response_model=ClassSessionResponse)
-async def update_display_mode(
-    session_id: int,
-    data: UpdateDisplayModeRequest,
-    db: AsyncSession = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
-) -> Any:
-    """更新学生端显示模式（全屏/窗口）"""
-    
-    try:
-        # 验证display_mode值
-        if data.display_mode not in ["fullscreen", "window"]:
-            raise HTTPException(status_code=400, detail="display_mode 必须是 'fullscreen' 或 'window'")
-        
-        print(f"🖥️ 更新显示模式: session_id={session_id}, display_mode={data.display_mode}")
-
-        session = await db.get(ClassSession, session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="会话不存在")
-
-        session_teacher_id = cast(int, session.teacher_id)
-        current_user_id = cast(int, current_user.id)
-        if session_teacher_id != current_user_id:
-            raise HTTPException(status_code=403, detail="无权操作")
-
-        if session.status != ClassSessionStatus.ACTIVE:  # type: ignore[comparison-overlap]
-            raise HTTPException(status_code=400, detail="只能在活跃会话中更新显示模式")
-        
-        # 保存 display_mode 到 settings
-        new_settings = dict(session.settings) if session.settings else {} # type: ignore[assignment]
-        new_settings["display_mode"] = data.display_mode # type: ignore[assignment]
-        setattr(session, "settings", new_settings)
-        
-        await db.commit()
-        await db.refresh(session)
-        
-        print(f"✅ 显示模式更新成功: session_id={session_id}, display_mode={data.display_mode}")
-        
-        # 通过 WebSocket 广播变化
-        from app.services.websocket_manager import manager as ws_manager
-        
-        await ws_manager.broadcast_to_session(
-            message={
-                "type": "display_mode_changed",
-                "timestamp": datetime.utcnow().isoformat(),
-                "data": {
-                    "display_mode": data.display_mode,
-                    "changed_by": {
-                        "user_id": current_user.id,
-                        "user_name": current_user.full_name or current_user.username,
-                    }
-                }
-            },
-            session_id=session_id,
-        )
-        
-        print(f"📢 已广播显示模式变化（会话 {session_id}）")
-        
-        return session
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        print(f"❌ 更新显示模式异常: {type(e).__name__}: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(
-            status_code=500,
-            detail=f"更新显示模式失败: {str(e)}"
-        )
 
 
 # ========== 旧代码（已废弃，保留用于参考）==========
@@ -786,7 +715,7 @@ async def start_activity(
     if session_teacher_id != current_user_id:
         raise HTTPException(status_code=403, detail="无权操作")
 
-    if session.status != ClassSessionStatus.ACTIVE:  # type: ignore[comparison-overlap]
+    if session.status != ClassSessionStatus.TEACHING:  # type: ignore[comparison-overlap]
         raise HTTPException(status_code=400, detail="只能在活跃会话中开始活动")
 
     # 验证Cell存在且是活动类型
@@ -1082,7 +1011,7 @@ async def get_student_pending_sessions(
     query = (
         select(ClassSession)
         .where(ClassSession.classroom_id.in_(list(student_classroom_ids)))
-        .where(ClassSession.status == ClassSessionStatus.PENDING)
+        .where(ClassSession.status == ClassSessionStatus.PREPARING)
         .where(ClassSession.created_at >= cutoff_time)  # 只返回最近48小时内的会话
         .options(
             selectinload(ClassSession.lesson),
@@ -1153,7 +1082,7 @@ async def get_student_active_sessions(
     query = (
         select(ClassSession)
         .where(ClassSession.classroom_id.in_(list(student_classroom_ids)))
-        .where(ClassSession.status == ClassSessionStatus.ACTIVE)
+        .where(ClassSession.status == ClassSessionStatus.TEACHING)
         .where(
             # 使用actual_start或created_at，只要有一个在40分钟内即可
             or_(
@@ -1329,7 +1258,7 @@ async def check_teacher_status(
     # 过于激进的自动结束会导致误操作和用户体验问题
     
     # 🔍 仅检查和返回状态，不自动结束会话
-    if not has_teacher and session.status in [ClassSessionStatus.ACTIVE, ClassSessionStatus.PAUSED]:  # type: ignore[comparison-overlap]
+    if not has_teacher and session.status in [ClassSessionStatus.TEACHING, ClassSessionStatus.PAUSED]:  # type: ignore[comparison-overlap]
         print(f"⚠️ 会话 {session_id} 当前没有教师 WebSocket 连接（状态：{session.status}），但不会自动结束")
         # 返回警告状态，但不结束会话
         return {
@@ -1510,7 +1439,6 @@ async def send_initial_state(websocket: WebSocket, session: ClassSession, db: As
             "current_state": {
                 "status": session.status.value if hasattr(session.status, 'value') else str(session.status),
                 "display_cell_orders": (session.settings or {}).get("display_cell_orders", []),
-                "display_mode": (session.settings or {}).get("display_mode", "window"),
                 "current_cell_id": session.current_cell_id,
                 "current_activity_id": session.current_activity_id,
                 # 🆕 添加教师和课程信息
@@ -1784,7 +1712,7 @@ async def websocket_teacher_session_endpoint(
             try:
                 # 重新获取会话最新状态
                 session = await db.get(ClassSession, session_id)
-                if session and session.status in [ClassSessionStatus.ACTIVE, ClassSessionStatus.PAUSED]:
+                if session and session.status in [ClassSessionStatus.TEACHING, ClassSessionStatus.PAUSED]:
                     print(f"⚠️ 教师异常退出，自动结束会话 {session_id}（状态：{session.status}）")
                     
                     # 更新会话状态为已结束
