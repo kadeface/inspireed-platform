@@ -193,11 +193,32 @@
 </template>
 
 <script setup lang="ts">
+// ============================================================================
+// 1. Vue 核心
+// ============================================================================
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, provide, nextTick } from 'vue'
+
+// ============================================================================
+// 2. 类型定义
+// ============================================================================
 import type { Lesson } from '../../types/lesson'
+import type { LessonClassroom } from '../../types/lesson'
 import type { Cell, ActivityCell } from '../../types/cell'
+
+// ============================================================================
+// 3. Store
+// ============================================================================
+import { useLessonStore } from '../../store/lesson'
+
+// ============================================================================
+// 4. 服务
+// ============================================================================
 import classroomSessionService from '../../services/classroomSession'
-// v2.0: 导入新拆分的子组件
+import activityService from '../../services/activity'
+
+// ============================================================================
+// 5. 子组件
+// ============================================================================
 import SessionDurationDisplay from './SessionDurationDisplay.vue'
 import StudentCountDisplay from './StudentCountDisplay.vue'
 import SessionControlButtons from './SessionControlButtons.vue'
@@ -208,13 +229,10 @@ import ModuleList from './ModuleList.vue'
 import ClassroomSelectModal from './ClassroomSelectModal.vue'
 import ActivityStatisticsPanel from './ActivityStatisticsPanel.vue'
 import CellTypeIcon from './CellTypeIcon.vue'
-import { getCellId as getCellIdUtil, toNumericId, isUUID } from '../../utils/cellId'
-import activityService from '../../services/activity'
-import logger from '@/utils/logger'
-import { isContentWithSections, sectionsToFlatCells, normalizeContentToSections } from '../../utils/lessonContent'
-import { useLessonStore } from '../../store/lesson'
-import type { LessonClassroom } from '../../types/lesson'
-// v2.0: 导入composables
+
+// ============================================================================
+// 6. Composables
+// ============================================================================
 import { useSessionManager } from './composables/useSessionManager'
 import { usePolling } from './composables/usePolling'
 import { useDurationTimer } from './composables/useDurationTimer'
@@ -222,7 +240,15 @@ import { useNavigation } from './composables/useNavigation'
 import { useDataLoader } from './composables/useDataLoader'
 import { useFullscreen } from './composables/useFullscreen'
 import { useSelectionMode } from './composables/useSelectionMode'
-// v2.0: 导入学生监控工具函数
+
+// ============================================================================
+// 7. 工具函数
+// ============================================================================
+import logger from '@/utils/logger'
+import { getCellId as getCellIdUtil, toNumericId, isUUID } from '../../utils/cellId'
+import { isContentWithSections, sectionsToFlatCells, normalizeContentToSections } from '../../utils/lessonContent'
+
+// 学生监控工具
 import {
   getStudentStatusClass,
   getStudentTooltip,
@@ -233,7 +259,8 @@ import {
   hasAlerts as checkHasAlerts,
   checkLowSubmissionRate
 } from './studentMonitoring'
-// v2.0: 导入Cell工具函数
+
+// Cell 工具函数
 import {
   getCellTypeLabel,
   getCellTypeEmoji,
@@ -248,11 +275,16 @@ import {
   setModuleItemRef,
   scrollToSelectedModule
 } from './cellUtils'
-// v2.0: 导入格式化工具函数
+
+// 格式化工具函数
 import {
   formatDuration,
   formatRemainingTime,
 } from './formatUtils'
+
+// ============================================================================
+// 8. 组件定义
+// ============================================================================
 
 interface Props {
   lessonId: number
@@ -261,12 +293,24 @@ interface Props {
 
 const props = defineProps<Props>()
 
+// ============================================================================
+// Props & Emits
+// ============================================================================
+
 // 🔧 定义事件，通知父组件 session 变化
 const emit = defineEmits<{
   'session-changed': [session: any | null]
 }>()
 
+// ============================================================================
+// Store
+// ============================================================================
+
 const lessonStore = useLessonStore()
+
+// ============================================================================
+// Composables 初始化
+// ============================================================================
 
 // v2.0: 使用composables管理会话状态
 const sessionManager = useSessionManager({
@@ -422,6 +466,7 @@ const {
   handleEndActivity,
 } = sessionManager
 
+// 组件 Refs
 const containerRef = ref<HTMLElement | null>(null) // 用于检查组件是否在 DOM 中
 const moduleListRef = ref<HTMLElement | null>(null) // 模块列表容器
 const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map()) // 模块项引用
