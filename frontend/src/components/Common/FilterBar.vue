@@ -22,17 +22,31 @@
         </select>
       </template>
 
-      <!-- 搜索框 -->
-      <input
+      <!-- 搜索框（支持自动完成） -->
+      <el-autocomplete
         v-if="searchConfig"
         v-model="searchValue"
+        :fetch-suggestions="searchConfig.fetchSuggestions"
+        :placeholder="searchConfig.placeholder || '搜索...'"
+        :trigger-on-focus="searchConfig.triggerOnFocus !== false"
+        :clearable="searchConfig.clearable !== false"
+        @select="handleSuggestionSelect"
         @input="handleSearchInput"
         @keyup.enter="handleSearchEnter"
-        type="text"
-        :placeholder="searchConfig.placeholder || '搜索...'"
-        :class="['px-3 py-2 border rounded-lg flex-shrink-0', searchConfig.class || '']"
+        :class="['flex-shrink-0', searchConfig.class || '']"
         :style="searchConfig.style || { minWidth: '180px', width: '240px', maxWidth: '320px' }"
-      />
+        class="filter-bar-search"
+      >
+        <template #default="{ item }">
+          <div class="flex items-center gap-2">
+            <span v-if="item.type" class="text-xs px-1.5 py-0.5 rounded" :class="getTypeClass(item.type)">
+              {{ item.type === 'school' ? '学校' : '班级' }}
+            </span>
+            <span class="flex-1">{{ item.value }}</span>
+            <span v-if="item.subtitle" class="text-xs text-gray-500">{{ item.subtitle }}</span>
+          </div>
+        </template>
+      </el-autocomplete>
 
       <!-- 自定义插槽 -->
       <slot name="extra" :filterValues="filterValues" :searchValue="searchValue" />
@@ -72,6 +86,20 @@ export interface FilterConfig {
 }
 
 /**
+ * 搜索建议项
+ */
+export interface SearchSuggestion {
+  /** 显示值 */
+  value: string
+  /** 类型（如 'school', 'classroom'） */
+  type?: string
+  /** 副标题（如学校名称、班级编码等） */
+  subtitle?: string
+  /** 原始数据 */
+  data?: any
+}
+
+/**
  * 搜索配置
  */
 export interface SearchConfig {
@@ -83,6 +111,12 @@ export interface SearchConfig {
   debounceDelay?: number
   /** 是否按 Enter 键触发（默认 false，实时触发） */
   enterToSearch?: boolean
+  /** 获取搜索建议的函数 */
+  fetchSuggestions?: (queryString: string, callback: (suggestions: SearchSuggestion[]) => void) => void
+  /** 是否在获得焦点时触发搜索建议（默认 true） */
+  triggerOnFocus?: boolean
+  /** 是否可清空（默认 true） */
+  clearable?: boolean
   /** 自定义样式类 */
   class?: string
   /** 自定义样式 */
@@ -289,6 +323,25 @@ function handleSearchInput() {
   }
 }
 
+// 处理搜索建议选择
+function handleSuggestionSelect(item: SearchSuggestion) {
+  searchValue.value = item.value
+  emit('update:searchModelValue', item.value)
+  // 选择建议后立即触发搜索
+  emit('search-enter', item.value)
+  emit('search', item.value)
+}
+
+// 获取类型样式类
+function getTypeClass(type: string): string {
+  if (type === 'school') {
+    return 'bg-blue-100 text-blue-800'
+  } else if (type === 'classroom') {
+    return 'bg-green-100 text-green-800'
+  }
+  return 'bg-gray-100 text-gray-800'
+}
+
 // 处理搜索 Enter 键
 function handleSearchEnter() {
   if (!props.searchConfig) return
@@ -350,5 +403,14 @@ defineExpose({
 
 .filter-bar > div::-webkit-scrollbar-thumb:hover {
   background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* 自动完成组件样式 */
+.filter-bar-search :deep(.el-autocomplete) {
+  width: 100%;
+}
+
+.filter-bar-search :deep(.el-input__wrapper) {
+  border-radius: 0.5rem;
 }
 </style>

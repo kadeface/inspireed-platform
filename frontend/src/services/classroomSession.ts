@@ -238,7 +238,8 @@ export const classroomSessionService = {
    */
   async listSessions(lessonId: number, status?: string): Promise<ClassSession[]> {
     try {
-      const params = status ? { status } : {}
+      // 🆕 修复：后端期望状态值是大写（PENDING, ACTIVE, PAUSED, ENDED）
+      const params = status ? { status: status.toUpperCase() } : {}
       // api.get 已经返回 response.data，所以 response 就是数据本身
       const response = await api.get(`/classroom-sessions/lessons/${lessonId}/sessions`, { params })
       

@@ -112,12 +112,55 @@
       width="600px"
       :close-on-click-modal="false"
     >
+      <!-- 编码格式说明 -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+        <div class="text-sm text-blue-800">
+          <div class="font-semibold mb-1">📝 班级编码格式说明：</div>
+          <ul class="list-disc list-inside space-y-1 text-xs">
+            <li>格式：<code class="bg-blue-100 px-1 rounded">前1-2位（年级级别）+ 后2位（班级序号）</code></li>
+            <li>示例：<code class="bg-blue-100 px-1 rounded">701</code> = 7年级1班，<code class="bg-blue-100 px-1 rounded">1001</code> = 10年级1班</li>
+            <li>年级级别范围：1-12（1-6小学，7-9初中，10-12高中）</li>
+            <li>班级序号范围：01-99</li>
+          </ul>
+        </div>
+      </div>
+
       <el-form :model="classroomForm" label-width="120px">
-        <el-form-item label="班级名称" required>
-          <el-input v-model="classroomForm.name" placeholder="如：三年级一班" />
+        <el-form-item label="班级编码*" required>
+          <el-input 
+            v-model="classroomForm.code" 
+            @input="handleClassroomCodeChange"
+            @keypress="handleCodeKeypress"
+            placeholder="如：701、1001" 
+            maxlength="4"
+          />
+          <div v-if="classroomCodeError" class="text-red-500 text-xs mt-1 flex items-start gap-1">
+            <span class="mt-0.5">❌</span>
+            <span class="flex-1">{{ classroomCodeError }}</span>
+          </div>
+          <div v-else-if="classroomForm.code && !classroomForm.grade_id" class="text-amber-600 text-xs mt-1 flex items-start gap-1">
+            <span class="mt-0.5">💡</span>
+            <span class="flex-1">系统将根据编码自动匹配年级，或请手动选择年级</span>
+          </div>
+          <div v-else-if="classroomForm.code && classroomForm.grade_id && classroomForm.name" class="text-green-600 text-xs mt-1 flex items-center gap-1">
+            <span>✅</span>
+            <span>班级名称已自动生成：<strong>{{ classroomForm.name }}</strong></span>
+          </div>
+          <div v-else-if="classroomForm.code && classroomForm.code.length >= 3 && !classroomForm.grade_id" class="text-blue-600 text-xs mt-1 flex items-start gap-1">
+            <span class="mt-0.5">ℹ️</span>
+            <span class="flex-1">正在尝试自动匹配年级...</span>
+          </div>
         </el-form-item>
-        <el-form-item label="班级编码">
-          <el-input v-model="classroomForm.code" placeholder="可选，如：301" />
+        <el-form-item label="班级名称*" required>
+          <el-input 
+            v-model="classroomForm.name" 
+            :readonly="true"
+            placeholder="将根据班级编码和年级自动生成" 
+            :class="classroomForm.name ? 'bg-green-50 border-green-200' : 'bg-gray-50'"
+          />
+          <div v-if="!classroomForm.name && classroomForm.code && classroomForm.grade_id" class="text-gray-500 text-xs mt-1">
+            请检查班级编码格式是否正确
+          </div>
         </el-form-item>
         <el-form-item label="所属学校" required>
           <el-select v-model="classroomForm.school_id" placeholder="请选择学校" filterable class="w-full">
@@ -130,7 +173,12 @@
           </el-select>
         </el-form-item>
         <el-form-item label="所属年级" required>
-          <el-select v-model="classroomForm.grade_id" placeholder="请选择年级" class="w-full">
+          <el-select 
+            v-model="classroomForm.grade_id" 
+            @change="handleGradeChange"
+            placeholder="请选择年级" 
+            class="w-full"
+          >
             <el-option
               v-for="grade in grades"
               :key="grade.id"
@@ -379,7 +427,7 @@ const classroomPagination = ref({
 // 筛选状态（使用统一的 filters 对象）
 const classroomFilters = ref({
   region_id: undefined as number | undefined,
-  school_type: '' as string,
+  school_type: undefined as string | undefined,
   school_id: undefined as number | undefined,
   grade_id: undefined as number | undefined,
 })
@@ -390,6 +438,7 @@ const showClassroomModal = ref(false)
 const editingClassroom = ref<Classroom | null>(null)
 const classroomSaving = ref(false)
 const classroomNameError = ref('')
+const classroomCodeError = ref('')
 const classroomForm = ref<Partial<Classroom>>({
   name: '',
   code: '',
@@ -550,11 +599,73 @@ const classroomFilterConfigs = computed<FilterConfig[]>(() => [
   },
 ])
 
+// 搜索建议函数
+function fetchSearchSuggestions(queryString: string, callback: (suggestions: any[]) => void) {
+  if (!queryString || queryString.trim().length === 0) {
+    callback([])
+    return
+  }
+
+  const query = queryString.trim().toLowerCase()
+  const suggestions: any[] = []
+
+  // 搜索学校（优先匹配）
+  schools.value.forEach((school) => {
+    const schoolName = school.name.toLowerCase()
+    if (schoolName.includes(query)) {
+      // 计算匹配度（开头匹配优先）
+      const startsWith = schoolName.startsWith(query)
+      suggestions.push({
+        value: school.name,
+        type: 'school',
+        subtitle: '学校',
+        data: school,
+        _priority: startsWith ? 1 : 2, // 开头匹配优先级更高
+      })
+    }
+  })
+
+  // 搜索班级
+  allClassrooms.value.forEach((classroom) => {
+    const nameMatch = classroom.name.toLowerCase().includes(query)
+    const codeMatch = classroom.code && classroom.code.toLowerCase().includes(query)
+    const schoolName = getSchoolNameById(classroom.school_id).toLowerCase()
+    const schoolMatch = schoolName.includes(query)
+
+    if (nameMatch || codeMatch || schoolMatch) {
+      const schoolName = getSchoolNameById(classroom.school_id)
+      const gradeName = getGradeName(classroom.grade_id)
+      const subtitle = `${schoolName} · ${gradeName}${classroom.code ? ` · ${classroom.code}` : ''}`
+      
+      // 计算匹配度
+      let priority = 3
+      if (classroom.name.toLowerCase().startsWith(query)) priority = 1
+      else if (nameMatch) priority = 2
+      else if (codeMatch) priority = 2.5
+
+      suggestions.push({
+        value: classroom.name,
+        type: 'classroom',
+        subtitle: subtitle,
+        data: classroom,
+        _priority: priority,
+      })
+    }
+  })
+
+  // 按优先级排序，然后限制数量（最多显示 10 条）
+  suggestions.sort((a, b) => (a._priority || 999) - (b._priority || 999))
+  callback(suggestions.slice(0, 10).map(({ _priority, ...rest }) => rest))
+}
+
 // 搜索配置
 const classroomSearchConfig: SearchConfig = {
   placeholder: '搜索学校或班级名称...',
   debounce: false,
   enterToSearch: true,
+  fetchSuggestions: fetchSearchSuggestions,
+  triggerOnFocus: true,
+  clearable: true,
   style: { width: '260px', minWidth: '220px', maxWidth: '300px' },
 }
 
@@ -624,7 +735,7 @@ async function loadAllClassrooms() {
       page: classroomPagination.value.page,
       size: classroomPagination.value.size,
       region_id: classroomFilters.value.region_id,
-      school_type: classroomFilters.value.school_type,
+      school_type: classroomFilters.value.school_type || undefined,
       school_id: classroomFilters.value.school_id,
       grade_id: classroomFilters.value.grade_id,
       search: classroomSearchQuery.value || undefined,
@@ -706,9 +817,156 @@ function getSchoolNameById(schoolId: number): string {
   return school?.name || `学校${schoolId}`
 }
 
+/**
+ * 解析班级编号，提取年级级别和班级序号
+ * 规则：后2位是班级序号，前面是年级级别
+ * 例如：701 -> (7, 1), 1001 -> (10, 1), 1203 -> (12, 3)
+ */
+function parseClassroomCode(code: string): { gradeLevel: number | null; classSeq: number | null } {
+  if (!code || !code.trim()) {
+    return { gradeLevel: null, classSeq: null }
+  }
+
+  const trimmedCode = code.trim()
+  
+  // 至少需要3位数字（如701）
+  if (trimmedCode.length < 3) {
+    return { gradeLevel: null, classSeq: null }
+  }
+
+  // 提取后2位作为班级序号
+  const classPart = trimmedCode.slice(-2)
+  const gradePart = trimmedCode.slice(0, -2)
+
+  try {
+    const gradeLevel = parseInt(gradePart, 10)
+    const classSeq = parseInt(classPart, 10)
+
+    // 验证范围：年级1-12，班级序号1-99
+    if (gradeLevel >= 1 && gradeLevel <= 12 && classSeq >= 1 && classSeq <= 99) {
+      return { gradeLevel, classSeq }
+    }
+  } catch (e) {
+    // 解析失败
+  }
+
+  return { gradeLevel: null, classSeq: null }
+}
+
+/**
+ * 根据班级编号和年级生成班级名称
+ */
+function generateClassroomName(): void {
+  classroomCodeError.value = ''
+  
+  if (!classroomForm.value.code || !classroomForm.value.grade_id) {
+    classroomForm.value.name = ''
+    return
+  }
+
+  const { gradeLevel, classSeq } = parseClassroomCode(classroomForm.value.code)
+
+  if (!gradeLevel || !classSeq) {
+    classroomCodeError.value = '班级编码格式不正确。格式：前1-2位表示年级（1-12），后2位表示班级序号（01-99）。示例：701（7年级1班）、1001（10年级1班）'
+    classroomForm.value.name = ''
+    return
+  }
+
+  // 获取选中的年级对象
+  const selectedGrade = grades.value.find(g => g.id === classroomForm.value.grade_id)
+  if (!selectedGrade) {
+    classroomCodeError.value = '请先选择年级'
+    classroomForm.value.name = ''
+    return
+  }
+
+  // 验证年级级别是否匹配
+  if (selectedGrade.level !== gradeLevel) {
+    classroomCodeError.value = `班级编码中的年级级别（${gradeLevel}）与所选年级（${selectedGrade.name}，级别${selectedGrade.level}）不匹配。请检查编码或重新选择年级。`
+    classroomForm.value.name = ''
+    return
+  }
+
+  // 生成班级名称：年级名称 + 班级序号 + "班"
+  // 班级序号直接使用，不需要特殊处理（01会显示为1，10会显示为10）
+  classroomForm.value.name = `${selectedGrade.name}${classSeq}班`
+}
+
+/**
+ * 处理班级编码变化
+ */
+function handleClassroomCodeChange(): void {
+  // 自动过滤非数字字符
+  if (classroomForm.value.code) {
+    const numericOnly = classroomForm.value.code.replace(/\D/g, '')
+    if (numericOnly !== classroomForm.value.code) {
+      classroomForm.value.code = numericOnly
+      return // 会在下次输入时触发
+    }
+  }
+  
+  // 先尝试根据编码自动填充年级
+  autoFillGradeFromCode()
+  // 然后生成班级名称
+  generateClassroomName()
+}
+
+/**
+ * 限制编码输入只能输入数字
+ */
+function handleCodeKeypress(event: KeyboardEvent): void {
+  // 只允许数字键
+  const char = String.fromCharCode(event.which || event.keyCode)
+  if (!/[0-9]/.test(char)) {
+    event.preventDefault()
+  }
+}
+
+/**
+ * 根据班级编码自动填充年级（如果可能）
+ */
+function autoFillGradeFromCode(): void {
+  if (!classroomForm.value.code) {
+    return
+  }
+
+  // 只处理纯数字的编码
+  if (!/^\d+$/.test(classroomForm.value.code.trim())) {
+    return
+  }
+
+  const { gradeLevel } = parseClassroomCode(classroomForm.value.code)
+  
+  if (!gradeLevel) {
+    return
+  }
+
+  // 如果已经选择了年级，且年级级别匹配，不需要修改
+  if (classroomForm.value.grade_id) {
+    const selectedGrade = grades.value.find(g => g.id === classroomForm.value.grade_id)
+    if (selectedGrade && selectedGrade.level === gradeLevel) {
+      return
+    }
+  }
+
+  // 尝试找到匹配的年级
+  const matchingGrade = grades.value.find(g => g.level === gradeLevel)
+  if (matchingGrade) {
+    classroomForm.value.grade_id = matchingGrade.id
+  }
+}
+
+/**
+ * 处理年级变化
+ */
+function handleGradeChange(): void {
+  generateClassroomName()
+}
+
 function openCreateClassroomModal() {
   editingClassroom.value = null
   classroomNameError.value = ''
+  classroomCodeError.value = ''
   classroomForm.value = {
     name: '',
     code: '',
@@ -725,6 +983,7 @@ function openCreateClassroomModal() {
 function editClassroom(classroom: Classroom) {
   editingClassroom.value = classroom
   classroomNameError.value = ''
+  classroomCodeError.value = ''
   classroomForm.value = {
     name: classroom.name,
     code: classroom.code || '',
@@ -735,12 +994,25 @@ function editClassroom(classroom: Classroom) {
     description: classroom.description || '',
     is_active: classroom.is_active,
   }
+  // 编辑时，如果编码和年级都存在，验证并重新生成名称（确保格式统一）
+  if (classroomForm.value.code && classroomForm.value.grade_id) {
+    // 先尝试自动填充年级（如果编码格式正确）
+    autoFillGradeFromCode()
+    // 然后生成名称
+    generateClassroomName()
+  }
   showClassroomModal.value = true
 }
 
 async function saveClassroom() {
-  if (!classroomForm.value.name || !classroomForm.value.school_id || !classroomForm.value.grade_id) {
-    classroomNameError.value = '请填写必填字段'
+  if (!classroomForm.value.code || !classroomForm.value.name || !classroomForm.value.school_id || !classroomForm.value.grade_id) {
+    classroomNameError.value = '请填写所有必填字段（班级编码、班级名称、学校、年级）'
+    return
+  }
+
+  // 验证班级编码格式
+  if (classroomCodeError.value) {
+    classroomNameError.value = '请先修正班级编码格式错误'
     return
   }
 

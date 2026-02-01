@@ -1,7 +1,7 @@
 <template>
-  <div v-if="session && (session.status === 'active' || session.status === 'pending')" class="student-classroom-sync">
+  <div v-if="session && (session.status === 'ACTIVE' || session.status === 'PENDING')" class="student-classroom-sync">
     <!-- PENDING 状态：等待教师开始上课 -->
-    <div v-if="session.status === 'pending'" class="waiting-banner">
+    <div v-if="session.status === 'PENDING'" class="waiting-banner">
       <div class="banner-content">
         <span class="waiting-indicator">⏳</span>
         <div class="banner-text">

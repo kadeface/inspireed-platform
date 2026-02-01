@@ -5,6 +5,7 @@
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, cast
 import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
@@ -17,7 +18,7 @@ from app.models.classroom_session import (
     ClassSessionStatus,
     StudentSessionParticipation,
 )
-from app.models.lesson import Lesson
+from app.models.lesson import Lesson, LessonClassroom, LessonStatus
 from app.models.cell import Cell
 from app.models.organization import Classroom
 from app.models.classroom_assistant import ClassroomMembership
@@ -40,6 +41,7 @@ from app.schemas.classroom_session import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ========== 课堂会话 CRUD ==========
@@ -73,6 +75,46 @@ async def create_class_session(
     classroom = await db.get(Classroom, data.classroom_id)
     if not classroom:
         raise HTTPException(status_code=404, detail="班级不存在")
+    
+    if classroom.is_active is not True:
+        raise HTTPException(status_code=400, detail="班级未激活，无法创建会话")
+
+    # 检查教师是否有权限在该班级上课
+    from app.services.permission_service import PermissionService
+    permission_service = PermissionService()
+    if not await permission_service.can_teacher_publish_to_classroom(
+        db, current_user, classroom
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=f"无权在班级 {classroom.name} 上课",
+        )
+
+    # 确保教案已发布（如果还没有发布，自动发布）
+    lesson_status = cast(LessonStatus, lesson.status)
+    if lesson_status != LessonStatus.PUBLISHED:
+        setattr(lesson, "status", LessonStatus.PUBLISHED)
+        setattr(lesson, "published_at", datetime.utcnow())
+
+    # 检查并创建 LessonClassroom 关系（如果不存在）
+    # 这样学生端就能看到该教案了
+    existing_relation_result = await db.execute(
+        select(LessonClassroom).where(
+            LessonClassroom.lesson_id == lesson_id,
+            LessonClassroom.classroom_id == data.classroom_id,
+        )
+    )
+    existing_relation = existing_relation_result.scalar_one_or_none()
+    
+    if not existing_relation:
+        # 创建 LessonClassroom 关系
+        lesson_classroom = LessonClassroom(
+            lesson_id=lesson_id,
+            classroom_id=data.classroom_id,
+            assigned_by=current_user_id,
+            assigned_at=datetime.utcnow(),
+        )
+        db.add(lesson_classroom)
 
     # 检查是否已有活跃的会话
     result = await db.execute(
@@ -142,10 +184,10 @@ async def get_class_session(
         raise HTTPException(status_code=403, detail="无权访问该会话")
 
     if current_role == UserRole.STUDENT:
-        # 检查学生是否属于该班级
+        # 🆕 使用统一函数检查学生是否属于该班级（支持多班级和向后兼容）
         classroom_id = cast(int, session.classroom_id)
-        student_classroom_id = cast(Optional[int], current_user.classroom_id)
-        if student_classroom_id != classroom_id:
+        has_access = await check_user_in_classroom(db, current_user, classroom_id)
+        if not has_access:
             raise HTTPException(status_code=403, detail="无权访问该会话")
 
     # 加载关联信息
@@ -227,6 +269,14 @@ async def list_lesson_sessions(
     # 如果是教师，只返回自己创建的会话
     if current_role == UserRole.TEACHER:
         query = query.where(ClassSession.teacher_id == current_user_id)
+    
+    # 🆕 如果是学生，只返回学生所属班级的会话
+    elif current_role == UserRole.STUDENT:
+        student_classroom_ids = await get_user_classroom_ids(db, current_user)
+        if not student_classroom_ids:
+            # 如果学生没有分配到任何班级，返回空列表
+            return []
+        query = query.where(ClassSession.classroom_id.in_(list(student_classroom_ids)))
 
     query = query.order_by(ClassSession.created_at.desc())
 
@@ -456,6 +506,7 @@ async def end_session(
         return session
 
     # 更新状态
+    old_status = session.status
     session.status = ClassSessionStatus.ENDED # type: ignore[comparison-overlap]
     session.ended_at = datetime.utcnow() # type: ignore[comparison-overlap]
 
@@ -478,22 +529,46 @@ async def end_session(
         participation.is_active = False # type: ignore[comparison-overlap]
         participation.left_at = datetime.utcnow() # type: ignore[comparison-overlap]
 
-    await db.commit()
+    # 提交到数据库
+    try:
+        await db.commit()
+        print(f"✅ 会话 {session_id} 状态已更新为 ENDED，已提交到数据库")
+    except Exception as commit_error:
+        print(f"❌ 提交数据库失败: {commit_error}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"结束会话失败：数据库提交错误 - {str(commit_error)}")
+    
+    # 刷新会话以获取最新状态
     await db.refresh(session)
+    
+    # 验证状态是否真的更新了
+    if session.status != ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
+        print(f"⚠️ 警告：会话 {session_id} 状态更新后验证失败！期望: ENDED, 实际: {session.status}")
+        raise HTTPException(status_code=500, detail="结束会话失败：状态更新验证失败")
+    
+    print(f"✅ 会话 {session_id} 已成功结束：状态从 {old_status} 更新为 {session.status}")
 
     # 🆕 通过 WebSocket 通知所有学生会话已结束
-    await manager.broadcast_to_session(
-        message={
-            "type": "session_ended",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "session_id": session_id,
-                "ended_at": session.ended_at.isoformat() if session.ended_at else None, # type: ignore[union-attr]
-                "message": "课程已结束"
-            }
-        },
-        session_id=session_id
-    )
+    # 注意：WebSocket 广播失败不应该影响数据库提交，所以放在 try-except 中
+    try:
+        await manager.broadcast_to_session(
+            message={
+                "type": "session_ended",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": {
+                    "session_id": session_id,
+                    "ended_at": session.ended_at.isoformat() if session.ended_at else None, # type: ignore[union-attr]
+                    "message": "课程已结束"
+                }
+            },
+            session_id=session_id
+        )
+        print(f"✅ 已通过 WebSocket 通知所有学生会话 {session_id} 已结束")
+    except Exception as ws_error:
+        # WebSocket 广播失败不应该影响数据库提交
+        print(f"⚠️ WebSocket 广播失败（不影响数据库提交）: {ws_error}")
+        import traceback
+        traceback.print_exc()
 
     return session
 
@@ -862,6 +937,28 @@ async def join_session(
         await db.commit()
         await db.refresh(existing)
 
+        # 🆕 如果学生重新加入（从离线变为在线），通知教师
+        if was_inactive:
+            try:
+                from app.api.v1.classroom_sessions import manager
+                await manager.broadcast_to_session(
+                    message={
+                        "type": "participant_joined",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "data": {
+                            "session_id": session_id,
+                            "student_id": current_user.id,
+                            "student_name": current_user.full_name or current_user.username,
+                            "active_students": session.active_students,
+                            "total_students": session.total_students,
+                        }
+                    },
+                    session_id=session_id
+                )
+                logger.info(f"📢 已广播学生重新加入消息（会话 {session_id}，学生 {current_user.id}）")
+            except Exception as ws_error:
+                logger.warning(f"⚠️ 广播学生重新加入消息失败: {ws_error}")
+
         return {
             **existing.__dict__,
             "student_name": current_user.full_name or current_user.username,
@@ -884,6 +981,28 @@ async def join_session(
 
     await db.commit()
     await db.refresh(participation)
+
+    # 🆕 通过 WebSocket 通知教师有学生加入
+    try:
+        from app.api.v1.classroom_sessions import manager
+        await manager.broadcast_to_session(
+            message={
+                "type": "participant_joined",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": {
+                    "session_id": session_id,
+                    "student_id": current_user.id,
+                    "student_name": current_user.full_name or current_user.username,
+                    "active_students": session.active_students,
+                    "total_students": session.total_students,
+                }
+            },
+            session_id=session_id
+        )
+        logger.info(f"📢 已广播学生加入消息（会话 {session_id}，学生 {current_user.id}）")
+    except Exception as ws_error:
+        # WebSocket 通知失败不影响加入流程
+        logger.warning(f"⚠️ 广播学生加入消息失败: {ws_error}")
 
     return {
         **participation.__dict__,
@@ -948,29 +1067,12 @@ async def get_student_pending_sessions(
     if current_role != UserRole.STUDENT:
         raise HTTPException(status_code=403, detail="仅学生可访问此接口")
 
-    # 🆕 获取学生所在班级ID（同时检查 User.classroom_id 和 ClassroomMembership）
-    student_classroom_ids = set()
-    
-    # 方式1：检查 User.classroom_id（向后兼容）
-    student_classroom_id = cast(Optional[int], current_user.classroom_id)
-    if student_classroom_id:
-        student_classroom_ids.add(student_classroom_id)
-    
-    # 方式2：检查 ClassroomMembership（支持多班级）
-    membership_result = await db.execute(
-        select(ClassroomMembership).where(
-            and_(
-                ClassroomMembership.user_id == current_user.id,
-                ClassroomMembership.is_active == True,
-            )
-        )
-    )
-    memberships = membership_result.scalars().all()
-    for membership in memberships:
-        student_classroom_ids.add(membership.classroom_id)
+    # 🆕 使用统一函数获取学生所在班级ID（支持多班级）
+    student_classroom_ids = await get_user_classroom_ids(db, current_user)
     
     if not student_classroom_ids:
         # 如果学生没有分配班级，返回空列表
+        logger.info(f"学生 {current_user.id} 没有分配到任何班级，返回空列表")
         return []
 
     # 计算48小时前的时间点
@@ -1392,6 +1494,9 @@ async def websocket_endpoint(
 async def send_initial_state(websocket: WebSocket, session: ClassSession, db: AsyncSession):
     """发送初始状态给新连接的客户端"""
     
+    # 确保 Lesson 已导入（防止作用域问题）
+    from app.models.lesson import Lesson
+    
     # 加载关联信息（教师、课程、班级）
     session_lesson = await db.get(Lesson, cast(int, session.lesson_id))
     session_teacher = await db.get(User, cast(int, session.teacher_id))
@@ -1802,6 +1907,9 @@ async def websocket_teacher_lesson_endpoint(
         return
     
     # 3. 验证教案存在性和权限
+    # 确保 Lesson 已导入（防止作用域问题）
+    from app.models.lesson import Lesson
+    
     lesson = await db.get(Lesson, lesson_id)
     if not lesson:
         await websocket.close(code=1008, reason="Lesson not found")

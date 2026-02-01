@@ -191,13 +191,26 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3 class="text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-3">等待教师切换内容</h3>
-            <p class="text-sm text-gray-700 font-medium mb-2">
-              教师正在准备课程内容，请稍候...
-            </p>
-            <p class="text-xs text-gray-600">
-              教师切换内容后，这里将显示相应的学习模块
-            </p>
+            <!-- PENDING 状态：等待教师开始上课 -->
+            <template v-if="classroomSession?.status === 'PENDING'">
+              <h3 class="text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-3">等待教师开始上课</h3>
+              <p class="text-sm text-gray-700 font-medium mb-2">
+                已成功加入课堂，请等待教师开始上课...
+              </p>
+              <p class="text-xs text-gray-600">
+                教师开始上课后，这里将显示相应的学习内容
+              </p>
+            </template>
+            <!-- ACTIVE 状态：等待教师切换内容 -->
+            <template v-else>
+              <h3 class="text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-3">等待教师切换内容</h3>
+              <p class="text-sm text-gray-700 font-medium mb-2">
+                教师正在准备课程内容，请稍候...
+              </p>
+              <p class="text-xs text-gray-600">
+                教师切换内容后，这里将显示相应的学习模块
+              </p>
+            </template>
           </div>
         </div>
 
@@ -400,7 +413,7 @@
     <QuestionForm
       :show="showQuestionForm"
       :lesson-id="lessonId"
-      :cells="lesson?.content"
+      :cells="lessonContentCells"
       @close="showQuestionForm = false"
       @success="handleQuestionSuccess"
     />
@@ -608,13 +621,17 @@ async function handleExitClassroom() {
 }
 
 // 🔍 调试：监听 classroomSession 变化
-watch(classroomSession, (newSession) => {
-  console.log('🔍 LessonView classroomSession 变化:', {
-    sessionId: newSession?.id,
-    status: newSession?.status,
-    lessonId: newSession?.lesson_id,
-  })
-}, { immediate: true, deep: true })
+watch(classroomSession, (newSession, oldSession) => {
+  // 只在有实际变化时输出日志（避免初始化时的 undefined 日志）
+  if (newSession || oldSession) {
+    console.log('🔍 LessonView classroomSession 变化:', {
+      sessionId: newSession?.id,
+      status: newSession?.status,
+      lessonId: newSession?.lessonId || newSession?.lesson_id,
+      hasSession: !!newSession,
+    })
+  }
+}, { deep: true })
 
 // 自动保存定时器
 let notesAutoSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -667,11 +684,17 @@ const filteredCells = computed(() => {
   const cells = lessonContentCells.value
   if (!cells || cells.length === 0) return []
   
+  // 🆕 关键修复：在 PENDING 状态下，学生不能看到任何内容（等待教师开始上课）
+  if (isInClassroomMode.value && classroomSession.value?.status === 'PENDING') {
+    return []
+  }
+  
   // 只在状态变化时输出日志
   const currentState = JSON.stringify({
     isInClassroomMode: isInClassroomMode.value,
     displayCellId: displayCellId.value,
     displayCellOrders: classroomSession.value?.settings?.display_cell_orders,
+    sessionStatus: classroomSession.value?.status,
   })
   
   if (currentState !== lastFilterState) {

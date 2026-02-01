@@ -120,7 +120,7 @@
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">年级</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">班级</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学科</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学期/学年</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学期</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">任务类型</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
@@ -144,7 +144,7 @@
               {{ assignment.subject?.name || '未知' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ assignment.semester?.name || '未知' }} ({{ assignment.academic_year }})
+              {{ assignment.semester?.name || '未知' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span
@@ -224,21 +224,6 @@
       :close-on-click-modal="false"
     >
       <el-form :model="assignmentForm" label-width="120px">
-        <el-form-item label="教师*" required>
-          <el-select
-            v-model="assignmentForm.teacher_id"
-            placeholder="请选择教师"
-            filterable
-            class="w-full"
-          >
-            <el-option
-              v-for="teacher in teachers"
-              :key="teacher.id"
-              :label="teacher.full_name || teacher.username"
-              :value="teacher.id"
-            />
-          </el-select>
-        </el-form-item>
         <el-form-item label="学校*" required>
           <el-select
             v-model="assignmentForm.school_id"
@@ -254,6 +239,25 @@
               :value="school.id"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item label="教师*" required>
+          <el-select
+            v-model="assignmentForm.teacher_id"
+            @change="handleAssignmentTeacherChange"
+            placeholder="请选择教师"
+            filterable
+            class="w-full"
+          >
+            <el-option
+              v-for="teacher in filteredAssignmentTeachers"
+              :key="teacher.id"
+              :label="teacher.full_name || teacher.username"
+              :value="teacher.id"
+            />
+          </el-select>
+          <div v-if="assignmentForm.school_id && filteredAssignmentTeachers.length === 0" class="text-xs text-gray-500 mt-1">
+            该学校暂无教师
+          </div>
         </el-form-item>
         <el-form-item label="年级*" required>
           <el-select
@@ -306,6 +310,7 @@
             v-model="assignmentForm.semester_id"
             placeholder="请选择学期"
             class="w-full"
+            filterable
           >
             <el-option
               v-for="semester in semesters"
@@ -314,13 +319,9 @@
               :value="semester.id"
             />
           </el-select>
-        </el-form-item>
-        <el-form-item label="学年*" required>
-          <el-input
-            v-model="assignmentForm.academic_year"
-            placeholder="如：2023-2024"
-            maxlength="20"
-          />
+          <div v-if="assignmentForm.semester_id" class="text-xs text-gray-500 mt-1">
+            {{ getSelectedSemesterInfo() }}
+          </div>
         </el-form-item>
         <el-form-item label="任务类型*" required>
           <el-select
@@ -707,12 +708,12 @@ const showAssignmentDialog = ref(false)
 const editingAssignment = ref<TeacherTeachingAssignment | null>(null)
 const assignmentSaving = ref(false)
 const assignmentForm = ref<TeacherTeachingAssignmentCreate>({
-  teacher_id: 0,
-  school_id: 0,
-  grade_id: 0,
-  classroom_id: 0,
-  subject_id: 0,
-  semester_id: 0,
+  teacher_id: undefined as any,
+  school_id: undefined as any,
+  grade_id: undefined as any,
+  classroom_id: undefined as any,
+  subject_id: undefined as any,
+  semester_id: undefined as any,
   academic_year: '',
   assignment_type: TeachingAssignmentType.SUBJECT_TEACHER,
   is_active: true,
@@ -750,6 +751,17 @@ const filteredAssignmentSchools = computed(() => {
   }
   return schools.value.filter(
     (s) => s.region_id === assignmentFilters.value.region_id
+  )
+})
+
+// 计算属性：过滤后的教师列表（用于教学任务表单，根据选择的学校筛选）
+// 如果没有选择学校，显示所有教师；如果选择了学校，只显示该学校的教师
+const filteredAssignmentTeachers = computed(() => {
+  if (!assignmentForm.value.school_id) {
+    return teachers.value
+  }
+  return teachers.value.filter(
+    (t) => t.school_id === assignmentForm.value.school_id
   )
 })
 
@@ -842,6 +854,13 @@ function handleAssignmentRegionChange() {
   loadTeacherAssignments()
 }
 
+// 辅助函数：获取选中学期信息
+function getSelectedSemesterInfo(): string {
+  if (!assignmentForm.value.semester_id) return ''
+  const semester = semesters.value.find(s => s.id === assignmentForm.value.semester_id)
+  return semester ? `学年：${semester.year || '未设置'}` : ''
+}
+
 async function loadTeacherAssignments() {
   assignmentLoading.value = true
   try {
@@ -863,12 +882,12 @@ async function loadTeacherAssignments() {
 function openCreateAssignmentDialog() {
   editingAssignment.value = null
   assignmentForm.value = {
-    teacher_id: 0,
-    school_id: 0,
-    grade_id: 0,
-    classroom_id: 0,
-    subject_id: 0,
-    semester_id: 0,
+    teacher_id: undefined as any,
+    school_id: undefined as any,
+    grade_id: undefined as any,
+    classroom_id: undefined as any,
+    subject_id: undefined as any,
+    semester_id: undefined as any,
     academic_year: '',
     assignment_type: TeachingAssignmentType.SUBJECT_TEACHER,
     is_active: true,
@@ -892,20 +911,52 @@ function editTeacherAssignment(assignment: TeacherTeachingAssignment) {
   showAssignmentDialog.value = true
 }
 
+function handleAssignmentTeacherChange() {
+  // 如果选择了教师，且教师有学校信息，自动填充学校
+  if (assignmentForm.value.teacher_id) {
+    const selectedTeacher = teachers.value.find(t => t.id === assignmentForm.value.teacher_id)
+    if (selectedTeacher && selectedTeacher.school_id) {
+      // 如果当前没有选择学校，或者选择的学校与教师学校不一致，则自动填充
+      if (!assignmentForm.value.school_id || assignmentForm.value.school_id !== selectedTeacher.school_id) {
+        assignmentForm.value.school_id = selectedTeacher.school_id
+        // 学校改变后，需要清空年级和班级
+        assignmentForm.value.grade_id = undefined as any
+        assignmentForm.value.classroom_id = undefined as any
+      }
+    }
+  }
+}
+
 function handleAssignmentSchoolChange() {
-  assignmentForm.value.grade_id = 0
-  assignmentForm.value.classroom_id = 0
+  // 清空年级和班级
+  assignmentForm.value.grade_id = undefined as any
+  assignmentForm.value.classroom_id = undefined as any
+  
+  // 如果当前选择的教师不属于新选择的学校，清空教师选择
+  if (assignmentForm.value.teacher_id) {
+    const selectedTeacher = teachers.value.find(t => t.id === assignmentForm.value.teacher_id)
+    if (selectedTeacher && selectedTeacher.school_id !== assignmentForm.value.school_id) {
+      assignmentForm.value.teacher_id = undefined as any
+    }
+  }
 }
 
 function handleAssignmentGradeChange() {
-  assignmentForm.value.classroom_id = 0
+  assignmentForm.value.classroom_id = undefined as any
 }
 
 async function saveTeacherAssignment() {
   if (!assignmentForm.value.teacher_id || !assignmentForm.value.school_id || !assignmentForm.value.grade_id ||
       !assignmentForm.value.classroom_id || !assignmentForm.value.subject_id || !assignmentForm.value.semester_id ||
-      !assignmentForm.value.academic_year || !assignmentForm.value.assignment_type) {
+      !assignmentForm.value.assignment_type) {
     ElMessage.warning('请填写所有必填字段')
+    return
+  }
+
+  // 从学期中提取学年
+  const selectedSemester = semesters.value.find(s => s.id === assignmentForm.value.semester_id)
+  if (!selectedSemester || !selectedSemester.year) {
+    ElMessage.error('所选学期缺少学年信息，请先完善学期数据')
     return
   }
 
@@ -920,7 +971,7 @@ async function saveTeacherAssignment() {
         classroom_id: assignmentForm.value.classroom_id,
         subject_id: assignmentForm.value.subject_id,
         semester_id: assignmentForm.value.semester_id,
-        academic_year: assignmentForm.value.academic_year,
+        academic_year: selectedSemester.year, // 从学期中提取
         assignment_type: assignmentForm.value.assignment_type,
         is_active: assignmentForm.value.is_active,
       }
@@ -928,7 +979,18 @@ async function saveTeacherAssignment() {
       ElMessage.success('教学任务更新成功')
     } else {
       // 创建
-      await teacherApi.createAssignment(assignmentForm.value as TeacherTeachingAssignmentCreate)
+      const createData: TeacherTeachingAssignmentCreate = {
+        teacher_id: assignmentForm.value.teacher_id,
+        school_id: assignmentForm.value.school_id,
+        grade_id: assignmentForm.value.grade_id,
+        classroom_id: assignmentForm.value.classroom_id,
+        subject_id: assignmentForm.value.subject_id,
+        semester_id: assignmentForm.value.semester_id,
+        academic_year: selectedSemester.year, // 从学期中提取
+        assignment_type: assignmentForm.value.assignment_type,
+        is_active: assignmentForm.value.is_active,
+      }
+      await teacherApi.createAssignment(createData)
       ElMessage.success('教学任务创建成功')
     }
     showAssignmentDialog.value = false

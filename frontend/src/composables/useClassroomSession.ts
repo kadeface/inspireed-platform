@@ -17,8 +17,8 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
   const participation = ref<StudentParticipation | null>(null)
   const currentCellId = ref<number | null>(null)
   const isInClassroomMode = computed(() => {
-    // 在 pending 和 active 状态下都认为是课堂模式
-    return session.value?.status === 'active' || session.value?.status === 'pending'
+    // 在 PENDING 和 ACTIVE 状态下都认为是课堂模式
+    return session.value?.status === 'ACTIVE' || session.value?.status === 'PENDING'
   })
   
   // 轮询定时器（用于定期获取会话状态）- 降级方案
@@ -37,14 +37,19 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
     const RETRY_DELAY = 2000 // 2秒
     
     try {
-      // 🆕 获取该教案的所有会话（包括 pending 和 active 状态）
-      // 先尝试查找 active 状态的会话
-      let sessions = await classroomSessionService.listSessions(lessonId, 'active')
+      console.log(`🔍 [${retryCount + 1}/3] 开始查找会话，lessonId: ${lessonId}`)
       
-      // 如果没有 active 状态的会话，尝试查找 pending 状态的会话
+      // 🆕 获取该教案的所有会话（包括 pending 和 active 状态）
+      // 先尝试查找 ACTIVE 状态的会话
+      let sessions = await classroomSessionService.listSessions(lessonId, 'ACTIVE')
+      console.log(`📋 找到 ${sessions.length} 个 ACTIVE 状态的会话`)
+
+      // 如果没有 ACTIVE 状态的会话，尝试查找 PENDING 状态的会话
       if (sessions.length === 0) {
         const allSessions = await classroomSessionService.listSessions(lessonId)
-        sessions = allSessions.filter(s => s.status === 'pending' || s.status === 'active')
+        console.log(`📋 找到 ${allSessions.length} 个所有状态的会话`)
+        sessions = allSessions.filter(s => s.status === 'PENDING' || s.status === 'ACTIVE')
+        console.log(`📋 过滤后找到 ${sessions.length} 个 PENDING 或 ACTIVE 状态的会话`)
       }
       
       if (sessions.length > 0) {
@@ -61,8 +66,8 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
           return 0
         })
         
-        // 找到最新的可加入会话（优先 active，其次 pending）
-        const activeSession = sortedSessions.find(s => s.status === 'active') || sortedSessions[0]
+        // 找到最新的可加入会话（优先 ACTIVE，其次 PENDING）
+        const activeSession = sortedSessions.find(s => s.status === 'ACTIVE') || sortedSessions[0]
         
         console.log('🔍 会话选择:', {
           totalSessions: sessions.length,
@@ -158,7 +163,12 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         return findAndJoinSession(retryCount + 1)
       }
       
-      console.log('⚠️ 未找到可加入的会话')
+      // 🆕 提供更清晰的日志说明
+      console.log('ℹ️ 未找到可加入的课堂会话，可能的原因：')
+      console.log('  1. 教师尚未创建课堂')
+      console.log('  2. 教师创建的课堂不属于您的班级')
+      console.log('  3. 所有课堂会话已结束')
+      console.log('  学生可以自主学习，不影响正常使用')
       return null
     } catch (error) {
       console.error('❌ 查找会话失败:', error)
@@ -656,19 +666,19 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
     }
     
     // 🆕 PENDING 状态下，学生不能看到内容
-    if (session.value?.status === 'pending') {
+    if (session.value?.status === 'PENDING') {
       return false
     }
-    
+
     const settings = session.value?.settings
-    
+
     // 🆕 优先检查新方式：display_cell_orders
     const displayOrders = settings?.display_cell_orders
     if (displayOrders && Array.isArray(displayOrders)) {
       // 🆕 修复：即使是空数组，在 ACTIVE/PAUSED 状态下也认为"有内容可显示"
       // 因为这可能只是教师暂时取消了所有选择，而不是课程未开始
       // 空数组会导致 filteredCells 为空，页面会显示空状态提示而不是"等待教师切换"
-      if (session.value?.status === 'active' || session.value?.status === 'paused') {
+      if (session.value?.status === 'ACTIVE' || session.value?.status === 'PAUSED') {
         return true  // ACTIVE/PAUSED 状态下，认为"有内容可显示"（即使是空数组）
       }
       // 在其他状态下，空数组表示没有内容

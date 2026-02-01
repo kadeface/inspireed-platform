@@ -670,7 +670,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { lessonService } from '@/services/lesson'
@@ -951,13 +951,16 @@ const viewLesson = (lessonId: number) => {
 // 加载待开始课堂列表
 const loadPendingSessions = async () => {
   // 只允许学生访问
-  if (currentUser.value?.role !== 'student') {
+  if (!currentUser.value || currentUser.value.role !== 'student') {
+    console.log('⏸️ loadPendingSessions: 用户不是学生或用户信息未加载，跳过')
     return
   }
   
   loadingPendingSessions.value = true
   try {
+    console.log('🔄 开始加载待开始课堂列表...')
     const sessions = await classroomSessionService.getStudentPendingSessions()
+    console.log('✅ 获取到待开始课堂:', sessions.length, '个', sessions)
     
     // 前端过滤：只保留最近48小时内的会话（双重保障）
     const now = new Date()
@@ -965,6 +968,7 @@ const loadPendingSessions = async () => {
     
     const filteredSessions = sessions.filter(session => {
       if (!session.createdAt) {
+        console.warn('⚠️ 会话缺少创建时间:', session)
         return false // 没有创建时间的会话不显示
       }
       
@@ -985,16 +989,27 @@ const loadPendingSessions = async () => {
       }
       
       // 只返回48小时内的会话
-      return createdAt >= cutoffTime
+      const isValid = createdAt >= cutoffTime
+      if (!isValid) {
+        console.log('⏭️ 会话已过期（超过48小时）:', session.lessonTitle, '创建时间:', createdAt)
+      }
+      return isValid
     })
     
+    console.log('✅ 过滤后的待开始课堂:', filteredSessions.length, '个')
     pendingSessions.value = filteredSessions
   } catch (e: any) {
-    console.error('Failed to load pending sessions:', e)
-    // 如果是权限错误或其他错误,不显示错误提示
-    if (e.response?.status !== 403) {
-      console.warn('⚠️ Could not load pending sessions:', e.message)
+    console.error('❌ 加载待开始课堂失败:', e)
+    // 如果是权限错误，可能是学生没有分配到班级
+    if (e.response?.status === 403) {
+      console.warn('⚠️ 权限错误：可能是学生没有分配到班级')
+    } else if (e.response?.status === 404) {
+      console.warn('⚠️ 接口不存在或学生没有待开始的课堂')
+    } else {
+      console.warn('⚠️ Could not load pending sessions:', e.message || e)
     }
+    // 即使出错也设置为空数组，避免显示错误
+    pendingSessions.value = []
   } finally {
     loadingPendingSessions.value = false
   }
@@ -1159,7 +1174,8 @@ const enterClassroom = (lessonId: number) => {
 // 开始轮询待开始课堂列表
 const startPendingSessionsPolling = () => {
   // 只允许学生轮询
-  if (currentUser.value?.role !== 'student') {
+  if (!currentUser.value || currentUser.value.role !== 'student') {
+    console.log('⏸️ startPendingSessionsPolling: 用户不是学生或用户信息未加载，跳过')
     return
   }
   
@@ -1175,6 +1191,8 @@ const startPendingSessionsPolling = () => {
   pendingSessionsPollingInterval = setInterval(() => {
     loadPendingSessions()
   }, PENDING_SESSIONS_POLLING_INTERVAL)
+  
+  console.log('✅ 已启动待开始课堂轮询，间隔:', PENDING_SESSIONS_POLLING_INTERVAL, 'ms')
 }
 
 // 停止轮询待开始课堂列表
@@ -1251,22 +1269,38 @@ const handleLogout = () => {
   router.push('/login')
 }
 
+// 监听用户信息变化，确保在用户信息加载后再启动轮询
+watch(
+  () => currentUser.value?.role,
+  (newRole) => {
+    if (newRole === 'student') {
+      // 用户信息加载完成且是学生，启动轮询
+      startPendingSessionsPolling()
+      startActiveSessionsPolling()
+    }
+  },
+  { immediate: true }
+)
+
 // 生命周期
-onMounted(() => {
-  fetchData()
-  // 开始轮询待开始和正在上课的课堂列表
-  startPendingSessionsPolling()
-  startActiveSessionsPolling()
-  // 开始轮询待开始课堂列表
-  startPendingSessionsPolling()
+onMounted(async () => {
+  // 先加载基础数据
+  await fetchData()
+  
+  // 等待用户信息加载完成后再启动轮询
+  await nextTick()
+  
+  // 如果用户信息已加载，立即启动轮询（watch 也会触发，但这里确保立即执行一次）
+  if (currentUser.value?.role === 'student') {
+    startPendingSessionsPolling()
+    startActiveSessionsPolling()
+  }
 })
 
 onUnmounted(() => {
   // 停止轮询
   stopPendingSessionsPolling()
   stopActiveSessionsPolling()
-  // 停止轮询
-  stopPendingSessionsPolling()
 })
 </script>
 

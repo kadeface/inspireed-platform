@@ -46,7 +46,7 @@
             </span>
           </div>
           <!-- 课程时长显示 -->
-          <div v-if="session && session.status !== 'pending'" class="duration-info" :class="{ 
+          <div v-if="session && normalizedSessionStatus !== 'pending'" class="duration-info" :class="{ 
             'duration-warning': remainingTime < 600, 
             'duration-danger': remainingTime < 300 
           }">
@@ -59,7 +59,7 @@
               }">
                 {{ formatDuration(displayDuration) }}
               </span>
-              <span v-if="session.status === 'active'" class="duration-remaining">
+              <span v-if="normalizedSessionStatus === 'active'" class="duration-remaining">
                 剩余: {{ formatRemainingTime(remainingTime) }}
               </span>
             </span>
@@ -77,14 +77,16 @@
         </button>
         
         <!-- PENDING 状态：等待学生登录 -->
-        <template v-if="session && session.status === 'pending'">
+        <template v-if="session && session.status === 'PENDING'">
           <button 
             @click="handleBeginClass"
             :disabled="loading || activeStudents.length === 0"
             class="btn btn-primary"
-            :title="activeStudents.length === 0 ? '请等待学生加入课堂' : '开始上课'"
+            :class="{ 'btn-disabled-hint': activeStudents.length === 0 }"
+            :title="activeStudents.length === 0 ? '请等待学生加入课堂（至少需要1名学生）' : '开始上课'"
           >
             ▶️ 开始上课
+            <span v-if="activeStudents.length === 0" class="ml-2 text-xs opacity-75">(等待学生加入)</span>
           </button>
           <button 
             @click="handleEnd"
@@ -97,7 +99,7 @@
         </template>
         
         <!-- ACTIVE 状态：上课中 -->
-        <template v-if="session && session.status === 'active'">
+        <template v-if="session && (session.status === 'active' || session.status === 'ACTIVE')">
           <!-- 显示模式切换按钮 -->
           <div class="display-mode-controls">
             <button 
@@ -133,7 +135,7 @@
         </template>
         
         <!-- PAUSED 状态：已暂停 -->
-        <template v-if="session && session.status === 'paused'">
+        <template v-if="session && (session.status === 'paused' || session.status === 'PAUSED')">
           <!-- 显示模式切换按钮 -->
           <div class="display-mode-controls">
             <button 
@@ -171,6 +173,55 @@
       </div>
     </div>
     
+    <!-- PENDING 状态：等待学生加入提示区域 -->
+    <div
+      v-if="session && session.status === 'PENDING'"
+      class="waiting-students-banner"
+    >
+      <div class="waiting-banner-content">
+        <div class="waiting-banner-icon">⏳</div>
+        <div class="waiting-banner-text">
+          <div class="waiting-banner-title">
+            等待学生加入课堂
+            <span v-if="activeStudents.length > 0" class="student-count-badge">{{ activeStudents.length }} 人已加入</span>
+          </div>
+          <div class="waiting-banner-subtitle">
+            <span v-if="activeStudents.length === 0">
+              已创建课堂，学生正在加入中... 请等待至少1名学生加入后再开始上课
+            </span>
+            <span v-else>
+              已有 {{ activeStudents.length }} 名学生加入，可以开始上课了
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 已加入学生列表 -->
+      <div v-if="activeStudents.length > 0" class="joined-students-list">
+        <div class="joined-students-header">
+          <span class="joined-students-title">已加入学生（{{ activeStudents.length }} 人）</span>
+        </div>
+        <div class="joined-students-grid">
+          <div 
+            v-for="student in activeStudents.slice(0, 12)" 
+            :key="student.id || student.user_id"
+            class="joined-student-item"
+          >
+            <div class="student-avatar">
+              {{ (student.full_name || student.username || '学生').charAt(0) }}
+            </div>
+            <div class="student-name">
+              {{ student.full_name || student.username || '学生' }}
+            </div>
+          </div>
+          <div v-if="activeStudents.length > 12" class="joined-student-item joined-student-more">
+            <div class="student-avatar">+{{ activeStudents.length - 12 }}</div>
+            <div class="student-name">更多</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 主布局：左侧模块列表，右侧预览和监控 -->
     <div class="main-layout" :class="{ 'module-fullscreen-mode': modulePanelFullscreen }">
       <!-- 左侧：教学模块 -->
@@ -260,6 +311,98 @@
       </div>
     </div>
   </div>
+
+  <!-- 班级选择弹窗（用于创建会话时选择班级） -->
+  <Transition name="modal">
+    <div
+      v-if="showClassroomSelectModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-50 px-4 py-6"
+      @click.self="handleClassroomSelectCancel"
+    >
+      <div class="w-full max-w-xl rounded-lg bg-white shadow-xl">
+        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">
+              选择班级
+            </h3>
+            <p class="text-xs text-gray-500 mt-1">请选择要上课的班级，学生将加入该班级的课堂</p>
+          </div>
+          <button
+            type="button"
+            class="text-gray-400 hover:text-gray-600"
+            @click="handleClassroomSelectCancel"
+          >
+            <span class="sr-only">关闭</span>
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="max-h-96 overflow-y-auto px-6 py-4">
+          <div v-if="loadingClassrooms" class="flex items-center justify-center py-8 text-gray-500">
+            <svg class="h-5 w-5 animate-spin text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span class="ml-2">加载班级中...</span>
+          </div>
+
+          <div v-else-if="availableClassrooms.length === 0" class="rounded-md bg-yellow-50 p-4 text-sm text-yellow-700">
+            当前没有可选的班级，请联系管理员配置班级信息。
+          </div>
+
+          <div v-else class="space-y-3">
+            <label
+              v-for="classroom in availableClassrooms"
+              :key="classroom.id"
+              class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
+              :class="selectedClassroomId === classroom.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-400'"
+            >
+              <input
+                type="radio"
+                name="classroom-select"
+                :value="classroom.id"
+                v-model="selectedClassroomId"
+                class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <p class="text-sm font-medium text-gray-900">
+                  {{ classroom.name }}
+                </p>
+                <p class="text-xs text-gray-500">
+                  年级：{{ formatGradeName(classroom.grade_id) }}
+                  <span v-if="classroom.code" class="ml-2">班级编码：{{ classroom.code }}</span>
+                </p>
+              </div>
+            </label>
+          </div>
+
+          <p v-if="classroomSelectError" class="mt-4 text-sm text-red-600">
+            {{ classroomSelectError }}
+          </p>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+          <button
+            type="button"
+            class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            @click="handleClassroomSelectCancel"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="loadingClassrooms || availableClassrooms.length === 0 || !selectedClassroomId"
+            @click="handleClassroomSelectConfirm"
+          >
+            确认创建
+          </button>
+        </div>
+      </div>
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -274,6 +417,8 @@ import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID }
 import activityService from '../../services/activity'
 import logger from '@/utils/logger'
 import { isContentWithSections, sectionsToFlatCells, normalizeContentToSections } from '../../utils/lessonContent'
+import { useLessonStore } from '../../store/lesson'
+import type { LessonClassroom } from '../../types/lesson'
 
 // Cell类型图标组件 - 使用更明显的图标设计
 const CellTypeIcon = (props: { type: string }) => {
@@ -324,10 +469,18 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
+const lessonStore = useLessonStore()
 const session = ref<any>(null)
 const containerRef = ref<HTMLElement | null>(null) // 用于检查组件是否在 DOM 中
 const moduleListRef = ref<HTMLElement | null>(null) // 模块列表容器
 const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map()) // 模块项引用
+
+// 班级选择相关状态
+const showClassroomSelectModal = ref(false)
+const selectedClassroomId = ref<number | null>(null)
+const classroomSelectError = ref<string | null>(null)
+const availableClassrooms = computed<LessonClassroom[]>(() => lessonStore.availableClassrooms || [])
+const loadingClassrooms = computed(() => lessonStore.isLoadingClassrooms)
 
 // 🔧 提供 sessionId 给子组件（通过 provide/inject）
 provide('classroomSessionId', computed(() => session.value?.id))
@@ -361,7 +514,8 @@ const LESSON_DURATION = 40 * 60
 // 显示的课程时长（只有在 active 状态才显示实际时长）
 const displayDuration = computed(() => {
   // 如果会话不存在或不是 active 状态，显示 0
-  if (!session.value || session.value.status !== 'active') {
+  const status = normalizedSessionStatus.value
+  if (!session.value || status !== 'active') {
     return 0
   }
   return sessionDuration.value || 0
@@ -374,21 +528,31 @@ const remainingTime = computed(() => {
   return remaining > 0 ? remaining : 0
 })
 
+// 统一状态值处理：将后端返回的大写状态转换为小写
+const normalizedSessionStatus = computed(() => {
+  if (!session.value || !session.value.status) return null
+  const status = session.value.status
+  // 统一转换为小写
+  return typeof status === 'string' ? status.toLowerCase() : status
+})
+
 // 计算属性
 const statusTitle = computed(() => {
   if (!session.value) return '未创建会话'
+  const status = normalizedSessionStatus.value
   const statusMap: Record<string, string> = {
     pending: '准备中',
     active: '上课中',
     paused: '已暂停',
     ended: '已结束',
   }
-  return statusMap[session.value.status] || '未知状态'
+  return statusMap[status || ''] || '未知状态'
 })
 
 const statusClass = computed(() => {
   if (!session.value) return 'status-pending'
-  return `status-${session.value.status}`
+  const status = normalizedSessionStatus.value || 'pending'
+  return `status-${status}`
 })
 
 const totalStudents = computed(() => {
@@ -1206,75 +1370,138 @@ function formatRemainingTime(seconds: number): string {
   return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
 }
 
+// 格式化年级名称
+function formatGradeName(gradeId: number): string {
+  const gradeNames: Record<number, string> = {
+    1: '一年级',
+    2: '二年级',
+    3: '三年级',
+    4: '四年级',
+    5: '五年级',
+    6: '六年级',
+    7: '七年级',
+    8: '八年级',
+    9: '九年级',
+    10: '高一',
+    11: '高二',
+    12: '高三',
+  }
+  return gradeNames[gradeId] ?? `年级 ${gradeId}`
+}
+
 // 会话操作
 // 创建课堂会话（保持 PENDING 状态，等待学生加入）
 async function handleCreateSession() {
+  // 先加载可用班级列表
+  try {
+    await lessonStore.loadAvailableClassrooms()
+    
+    // 如果只有一个班级，直接使用；否则显示选择弹窗
+    if (availableClassrooms.value.length === 1) {
+      selectedClassroomId.value = availableClassrooms.value[0].id
+      await createSessionWithClassroom(availableClassrooms.value[0].id)
+    } else if (availableClassrooms.value.length === 0) {
+      alert('当前没有可用的班级，请联系管理员配置班级信息。')
+    } else {
+      // 显示班级选择弹窗
+      showClassroomSelectModal.value = true
+      classroomSelectError.value = null
+    }
+  } catch (error: any) {
+    console.error('加载班级列表失败:', error)
+    alert('加载班级列表失败：' + (error.message || '未知错误'))
+  }
+}
+
+// 确认选择班级并创建会话
+async function handleClassroomSelectConfirm() {
+  if (!selectedClassroomId.value) {
+    classroomSelectError.value = '请选择一个班级'
+    return
+  }
+  
+  classroomSelectError.value = null
+  showClassroomSelectModal.value = false
+  
+  await createSessionWithClassroom(selectedClassroomId.value)
+  
+  // 重置选择
+  selectedClassroomId.value = null
+}
+
+// 取消班级选择
+function handleClassroomSelectCancel() {
+  showClassroomSelectModal.value = false
+  selectedClassroomId.value = null
+  classroomSelectError.value = null
+}
+
+// 使用指定班级创建会话
+async function createSessionWithClassroom(classroomId: number, retryCount: number = 0) {
+  const MAX_RETRIES = 2 // 最多重试2次
   loading.value = true
   try {
-    // 首先需要创建会话，这里需要classroom_id
-    // 暂时从路由或props中获取，或者提示用户选择班级
-    const classroomId = route.params.classroomId as string || '1'
+    // 创建会话（状态为 PENDING）
+    const newSession = await classroomSessionService.createSession(props.lessonId, {
+      classroom_id: classroomId,
+    })
     
-    try {
-      // 创建会话（状态为 PENDING）
-      const newSession = await classroomSessionService.createSession(props.lessonId, {
-        classroom_id: parseInt(classroomId),
-      })
+    // 检查响应
+    if (!newSession || !newSession.id) {
+      console.error('Invalid session response:', newSession)
+      throw new Error('创建会话失败：服务器返回的数据格式不正确')
+    }
+    
+    // 保持 PENDING 状态，不立即开始
+    session.value = newSession
+    
+    // 🔧 添加调试日志，确认 sessionId 已生成
+    console.log('✅ TeacherControlPanel: 会话已创建，sessionId =', newSession.id, '状态 =', newSession.status)
+    
+    // 立即加载一次学生列表
+    await loadParticipants()
+    console.log('✅ 初始学生列表加载完成，学生数:', activeStudents.value.length)
+    
+    // 启动轮询（根据会话状态）
+    startPollingIfNeeded()
+    console.log('✅ 已启动轮询，状态:', normalizedSessionStatus.value)
+  } catch (createError: any) {
+    console.log('🔍 捕获到创建会话错误:', {
+      message: createError.message,
+      responseStatus: createError.response?.status,
+      responseData: createError.response?.data,
+    })
+    
+    // 如果创建失败，检查是否是因为已有活跃会话
+    // 需要同时检查 error.response?.data?.detail 和 error.message，因为错误可能被包装
+    const errorDetail = createError.response?.data?.detail || createError.message || ''
+    console.log('🔍 错误详情:', errorDetail)
+    
+    // 检查错误消息中是否包含"已有活跃的课堂会话"
+    const hasActiveSessionError = errorDetail.includes('已有活跃的课堂会话') || 
+                                  errorDetail.includes('已有活跃会话')
+    
+    if (hasActiveSessionError && (createError.response?.status === 400 || createError.message)) {
+      console.log('✅ 检测到"已有活跃会话"错误，尝试提取会话ID...')
       
-      // 检查响应
-      if (!newSession || !newSession.id) {
-        console.error('Invalid session response:', newSession)
-        throw new Error('创建会话失败：服务器返回的数据格式不正确')
+      // 从错误信息中提取会话ID（支持多种格式）
+      // 错误消息格式可能是：
+      // - 该班级已有活跃的课堂会话（ID: 139）
+      // - 该班级已有活跃的课堂会话(ID:139)
+      // - 创建会话失败:该班级已有活跃的课堂会话(ID:139),请先结束或使用现有会话
+      const sessionIdMatch = errorDetail.match(/\(ID\s*[：:]\s*(\d+)\)/) ||
+                             errorDetail.match(/（ID\s*[：:]\s*(\d+)）/) ||
+                             errorDetail.match(/ID\s*[：:]\s*(\d+)/) ||
+                             errorDetail.match(/ID\s*[：:]\s*(\d+)/)
+      
+      console.log('🔍 会话ID匹配结果:', sessionIdMatch)
+      
+      if (!sessionIdMatch) {
+        console.error('❌ 无法从错误信息中提取会话ID。错误信息:', errorDetail)
+        // 如果无法提取会话ID，显示错误
+        throw createError
       }
       
-      // 保持 PENDING 状态，不立即开始
-      session.value = newSession
-      
-      // 🔧 添加调试日志，确认 sessionId 已生成
-      console.log('✅ TeacherControlPanel: 会话已创建，sessionId =', newSession.id, '状态 =', newSession.status)
-      
-      // 加载学生列表（仅加载一次，不立即轮询）
-      loadParticipants()
-      
-      // 启动轮询（根据会话状态）
-      startPollingIfNeeded()
-    } catch (createError: any) {
-      console.log('🔍 捕获到创建会话错误:', {
-        message: createError.message,
-        responseStatus: createError.response?.status,
-        responseData: createError.response?.data,
-      })
-      
-      // 如果创建失败，检查是否是因为已有活跃会话
-      // 需要同时检查 error.response?.data?.detail 和 error.message，因为错误可能被包装
-      const errorDetail = createError.response?.data?.detail || createError.message || ''
-      console.log('🔍 错误详情:', errorDetail)
-      
-      // 检查错误消息中是否包含"已有活跃的课堂会话"
-      const hasActiveSessionError = errorDetail.includes('已有活跃的课堂会话') || 
-                                    errorDetail.includes('已有活跃会话')
-      
-      if (hasActiveSessionError && (createError.response?.status === 400 || createError.message)) {
-        console.log('✅ 检测到"已有活跃会话"错误，尝试提取会话ID...')
-        
-        // 从错误信息中提取会话ID（支持多种格式）
-        // 错误消息格式可能是：
-        // - 该班级已有活跃的课堂会话（ID: 139）
-        // - 该班级已有活跃的课堂会话(ID:139)
-        // - 创建会话失败:该班级已有活跃的课堂会话(ID:139),请先结束或使用现有会话
-        const sessionIdMatch = errorDetail.match(/\(ID\s*[：:]\s*(\d+)\)/) ||
-                               errorDetail.match(/（ID\s*[：:]\s*(\d+)）/) ||
-                               errorDetail.match(/ID\s*[：:]\s*(\d+)/) ||
-                               errorDetail.match(/ID\s*[：:]\s*(\d+)/)
-        
-        console.log('🔍 会话ID匹配结果:', sessionIdMatch)
-        
-        if (!sessionIdMatch) {
-          console.error('❌ 无法从错误信息中提取会话ID。错误信息:', errorDetail)
-          // 如果无法提取会话ID，显示错误
-          throw createError
-        }
-        
         const existingSessionId = parseInt(sessionIdMatch[1])
         console.log('✅ 从错误信息中提取到会话ID:', existingSessionId)
         
@@ -1282,52 +1509,87 @@ async function handleCreateSession() {
         try {
           const existingSession = await classroomSessionService.getSession(existingSessionId)
           if (existingSession) {
-            session.value = existingSession
-            loadParticipants()
-            loadStatistics()
-            startPollingIfNeeded()
-            console.log('✅ 已自动加载现有会话:', existingSession.id)
-            
-            // 提示用户：已加载现有会话，如需创建新会话请先结束当前会话
-            const sessionStatusText = {
-              pending: '待开始',
-              active: '进行中',
-              paused: '已暂停',
-            }[existingSession.status] || existingSession.status
-            
-            alert(
-              `📢 检测到已有活跃的课堂会话（ID: ${existingSessionId}，状态：${sessionStatusText}）\n\n` +
-              `已自动加载现有会话。如需创建新会话，请先点击"结束"按钮结束当前会话。`
-            )
-            return
+            // 检查会话状态，如果是 ENDED 状态，重新创建新会话
+            if (existingSession.status === 'ended' || existingSession.status === 'ENDED') {
+              console.log('ℹ️ 检测到的会话已经是 ENDED 状态，重新创建新会话')
+              
+              // 如果重试次数未超过限制，重新调用创建会话
+              if (retryCount < MAX_RETRIES) {
+                console.log(`🔄 重试创建会话 (${retryCount + 1}/${MAX_RETRIES})...`)
+                loading.value = false // 先重置 loading，避免 UI 卡住
+                // 等待一小段时间，确保后端状态已更新
+                await new Promise(resolve => setTimeout(resolve, 500))
+                // 递归调用，重新创建会话
+                return await createSessionWithClassroom(classroomId, retryCount + 1)
+              } else {
+                console.error('❌ 重试次数已达上限，无法创建新会话')
+                alert('检测到已结束的会话，但多次重试后仍无法创建新会话。请刷新页面后重试。')
+                throw new Error('重试次数已达上限')
+              }
+            } else {
+              // 会话是活跃状态，加载它并提示用户
+              session.value = existingSession
+              loadParticipants()
+              loadStatistics()
+              startPollingIfNeeded()
+              console.log('✅ 已自动加载现有会话:', existingSession.id)
+              
+              // 提示用户：已加载现有会话，如需创建新会话请先结束当前会话
+              const sessionStatusText = {
+                pending: '待开始',
+                active: '进行中',
+                paused: '已暂停',
+                ended: '已结束',
+              }[existingSession.status] || existingSession.status
+              
+              alert(
+                `📢 检测到已有活跃的课堂会话（ID: ${existingSessionId}，状态：${sessionStatusText}）\n\n` +
+                `已自动加载现有会话。如需创建新会话，请先点击"结束"按钮结束当前会话。`
+              )
+              return
+            }
           }
         } catch (loadError: any) {
           console.error('加载现有会话失败:', loadError)
-          const loadErrorDetail = loadError.response?.data?.detail || loadError.message || '加载会话失败'
-          alert(`检测到已有活跃会话，但无法加载：${loadErrorDetail}\n\n会话ID: ${existingSessionId}`)
-          throw loadError
+          // 如果加载失败（可能是会话不存在或已删除），尝试重新创建
+          if (loadError.response?.status === 404) {
+            console.log('ℹ️ 会话不存在（可能已删除），尝试重新创建新会话')
+            
+            // 如果重试次数未超过限制，重新调用创建会话
+            if (retryCount < MAX_RETRIES) {
+              console.log(`🔄 会话不存在，重试创建会话 (${retryCount + 1}/${MAX_RETRIES})...`)
+              loading.value = false
+              await new Promise(resolve => setTimeout(resolve, 500))
+              return await createSessionWithClassroom(classroomId, retryCount + 1)
+            } else {
+              console.error('❌ 重试次数已达上限')
+              alert('会话不存在，但多次重试后仍无法创建新会话。请刷新页面后重试。')
+              throw loadError
+            }
+          } else {
+            const loadErrorDetail = loadError.response?.data?.detail || loadError.message || '加载会话失败'
+            alert(`检测到已有活跃会话，但无法加载：${loadErrorDetail}\n\n会话ID: ${existingSessionId}\n\n请刷新页面后重试。`)
+            throw loadError
+          }
         }
-      } else {
-        // 其他错误，直接抛出
-        throw createError
+    } else {
+      // 其他错误，显示错误信息
+      console.error('Failed to create session:', createError)
+      // 提取更友好的错误信息
+      let errorMessage = createError.message || createError.response?.data?.detail || '创建课堂失败'
+      
+      // 如果是已知的错误类型，显示更友好的提示
+      if (errorMessage.includes('无权限')) {
+        errorMessage = '无法访问该会话。请确保您是该会话的创建者。'
+      } else if (errorMessage.includes('不存在')) {
+        errorMessage = '会话不存在，请刷新页面重试。'
+      } else if (errorMessage.includes('已有活跃的课堂会话')) {
+        // 这种情况应该已经被处理了，但如果仍然出现，说明加载失败
+        errorMessage = '检测到已有活跃会话，但无法自动加载。请刷新页面重试。'
       }
+      
+      alert(errorMessage)
     }
-  } catch (error: any) {
-    console.error('Failed to create session:', error)
-    // 提取更友好的错误信息
-    let errorMessage = error.message || error.response?.data?.detail || '创建课堂失败'
-    
-    // 如果是已知的错误类型，显示更友好的提示
-    if (errorMessage.includes('无权限')) {
-      errorMessage = '无法访问该会话。请确保您是该会话的创建者。'
-    } else if (errorMessage.includes('不存在')) {
-      errorMessage = '会话不存在，请刷新页面重试。'
-    } else if (errorMessage.includes('已有活跃的课堂会话')) {
-      // 这种情况应该已经被处理了，但如果仍然出现，说明加载失败
-      errorMessage = '检测到已有活跃会话，但无法自动加载。请刷新页面重试。'
-    }
-    
-    alert(errorMessage)
   } finally {
     loading.value = false
   }
@@ -1335,7 +1597,8 @@ async function handleCreateSession() {
 
 // 开始上课（将 PENDING 状态变为 ACTIVE）
 async function handleBeginClass() {
-  if (!session.value || session.value.status !== 'pending') return
+  const status = normalizedSessionStatus.value
+  if (!session.value || status !== 'pending') return
   
   loading.value = true
   try {
@@ -1349,7 +1612,8 @@ async function handleBeginClass() {
     // 开始计时（新会话从0开始）
     // 注意：计时器会通过 watch 监听 session.status 变化自动启动
     // 这里确保状态正确即可，watch 会自动处理计时器启动
-    if (session.value.status === 'active') {
+    const newStatus = normalizedSessionStatus.value
+    if (newStatus === 'active') {
       sessionDuration.value = 0  // 新会话从0开始
       // watch 会自动启动计时器，但为了确保立即启动，这里也调用一次
       if (!durationInterval.value) {
@@ -1373,7 +1637,8 @@ async function handleBeginClass() {
 
 // 取消课堂（删除 PENDING 状态的会话）
 async function handleCancelSession() {
-  if (!session.value || session.value.status !== 'pending') return
+  const status = normalizedSessionStatus.value
+  if (!session.value || status !== 'pending') return
   
   // 根据是否有学生进入，显示不同的提示
   const hasStudents = activeStudents.value.length > 0
@@ -1470,12 +1735,71 @@ async function handleEnd() {
   if (!confirm('确定要结束课程吗？')) return
   
   loading.value = true
+  const sessionId = session.value.id
+  const oldStatus = session.value.status
+  
+  console.log(`🔄 开始结束会话: ID=${sessionId}, 当前状态=${oldStatus}`)
+  
   try {
-    session.value = await classroomSessionService.endSession(session.value.id)
+    // 调用 API 结束会话
+    console.log(`📤 调用结束会话 API: POST /classroom-sessions/sessions/${sessionId}/end`)
+    const endedSession = await classroomSessionService.endSession(sessionId)
+    
+    console.log('✅ 会话已结束，后端返回:', {
+      id: endedSession.id,
+      status: endedSession.status,
+      endedAt: endedSession.endedAt || endedSession.ended_at,
+      fullResponse: endedSession
+    })
+    
+    // 验证返回的状态
+    const returnedStatus = endedSession.status || (endedSession as any).status
+    if (returnedStatus !== 'ended' && returnedStatus !== 'ENDED') {
+      console.warn(`⚠️ 警告：后端返回的状态不是 ENDED，而是: ${returnedStatus}`)
+      // 即使状态不对，也继续清除本地状态，让用户尝试创建新会话
+    }
+    
+    // 结束会话后，清除本地状态，以便可以创建新会话
+    session.value = null
+    activeStudents.value = []
     stopDurationTimer()
+    clearAllPollingIntervals()
+    
+    console.log('✅ 会话已结束，本地状态已清除，可以创建新会话')
+    // 显示成功提示
+    alert('课程已成功结束，现在可以创建新课堂了')
   } catch (error: any) {
-    console.error('Failed to end session:', error)
-    alert('结束课程失败')
+    console.error('❌ 结束会话失败:', error)
+    const errorMessage = error.response?.data?.detail || error.message || '结束课程失败'
+    console.error('错误详情:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      stack: error.stack
+    })
+    
+    // 根据错误类型显示不同的提示
+    let userMessage = '结束课程失败：' + errorMessage
+    if (error.response?.status === 403) {
+      userMessage = '结束课程失败：您没有权限结束此会话'
+    } else if (error.response?.status === 404) {
+      userMessage = '结束课程失败：会话不存在（可能已被删除）'
+    } else if (error.response?.status === 500) {
+      userMessage = '结束课程失败：服务器内部错误，请稍后重试或联系管理员'
+    }
+    
+    alert(userMessage + '\n\n请查看浏览器控制台获取详细信息。')
+    
+    // 即使 API 调用失败，也尝试清除本地状态（如果会话可能已经结束）
+    // 这样用户至少可以尝试创建新会话
+    if (error.response?.status === 404 || errorMessage.includes('不存在')) {
+      console.log('⚠️ 会话可能已经不存在，清除本地状态')
+      session.value = null
+      activeStudents.value = []
+      stopDurationTimer()
+      clearAllPollingIntervals()
+    }
   } finally {
     loading.value = false
   }
@@ -1511,7 +1835,8 @@ async function handleHideAll() {
   if (!session.value) return
   
   // 🆕 检查会话状态：导航功能要求会话状态必须是 ACTIVE
-  if (session.value.status !== 'active') {
+  const status = normalizedSessionStatus.value
+  if (status !== 'active') {
     const statusMessages: Record<string, string> = {
       'pending': '请先点击"开始上课"按钮，等待教师开始上课',
       'paused': '会话已暂停，请先继续会话',
@@ -1595,7 +1920,8 @@ async function handleControlBoardNavigate(
   }
   
   // 🆕 检查会话状态：导航功能要求会话状态必须是 ACTIVE
-  if (session.value.status !== 'active') {
+  const status = normalizedSessionStatus.value
+  if (status !== 'active') {
     const statusMessages: Record<string, string> = {
       'pending': '请先点击"开始上课"按钮，等待教师开始上课',
       'paused': '会话已暂停，请先继续会话',
@@ -1771,34 +2097,38 @@ async function loadParticipants() {
     return
   }
   
-  // 静默执行，不输出调用栈
-  
   loadingStudents.value = true
   try {
+    console.log('🔄 开始加载学生列表，sessionId:', session.value.id)
     // 获取所有在线学生（is_active=true）
     const participants = await classroomSessionService.getParticipants(session.value.id, true)
+    console.log('📥 获取到参与者数据:', participants)
     
     // 确保是数组且只包含在线学生
     const activeParticipants = Array.isArray(participants) 
       ? participants.filter(p => p.isActive !== false)
       : []
     
+    console.log('✅ 过滤后的在线学生:', activeParticipants.length, '人', activeParticipants.map(s => ({
+      id: s.id,
+      name: s.studentName || s.student_name,
+      isActive: s.isActive ?? s.is_active,
+    })))
+    
     activeStudents.value = activeParticipants
-    // 🔧 移除频繁的调试日志，避免控制台噪音（轮询时每3-5秒调用一次）
-    // logger.debug(`加载在线学生完成: ${activeStudents.value.length} 人`, activeStudents.value.map(s => ({
-    //   id: s.id,
-    //   name: s.studentName || s.student_name,
-    //   isActive: s.isActive || s.is_active,
-    // })))
     
     // 更新会话统计中的在线学生数
     if (session.value) {
       session.value.activeStudents = activeStudents.value.length
-      // 🔧 移除频繁的调试日志
-      // logger.debug('更新会话统计，在线学生数:', session.value.activeStudents)
+      console.log('📊 更新会话统计，在线学生数:', session.value.activeStudents)
     }
   } catch (error: any) {
-    console.error('加载学生列表失败:', error)
+    console.error('❌ 加载学生列表失败:', error)
+    console.error('错误详情:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    })
     activeStudents.value = []
   } finally {
     loadingStudents.value = false
@@ -2040,7 +2370,8 @@ function startPollingIfNeeded() {
   // 静默启动轮询
   
   // 根据会话状态启动不同的轮询
-  if (session.value.status === 'pending') {
+  const status = normalizedSessionStatus.value
+  if (status === 'pending') {
     // PENDING 状态：只轮询参与者列表（每3秒）
     const interval = setInterval(() => {
       // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
@@ -2050,7 +2381,8 @@ function startPollingIfNeeded() {
         return
       }
       // 检查会话是否还存在且状态正确
-      if (!session.value || session.value.status !== 'pending') {
+      const currentStatus = normalizedSessionStatus.value
+      if (!session.value || currentStatus !== 'pending') {
         clearAllPollingIntervals()
         return
       }
@@ -2058,28 +2390,32 @@ function startPollingIfNeeded() {
       loadParticipants()
     }, 3000)
     pollingIntervals.value.push(interval)
-  } else if (session.value.status === 'active' || session.value.status === 'paused') {
-    // ACTIVE/PAUSED 状态：轮询参与者列表和统计（每5秒）
-    const interval = setInterval(() => {
-      // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
-      if (!containerRef.value || !containerRef.value.isConnected) {
-        clearAllPollingIntervals()
-        return
-      }
-      // 检查会话是否还存在且状态正确
-      if (!session.value || (session.value.status !== 'active' && session.value.status !== 'paused')) {
-        clearAllPollingIntervals()
-        return
-      }
-      // 只在有会话时才加载
-      loadParticipants()
-      loadStatistics()
-      // 如果当前是活动模块，也刷新活动统计
-      if (currentCell.value && currentCell.value.type === 'activity' && currentActivityDbCell.value) {
-        loadActivityStatistics()
-      }
-    }, 5000)
-    pollingIntervals.value.push(interval)
+  } else {
+    const currentStatus = normalizedSessionStatus.value
+    if (currentStatus === 'active' || currentStatus === 'paused') {
+      // ACTIVE/PAUSED 状态：轮询参与者列表和统计（每5秒）
+      const interval = setInterval(() => {
+        // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
+        if (!containerRef.value || !containerRef.value.isConnected) {
+          clearAllPollingIntervals()
+          return
+        }
+        // 检查会话是否还存在且状态正确
+        const checkStatus = normalizedSessionStatus.value
+        if (!session.value || (checkStatus !== 'active' && checkStatus !== 'paused')) {
+          clearAllPollingIntervals()
+          return
+        }
+        // 只在有会话时才加载
+        loadParticipants()
+        loadStatistics()
+        // 如果当前是活动模块，也刷新活动统计
+        if (currentCell.value && currentCell.value.type === 'activity' && currentActivityDbCell.value) {
+          loadActivityStatistics()
+        }
+      }, 5000)
+      pollingIntervals.value.push(interval)
+    }
   }
   // 其他状态不启动轮询
 }
@@ -4625,6 +4961,85 @@ input[type="checkbox"].checkbox-input {
   
   .module-item-title {
     font-size: 12px;
+  }
+}
+
+/* 等待学生加入提示区域 */
+.waiting-students-banner {
+  @apply bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b-2 border-blue-200 shadow-sm;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.waiting-banner-content {
+  @apply flex items-center gap-4;
+}
+
+.waiting-banner-icon {
+  @apply text-4xl;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.waiting-banner-text {
+  @apply flex-1;
+}
+
+.waiting-banner-title {
+  @apply text-lg font-bold text-gray-900 mb-1 flex items-center gap-2;
+}
+
+.student-count-badge {
+  @apply px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800;
+}
+
+.waiting-banner-subtitle {
+  @apply text-sm text-gray-600;
+}
+
+.joined-students-list {
+  @apply mt-4 pt-4 border-t border-blue-200;
+}
+
+.joined-students-header {
+  @apply mb-3;
+}
+
+.joined-students-title {
+  @apply text-sm font-semibold text-gray-700;
+}
+
+.joined-students-grid {
+  @apply grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3;
+}
+
+.joined-student-item {
+  @apply flex flex-col items-center gap-2 p-2 rounded-lg bg-white border border-gray-200 hover:border-blue-400 hover:shadow-sm transition-all;
+}
+
+.joined-student-item.joined-student-more {
+  @apply bg-gray-50 border-dashed;
+}
+
+.student-avatar {
+  @apply w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-semibold text-sm shadow-sm;
+}
+
+.joined-student-more .student-avatar {
+  @apply bg-gray-400;
+}
+
+.student-name {
+  @apply text-xs text-gray-700 text-center truncate w-full;
+  max-width: 80px;
+}
+
+.btn-disabled-hint {
+  @apply opacity-60 cursor-not-allowed;
+}
+
+@media (max-width: 768px) {
+  .joined-students-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 

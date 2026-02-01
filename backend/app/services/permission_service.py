@@ -4,7 +4,17 @@ Permission Service for centralized permission checking
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models import Classroom, ClassroomMembership, RoleInClass, UserRole, LessonClassroom, LessonStatus
+from app.models import (
+    Classroom, 
+    ClassroomMembership, 
+    RoleInClass, 
+    UserRole, 
+    Lesson,
+    LessonClassroom, 
+    LessonStatus,
+    ClassSession,
+    ClassSessionStatus,
+)
 
 
 class PermissionService:
@@ -56,23 +66,30 @@ class PermissionService:
         Returns:
             bool: True if student can view the lesson, False otherwise
         """
-        # Get active student memberships
-        memberships = await db.execute(
-            select(ClassroomMembership).where(
-                ClassroomMembership.user_id == student.id,
-                ClassroomMembership.role_in_class == RoleInClass.STUDENT,
-                ClassroomMembership.is_active == True
-            )
-        )
-        classroom_ids = [m.classroom_id for m in memberships.scalars()]
+        # 🆕 使用统一的班级查询函数（支持多班级和向后兼容）
+        from app.core.classroom_utils import get_user_classroom_ids
+        classroom_ids = await get_user_classroom_ids(db, student)
+        
         if not classroom_ids:
             return False
+
+        # 🆕 优先检查：如果学生有活跃的课堂会话（PENDING或ACTIVE），允许访问
+        # 这样可以确保学生能够从待开始课堂列表进入课程
+        active_session_result = await db.execute(
+            select(ClassSession).where(
+                ClassSession.lesson_id == lesson_id,
+                ClassSession.classroom_id.in_(list(classroom_ids)),
+                ClassSession.status.in_([ClassSessionStatus.PENDING, ClassSessionStatus.ACTIVE, ClassSessionStatus.PAUSED])
+            )
+        )
+        if active_session_result.scalar_one_or_none() is not None:
+            return True
 
         # Check if lesson is published and assigned to any of student's classrooms
         assignment = await db.execute(
             select(LessonClassroom).join(Lesson).where(
                 LessonClassroom.lesson_id == lesson_id,
-                LessonClassroom.classroom_id.in_(classroom_ids),
+                LessonClassroom.classroom_id.in_(list(classroom_ids)),
                 Lesson.status == LessonStatus.PUBLISHED
             )
         )
