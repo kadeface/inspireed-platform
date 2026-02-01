@@ -246,6 +246,11 @@ import {
   setModuleItemRef,
   scrollToSelectedModule
 } from './cellUtils'
+// v2.0: 导入格式化工具函数
+import {
+  formatDuration,
+  formatRemainingTime,
+} from './formatUtils'
 
 interface Props {
   lessonId: number
@@ -882,19 +887,6 @@ function handleFullscreenChange() {
   if (!isCurrentlyFullscreen && isPanelFullscreen.value) {
     isPanelFullscreen.value = false
   }
-}
-
-function formatDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60)
-  // 显示为"15分钟"格式
-  return `${minutes}分钟`
-}
-
-function formatRemainingTime(seconds: number): string {
-  if (seconds <= 0) return '0:00'
-  const minutes = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
 }
 
 
