@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
@@ -9,6 +10,23 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src')
     }
+  },
+  test: {
+    // Vitest 配置
+    globals: true,
+    environment: 'jsdom',
+    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,jsx,tsx}', 'tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,jsx,tsx}'],
+    exclude: ['node_modules', 'dist'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/**/*.spec.ts',
+        'src/**/*.test.ts',
+        '**/*.d.ts',
+      ],
+    },
   },
   server: {
     host: '0.0.0.0', // 监听所有网络接口，允许局域网访问
