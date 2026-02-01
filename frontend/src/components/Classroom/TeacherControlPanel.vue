@@ -172,96 +172,16 @@
   </div>
 
   <!-- 班级选择弹窗（用于创建会话时选择班级） -->
-  <Transition name="modal">
-    <div
-      v-if="showClassroomSelectModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-50 px-4 py-6"
-      @click.self="handleClassroomSelectCancel"
-    >
-      <div class="w-full max-w-xl rounded-lg bg-white shadow-xl">
-        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <div>
-            <h3 class="text-lg font-semibold text-gray-900">
-              选择班级
-            </h3>
-            <p class="text-xs text-gray-500 mt-1">请选择要上课的班级，学生将加入该班级的课堂</p>
-          </div>
-          <button
-            type="button"
-            class="text-gray-400 hover:text-gray-600"
-            @click="handleClassroomSelectCancel"
-          >
-            <span class="sr-only">关闭</span>
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="max-h-96 overflow-y-auto px-6 py-4">
-          <div v-if="loadingClassrooms" class="flex items-center justify-center py-8 text-gray-500">
-            <svg class="h-5 w-5 animate-spin text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <span class="ml-2">加载班级中...</span>
-          </div>
-
-          <div v-else-if="availableClassrooms.length === 0" class="rounded-md bg-yellow-50 p-4 text-sm text-yellow-700">
-            当前没有可选的班级，请联系管理员配置班级信息。
-          </div>
-
-          <div v-else class="space-y-3">
-            <label
-              v-for="classroom in availableClassrooms"
-              :key="classroom.id"
-              class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
-              :class="selectedClassroomId === classroom.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-400'"
-            >
-              <input
-                type="radio"
-                name="classroom-select"
-                :value="classroom.id"
-                v-model="selectedClassroomId"
-                class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500"
-              />
-              <div>
-                <p class="text-sm font-medium text-gray-900">
-                  {{ classroom.name }}
-                </p>
-                <p class="text-xs text-gray-500">
-                  年级：{{ formatGradeName(classroom.grade_id) }}
-                  <span v-if="classroom.code" class="ml-2">班级编码：{{ classroom.code }}</span>
-                </p>
-              </div>
-            </label>
-          </div>
-
-          <p v-if="classroomSelectError" class="mt-4 text-sm text-red-600">
-            {{ classroomSelectError }}
-          </p>
-        </div>
-
-        <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
-          <button
-            type="button"
-            class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            @click="handleClassroomSelectCancel"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="loadingClassrooms || availableClassrooms.length === 0 || !selectedClassroomId"
-            @click="handleClassroomSelectConfirm"
-          >
-            确认创建
-          </button>
-        </div>
-      </div>
-    </div>
-  </Transition>
+  <ClassroomSelectModal
+    :show="showClassroomSelectModal"
+    :classrooms="availableClassrooms"
+    :loading="loadingClassrooms"
+    v-model="selectedClassroomId"
+    :error="classroomSelectError"
+    @update:show="showClassroomSelectModal = $event"
+    @cancel="handleClassroomSelectCancel"
+    @confirm="handleClassroomSelectConfirm"
+  />
 </template>
 
 <script setup lang="ts">
@@ -280,6 +200,7 @@ import ModuleCountDisplay from './ModuleCountDisplay.vue'
 import WaitingForStudentsBanner from './WaitingForStudentsBanner.vue'
 import JoinedStudentsList from './JoinedStudentsList.vue'
 import ModuleList from './ModuleList.vue'
+import ClassroomSelectModal from './ClassroomSelectModal.vue'
 import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
 import activityService from '../../services/activity'
 import logger from '@/utils/logger'
@@ -1237,24 +1158,6 @@ function formatRemainingTime(seconds: number): string {
   return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
 }
 
-// 格式化年级名称
-function formatGradeName(gradeId: number): string {
-  const gradeNames: Record<number, string> = {
-    1: '一年级',
-    2: '二年级',
-    3: '三年级',
-    4: '四年级',
-    5: '五年级',
-    6: '六年级',
-    7: '七年级',
-    8: '八年级',
-    9: '九年级',
-    10: '高一',
-    11: '高二',
-    12: '高三',
-  }
-  return gradeNames[gradeId] ?? `年级 ${gradeId}`
-}
 
 // 会话操作
 // 创建课堂会话（保持 PENDING 状态，等待学生加入）
