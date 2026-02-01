@@ -12,11 +12,11 @@
 |------|------|------|------|
 | 第1阶段：准备 | ✅ 完成 | 100% | 2026-02-01 上午 |
 | 第2阶段：后端重构 | ✅ **完成** | **100%** | 2026-02-01 下午 |
-| 第3阶段：前端重构 | 🔄 **进行中** | **75%** | 2026-02-01 晚上 |
+| 第3阶段：前端重构 | 🔄 **进行中** | **85%** | 2026-02-01 晚上 |
 | 第4阶段：集成测试 | ⏳ 待开始 | 0% | - |
 | 第5阶段：部署 | ⏳ 待开始 | 0% | - |
 
-**总体进度**: **55%** (2.75/5阶段)
+**总体进度**: **62%** (3.1/5阶段)
 
 ---
 
@@ -88,8 +88,8 @@
 ## 📊 第3阶段：前端重构 🔄
 
 **时间**: 2026-02-01 晚上
-**状态**: 进行中（**75%**）
-**提交**: dedcb2b, 6d371e5, 3ea5ee8, a8e9adf, a4d0ddf, 2613c8d, f8f29b3, bf4dd24, 0643c17, 6020444, 6c8b30f, beb5932, **[NEW COMMIT]**
+**状态**: 进行中（**85%**）
+**提交**: dedcb2b, 6d371e5, 3ea5ee8, a8e9adf, a4d0ddf, 2613c8d, f8f29b3, bf4dd24, 0643c17, 6020444, 6c8b30f, beb5932, f858bba, d202426, e1e7885, **34dbc53**
 
 ### 已完成的任务
 
@@ -102,10 +102,13 @@
 - [x] **提取学生监控工具函数到studentMonitoring.ts**
 - [x] **提取Cell工具函数到cellUtils.ts**
 - [x] **提取会话状态管理到useSessionManager composable**
+- [x] **提取轮询管理到usePolling composable**
+- [x] **提取格式化工具函数到formatUtils.ts**
+- [x] **提取计时器管理到useDurationTimer composable**
 
 ### 剩余任务
 
-- [ ] 继续拆分TeacherControlPanel（轮询管理等）
+- [ ] 继续拆分TeacherControlPanel（导航逻辑、数据加载等）
 - [ ] 实现useWebSocket.ts（移除轮询降级）
 - [ ] 实现useClassroomStore.ts（Pinia）
 - [ ] 编写前端单元测试
@@ -113,13 +116,13 @@
 ### 代码变化
 
 ```
-修改文件: 11个
-新增文件: 9个 (5个组件 + 1个图标 + 2个工具 + 1个composable)
+修改文件: 13个
+新增文件: 12个 (5个组件 + 1个图标 + 3个工具 + 3个composables)
 状态比较更新: ~50处
 废弃方法: 2个 (pauseSession, resumeSession)
 子组件拆分: 10个新组件
-工具函数提取: 2个文件
-Composables: 1个文件
+工具函数提取: 3个文件
+Composables: 3个文件
 ```
 
 ### 详细进度
@@ -140,6 +143,9 @@ Composables: 1个文件
 | **工具函数提取（第7轮）** | ✅ | studentMonitoring.ts（~175行） |
 | **工具函数提取（第8轮）** | ✅ | cellUtils.ts（~280行） |
 | **Composable提取（第9轮）** | ✅ | useSessionManager.ts（~481行） |
+| **Composable提取（第10轮）** | ✅ | usePolling.ts（~170行） |
+| **工具函数提取（第11轮）** | ✅ | formatUtils.ts（~150行） |
+| **Composable提取（第12轮）** | ✅ | useDurationTimer.ts（~150行） |
 | 继续拆分组件 | ⏳ | 待开始（更多模块） |
 | Composables | ⏳ | 待开始 |
 | 前端测试 | ⏳ | 待开始 |
@@ -158,18 +164,21 @@ Composables: 1个文件
 9. ActivityStatisticsPanel - 活动统计面板（~330行）
 10. CellTypeIcon - 类型图标组件（~77行）
 
-**工具函数（2个）**:
+**工具函数（3个）**:
 11. studentMonitoring.ts - 学生监控工具（~175行）
 12. cellUtils.ts - Cell工具函数（~280行）
+13. formatUtils.ts - 格式化工具（~150行）
 
-**Composables（1个）**:
-13. useSessionManager.ts - 会话状态管理（~481行）
+**Composables（4个）**:
+14. useSessionManager.ts - 会话状态管理（~481行）
+15. usePolling.ts - 轮询管理（~170行）
+16. useDurationTimer.ts - 计时器管理（~150行）
 
 **主组件变化**:
 - 原始: 5047行
-- 当前: ~4000行
-- 减少: 1047行
-- 子组件总计: ~3329行
+- 当前: ~3920行
+- 减少: 1127行
+- 子组件总计: ~3799行
 
 **代码质量提升**:
 - ✅ 组件职责单一，易于测试

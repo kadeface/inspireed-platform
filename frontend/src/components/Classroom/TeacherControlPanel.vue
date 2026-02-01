@@ -221,6 +221,7 @@ import type { LessonClassroom } from '../../types/lesson'
 import { useSessionManager } from './composables/useSessionManager'
 import { usePolling } from './composables/usePolling'
 import { useDurationTimer } from './composables/useDurationTimer'
+import { useNavigation } from './composables/useNavigation'
 // v2.0: 导入学生监控工具函数
 import {
   getStudentStatusClass,
@@ -313,6 +314,23 @@ const durationTimer = useDurationTimer({
 
 // 监听会话状态变化，自动启动/停止计时器
 durationTimer.watchSessionStatus(sessionManager.normalizedSessionStatus)
+
+// v2.0: 使用composables管理导航
+const navigationManager = useNavigation({
+  session,
+  loading,
+  selectedCellIndex,
+  lessonContentCells,
+  isMultiSelectMode,
+  normalizedSessionStatus: sessionManager.normalizedSessionStatus,
+  currentModuleIndex,
+  isModuleActive: isModuleActiveWrapper,
+  scrollToSelectedModule: scrollToSelectedModuleWrapper,
+  loadParticipants,
+  ensureActivityCellExists,
+  loadDbCells,
+  dbCells,
+})
 
 // 从 composable 解构会话相关状态和方法
 const {
@@ -528,16 +546,8 @@ const currentModuleIndex = computed(() => {
   return -1
 })
 
-// 判断是否可以上一模块
-const canGoPrev = computed(() => {
-  return currentModuleIndex.value > 0
-})
-
-// 判断是否可以下一模块
-const canGoNext = computed(() => {
-  if (!lessonContentCells.value.length) return false
-  return currentModuleIndex.value >= 0 && currentModuleIndex.value < lessonContentCells.value.length - 1
-})
+// v2.0: 以下computed属性已移至 useNavigation composable
+// const canGoPrev, const canGoNext 现在从 navigationManager 导入
 
 const currentActivityDbCell = computed(() => {
   if (!currentCell.value || currentCell.value.type !== 'activity') {
@@ -610,125 +620,11 @@ function scrollToSelectedModuleWrapper() {
   scrollToSelectedModule(moduleListRef, moduleItemRefs.value, selectedCellIndex.value)
 }
 
-// 处理模块项点击
-function handleModuleItemClick(cell: Cell, index: number) {
-  if (loading.value) return
-  
-  // 立即更新 selectedCellIndex，确保按钮状态及时更新
-  selectedCellIndex.value = index
-  
-  const cellId = getCellId(cell)
-  const cellOrder = cell.order !== undefined ? cell.order : index
-  
-  // 根据模式选择 action
-  let action: 'toggle' | 'add' | 'remove' = 'toggle'
-  if (isMultiSelectMode.value) {
-    // 多选模式：对于活动模块，使用 'add'；其他模块使用 'toggle'
-    action = cell.type === 'activity' ? 'add' : 'toggle'
-  } else {
-    // 单选模式：对于活动模块，使用 'add'；其他模块使用 'toggle'
-    action = cell.type === 'activity' ? 'add' : 'toggle'
-  }
-  
-  // 使用 handleControlBoardNavigate 处理导航
-  handleControlBoardNavigate(cellId, cellOrder, action, isMultiSelectMode.value)
-}
-
-// 导航到上一模块
-function handlePrevModule() {
-  if (!canGoPrev.value || !lessonContentCells.value.length) return
-  const prevIndex = currentModuleIndex.value - 1
-  const prevCell = lessonContentCells.value[prevIndex]
-  if (prevCell) {
-    handleModuleItemClick(prevCell, prevIndex)
-  }
-}
-
-// 导航到下一模块
-function handleNextModule() {
-  if (!canGoNext.value || !lessonContentCells.value.length) return
-  const nextIndex = currentModuleIndex.value + 1
-  const nextCell = lessonContentCells.value[nextIndex]
-  if (nextCell) {
-    handleModuleItemClick(nextCell, nextIndex)
-  }
-}
-
-// 处理单选框/复选框点击（防止事件冒泡，并处理取消选中）
-function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
-  event.stopPropagation()
-  
-  if (loading.value) {
-    return
-  }
-  
-  const isCurrentlyActive = isModuleActiveWrapper(cell, index)
-  const cellId = getCellId(cell)
-  const cellOrder = cell.order !== undefined ? cell.order : index
-  
-  if (isMultiSelectMode.value) {
-    // 多选模式：复选框逻辑
-    if (isCurrentlyActive) {
-      // 取消选中：从选中列表中移除
-      handleControlBoardNavigate(cellId, cellOrder, 'remove', true)
-    } else {
-      // 选中：添加到选中列表
-      handleControlBoardNavigate(cellId, cellOrder, 'add', true)
-    }
-  } else {
-    // 单选模式：单选框逻辑
-    if (isCurrentlyActive) {
-      // 如果点击已选中的单选框，取消选中（隐藏所有内容）
-      event.preventDefault()
-      const target = event.target as HTMLElement
-      const radioInput = target.closest('.module-item-checkbox')?.querySelector('input[type="radio"]') as HTMLInputElement
-      if (radioInput) {
-        radioInput.checked = false
-        // 隐藏所有内容
-        handleControlBoardNavigate(null, null, 'toggle', false)
-      }
-    }
-  }
-}
-
-// 处理单选框/复选框变化
-function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
-  if (loading.value) {
-    return
-  }
-  
-  const target = event.target as HTMLInputElement
-  const isChecked = target.checked
-  const cellId = getCellId(cell)
-  const cellOrder = cell.order !== undefined ? cell.order : index
-  
-  if (isMultiSelectMode.value) {
-    // 多选模式：复选框逻辑（已在 handleModuleCheckboxClick 中处理，这里作为备用）
-    if (isChecked) {
-      handleControlBoardNavigate(cellId, cellOrder, 'add', true)
-    } else {
-      handleControlBoardNavigate(cellId, cellOrder, 'remove', true)
-    }
-  } else {
-    // 单选模式：单选框逻辑
-    // 只处理选中新项的情况（取消选中已在 handleModuleCheckboxClick 中处理）
-    if (!isChecked) {
-      return
-    }
-    
-    // 选中新项（单选模式，multiSelect = false，会自动清除其他选中项）
-    if (cellId && typeof cellId === 'string' && isUUID(cellId)) {
-      handleControlBoardNavigate(null, cellOrder, 'toggle', false)
-    } else {
-      const numericId = toNumericId(cellId)
-      if (numericId) {
-        handleControlBoardNavigate(numericId, null, 'toggle', false)
-      } else {
-        handleControlBoardNavigate(null, cellOrder, 'toggle', false)
-      }
-    }
-  }
-}
+// v2.0: 以下函数已移至 useNavigation composable
+// function handleModuleItemClick, handlePrevModule, handleNextModule
+// function handleModuleCheckboxClick, handleModuleCheckboxChange, handleHideAll
+// function handleControlBoardNavigate
+// 现在从 navigationManager 导入
 
 // 获取模块提示信息
 // v2.0: 已移至 cellUtils.ts as getModuleTooltip
@@ -938,218 +834,7 @@ async function toggleSelectionMode() {
 }
 
 // 隐藏所有内容（通过导播台的"隐藏"节点调用）
-async function handleHideAll() {
-  if (!session.value) return
-  
-  // 🆕 检查会话状态：导航功能要求会话状态必须是 ACTIVE
-  const status = normalizedSessionStatus.value
-  if (status !== 'active') {
-    const statusMessages: Record<string, string> = {
-      'pending': '请先点击"开始上课"按钮，等待教师开始上课',
-      'paused': '会话已暂停，请先继续会话',
-      'ended': '会话已结束，无法隐藏内容'
-    }
-    const message = statusMessages[session.value.status] || '会话状态不正确，无法隐藏内容'
-    alert(message)
-    console.warn('隐藏内容失败：会话状态不是 ACTIVE', {
-      currentStatus: session.value.status,
-      sessionId: session.value.id
-    })
-    return
-  }
-  
-  loading.value = true
-  try {
-    // 🆕 使用 displayCellOrders: [] 来隐藏所有内容
-    session.value = await classroomSessionService.navigateToCell(session.value.id, {
-      displayCellOrders: [],
-    })
-    selectedCellIndex.value = -1
-  } catch (error: any) {
-    console.error('Failed to hide content:', error)
-    const errorMessage = error.response?.data?.detail || error.message || '隐藏内容失败'
-    alert(errorMessage)
-  } finally {
-    loading.value = false
-  }
-}
-
-
-// 隐藏所有内容（通过导播台的"隐藏"节点调用）
-async function handleControlBoardNavigate(
-  cellId: number | string | null, 
-  cellOrder: number | null,
-  action: 'toggle' | 'add' | 'remove' = 'toggle',
-  multiSelect: boolean = false
-) {
-  if (!session.value) {
-    console.warn('无法导航：会话不存在')
-    return
-  }
-  
-  // 🆕 检查会话状态：导航功能要求会话状态必须是 ACTIVE
-  const status = normalizedSessionStatus.value
-  if (status !== 'active') {
-    const statusMessages: Record<string, string> = {
-      'pending': '请先点击"开始上课"按钮，等待教师开始上课',
-      'paused': '会话已暂停，请先继续会话',
-      'ended': '会话已结束，无法导航'
-    }
-    const message = statusMessages[session.value.status] || '会话状态不正确，无法导航'
-    alert(message)
-    console.warn('导航失败：会话状态不是 ACTIVE', {
-      currentStatus: session.value.status,
-      sessionId: session.value.id
-    })
-    return
-  }
-  
-  loading.value = true
-  try {
-    // 🆕 新方式：使用 display_cell_orders（推荐）
-    // 获取当前选中的 orders（从 settings 中获取，如果有的话）
-    let displayOrders: number[] = []
-    const currentSettings = session.value.settings as any
-    if (currentSettings?.display_cell_orders) {
-      displayOrders = [...currentSettings.display_cell_orders]
-    } else if (currentSettings?.display_cell_ids && lessonContentCells.value.length > 0) {
-      // 向后兼容：如果只有 display_cell_ids，转换成 orders
-      displayOrders = currentSettings.display_cell_ids
-        .map((id: number) => {
-          const cell = lessonContentCells.value.find((c: any) => getCellId(c) === id)
-          if (cell) {
-            const cellIndex = lessonContentCells.value.indexOf(cell)
-            return cell.order !== undefined ? cell.order : cellIndex
-          }
-          return -1
-        })
-        .filter((order: number) => order >= 0)
-    }
-    
-    // 如果是隐藏所有（cellId === 0、"0" 或 null）且不是多选模式
-    const isHideAll = (cellId === 0 || cellId === "0" || cellId === null) && cellOrder === null && !multiSelect
-    if (isHideAll) {
-      displayOrders = []
-    } else if (cellOrder !== null) {
-      // 根据 action 更新 displayOrders
-      if (action === 'add') {
-        if (!displayOrders.includes(cellOrder)) {
-          displayOrders.push(cellOrder)
-        }
-      } else if (action === 'remove') {
-        displayOrders = displayOrders.filter(o => o !== cellOrder)
-      } else if (action === 'toggle') {
-        if (displayOrders.includes(cellOrder)) {
-          displayOrders = displayOrders.filter(o => o !== cellOrder)
-        } else {
-          displayOrders = multiSelect ? [...displayOrders, cellOrder] : [cellOrder]
-        }
-      }
-    }
-    
-    // 发送新方式的请求
-    const requestData = {
-      displayCellOrders: displayOrders,
-      action,
-    }
-    const updatedSession = await classroomSessionService.navigateToCell(session.value.id, requestData)
-    
-    // 确保更新后的会话状态正确（不要丢失状态）
-    if (updatedSession) {
-      session.value = {
-        ...session.value,
-        ...updatedSession,
-        status: session.value.status, // 保持原有状态，导航不应该改变会话状态
-        id: session.value.id,
-      }
-    }
-    
-    // 导航后立即刷新学生列表
-    loadParticipants()
-    
-    // 🆕 如果点击的是活动模块，确保数据库记录存在
-    if (cellOrder !== null && lessonContentCells.value.length > 0) {
-      const clickedCell = lessonContentCells.value.find((cell, idx) => {
-        const cellOrderValue = cell.order !== undefined ? cell.order : idx
-        return cellOrderValue === cellOrder
-      })
-      
-      if (clickedCell && clickedCell.type === 'activity') {
-        const createdCellId = await ensureActivityCellExists(clickedCell, cellOrder)
-        // 重新加载 dbCells 以获取最新数据
-        await loadDbCells()
-        
-        // 🆕 如果创建成功，等待一小段时间让数据库记录生效
-        if (createdCellId) {
-          await new Promise(resolve => setTimeout(resolve, 500))
-          // 再次加载确保获取到最新数据
-          await loadDbCells()
-        }
-      }
-    }
-    
-    // 🆕 如果 dbCells 为空，重新加载（可能活动模块刚创建）
-    if (dbCells.value.length === 0) {
-      await loadDbCells()
-    }
-    
-    // 更新selectedCellIndex
-    if (cellId === 0) {
-      selectedCellIndex.value = -1
-    } else if (cellOrder !== null && cellOrder !== undefined && lessonContentCells.value.length > 0) {
-      // 🆕 通过 cellOrder 查找对应的数组索引（而不是直接使用 cellOrder）
-      const index = lessonContentCells.value.findIndex((cell, idx) => {
-        const cellOrderValue = cell.order !== undefined ? cell.order : idx
-        return cellOrderValue === cellOrder
-      })
-      if (index >= 0) {
-        selectedCellIndex.value = index
-      } else {
-        // 如果找不到，尝试使用 cellOrder 作为索引（向后兼容）
-        selectedCellIndex.value = cellOrder < lessonContentCells.value.length ? cellOrder : -1
-      }
-    } else if (cellId && lessonContentCells.value.length > 0) {
-      // 通过 cellId 查找索引
-      const index = lessonContentCells.value.findIndex((cell) => {
-        const id = getCellId(cell)
-        if (typeof id === 'number' && id === cellId) return true
-        if (typeof id === 'string') {
-          const numId = parseInt(id, 10)
-          if (!isNaN(numId) && numId === cellId) return true
-        }
-        return false
-      })
-      if (index >= 0) {
-        selectedCellIndex.value = index
-      } else {
-        // 如果找不到，尝试使用返回的 currentCellId 对应的索引
-        if (updatedSession?.currentCellId) {
-          const currentId = updatedSession.currentCellId
-          const foundIndex = lessonContentCells.value.findIndex((cell) => {
-            const id = getCellId(cell)
-            return id === currentId || (typeof id === 'string' && String(id) === String(currentId))
-          })
-          if (foundIndex >= 0) {
-            selectedCellIndex.value = foundIndex
-          }
-        }
-      }
-    }
-    
-    // 🆕 滚动到选中的模块
-    // 使用 nextTick 确保 DOM 已更新
-    await nextTick()
-    setTimeout(() => {
-      scrollToSelectedModuleWrapper()
-    }, 100)
-  } catch (error: any) {
-    console.error('Failed to navigate from control board:', error)
-    const errorMessage = error.response?.data?.detail || error.message || '切换内容失败'
-    alert(errorMessage)
-  } finally {
-    loading.value = false
-  }
-}
+// v2.0: 已移至 useNavigation composable
 
 // 加载数据
 async function loadParticipants() {
