@@ -28,41 +28,78 @@
               <span class="ml-1 text-xs font-medium">{{ isMultiSelectMode ? '多选' : '单选' }}</span>
             </button>
           </div>
-          <!-- v2.0: 使用子组件显示学生人数 -->
-          <StudentCountDisplay
-            v-if="session"
-            :active-count="activeStudents.length"
-            :total-count="totalStudents"
-            label="人已进入"
-          />
-          <!-- v2.0: 使用子组件显示模块数量 -->
-          <ModuleCountDisplay
-            v-if="lessonContentCells.length > 0"
-            :count="lessonContentCells.length"
-            label="个模块"
-          />
-          <!-- v2.0: 使用子组件显示课程时长 -->
-          <SessionDurationDisplay
-            v-if="session && normalizedSessionStatus !== 'pending'"
-            :status="session.status"
-            :duration="displayDuration"
-            :remaining="remainingTime"
-          />
+          <!-- 学生人数显示 -->
+          <div v-if="session" class="student-count-info">
+            <span class="student-count-icon">👥</span>
+            <span class="student-count-text">
+              <span class="student-count-value">{{ activeStudents.length }}</span>
+              <span v-if="totalStudents > 0" class="student-count-total">/{{ totalStudents }}</span>
+              <span class="student-count-label">人已进入</span>
+            </span>
+          </div>
+          <!-- 模块数量显示 -->
+          <div v-if="lessonContentCells.length > 0" class="module-count-info">
+            <span class="module-count-icon">📚</span>
+            <span class="module-count-text">
+              <span class="module-count-value">{{ lessonContentCells.length }}</span>
+              <span class="module-count-label">个模块</span>
+            </span>
+          </div>
+          <!-- 课程时长显示 -->
+          <div v-if="session && normalizedSessionStatus !== 'pending'" class="duration-info" :class="{ 
+            'duration-warning': remainingTime < 600, 
+            'duration-danger': remainingTime < 300 
+          }">
+            <span class="duration-icon">⏱️</span>
+            <span class="duration-text">
+              <span class="duration-value" :class="{
+                'text-blue-600': remainingTime >= 600,
+                'text-orange-600': remainingTime < 600 && remainingTime >= 300,
+                'text-red-600': remainingTime < 300
+              }">
+                {{ formatDuration(displayDuration) }}
+              </span>
+              <span v-if="normalizedSessionStatus === 'active'" class="duration-remaining">
+                剩余: {{ formatRemainingTime(remainingTime) }}
+              </span>
+            </span>
+          </div>
         </div>
         <div class="header-controls">
-          <!-- v2.0: 使用子组件显示会话控制按钮 -->
-          <SessionControlButtons
-            :has-session="!!session"
-            :session-status="session?.status"
-            :loading="loading"
-            :active-students-count="activeStudents.length"
-            @create="handleCreateSession"
-            @start="handleBeginClass"
-            @end="handleEnd"
-          />
+        <!-- 没有会话时，显示"创建课堂"按钮 -->
+        <button 
+          v-if="!session"
+          @click="handleCreateSession"
+          :disabled="loading"
+          class="btn btn-primary"
+        >
+          📚 创建课堂
+        </button>
+        
+        <!-- PENDING 状态：等待学生登录 -->
+        <template v-if="session && session.status === 'PENDING'">
+          <button 
+            @click="handleBeginClass"
+            :disabled="loading || activeStudents.length === 0"
+            class="btn btn-primary"
+            :class="{ 'btn-disabled-hint': activeStudents.length === 0 }"
+            :title="activeStudents.length === 0 ? '请等待学生加入课堂（至少需要1名学生）' : '开始上课'"
+          >
+            ▶️ 开始上课
+            <span v-if="activeStudents.length === 0" class="ml-2 text-xs opacity-75">(等待学生加入)</span>
+          </button>
+          <button 
+            @click="handleEnd"
+            :disabled="loading"
+            class="btn btn-danger"
+            title="结束当前会话，以便创建新会话"
+          >
+            ⏹️ 结束
+          </button>
+        </template>
         
         <!-- ACTIVE 状态：上课中 -->
-        <template v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')">
+        <template v-if="session && (session.status === 'active' || session.status === 'ACTIVE')">
           <!-- 显示模式切换按钮 -->
           <div class="display-mode-controls">
             <button 
@@ -98,7 +135,7 @@
         </template>
         
         <!-- PAUSED 状态：已暂停 -->
-        <template v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')">
+        <template v-if="session && (session.status === 'paused' || session.status === 'PAUSED')">
           <!-- 显示模式切换按钮 -->
           <div class="display-mode-controls">
             <button 
@@ -138,7 +175,7 @@
     
     <!-- PENDING 状态：等待学生加入提示区域 -->
     <div
-      v-if="session && session.status === 'PREPARING'"
+      v-if="session && session.status === 'PENDING'"
       class="waiting-students-banner"
     >
       <div class="waiting-banner-content">
@@ -376,11 +413,6 @@ import type { Cell, ActivityCell } from '../../types/cell'
 import classroomSessionService from '../../services/classroomSession'
 import ClassroomSwitcher from './ClassroomSwitcher.vue'
 import ClassroomControlBoard from './ClassroomControlBoard.vue'
-// v2.0: 导入新拆分的子组件
-import SessionDurationDisplay from './SessionDurationDisplay.vue'
-import StudentCountDisplay from './StudentCountDisplay.vue'
-import SessionControlButtons from './SessionControlButtons.vue'
-import ModuleCountDisplay from './ModuleCountDisplay.vue'
 import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
 import activityService from '../../services/activity'
 import logger from '@/utils/logger'
@@ -2138,7 +2170,7 @@ function stopDurationTimer() {
 
 // 监听session状态变化，自动启动/停止计时器
 watch(() => session.value?.status, (status, oldStatus) => {
-  if (status === 'teaching') {
+  if (status === 'active') {
     // 当状态变为 active 时，启动计时器
     if (!durationInterval.value) {
       // 如果计时器还没有启动
@@ -2149,7 +2181,7 @@ watch(() => session.value?.status, (status, oldStatus) => {
       }
       startDurationTimer()
     }
-  } else if (status === 'teaching') {
+  } else if (status === 'paused') {
     // 当状态变为 paused 时，停止计时器（但保持当前时长）
     stopDurationTimer()
   } else if (status === 'ended') {
@@ -2339,7 +2371,7 @@ function startPollingIfNeeded() {
   
   // 根据会话状态启动不同的轮询
   const status = normalizedSessionStatus.value
-  if (status === 'preparing') {
+  if (status === 'pending') {
     // PENDING 状态：只轮询参与者列表（每3秒）
     const interval = setInterval(() => {
       // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
