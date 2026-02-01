@@ -14,3 +14,4 @@ export { default as WaitingForStudentsBanner } from './WaitingForStudentsBanner.
 export { default as JoinedStudentsList } from './JoinedStudentsList.vue'
 export { default as ModuleList } from './ModuleList.vue'
 export { default as ClassroomSelectModal } from './ClassroomSelectModal.vue'
+export { default as ActivityStatisticsPanel } from './ActivityStatisticsPanel.vue'

@@ -167,6 +167,14 @@
           @prev-module="handlePrevModule"
           @next-module="handleNextModule"
         />
+
+        <!-- 活动统计面板 -->
+        <ActivityStatisticsPanel
+          v-if="currentCell"
+          :current-cell="currentCell"
+          :activity-statistics="activityStatistics"
+          :loading="loadingActivityStats"
+        />
       </div>
     </div>
   </div>
@@ -201,6 +209,7 @@ import WaitingForStudentsBanner from './WaitingForStudentsBanner.vue'
 import JoinedStudentsList from './JoinedStudentsList.vue'
 import ModuleList from './ModuleList.vue'
 import ClassroomSelectModal from './ClassroomSelectModal.vue'
+import ActivityStatisticsPanel from './ActivityStatisticsPanel.vue'
 import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
 import activityService from '../../services/activity'
 import logger from '@/utils/logger'
@@ -857,105 +866,6 @@ const loadingActivityStats = ref(false)
 
 // 学生提交状态映射（studentId -> submissionStatus）
 const studentSubmissionStatus = ref<Map<number | string, string>>(new Map())
-
-// 获取选择题及其统计
-const choiceItemsWithStats = computed(() => {
-  try {
-    if (!currentCell.value || currentCell.value.type !== 'activity' || !currentCell.value.content?.items || !activityStatistics.value.itemStatistics) {
-      return []
-    }
-    
-    const choiceTypes = ['single-choice', 'multiple-choice', 'true-false']
-    const items = currentCell.value.content.items.filter((item: any) => item && choiceTypes.includes(item.type))
-    
-    if (items.length === 0) {
-      return []
-    }
-    
-    return items.map((item: any, index: number) => {
-      const itemId = item.id
-      const itemStats = activityStatistics.value.itemStatistics?.[itemId]
-      const optionDistribution = itemStats?.option_distribution || itemStats?.options || {}
-      
-      // 获取选项列表
-      let options: Array<{ id: string; label: string; isCorrect?: boolean; count: number; percentage: number }> = []
-      
-      try {
-        if (item.type === 'single-choice' && 'config' in item && item.config && Array.isArray(item.config.options)) {
-          // 单选题：从配置中获取选项
-          const totalResponses: number = (Object.values(optionDistribution).reduce((sum: number, count: any) => sum + (Number(count) || 0), 0) as number) || activityStatistics.value.submittedCount || 1
-          options = item.config.options.map((opt: any) => {
-            const count = Number(optionDistribution[opt.id] || optionDistribution[String(opt.id)] || 0)
-            return {
-              id: opt.id,
-              label: opt.text || opt.label || opt.id,
-              isCorrect: opt.isCorrect,
-              count,
-              percentage: totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0,
-            }
-          })
-        } else if (item.type === 'multiple-choice' && 'config' in item && item.config && Array.isArray(item.config.options)) {
-          // 多选题：从配置中获取选项
-          const totalResponses = activityStatistics.value.submittedCount || 1
-          options = item.config.options.map((opt: any) => {
-            const count = Number(optionDistribution[opt.id] || optionDistribution[String(opt.id)] || 0)
-            return {
-              id: opt.id,
-              label: opt.text || opt.label || opt.id,
-              isCorrect: opt.isCorrect,
-              count,
-              percentage: totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0,
-            }
-          })
-        } else if (item.type === 'true-false') {
-          // 判断题：固定两个选项
-          const totalResponses: number = (Object.values(optionDistribution).reduce((sum: number, count: any) => sum + (Number(count) || 0), 0) as number) || activityStatistics.value.submittedCount || 1
-          const config = 'config' in item ? item.config : null
-          options = [
-            {
-              id: 'true',
-              label: '正确',
-              isCorrect: config && 'correctAnswer' in config ? config.correctAnswer === true : false,
-              count: Number(optionDistribution.true || optionDistribution['true'] || 0),
-              percentage: totalResponses > 0 ? Math.round((Number(optionDistribution.true || optionDistribution['true'] || 0) / totalResponses) * 100) : 0,
-            },
-            {
-              id: 'false',
-              label: '错误',
-              isCorrect: config && 'correctAnswer' in config ? config.correctAnswer === false : false,
-              count: Number(optionDistribution.false || optionDistribution['false'] || 0),
-              percentage: totalResponses > 0 ? Math.round((Number(optionDistribution.false || optionDistribution['false'] || 0) / totalResponses) * 100) : 0,
-            },
-          ]
-        }
-      } catch (error) {
-        console.error('处理选择题选项时出错:', error, item)
-        options = []
-      }
-      
-      return {
-        itemId,
-        order: index,
-        type: item.type,
-        question: item.question || `题目 ${index + 1}`,
-        options,
-      }
-    }).filter((item: any) => item && item.options && item.options.length > 0)
-  } catch (error) {
-    console.error('计算选择题统计时出错:', error)
-    return []
-  }
-})
-
-// 获取题目类型标签
-function getItemTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    'single-choice': '单选题',
-    'multiple-choice': '多选题',
-    'true-false': '判断题',
-  }
-  return labels[type] || type
-}
 
 // 加载活动统计
 async function loadActivityStatistics() {
@@ -2252,14 +2162,6 @@ defineExpose({
 </script>
 
 <style scoped>
-/* 活动统计面板样式 */
-.activity-panel {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
 .teacher-control-panel {
   @apply bg-white rounded-lg border border-gray-200;
   min-height: auto;
@@ -4061,77 +3963,6 @@ input[type="checkbox"].checkbox-input {
   text-align: center;
 }
 
-/* 活动统计部分样式 */
-.activity-statistics-section {
-  margin-top: 12px;
-  padding-top: 12px;
-  @apply border-t border-gray-200;
-}
-
-.activity-stats-header {
-  @apply flex items-center justify-between mb-3;
-}
-
-.activity-stats-title {
-  @apply text-sm font-semibold text-gray-700;
-}
-
-.activity-stats-submission {
-  @apply text-sm font-medium text-blue-600;
-}
-
-.activity-choice-stats {
-  @apply space-y-3;
-}
-
-.activity-choice-item {
-  @apply bg-gray-50 rounded-lg p-3 border border-gray-200;
-}
-
-.activity-choice-header {
-  @apply flex items-center justify-between mb-2;
-}
-
-.activity-choice-order {
-  @apply text-xs font-medium text-gray-700;
-}
-
-.activity-choice-type {
-  @apply text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full;
-}
-
-.activity-choice-options {
-  @apply space-y-1.5;
-}
-
-.activity-option-item {
-  @apply flex items-center justify-between px-2 py-1 bg-white rounded border border-gray-200;
-}
-
-.activity-option-item.is-correct {
-  @apply border-green-300 bg-green-50;
-}
-
-.activity-option-label {
-  @apply text-xs text-gray-800;
-}
-
-.activity-option-percentage {
-  @apply text-xs font-semibold text-blue-600;
-}
-
-.activity-option-item.is-correct .activity-option-percentage {
-  @apply text-green-600;
-}
-
-.activity-stats-loading,
-.activity-stats-empty {
-  @apply text-center py-4 text-sm text-gray-500;
-  padding: 20px;
-  @apply text-gray-500 text-sm;
-  @apply border-t border-gray-200 pt-4;
-}
-
 .monitoring-stats {
   display: flex;
   flex-direction: column;
@@ -4273,13 +4104,6 @@ input[type="checkbox"].checkbox-input {
 
 .btn-danger:hover:not(:disabled) {
   background: #dc2626;
-}
-
-/* 活动统计面板样式 */
-.activity-panel {
-  margin-top: 24px;
-  @apply bg-white rounded-lg border border-gray-200 p-6;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* 响应式布局 */

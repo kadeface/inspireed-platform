@@ -24,10 +24,9 @@ from app.core.database import Base
 class ClassSessionStatus(str, Enum):
     """课堂会话状态"""
 
-    PENDING = "PENDING"  # 准备中（教师已创建但未开始）
-    ACTIVE = "ACTIVE"  # 进行中
-    PAUSED = "PAUSED"  # 已暂停
-    ENDED = "ENDED"  # 已结束
+    PREPARING = "PREPARING"  # 准备中（教师已创建但未开始）
+    TEACHING = "TEACHING"    # 上课中
+    ENDED = "ENDED"          # 已结束
 
 
 class ClassSession(Base):
@@ -52,7 +51,7 @@ class ClassSession(Base):
     # 会话状态
     status = Column(
         SQLEnum(ClassSessionStatus),
-        default=ClassSessionStatus.PENDING,
+        default=ClassSessionStatus.PREPARING,
         nullable=False,
         index=True,
     )
