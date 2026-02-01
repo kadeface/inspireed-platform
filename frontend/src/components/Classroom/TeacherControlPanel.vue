@@ -137,53 +137,18 @@
     </div>
     
     <!-- PENDING 状态：等待学生加入提示区域 -->
-    <div
+    <WaitingForStudentsBanner
+      v-if="session"
+      :session-status="session.status"
+      :active-count="activeStudents.length"
+    />
+
+    <!-- 已加入学生列表 -->
+    <JoinedStudentsList
       v-if="session && session.status === 'PREPARING'"
-      class="waiting-students-banner"
-    >
-      <div class="waiting-banner-content">
-        <div class="waiting-banner-icon">⏳</div>
-        <div class="waiting-banner-text">
-          <div class="waiting-banner-title">
-            等待学生加入课堂
-            <span v-if="activeStudents.length > 0" class="student-count-badge">{{ activeStudents.length }} 人已加入</span>
-          </div>
-          <div class="waiting-banner-subtitle">
-            <span v-if="activeStudents.length === 0">
-              已创建课堂，学生正在加入中... 请等待至少1名学生加入后再开始上课
-            </span>
-            <span v-else>
-              已有 {{ activeStudents.length }} 名学生加入，可以开始上课了
-            </span>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 已加入学生列表 -->
-      <div v-if="activeStudents.length > 0" class="joined-students-list">
-        <div class="joined-students-header">
-          <span class="joined-students-title">已加入学生（{{ activeStudents.length }} 人）</span>
-        </div>
-        <div class="joined-students-grid">
-          <div 
-            v-for="student in activeStudents.slice(0, 12)" 
-            :key="student.id || student.user_id"
-            class="joined-student-item"
-          >
-            <div class="student-avatar">
-              {{ (student.full_name || student.username || '学生').charAt(0) }}
-            </div>
-            <div class="student-name">
-              {{ student.full_name || student.username || '学生' }}
-            </div>
-          </div>
-          <div v-if="activeStudents.length > 12" class="joined-student-item joined-student-more">
-            <div class="student-avatar">+{{ activeStudents.length - 12 }}</div>
-            <div class="student-name">更多</div>
-          </div>
-        </div>
-      </div>
-    </div>
+      :students="activeStudents"
+      :max-display="12"
+    />
 
     <!-- 主布局：左侧模块列表，右侧预览和监控 -->
     <div class="main-layout" :class="{ 'module-fullscreen-mode': modulePanelFullscreen }">
@@ -381,6 +346,8 @@ import SessionDurationDisplay from './SessionDurationDisplay.vue'
 import StudentCountDisplay from './StudentCountDisplay.vue'
 import SessionControlButtons from './SessionControlButtons.vue'
 import ModuleCountDisplay from './ModuleCountDisplay.vue'
+import WaitingForStudentsBanner from './WaitingForStudentsBanner.vue'
+import JoinedStudentsList from './JoinedStudentsList.vue'
 import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
 import activityService from '../../services/activity'
 import logger from '@/utils/logger'
