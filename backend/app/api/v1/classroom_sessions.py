@@ -112,6 +112,170 @@ async def transition_session_state(
         )
 
 
+# ========== WebSocket辅助函数 ==========
+
+
+async def validate_websocket_origin(websocket: WebSocket) -> bool:
+    """
+    验证WebSocket连接的Origin头
+
+    Args:
+        websocket: WebSocket连接对象
+
+    Returns:
+        bool: Origin是否合法
+    """
+    import re
+
+    origin = websocket.headers.get("origin")
+    logger.info(f"🔍 WebSocket Origin: {origin}")
+
+    # 如果没有Origin头，允许连接
+    if not origin:
+        logger.info("⚠️ 没有Origin头，允许连接")
+        return True
+
+    # 验证Origin（允许localhost、局域网IP和CloudStudio域名）
+    pattern = r"^https?://((localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?|.*\.cloudstudio\.club|.*\.coding\.net)$"
+    if re.match(pattern, origin):
+        logger.info(f"✅ Origin验证通过: {origin}")
+        return True
+    else:
+        logger.warning(f"❌ Origin验证失败: {origin}")
+        return False
+
+
+async def authenticate_websocket_token(
+    token: str,
+    db: AsyncSession,
+) -> Optional[User]:
+    """
+    验证WebSocket Token并返回用户信息
+
+    Args:
+        token: JWT token
+        db: 数据库会话
+
+    Returns:
+        User对象，如果验证失败返回None
+    """
+    try:
+        current_user = await deps.get_current_user_from_token(token, db)
+        if current_user:
+            logger.info(f"✅ Token验证成功: user_id={current_user.id}, role={current_user.role}")
+        return current_user
+    except Exception as e:
+        logger.error(f"❌ Token验证异常: {str(e)}")
+        return None
+
+
+async def validate_student_websocket_access(
+    user: User,
+    session: ClassSession,
+    db: AsyncSession,
+) -> bool:
+    """
+    验证学生是否有权限访问WebSocket
+
+    Args:
+        user: 用户对象
+        session: 会话对象
+        db: 数据库会话
+
+    Returns:
+        bool: 是否有权限
+    """
+    # 1. 验证用户角色
+    current_role = cast(UserRole, user.role)
+    if current_role != UserRole.STUDENT:
+        logger.warning(f"❌ 角色验证失败: 只允许学生连接，当前角色={current_role}")
+        return False
+
+    # 2. 验证会话状态
+    if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
+        logger.warning(f"❌ 会话已结束: session_id={session.id}, status={session.status}")
+        return False
+
+    # 3. 验证班级权限
+    classroom_id = cast(int, session.classroom_id)
+    has_access = await check_user_in_classroom(db, user, classroom_id)
+
+    if not has_access:
+        logger.warning(f"❌ 权限验证失败: 不属于班级 {classroom_id}")
+        return False
+
+    logger.info(f"✅ 学生访问验证通过: user_id={user.id}, session_id={session.id}")
+    return True
+
+
+async def validate_teacher_websocket_access(
+    user: User,
+    session: ClassSession,
+) -> bool:
+    """
+    验证教师是否有权限访问WebSocket
+
+    Args:
+        user: 用户对象
+        session: 会话对象
+
+    Returns:
+        bool: 是否有权限
+    """
+    # 1. 验证用户角色
+    current_role = cast(UserRole, user.role)
+    if current_role != UserRole.TEACHER:
+        logger.warning(f"❌ 角色验证失败: 只允许教师连接，当前角色={current_role}")
+        return False
+
+    # 2. 验证是否是会话的创建者
+    session_teacher_id = cast(int, session.teacher_id)
+    current_user_id = cast(int, user.id)
+    if session_teacher_id != current_user_id:
+        logger.warning(f"❌ 权限验证失败: 不是会话创建者")
+        return False
+
+    logger.info(f"✅ 教师访问验证通过: user_id={user.id}, session_id={session.id}")
+    return True
+
+
+async def send_initial_state(websocket: WebSocket, session: ClassSession, db: AsyncSession) -> None:
+    """
+    发送WebSocket初始状态
+
+    Args:
+        websocket: WebSocket连接
+        session: 会话对象
+        db: 数据库会话
+    """
+    # 获取关联对象
+    session_teacher = await db.get(User, cast(int, session.teacher_id))
+    session_lesson = await db.get(Lesson, cast(int, session.lesson_id))
+    session_classroom = await db.get(Classroom, cast(int, session.classroom_id))
+
+    # 构造初始状态消息
+    message = {
+        "type": "connected",
+        "timestamp": datetime.utcnow().isoformat(),
+        "data": {
+            "session_id": session.id,
+            "current_state": {
+                "status": session.status.value if hasattr(session.status, 'value') else str(session.status),
+                "display_cell_orders": (session.settings or {}).get("display_cell_orders", []),
+                "current_cell_id": session.current_cell_id,
+                "current_activity_id": session.current_activity_id,
+                # 添加教师和课程信息
+                "teacher_name": session_teacher.full_name or session_teacher.username if session_teacher else None,
+                "lesson_title": session_lesson.title if session_lesson else None,
+                "classroom_name": session_classroom.name if session_classroom else None,
+            }
+        }
+    }
+
+    await websocket.send_text(json.dumps(message))
+    logger.info(f"✅ 初始状态已发送: session_id={session.id}")
+
+
 # ========== 课堂会话 CRUD ==========
 
 
