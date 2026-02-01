@@ -1,8 +1,15 @@
 /**
  * 课堂会话类型定义
+ *
+ * v2.0 状态枚举更新：
+ * - 移除 'paused' 状态（简化状态机）
+ * - 统一使用大写命名（与后端一致）
+ * - 'pending' → 'preparing'
+ * - 'active' → 'teaching'
+ * - 'ended' → 'ended'
  */
 
-export type ClassSessionStatus = 'pending' | 'active' | 'paused' | 'ended'
+export type ClassSessionStatus = 'preparing' | 'teaching' | 'ended'
 
 export interface ClassSession {
   id: number
