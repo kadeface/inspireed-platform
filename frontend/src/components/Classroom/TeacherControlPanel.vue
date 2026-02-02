@@ -234,7 +234,7 @@ import CellTypeIcon from './CellTypeIcon.vue'
 // 6. Composables
 // ============================================================================
 import { useSessionManager } from './composables/useSessionManager'
-import { usePolling } from './composables/usePolling'
+import { useWebSocket } from './composables/useWebSocket'
 import { useDurationTimer } from './composables/useDurationTimer'
 import { useNavigation } from './composables/useNavigation'
 import { useDataLoader } from './composables/useDataLoader'
@@ -329,20 +329,60 @@ const sessionManager = useSessionManager({
   },
   onSessionEnded: () => {
     durationTimer.stopDurationTimer()
-    pollingManager.clearAllPollingIntervals()
+    wsManager?.disconnect()
     activeStudents.value = []
   },
 })
 
-// v2.0: 使用composables管理轮询
-const pollingManager = usePolling({
-  isComponentVisible: () => containerRef.value?.isConnected ?? false,
-  getSessionStatus: () => sessionManager.normalizedSessionStatus.value,
-  hasSession: () => !!session.value,
-  loadParticipants,
-  loadStatistics,
-  loadActivityStatistics,
-  isCurrentCellActivity: () => currentCell.value?.type === 'activity' && !!currentActivityDbCell.value,
+// v2.0: WebSocket 端点 URL（基于 session）
+const wsEndpointUrl = computed(() => {
+  if (!session.value) return ''
+  return `/api/v1/classroom-sessions/sessions/${session.value.id}/ws/teacher`
+})
+
+// v2.0: 使用 WebSocket composable 管理实时通信
+const wsManager = useWebSocket({
+  endpointUrl: wsEndpointUrl,
+  scope: 'session',
+  onConnected: (event) => {
+    console.log('✅ WebSocket 已连接')
+  },
+  onDisconnected: (event) => {
+    console.log('🔌 WebSocket 已断开')
+  },
+  onError: (event) => {
+    console.error('❌ WebSocket 错误:', event)
+  },
+  onParticipantJoined: (data) => {
+    console.log('👨‍🎓 学生加入:', data)
+    // 重新加载学生列表
+    loadParticipants()
+  },
+  onSessionStatusChanged: (data) => {
+    console.log('📢 会话状态变化:', data)
+    // 更新会话状态
+    if (session.value && data.status) {
+      session.value.status = data.status
+    }
+  },
+  onCellChanged: (data) => {
+    console.log('📺 内容切换:', data)
+    // 内容已切换，无需额外处理
+  },
+  onSessionEnded: (data) => {
+    console.log('🏁 会话结束:', data)
+    // 会话结束，断开连接
+    wsManager?.disconnect()
+  },
+  onSubmissionStatisticsUpdated: (data) => {
+    console.log('📊 活动统计更新:', data)
+    // 更新活动统计数据
+    if (activityStatistics.value) {
+      activityStatistics.value.totalStudents = data.total_students || 0
+      activityStatistics.value.submittedCount = data.submitted_count || 0
+      activityStatistics.value.itemStatistics = data.item_statistics || null
+    }
+  },
 })
 
 // v2.0: 使用composables管理计时器
@@ -365,7 +405,15 @@ const dataLoader = useDataLoader({
   currentCell,
   currentActivityDbCell,
   containerRef,
-  pollingManager,
+  wsManager: {
+    clearAllPollingIntervals: () => {
+      // WebSocket 不需要轮询，这里是一个适配器方法
+      // 当会话结束时，断开 WebSocket 连接
+      if (wsManager) {
+        wsManager.disconnect()
+      }
+    }
+  },
   dbCells,
 })
 
@@ -784,16 +832,16 @@ const hasAlerts = computed(() => {
 
 // v2.0: 定时器管理已移至 useDurationTimer composable
 
-// v2.0: 监听会话状态变化，自动启动/停止轮询
+// v2.0: 监听会话状态变化，自动连接/断开 WebSocket
 watch(() => sessionManager.normalizedSessionStatus.value, (status, oldStatus) => {
-  // 当会话被创建或状态改变时，启动轮询
-  if (status && status !== oldStatus) {
-    pollingManager.startPollingIfNeeded()
-    console.log('✅ 会话状态变化，已启动轮询，新状态:', status)
+  // 当会话被创建或状态改变时，连接 WebSocket
+  if (status && status !== oldStatus && status !== 'ended') {
+    wsManager.connect()
+    console.log('✅ 会话状态变化，已连接 WebSocket，新状态:', status)
   }
-  // 当会话结束时，清理轮询
+  // 当会话结束时，断开 WebSocket
   if (status === 'ended' || status === null) {
-    pollingManager.clearAllPollingIntervals()
+    wsManager.disconnect()
   }
 }, { immediate: false })
 
@@ -881,25 +929,25 @@ onMounted(async () => {
   // v2.0: 监听 currentCell 变化，自动加载活动统计
   watchCurrentCell()
 
-  // ✅ 重要：不自动加载会话和启动轮询
+  // ✅ 重要：不自动加载会话和启动 WebSocket
   // 只有在用户明确点击"创建课堂"或"准备上课"时才加载会话
-  // 这样可以避免在非授课模式下不必要的轮询
+  // 这样可以避免在非授课模式下不必要的 WebSocket 连接
 
-  // 确保没有遗留的轮询定时器
-  pollingManager.clearAllPollingIntervals()
+  // 确保没有遗留的 WebSocket 连接
+  wsManager?.disconnect()
 })
 
 // 组件卸载前清理
 onBeforeUnmount(() => {
-  pollingManager.clearAllPollingIntervals()
+  wsManager?.disconnect()
 })
 
 onUnmounted(() => {
   // v2.0: 使用 durationTimer composable 停止计时
   durationTimer.stopDurationTimer()
 
-  // 清理所有轮询定时器（双重保险）
-  pollingManager.clearAllPollingIntervals()
+  // 清理 WebSocket 连接（双重保险）
+  wsManager?.disconnect()
 
   // v2.0: 清理全屏监听器
   cleanupFullscreenListeners()

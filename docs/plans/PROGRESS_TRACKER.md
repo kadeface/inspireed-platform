@@ -151,6 +151,7 @@ Composables: 7个文件
 | **Composable提取（第16轮）** | ✅ | useSelectionMode.ts（~120行） |
 | **代码清理（第17轮）** | ✅ | 清理未使用代码和导入（-14行） |
 | **代码组织优化（第18轮）** | ✅ | 优化导入顺序和代码结构（+45行注释） |
+| **WebSocket实现（第19轮）** | ✅ | useWebSocket.ts（~300行，替换轮询） |
 | 继续拆分组件 | ⏳ | 待开始（更多模块） |
 | Composables | ⏳ | 待开始 |
 | 前端测试 | ⏳ | 待开始 |
@@ -174,14 +175,15 @@ Composables: 7个文件
 12. cellUtils.ts - Cell工具函数（~280行）
 13. formatUtils.ts - 格式化工具（~150行）
 
-**Composables（7个）**:
+**Composables（8个）**:
 14. useSessionManager.ts - 会话状态管理（~481行）
-15. usePolling.ts - 轮询管理（~170行）
-16. useDurationTimer.ts - 计时器管理（~150行）
-17. useNavigation.ts - 导航管理（~474行）
-18. useDataLoader.ts - 数据加载管理（~370行）
-19. useFullscreen.ts - 全屏控制管理（~120行）
-20. useSelectionMode.ts - 选择模式管理（~120行）
+15. ~~usePolling.ts~~ - 轮询管理（~170行）- 已废弃
+16. useWebSocket.ts - WebSocket实时通信（~300行，新增）
+17. useDurationTimer.ts - 计时器管理（~150行）
+18. useNavigation.ts - 导航管理（~474行）
+19. useDataLoader.ts - 数据加载管理（~370行）
+20. useFullscreen.ts - 全屏控制管理（~120行）
+21. useSelectionMode.ts - 选择模式管理（~120行）
 
 **主组件变化**:
 - 原始: 5047行
@@ -326,6 +328,9 @@ Composables: 7个文件
 - 03:15 - **第3阶段完成98%！代码清理完成**
 - 03:20 - **优化导入顺序和代码组织（+45行注释）**
 - 03:25 - **🎉 第3阶段完成100%！前端重构全部完成**
+- 03:35 - **创建 useWebSocket.ts composable（~300行）**
+- 03:45 - **集成 WebSocket 到 TeacherControlPanel，替换 HTTP 轮询**
+- 03:50 - **第3阶段完成105%！WebSocket实时通信实现完成**
 
 ---
 
@@ -351,11 +356,11 @@ Composables: 7个文件
 
 ### 中期任务（下周）
 
-1. **继续第3阶段：前端重构**
-   - 实现useSessionManager.ts
-   - 实现useWebSocket.ts（纯WebSocket，移除轮询）
-   - 实现Pinia Store
-   - 编写前端单元测试
+1. **继续第3阶段：前端重构** - ✅ 大部分完成
+   - ✅ 实现useSessionManager.ts
+   - ✅ 实现useWebSocket.ts（纯WebSocket，移除轮询降级）
+   - ⏳ 实现Pinia Store（待开始）
+   - ⏳ 编写前端单元测试（待开始）
 
 2. **进入第4阶段：集成测试**
    - E2E测试（Playwright）
