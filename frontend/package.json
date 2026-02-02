@@ -12,7 +12,11 @@
     "type-check": "vue-tsc --noEmit",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@antv/x6": "^2.18.1",
@@ -67,6 +71,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.1",
     "@tailwindcss/typography": "^0.5.19",
     "@types/dagre": "^0.7.52",
     "@types/dompurify": "^3.0.5",
