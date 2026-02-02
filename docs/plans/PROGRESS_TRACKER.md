@@ -153,9 +153,9 @@ Composables: 7个文件
 | **代码组织优化（第18轮）** | ✅ | 优化导入顺序和代码结构（+45行注释） |
 | **WebSocket实现（第19轮）** | ✅ | useWebSocket.ts（~300行，替换轮询） |
 | **Pinia Store实现（第20轮）** | ✅ | classroom.ts store（~340行） |
+| **前端单元测试（第21-24轮）** | ✅ | 5个测试文件，86个测试全部通过 |
 | 继续拆分组件 | ⏳ | 待开始（更多模块） |
-| Composables | ⏳ | 待开始 |
-| 前端测试 | ⏳ | 待开始 |
+| **前端测试** | ✅ **完成** | **86个测试全部通过** |
 
 ### 组件拆分详情
 
@@ -336,6 +336,72 @@ Composables: 7个文件
 - 04:10 - **添加 ActivityStatistics 类型定义**
 - 04:15 - **第3阶段完成110%！Pinia Store实现完成**
 
+### 前端单元测试详情（第21-24轮）
+
+**提交记录**:
+- c7a9f6a: test: 编写前端 Composables 单元测试（第21轮）
+- 3b648c7: test: 编写 useSessionManager 单元测试（第22轮）
+- 7231850: test: 编写 useWebSocket 单元测试（第23轮）
+- 63b2192: test: 编写 classroom Store 单元测试并修复属性名问题（第24轮）
+
+**测试文件覆盖**:
+1. `useFullscreen.test.ts` - 9个测试
+   - 全屏API mock
+   - 浏览器全屏切换
+   - 全屏监听器设置和清理
+   - 全屏状态变化处理
+
+2. `useSelectionMode.test.ts` - 11个测试
+   - 单选/多选模式切换
+   - displayCellOrders监听
+   - handleControlBoardNavigate集成
+   - 加载/会话状态检查
+
+3. `useDurationTimer.test.ts` - 14个测试
+   - 计时器启动/停止/重置
+   - 自定义课程时长
+   - 剩余时间计算
+   - getDisplayDuration状态检查
+   - 会话状态监听
+   - 暂停/继续功能
+
+4. `useSessionManager.test.ts` - 22个测试
+   - 会话创建/开始/结束/取消
+   - 班级选择弹窗
+   - 暂停/继续会话
+   - 显示模式切换
+   - 活动开始/结束
+   - 错误处理和重试逻辑
+
+5. `useWebSocket.test.ts` - 6个测试
+   - 初始化状态验证
+   - 导出的方法和属性
+   - 回调函数参数
+   - 自定义心跳间隔
+   - 作用域支持（session/lesson）
+
+6. `classroom.test.ts` - 23个测试
+   - Store初始化状态
+   - 所有计算属性
+   - 所有操作方法
+   - 学生管理（添加/移除/更新状态）
+   - 统计信息管理
+   - reset和cleanupSession
+
+**总计**: 5个测试文件，86个测试用例，全部通过 ✅
+
+**Bug修复**:
+- 修复 `classroom.ts` store 中属性名不匹配问题
+- 将所有 snake_case 属性改为 camelCase 以匹配 TypeScript 接口
+- 修复的属性: `is_active`→`isActive`, `total_students`→`totalStudents`, `current_cell_id`→`currentCellId`, `student_id`→`studentId` 等
+
+**技术亮点**:
+- 使用 vi.useFakeTimers() 测试计时器
+- Mock document 全屏API
+- Mock Pinia store 和 API 服务
+- 测试 Vue 响应式系统和 watch 效果
+- 测试复杂业务逻辑和状态转换
+
 ---
 
 ## 🚧 下一步行动
@@ -364,7 +430,7 @@ Composables: 7个文件
    - ✅ 实现useSessionManager.ts
    - ✅ 实现useWebSocket.ts（纯WebSocket，移除轮询降级）
    - ✅ 实现Pinia Store（classroom.ts）
-   - ⏳ 编写前端单元测试（待开始）
+   - ✅ 编写前端单元测试（86个测试全部通过）
 
 2. **进入第4阶段：集成测试**
    - E2E测试（Playwright）
@@ -398,4 +464,4 @@ Composables: 7个文件
 ---
 
 **文档维护**: 请在每次重要进展后更新此文档
-**最后更新**: 2026-02-01 03:25
+**最后更新**: 2026-02-02 12:50
