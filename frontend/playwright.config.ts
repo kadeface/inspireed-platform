@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   // 测试文件位置
-  testDir: './e2e',
+  testDir: './tests/e2e',
 
   // 每个测试的超时时间（毫秒）
   timeout: 30 * 1000,
