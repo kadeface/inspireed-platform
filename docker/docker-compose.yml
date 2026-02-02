@@ -66,6 +66,10 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
+      args:
+        # 若拉取 Docker Hub 超时，使用镜像源（默认 DaoCloud）；恢复官方可设 DOCKER_BASE_IMAGE=python:3.10-slim
+        BASE_IMAGE: ${DOCKER_BASE_IMAGE:-docker.m.daocloud.io/library/python:3.10-slim}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
     container_name: inspireed-backend
     env_file:
       - .env

@@ -116,13 +116,16 @@
           </div>
 
           <!-- 课堂控制面板（预览模式下） -->
-          <TeacherClassroomControlPanel
+          <div
             v-if="isPreviewMode && showClassroomPanel && currentLesson"
-            :lesson-id="currentLesson.id"
-            :lesson="currentLesson"
             :class="isPreviewMode ? 'mb-2' : 'mb-6'"
-            @session-changed="emit('session-changed', $event)"
-          />
+          >
+            <TeacherClassroomControlPanel
+              :lesson-id="currentLesson.id"
+              :lesson="currentLesson"
+              @session-changed="emit('session-changed', $event)"
+            />
+          </div>
 
           <!-- MVP: 参考资源面板 -->
           <ReferenceResourcePanel
@@ -161,7 +164,7 @@
 
           <!-- 大环节列表 -->
           <div ref="cellListRef" :class="isPreviewMode ? 'space-y-2' : 'space-y-4'">
-            <!-- 编辑模式：标签页导航 -->
+            <!-- 编辑模式：标签页导航（可拖拽、可编辑） -->
             <div v-if="!isPreviewMode" class="mb-4">
               <div class="flex items-center gap-2 border-b border-gray-200 overflow-x-auto pb-1 no-scrollbar">
                 <!-- 标签列表容器，用于 Sortable -->
@@ -228,6 +231,25 @@
               </div>
             </div>
 
+            <!-- 授课模式：上课流程导航（只读，便于快速跳转） -->
+            <div v-if="isPreviewMode && sections.length > 0" class="mb-4">
+              <div class="flex items-center gap-2 border-b border-gray-200 overflow-x-auto pb-1 no-scrollbar">
+                <span class="text-xs text-gray-500 flex-shrink-0 mr-2">上课流程：</span>
+                <div class="flex items-center gap-2">
+                  <button
+                    v-for="(sec, index) in sections"
+                    :key="sec.id"
+                    type="button"
+                    class="px-3 py-1.5 rounded-t-lg text-sm font-medium transition-colors flex-shrink-0"
+                    :class="activeSectionIndex === index ? 'bg-blue-50 text-blue-600 border border-b-0 border-gray-200 -mb-[1px]' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent'"
+                    @click="handlePreviewModeSectionClick(index)"
+                  >
+                    {{ sec.name }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- 编辑模式：当前选中大环节的内容 -->
             <template v-if="!isPreviewMode && sections[activeSectionIndex]">
               <SectionContainer
@@ -250,23 +272,27 @@
 
             <!-- 预览模式：显示所有大环节 -->
             <template v-else-if="isPreviewMode">
-              <SectionContainer
+              <div
                 v-for="(sec, si) in sections"
                 :key="`${sec.id}-${sec.cells?.length || 0}`"
-                :section="sec"
-                :section-index="si"
-                :cell-offset="sections.slice(0, si).reduce((a, s) => a + (s.cells?.length || 0), 0)"
-                :editable="false"
-                :compact-mode="false"
-                :lesson-id="currentLesson?.id"
-                :show-header="true"
-                @update:section="(p) => emit('update-section', { index: si, payload: p })"
-                @add-cell="(sectionIndex, indexInSection, cellType) => emit('add-cell-in-section', { sectionIndex, indexInSection, cellType })"
-                @cell-update="emit('cell-update', $event)"
-                @cell-delete="emit('cell-delete', $event)"
-                @cell-move-up="emit('cell-move-up', $event)"
-                @cell-move-down="emit('cell-move-down', $event)"
-              />
+                :id="`section-preview-${si}`"
+              >
+                <SectionContainer
+                  :section="sec"
+                  :section-index="si"
+                  :cell-offset="sections.slice(0, si).reduce((a, s) => a + (s.cells?.length || 0), 0)"
+                  :editable="false"
+                  :compact-mode="false"
+                  :lesson-id="currentLesson?.id"
+                  :show-header="true"
+                  @update:section="(p) => emit('update-section', { index: si, payload: p })"
+                  @add-cell="(sectionIndex, indexInSection, cellType) => emit('add-cell-in-section', { sectionIndex, indexInSection, cellType })"
+                  @cell-update="emit('cell-update', $event)"
+                  @cell-delete="emit('cell-delete', $event)"
+                  @cell-move-up="emit('cell-move-up', $event)"
+                  @cell-move-down="emit('cell-move-down', $event)"
+                />
+              </div>
             </template>
           </div>
         </div>
@@ -276,6 +302,7 @@
 </template>
 
 <script setup lang="ts">
+import { nextTick } from 'vue'
 import type { Lesson } from '@/types/lesson'
 import type { SectionInContent } from '@/types/section'
 import CellToolbar from '@/components/Lesson/CellToolbar.vue'
@@ -328,6 +355,15 @@ const emit = defineEmits<{
   'cell-move-up': [cellId: string]
   'cell-move-down': [cellId: string]
 }>()
+
+// 授课模式下点击大环节标签：更新选中状态并滚动到对应区域
+function handlePreviewModeSectionClick(index: number) {
+  emit('set-active-section', index)
+  nextTick(() => {
+    const el = document.getElementById(`section-preview-${index}`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
 
 // 辅助函数：设置编辑tab的ref
 function setEditingTabRef(el: any, tabId: string) {

@@ -4,8 +4,8 @@
  * 管理课堂会话的 WebSocket 连接，替代 HTTP 轮询
  */
 
-import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
-import { useAuthStore } from '@/store/auth'
+import { ref, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { useUserStore } from '@/store/user'
 
 export interface WebSocketMessage {
   type: string
@@ -99,22 +99,23 @@ export function useWebSocket(options: UseWebSocketOptions) {
   const reconnectDelay = 3000 // 3秒后重连
 
   /**
-   * 构建完整的 WebSocket URL
+   * 构建完整的 WebSocket URL（含 JWT，后端教师端 ws/teacher 需要 token 校验）
    */
   function buildWebSocketUrl(): string {
     const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
     const wsProtocol = apiBase.startsWith('https') ? 'wss:' : 'ws:'
-    const wsHost = apiBase.replace(/^https?:\/\//, '')
-
-    return `${wsProtocol}//${wsHost}${endpointUrl.value}`
+    const wsHost = apiBase.replace(/^https?:\/\//, '').replace(/\/api\/v1\/?$/, '')
+    const token = getToken()
+    const base = `${wsProtocol}//${wsHost}${endpointUrl.value}`
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base
   }
 
   /**
-   * 获取 JWT Token
+   * 获取 JWT Token（与 useRealtimeChannel / API 一致：userStore + localStorage）
    */
   function getToken(): string {
-    const authStore = useAuthStore()
-    return authStore.token || ''
+    const userStore = useUserStore()
+    return userStore.token || localStorage.getItem('access_token') || ''
   }
 
   /**
@@ -224,6 +225,11 @@ export function useWebSocket(options: UseWebSocketOptions) {
    * 连接 WebSocket
    */
   function connect() {
+    // 无有效 endpoint 时不连接（例如 session 尚未创建）
+    if (!endpointUrl.value || !endpointUrl.value.startsWith('/')) {
+      return
+    }
+
     if (ws.value?.readyState === WebSocket.OPEN) {
       console.log('WebSocket 已连接，跳过')
       return
@@ -237,11 +243,9 @@ export function useWebSocket(options: UseWebSocketOptions) {
     isConnecting.value = true
 
     try {
-      const token = getToken()
-      const url = buildWebSocketUrl()
-      const wsUrl = token ? `${url}?token=${token}` : url
-
-      console.log('🔌 连接 WebSocket:', wsUrl)
+      const wsUrl = buildWebSocketUrl()
+      const logUrl = wsUrl.includes('?') ? wsUrl.split('?')[0] : wsUrl
+      console.log('🔌 连接 WebSocket:', logUrl)
 
       ws.value = new WebSocket(wsUrl)
 
@@ -314,13 +318,23 @@ export function useWebSocket(options: UseWebSocketOptions) {
   }
 
   /**
-   * 组件挂载时自动连接
+   * 监听 endpointUrl 变化：当 session 创建后 endpoint 有效时自动连接
    */
+  watch(
+    endpointUrl,
+    (url) => {
+      if (url && url.startsWith('/') && !isConnected.value && !isConnecting.value) {
+        setTimeout(() => connect(), 100)
+      }
+    },
+    { immediate: true }
+  )
+
   onMounted(() => {
-    // 延迟连接，确保组件已完全渲染
-    setTimeout(() => {
-      connect()
-    }, 100)
+    // 挂载时若 endpoint 已有效则连接
+    if (endpointUrl.value && endpointUrl.value.startsWith('/')) {
+      setTimeout(() => connect(), 100)
+    }
   })
 
   /**

@@ -96,19 +96,34 @@ if ! docker info > /dev/null 2>&1; then
     fi
 fi
 
-# 启动基础服务
-echo "📦 启动基础服务 (PostgreSQL, Redis, MinIO, Kafka)..."
+# 启动基础服务（仅 postgres/redis/minio，后端和前端在本地运行，避免拉取 python/node 镜像）
+echo "📦 启动基础服务 (PostgreSQL, Redis, MinIO)..."
 cd docker
-docker-compose up -d
+docker compose up -d postgres redis minio 2>/dev/null || docker-compose up -d postgres redis minio
 cd ..
 
 # 等待服务启动
 echo "⏳ 等待服务启动..."
 sleep 5
 
+# 等待 PostgreSQL 可连接（最多约 60 秒）
+echo "⏳ 等待 PostgreSQL 就绪..."
+POSTGRES_MAX_ATTEMPTS=30
+POSTGRES_ATTEMPT=0
+until nc -z 127.0.0.1 5432 2>/dev/null; do
+    POSTGRES_ATTEMPT=$((POSTGRES_ATTEMPT + 1))
+    if [ $POSTGRES_ATTEMPT -ge $POSTGRES_MAX_ATTEMPTS ]; then
+        echo "❌ PostgreSQL 启动超时，请检查 Docker 容器: docker-compose -f docker/docker-compose.yml ps"
+        exit 1
+    fi
+    echo "   等待中... ($POSTGRES_ATTEMPT/$POSTGRES_MAX_ATTEMPTS)"
+    sleep 2
+done
+echo "✅ PostgreSQL 已就绪"
+
 # 检查服务状态
 echo "🔍 检查服务状态..."
-docker-compose -f docker/docker-compose.yml ps
+(docker compose -f docker/docker-compose.yml ps 2>/dev/null || docker-compose -f docker/docker-compose.yml ps) || true
 
 # 启动后端服务
 echo "🔧 启动后端服务..."

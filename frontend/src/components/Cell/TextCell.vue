@@ -162,7 +162,7 @@
           'expanded-editor-wrapper': compactMode && isExpanded,
         }"
       >
-        <TipTapEditor :content="cell.content.html" @update="handleContentUpdate" />
+        <TipTapEditor :content="cellContent.html ?? ''" @update="handleContentUpdate" />
       </div>
       <!-- Markdown编辑器 -->
       <div
@@ -270,8 +270,11 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLElement | null>(null)
 const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)
 
+// 安全访问 content（某些旧数据可能缺少 content）
+const cellContent = computed(() => props.cell?.content ?? { html: '', markdown: undefined, editorMode: undefined as 'html' | 'markdown' | undefined })
+
 const isEditing = ref(props.editable)
-const tempContent = ref(props.cell.content.html)
+const tempContent = ref(cellContent.value?.html ?? '')
 const isExpanded = ref(false) // 是否展开（在紧凑模式下）
 
 // 滚动到顶部
@@ -280,18 +283,19 @@ function scrollToTop() {
 }
 // 编辑器模式：'html' 或 'markdown'
 const editorMode = ref<'html' | 'markdown'>(
-  props.cell.content.editorMode || (props.cell.content.markdown ? 'markdown' : 'html')
+  cellContent.value?.editorMode || (cellContent.value?.markdown ? 'markdown' : 'html')
 )
-const tempMarkdown = ref(props.cell.content.markdown || '')
+const tempMarkdown = ref(cellContent.value?.markdown || '')
 
 const sanitizedHtml = computed(() => {
+  const content = cellContent.value
   // 如果内容有 Markdown，优先使用 Markdown 渲染（在非编辑模式下）
   let html = ''
-  if (props.cell.content.markdown && (!props.editable || !isEditing.value)) {
+  if (content?.markdown && (!props.editable || !isEditing.value)) {
     // 使用 Markdown 渲染
-    html = markdownToHtml(props.cell.content.markdown)
+    html = markdownToHtml(content.markdown)
   } else {
-    html = props.cell.content.html || ''
+    html = content?.html || ''
   }
 
   // 过滤占位符文本：在非编辑模式下，移除占位符文本
@@ -903,16 +907,17 @@ function markdownToHtml(markdown: string): string {
 
 function startEdit() {
   isEditing.value = true
+  const content = cellContent.value
   // 根据当前内容决定编辑器模式
-  if (props.cell.content.markdown) {
+  if (content?.markdown) {
     editorMode.value = 'markdown'
-    tempMarkdown.value = props.cell.content.markdown
+    tempMarkdown.value = content.markdown
   } else {
-    editorMode.value = props.cell.content.editorMode || 'html'
-    tempContent.value = props.cell.content.html
-    if (editorMode.value === 'markdown' && !tempMarkdown.value) {
+    editorMode.value = content?.editorMode || 'html'
+    tempContent.value = content?.html ?? ''
+    if (editorMode.value === 'markdown' && !tempMarkdown.value && content?.html) {
       // 如果切换到 Markdown 模式但没有 Markdown 内容，尝试从 HTML 转换
-      tempMarkdown.value = htmlToMarkdown(props.cell.content.html)
+      tempMarkdown.value = htmlToMarkdown(content.html)
     }
   }
 }
@@ -924,14 +929,16 @@ function saveEdit() {
 
 function cancelEdit() {
   isEditing.value = false
-  tempContent.value = props.cell.content.html
-  tempMarkdown.value = props.cell.content.markdown || ''
+  const content = cellContent.value
+  tempContent.value = content?.html ?? ''
+  tempMarkdown.value = content?.markdown || ''
   editorMode.value =
-    props.cell.content.editorMode || (props.cell.content.markdown ? 'markdown' : 'html')
+    content?.editorMode || (content?.markdown ? 'markdown' : 'html')
 }
 
 function handleContentUpdate(html: string) {
   tempContent.value = html
+  if (!props.cell.content) (props.cell as any).content = { html: '', editorMode: 'html' }
   props.cell.content.html = html
   props.cell.content.editorMode = 'html'
   // 如果使用 HTML 编辑器，清除 Markdown 内容
@@ -942,6 +949,7 @@ function handleContentUpdate(html: string) {
 
 function handleMarkdownUpdate(markdown: string) {
   tempMarkdown.value = markdown
+  if (!props.cell.content) (props.cell as any).content = { html: '', editorMode: 'markdown' }
   props.cell.content.markdown = markdown
   props.cell.content.editorMode = 'markdown'
   // 将 Markdown 转换为 HTML 用于预览和兼容性
@@ -1048,9 +1056,10 @@ function htmlToMarkdown(html: string): string {
 // 监听编辑器模式变化
 watch(editorMode, (newMode) => {
   if (isEditing.value) {
-    if (newMode === 'markdown' && !tempMarkdown.value && props.cell.content.html) {
+    const content = cellContent.value
+    if (newMode === 'markdown' && !tempMarkdown.value && content?.html) {
       // 从 HTML 模式切换到 Markdown 模式，尝试转换
-      tempMarkdown.value = htmlToMarkdown(props.cell.content.html)
+      tempMarkdown.value = htmlToMarkdown(content.html)
     }
   }
 })
@@ -1083,8 +1092,9 @@ function handleUpdate() {
   // 在保存前，确保HTML内容中的URL都是文件名格式（安全网）
   // TipTapEditor的onUpdate已经处理了URL提取，但这里作为额外保障
   const cellToSave = { ...props.cell }
+  if (!cellToSave.content) cellToSave.content = { html: '', editorMode: 'html' }
 
-  if (cellToSave.content?.html) {
+  if (cellToSave.content.html) {
     let html = cellToSave.content.html
 
     // 提取img标签中的文件名
@@ -1156,29 +1166,36 @@ function handleImageError(event: Event) {
 }
 
 onMounted(async () => {
-  // 等待DOM渲染完成后再添加事件监听
-  await nextTick()
+  try {
+    // 等待DOM渲染完成后再添加事件监听
+    await nextTick()
 
-  const isDev = import.meta.env.DEV
-
-  // 在组件挂载后，为所有图片添加错误监听
-  const cellElement = document.querySelector(`[data-cell-id="${props.cell.id}"]`)
-  if (cellElement) {
-    const images = cellElement.querySelectorAll('img')
-    images.forEach((img) => {
-      img.addEventListener('error', handleImageError)
-    })
+    // 在组件挂载后，为所有图片添加错误监听
+    const cellId = props.cell?.id
+    if (cellId) {
+      const cellElement = document.querySelector(`[data-cell-id="${cellId}"]`)
+      if (cellElement) {
+        const images = cellElement.querySelectorAll('img')
+        images.forEach((img) => {
+          img.addEventListener('error', handleImageError)
+        })
+      }
+    }
+  } catch (err) {
+    console.warn('[TextCell] Mount hook error:', err)
   }
 })
 
 onUnmounted(() => {
-  // 清理事件监听
-  const cellElement = document.querySelector(`[data-cell-id="${props.cell.id}"]`)
-  if (cellElement) {
-    const images = cellElement.querySelectorAll('img')
-    images.forEach((img) => {
-      img.removeEventListener('error', handleImageError)
-    })
+  const cellId = props.cell?.id
+  if (cellId) {
+    const cellElement = document.querySelector(`[data-cell-id="${cellId}"]`)
+    if (cellElement) {
+      const images = cellElement.querySelectorAll('img')
+      images.forEach((img) => {
+        img.removeEventListener('error', handleImageError)
+      })
+    }
   }
 })
 </script>

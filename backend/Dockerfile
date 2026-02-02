@@ -1,5 +1,8 @@
 # 后端 Dockerfile
-FROM python:3.10-slim
+# 若拉取 docker.io 超时，可用镜像：docker build --build-arg BASE_IMAGE=docker.m.daocloud.io/library/python:3.10-slim .
+# 或在 Docker Desktop 配置 registry-mirrors（如 https://docker.mirrors.ustc.edu.cn）
+ARG BASE_IMAGE=python:3.10-slim
+FROM ${BASE_IMAGE}
 
 # 设置工作目录
 WORKDIR /app
@@ -23,9 +26,11 @@ RUN apt-get update --fix-missing && \
 # 复制依赖文件
 COPY requirements.txt .
 
-# 配置 pip 使用国内镜像源（清华大学镜像）以加速安装
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip install --no-cache-dir -r requirements.txt
+# pip 源：默认官方 PyPI；国内可加速：--build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+# 慢速网络可加大超时：--build-arg PIP_TIMEOUT=600
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_TIMEOUT=300
+RUN pip install --no-cache-dir --index-url "$PIP_INDEX_URL" --timeout "$PIP_TIMEOUT" --retries 5 -r requirements.txt
 
 # 复制应用代码
 COPY . .

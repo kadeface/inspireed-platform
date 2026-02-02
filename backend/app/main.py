@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.exceptions import RequestValidationError
 import traceback
 import os
@@ -236,8 +236,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-# 配置静态文件服务 - 使用自定义路由确保CORS头被正确添加
-@app.get("/uploads/resources/{file_path:path}")
+# 配置静态文件服务 - 使用自定义路由确保CORS头被正确添加（支持 GET/HEAD，视频会发 HEAD 探路）
+@app.api_route("/uploads/resources/{file_path:path}", methods=["GET", "HEAD"])
 async def serve_static_file(file_path: str, request: Request):
     """
     提供静态文件服务，支持视频流（Range请求）和CORS
@@ -345,7 +345,11 @@ async def serve_static_file(file_path: str, request: Request):
     
     # 添加缓存控制（视频文件可以缓存）
     response.headers["Cache-Control"] = "public, max-age=31536000"
-    
+
+    # HEAD 请求只返回头信息，不返回 body（避免 405）
+    if request.method == "HEAD":
+        return Response(status_code=response.status_code, headers=dict(response.headers))
+
     return response
 
 

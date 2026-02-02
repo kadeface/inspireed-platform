@@ -317,14 +317,11 @@ const sessionManager = useSessionManager({
   lessonId: props.lessonId,
   onSessionCreated: (newSession) => {
     console.log('✅ TeacherControlPanel: 会话已创建，sessionId =', newSession.id, '状态 =', newSession.status)
-    // 立即加载一次学生列表
     loadParticipants()
     console.log('✅ 初始学生列表加载完成，学生数:', activeStudents.value.length)
   },
   onSessionStarted: (updatedSession) => {
-    // v2.0: 使用 durationTimer composable 管理计时
     durationTimer.startDurationTimer()
-    // 加载统计信息
     loadStatistics()
   },
   onSessionEnded: () => {
@@ -333,6 +330,146 @@ const sessionManager = useSessionManager({
     activeStudents.value = []
   },
 })
+
+// 必须立即解构，供后续 composables 使用（避免 TDZ）
+const {
+  session,
+  loading,
+  showClassroomSelectModal,
+  selectedClassroomId,
+  classroomSelectError,
+  availableClassrooms,
+  loadingClassrooms,
+  normalizedSessionStatus,
+  statusTitle,
+  statusClass,
+  currentDisplayMode,
+  handleCreateSession,
+  handleClassroomSelectConfirm,
+  handleClassroomSelectCancel,
+  handleBeginClass,
+  handleCancelSession,
+  handlePause,
+  handleResume,
+  handleEnd,
+  handleToggleDisplayMode,
+  handleStartActivity,
+  handleEndActivity,
+} = sessionManager
+
+// 组件 Refs（需在 dataLoader 之前定义）
+const containerRef = ref<HTMLElement | null>(null)
+const moduleListRef = ref<HTMLElement | null>(null)
+const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map())
+const selectedCellIndex = ref(-1)
+const dbCells = ref<Array<{ id: number | string; order: number; cell_type: string }>>([])
+
+// 将 lesson.content 转换为 flat cells（需在 dataLoader 之前）
+const lessonContentCells = computed(() => {
+  if (!props.lesson?.content) return []
+  if (Array.isArray(props.lesson.content)) return props.lesson.content
+  if (isContentWithSections(props.lesson.content)) {
+    const sections = normalizeContentToSections(props.lesson.content)
+    return sectionsToFlatCells(sections)
+  }
+  return []
+})
+
+// displayCellOrders、currentModuleIndex、currentCell、currentActivityDbCell 依赖 session/lessonContentCells，需在 dataLoader 之前
+const displayCellOrders = computed(() => {
+  if (!session.value?.settings) return []
+  const settings = session.value.settings as any
+  if (settings?.display_cell_orders && Array.isArray(settings.display_cell_orders)) {
+    return settings.display_cell_orders
+  }
+  return []
+})
+
+const currentModuleIndex = computed(() => {
+  if (!lessonContentCells.value.length) return -1
+  if (displayCellOrders.value?.length > 0) {
+    const firstOrder = displayCellOrders.value[0]
+    const index = lessonContentCells.value.findIndex((cell, idx) => {
+      const cellOrder = cell.order !== undefined ? cell.order : idx
+      return cellOrder === firstOrder
+    })
+    if (index >= 0) return index
+  }
+  if (selectedCellIndex.value >= 0 && selectedCellIndex.value < lessonContentCells.value.length) {
+    return selectedCellIndex.value
+  }
+  if (session.value?.current_cell_id) {
+    const currentId = session.value.current_cell_id
+    if (currentId === 0) return -1
+    const index = lessonContentCells.value.findIndex((cell, idx) => {
+      const cellId = getCellIdUtil(cell)
+      if (typeof cellId === 'number' && cellId === currentId) return true
+      if (typeof cellId === 'string') {
+        const numId = parseInt(cellId)
+        if (!isNaN(numId) && numId === currentId) return true
+      }
+      if (idx === currentId) return true
+      if (cell.order !== undefined && cell.order === currentId) return true
+      return false
+    })
+    if (index >= 0) return index
+  }
+  return -1
+})
+
+const currentCell = computed(() => {
+  if (!lessonContentCells.value.length || !session.value) return null
+  if (selectedCellIndex.value >= 0 && selectedCellIndex.value < lessonContentCells.value.length) {
+    return lessonContentCells.value[selectedCellIndex.value]
+  }
+  const currentId = session.value.current_cell_id
+  if (!currentId || currentId === 0) return null
+  const foundCell = lessonContentCells.value.find((cell, index) => {
+    const cellId = getCellIdUtil(cell)
+    if (typeof cellId === 'number' && cellId === currentId) return true
+    if (typeof cellId === 'string') {
+      const numId = parseInt(cellId)
+      if (!isNaN(numId) && numId === currentId) return true
+    }
+    if (index === currentId) return true
+    if (cell.order !== undefined && cell.order === currentId) return true
+    return false
+  })
+  return foundCell || null
+})
+
+const currentActivityDbCell = computed(() => {
+  if (!currentCell.value || currentCell.value.type !== 'activity') return null
+  if (!dbCells.value?.length) return null
+  const order = currentCell.value.order
+  if (order === undefined) return null
+  const matchedDbCell = dbCells.value.find(dbCell => {
+    const cellTypeMatch = dbCell.cell_type === 'ACTIVITY' || dbCell.cell_type === 'activity' || dbCell.cell_type?.toUpperCase() === 'ACTIVITY'
+    return dbCell.order === order && cellTypeMatch
+  })
+  return matchedDbCell || null
+})
+
+function getCellId(cell: Cell): number | string | null {
+  return getCellIdUtil(cell)
+}
+
+function isModuleActiveWrapper(cell: Cell, index: number): boolean {
+  return isModuleActive(cell, index, session.value, displayCellOrders.value, selectedCellIndex.value)
+}
+
+function isModuleActivityActiveWrapper(cell: Cell, index: number): boolean {
+  return isModuleActivityActive(cell, index, session.value)
+}
+
+function getModuleTooltipWrapper(cell: Cell, index: number): string {
+  const isActive = isModuleActiveWrapper(cell, index)
+  return getModuleTooltip(cell, index, isActive)
+}
+
+function scrollToSelectedModuleWrapper() {
+  scrollToSelectedModule(moduleListRef, moduleItemRefs.value, selectedCellIndex.value)
+}
 
 // v2.0: WebSocket 端点 URL（基于 session）
 const wsEndpointUrl = computed(() => {
@@ -405,13 +542,9 @@ const dataLoader = useDataLoader({
   currentCell,
   currentActivityDbCell,
   containerRef,
-  wsManager: {
+  pollingManager: {
     clearAllPollingIntervals: () => {
-      // WebSocket 不需要轮询，这里是一个适配器方法
-      // 当会话结束时，断开 WebSocket 连接
-      if (wsManager) {
-        wsManager.disconnect()
-      }
+      if (wsManager) wsManager.disconnect()
     }
   },
   dbCells,
@@ -487,37 +620,6 @@ const {
   handleModuleCheckboxChange,
   handleHideAll,
 } = navigationManager
-
-// 从 composable 解构会话相关状态和方法
-const {
-  session,
-  loading,
-  showClassroomSelectModal,
-  selectedClassroomId,
-  classroomSelectError,
-  availableClassrooms,
-  loadingClassrooms,
-  normalizedSessionStatus,
-  statusTitle,
-  statusClass,
-  currentDisplayMode,
-  handleCreateSession,
-  handleClassroomSelectConfirm,
-  handleClassroomSelectCancel,
-  handleBeginClass,
-  handleCancelSession,
-  handlePause,
-  handleResume,
-  handleEnd,
-  handleToggleDisplayMode,
-  handleStartActivity,
-  handleEndActivity,
-} = sessionManager
-
-// 组件 Refs
-const containerRef = ref<HTMLElement | null>(null) // 用于检查组件是否在 DOM 中
-const moduleListRef = ref<HTMLElement | null>(null) // 模块列表容器
-const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map()) // 模块项引用
 // v2.0: 以下状态已移至 useDataLoader composable
 // const activeStudents, const loadingStudents, const sessionStatistics
 // const activityStatistics, const studentSubmissionStatus, const loadingActivityStats
@@ -541,10 +643,7 @@ watch(session, (newSession) => {
 // const loadingStudents, const sessionStatistics, const activityStatistics
 // const studentSubmissionStatus, const loadingActivityStats
 // 现在从 dataLoader 导入
-// v2.0: 以下状态已移至 useSelectionMode composable
-// const isMultiSelectMode 现在从 selectionModeManager 导入
-const selectedCellIndex = ref(-1)  // -1表示隐藏所有内容
-const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录（用于 ID 匹配）
+// v2.0: selectedCellIndex, dbCells 已移至顶部（在 dataLoader 之前）
 // v2.0: 以下状态已移至 useFullscreen composable
 // const modulePanelFullscreen, const isPanelFullscreen
 // 现在从 fullscreenManager 导入
@@ -582,23 +681,7 @@ const displayStudents = computed(() => {
   return activeStudents.value.slice(0, 8)
 })
 
-// 将 lesson.content 转换为 flat cells 数组（支持新旧两种格式）
-const lessonContentCells = computed(() => {
-  if (!props.lesson?.content) return []
-  
-  // 如果已经是数组格式（旧格式），直接返回
-  if (Array.isArray(props.lesson.content)) {
-    return props.lesson.content
-  }
-  
-  // 如果是 sections 格式（新格式），转换为 flat cells
-  if (isContentWithSections(props.lesson.content)) {
-    const sections = normalizeContentToSections(props.lesson.content)
-    return sectionsToFlatCells(sections)
-  }
-  
-  return []
-})
+// v2.0: lessonContentCells 已移至顶部（在 dataLoader 之前）
 
 // v2.0: 学生监控工具函数已移至 studentMonitoring.ts
 // getStudentStatusClass, getStudentTooltip, getStudentAccount 现在从工具文件导入
@@ -622,167 +705,9 @@ const averageScore = computed(() => {
 
 
 
-const currentCell = computed(() => {
-  if (!lessonContentCells.value.length || !session.value) {
-    return null
-  }
-  
-  // 如果 selectedCellIndex 有效，优先使用它
-  if (selectedCellIndex.value >= 0 && selectedCellIndex.value < lessonContentCells.value.length) {
-    return lessonContentCells.value[selectedCellIndex.value]
-  }
-  
-  // 否则使用 current_cell_id 查找
-  const currentId = session.value.current_cell_id
-  if (!currentId || currentId === 0) {
-    return null
-  }
-  
-  // 查找匹配的Cell
-  const foundCell = lessonContentCells.value.find((cell, index) => {
-    const cellId = getCellId(cell)
-    // 尝试匹配数字ID
-    if (typeof cellId === 'number' && cellId === currentId) return true
-    // 尝试匹配字符串ID（转换为数字）
-    if (typeof cellId === 'string') {
-      const numId = parseInt(cellId)
-      if (!isNaN(numId) && numId === currentId) return true
-    }
-    // 尝试通过索引匹配（如果currentId是顺序索引）
-    if (index === currentId) return true
-    // 尝试通过order匹配
-    if (cell.order !== undefined && cell.order === currentId) return true
-    return false
-  })
-  
-  return foundCell || null
-})
-
-// 获取当前活动 Cell 的数据库 ID（用于查询提交数据）
-// 计算 displayCellOrders（从 session.settings 中获取）
-const displayCellOrders = computed(() => {
-  if (!session.value?.settings) return []
-  const settings = session.value.settings as any
-  if (settings?.display_cell_orders && Array.isArray(settings.display_cell_orders)) {
-    return settings.display_cell_orders
-  }
-  return []
-})
-
-// 获取当前选中模块的索引
-const currentModuleIndex = computed(() => {
-  if (!lessonContentCells.value.length) return -1
-  
-  // 多选模式：使用 displayCellOrders 中的第一个
-  if (displayCellOrders.value !== undefined && Array.isArray(displayCellOrders.value) && displayCellOrders.value.length > 0) {
-    const firstOrder = displayCellOrders.value[0]
-    const index = lessonContentCells.value.findIndex((cell, idx) => {
-      const cellOrder = cell.order !== undefined ? cell.order : idx
-      return cellOrder === firstOrder
-    })
-    if (index >= 0) return index
-  }
-  
-  // 单选模式：直接使用 selectedCellIndex（它会在点击时立即更新）
-  if (selectedCellIndex.value >= 0 && selectedCellIndex.value < lessonContentCells.value.length) {
-    return selectedCellIndex.value
-  }
-  
-  // 如果 selectedCellIndex 无效，尝试从 session.current_cell_id 获取
-  if (session.value?.current_cell_id) {
-    const currentId = session.value.current_cell_id
-    if (currentId === 0) return -1
-    
-    const index = lessonContentCells.value.findIndex((cell, idx) => {
-      const cellId = getCellId(cell)
-      if (typeof cellId === 'number' && cellId === currentId) return true
-      if (typeof cellId === 'string') {
-        const numId = parseInt(cellId)
-        if (!isNaN(numId) && numId === currentId) return true
-      }
-      if (idx === currentId) return true
-      if (cell.order !== undefined && cell.order === currentId) return true
-      return false
-    })
-    if (index >= 0) return index
-  }
-  
-  return -1
-})
-
-// v2.0: 以下computed属性已移至 useNavigation composable
-// const canGoPrev, const canGoNext 现在从 navigationManager 导入
-
-const currentActivityDbCell = computed(() => {
-  if (!currentCell.value || currentCell.value.type !== 'activity') {
-    return null
-  }
-  
-  if (!dbCells.value || dbCells.value.length === 0) {
-    return null
-  }
-  
-  // 通过 order 查找对应的数据库 Cell
-  const order = currentCell.value.order
-  if (order === undefined) {
-    return null
-  }
-  
-  // 尝试匹配 cell_type（可能是 'ACTIVITY' 或 'activity'）
-  const matchedDbCell = dbCells.value.find(dbCell => {
-    const cellTypeMatch = dbCell.cell_type === 'ACTIVITY' || 
-                          dbCell.cell_type === 'activity' ||
-                          dbCell.cell_type?.toUpperCase() === 'ACTIVITY'
-    return dbCell.order === order && cellTypeMatch
-  })
-  
-  return matchedDbCell || null
-})
-
-
-// v2.0: Cell工具函数已移至 cellUtils.ts
-// getCellId, getCellTypeLabel, getCellTypeEmoji, isModuleActive, isModuleActivityActive,
-// getModuleTooltip, getCurrentModuleIndex, getCellByOrder, getTextPreview, getCodePreview,
-// handleThumbnailError, setModuleItemRef, scrollToSelectedModule
-// 现在从工具文件导入
-
-// 方法
-// 使用工具函数获取 Cell ID（保留此函数名以兼容现有代码）
-function getCellId(cell: Cell): number | string | null {
-  return getCellIdUtil(cell)
-}
-
-// v2.0: 以下函数已移至 cellUtils.ts
-// function getCellTypeLabel(type: string): string
-// function getCellTypeEmoji(type: string): string
-// function isModuleActiveWrapper(cell, index): boolean
-// function isModuleActivityActive(cell, index): boolean
-// function setModuleItemRef(el, index): void
-// function scrollToSelectedModuleWrapper(): void
-// function getModuleTooltip(cell, index): string
-// function getCurrentModuleIndex(): number
-// function getCellByOrder(order): Cell | null
-// function getTextPreview(cell, maxLength): string
-// function getCodePreview(cell): string
-// function handleThumbnailError(event): void
-
-// v2.0: 包装函数 - 调用cellUtils中的工具函数
-function isModuleActiveWrapper(cell: Cell, index: number): boolean {
-  return isModuleActive(cell, index, session.value, displayCellOrders.value, selectedCellIndex.value)
-}
-
-function isModuleActivityActiveWrapper(cell: Cell, index: number): boolean {
-  return isModuleActivityActive(cell, index, session.value)
-}
-
-function getModuleTooltipWrapper(cell: Cell, index: number): string {
-  const isActive = isModuleActiveWrapper(cell, index)
-  return getModuleTooltip(cell, index, isActive)
-}
-
-function scrollToSelectedModuleWrapper() {
-  scrollToSelectedModule(moduleListRef, moduleItemRefs.value, selectedCellIndex.value)
-}
+// v2.0: currentCell, displayCellOrders, currentModuleIndex, currentActivityDbCell,
+// getCellId, isModuleActiveWrapper, scrollToSelectedModuleWrapper, getModuleTooltipWrapper, isModuleActivityActiveWrapper
+// 已移至顶部（在 dataLoader 之前）
 
 // v2.0: 以下函数已移至 useNavigation composable
 // function handleModuleItemClick, handlePrevModule, handleNextModule

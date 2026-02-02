@@ -1,7 +1,7 @@
 """add unique constraint for head teachers
 
 Revision ID: 20260131_1400
-Revises: 20260131_0523
+Revises: 671c82581d6c
 Create Date: 2025-01-31
 
 This migration adds a partial unique index to ensure only one HEAD_TEACHER_PRIMARY
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20260131_1400'
-down_revision = '20260131_0523'
+down_revision = '671c82581d6c'
 branch_labels = None
 depends_on = None
 

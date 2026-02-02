@@ -73,13 +73,13 @@ class PermissionService:
         if not classroom_ids:
             return False
 
-        # 🆕 优先检查：如果学生有活跃的课堂会话（PENDING或ACTIVE），允许访问
+        # 🆕 优先检查：如果学生有活跃的课堂会话（PREPARING或TEACHING），允许访问
         # 这样可以确保学生能够从待开始课堂列表进入课程
         active_session_result = await db.execute(
             select(ClassSession).where(
                 ClassSession.lesson_id == lesson_id,
                 ClassSession.classroom_id.in_(list(classroom_ids)),
-                ClassSession.status.in_([ClassSessionStatus.PENDING, ClassSessionStatus.ACTIVE, ClassSessionStatus.PAUSED])
+                ClassSession.status.in_([ClassSessionStatus.PREPARING, ClassSessionStatus.TEACHING])
             )
         )
         if active_session_result.scalar_one_or_none() is not None:
