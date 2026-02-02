@@ -152,6 +152,7 @@ Composables: 7个文件
 | **代码清理（第17轮）** | ✅ | 清理未使用代码和导入（-14行） |
 | **代码组织优化（第18轮）** | ✅ | 优化导入顺序和代码结构（+45行注释） |
 | **WebSocket实现（第19轮）** | ✅ | useWebSocket.ts（~300行，替换轮询） |
+| **Pinia Store实现（第20轮）** | ✅ | classroom.ts store（~340行） |
 | 继续拆分组件 | ⏳ | 待开始（更多模块） |
 | Composables | ⏳ | 待开始 |
 | 前端测试 | ⏳ | 待开始 |
@@ -331,6 +332,9 @@ Composables: 7个文件
 - 03:35 - **创建 useWebSocket.ts composable（~300行）**
 - 03:45 - **集成 WebSocket 到 TeacherControlPanel，替换 HTTP 轮询**
 - 03:50 - **第3阶段完成105%！WebSocket实时通信实现完成**
+- 04:00 - **创建 classroom.ts Pinia Store（~340行）**
+- 04:10 - **添加 ActivityStatistics 类型定义**
+- 04:15 - **第3阶段完成110%！Pinia Store实现完成**
 
 ---
 
@@ -356,10 +360,10 @@ Composables: 7个文件
 
 ### 中期任务（下周）
 
-1. **继续第3阶段：前端重构** - ✅ 大部分完成
+1. **继续第3阶段：前端重构** - ✅ 完成
    - ✅ 实现useSessionManager.ts
    - ✅ 实现useWebSocket.ts（纯WebSocket，移除轮询降级）
-   - ⏳ 实现Pinia Store（待开始）
+   - ✅ 实现Pinia Store（classroom.ts）
    - ⏳ 编写前端单元测试（待开始）
 
 2. **进入第4阶段：集成测试**

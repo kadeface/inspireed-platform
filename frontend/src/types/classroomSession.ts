@@ -94,6 +94,15 @@ export interface SessionStatistics {
   }
 }
 
+/**
+ * 活动统计（用于教师端查看学生提交情况）
+ */
+export interface ActivityStatistics {
+  totalStudents: number
+  submittedCount: number
+  itemStatistics: Record<string, any> | null
+}
+
 export interface ClassroomEvent {
   type: 'session_started' | 'session_ended' | 'cell_changed' | 
         'activity_started' | 'activity_ended' | 'student_joined' | 
