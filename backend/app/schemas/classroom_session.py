@@ -21,9 +21,6 @@ __all__ = [
     "StartActivityRequest",
     "StudentProgressUpdate",
     "StartSessionRequest",
-    "PauseSessionRequest",
-    "ResumeSessionRequest",
-    "EndSessionRequest",
     "UpdateDisplayModeRequest",
     "SessionStatistics",
     "StudentPendingSessionResponse",
@@ -163,14 +160,6 @@ class StartSessionRequest(BaseModel):
     pass
 
 
-class PauseSessionRequest(BaseModel):
-    """暂停会话请求"""
-
-    pass
-
-
-class ResumeSessionRequest(BaseModel):
-    """继续会话请求"""
 
     pass
 
@@ -180,11 +169,6 @@ class EndSessionRequest(BaseModel):
 
     notes: Optional[str] = None  # 课后笔记
 
-
-class UpdateDisplayModeRequest(BaseModel):
-    """更新显示模式请求（全屏/窗口）"""
-
-    display_mode: str = Field(..., description="显示模式：'fullscreen' 或 'window'")
 
 
 # ========== 统计数据 ==========

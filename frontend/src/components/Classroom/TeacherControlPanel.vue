@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerRef" class="teacher-control-panel" :class="{ 'panel-fullscreen': isPanelFullscreen }">
+  <div ref="containerRef" class="teacher-control-panel" :class="{ 'panel-fullscreen': isPanelFullscreen }" data-testid="teacher-control-panel">
     <!-- 🎯 优化后的顶部控制栏（固定，始终可见） -->
     <div class="top-control-bar">
       <!-- 第一行：标题和操作按钮 -->
@@ -28,78 +28,41 @@
               <span class="ml-1 text-xs font-medium">{{ isMultiSelectMode ? '多选' : '单选' }}</span>
             </button>
           </div>
-          <!-- 学生人数显示 -->
-          <div v-if="session" class="student-count-info">
-            <span class="student-count-icon">👥</span>
-            <span class="student-count-text">
-              <span class="student-count-value">{{ activeStudents.length }}</span>
-              <span v-if="totalStudents > 0" class="student-count-total">/{{ totalStudents }}</span>
-              <span class="student-count-label">人已进入</span>
-            </span>
-          </div>
-          <!-- 模块数量显示 -->
-          <div v-if="lessonContentCells.length > 0" class="module-count-info">
-            <span class="module-count-icon">📚</span>
-            <span class="module-count-text">
-              <span class="module-count-value">{{ lessonContentCells.length }}</span>
-              <span class="module-count-label">个模块</span>
-            </span>
-          </div>
-          <!-- 课程时长显示 -->
-          <div v-if="session && normalizedSessionStatus !== 'pending'" class="duration-info" :class="{ 
-            'duration-warning': remainingTime < 600, 
-            'duration-danger': remainingTime < 300 
-          }">
-            <span class="duration-icon">⏱️</span>
-            <span class="duration-text">
-              <span class="duration-value" :class="{
-                'text-blue-600': remainingTime >= 600,
-                'text-orange-600': remainingTime < 600 && remainingTime >= 300,
-                'text-red-600': remainingTime < 300
-              }">
-                {{ formatDuration(displayDuration) }}
-              </span>
-              <span v-if="normalizedSessionStatus === 'active'" class="duration-remaining">
-                剩余: {{ formatRemainingTime(remainingTime) }}
-              </span>
-            </span>
-          </div>
+          <!-- v2.0: 使用子组件显示学生人数 -->
+          <StudentCountDisplay
+            v-if="session"
+            :active-count="activeStudents.length"
+            :total-count="totalStudents"
+            label="人已进入"
+          />
+          <!-- v2.0: 使用子组件显示模块数量 -->
+          <ModuleCountDisplay
+            v-if="lessonContentCells.length > 0"
+            :count="lessonContentCells.length"
+            label="个模块"
+          />
+          <!-- v2.0: 使用子组件显示课程时长 -->
+          <SessionDurationDisplay
+            v-if="session && normalizedSessionStatus !== 'pending'"
+            :status="session.status"
+            :duration="displayDuration"
+            :remaining="remainingTime"
+          />
         </div>
         <div class="header-controls">
-        <!-- 没有会话时，显示"创建课堂"按钮 -->
-        <button 
-          v-if="!session"
-          @click="handleCreateSession"
-          :disabled="loading"
-          class="btn btn-primary"
-        >
-          📚 创建课堂
-        </button>
-        
-        <!-- PENDING 状态：等待学生登录 -->
-        <template v-if="session && session.status === 'PENDING'">
-          <button 
-            @click="handleBeginClass"
-            :disabled="loading || activeStudents.length === 0"
-            class="btn btn-primary"
-            :class="{ 'btn-disabled-hint': activeStudents.length === 0 }"
-            :title="activeStudents.length === 0 ? '请等待学生加入课堂（至少需要1名学生）' : '开始上课'"
-          >
-            ▶️ 开始上课
-            <span v-if="activeStudents.length === 0" class="ml-2 text-xs opacity-75">(等待学生加入)</span>
-          </button>
-          <button 
-            @click="handleEnd"
-            :disabled="loading"
-            class="btn btn-danger"
-            title="结束当前会话，以便创建新会话"
-          >
-            ⏹️ 结束
-          </button>
-        </template>
+          <!-- v2.0: 使用子组件显示会话控制按钮 -->
+          <SessionControlButtons
+            :has-session="!!session"
+            :session-status="session?.status"
+            :loading="loading"
+            :active-students-count="activeStudents.length"
+            @create="handleCreateSession"
+            @start="handleBeginClass"
+            @end="handleEnd"
+          />
         
         <!-- ACTIVE 状态：上课中 -->
-        <template v-if="session && (session.status === 'active' || session.status === 'ACTIVE')">
+        <template v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')">
           <!-- 显示模式切换按钮 -->
           <div class="display-mode-controls">
             <button 
@@ -135,7 +98,7 @@
         </template>
         
         <!-- PAUSED 状态：已暂停 -->
-        <template v-if="session && (session.status === 'paused' || session.status === 'PAUSED')">
+        <template v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')">
           <!-- 显示模式切换按钮 -->
           <div class="display-mode-controls">
             <button 
@@ -174,287 +137,154 @@
     </div>
     
     <!-- PENDING 状态：等待学生加入提示区域 -->
-    <div
-      v-if="session && session.status === 'PENDING'"
-      class="waiting-students-banner"
-    >
-      <div class="waiting-banner-content">
-        <div class="waiting-banner-icon">⏳</div>
-        <div class="waiting-banner-text">
-          <div class="waiting-banner-title">
-            等待学生加入课堂
-            <span v-if="activeStudents.length > 0" class="student-count-badge">{{ activeStudents.length }} 人已加入</span>
-          </div>
-          <div class="waiting-banner-subtitle">
-            <span v-if="activeStudents.length === 0">
-              已创建课堂，学生正在加入中... 请等待至少1名学生加入后再开始上课
-            </span>
-            <span v-else>
-              已有 {{ activeStudents.length }} 名学生加入，可以开始上课了
-            </span>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 已加入学生列表 -->
-      <div v-if="activeStudents.length > 0" class="joined-students-list">
-        <div class="joined-students-header">
-          <span class="joined-students-title">已加入学生（{{ activeStudents.length }} 人）</span>
-        </div>
-        <div class="joined-students-grid">
-          <div 
-            v-for="student in activeStudents.slice(0, 12)" 
-            :key="student.id || student.user_id"
-            class="joined-student-item"
-          >
-            <div class="student-avatar">
-              {{ (student.full_name || student.username || '学生').charAt(0) }}
-            </div>
-            <div class="student-name">
-              {{ student.full_name || student.username || '学生' }}
-            </div>
-          </div>
-          <div v-if="activeStudents.length > 12" class="joined-student-item joined-student-more">
-            <div class="student-avatar">+{{ activeStudents.length - 12 }}</div>
-            <div class="student-name">更多</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <WaitingForStudentsBanner
+      v-if="session"
+      :session-status="session.status"
+      :active-count="activeStudents.length"
+    />
+
+    <!-- 已加入学生列表 -->
+    <JoinedStudentsList
+      v-if="session && session.status === 'PREPARING'"
+      :students="activeStudents"
+      :max-display="12"
+    />
 
     <!-- 主布局：左侧模块列表，右侧预览和监控 -->
     <div class="main-layout" :class="{ 'module-fullscreen-mode': modulePanelFullscreen }">
       <!-- 左侧：教学模块 -->
       <div class="panel teaching-modules teaching-modules-fullwidth" :class="{ 'module-panel-fullscreen': modulePanelFullscreen }">
-        <!-- 导航控制栏（固定在顶部，始终可见） -->
-        <div class="module-navigation-bar" v-if="lessonContentCells.length > 0">
-          <!-- 上一模块按钮 -->
-          <button
-            class="module-nav-btn module-nav-btn-prev"
-            :class="{ 'module-nav-btn-disabled': !canGoPrev }"
-            :disabled="!canGoPrev"
-            @click="handlePrevModule"
-            :title="canGoPrev ? '上一模块' : '已经是第一个模块'"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>上一模块</span>
-          </button>
-          
-          <!-- 下一模块按钮 -->
-          <button
-            class="module-nav-btn module-nav-btn-next"
-            :class="{ 'module-nav-btn-disabled': !canGoNext }"
-            :disabled="!canGoNext"
-            @click="handleNextModule"
-            :title="canGoNext ? '下一模块' : '已经是最后一个模块'"
-          >
-            <span>下一模块</span>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-        
-        <div class="module-list" ref="moduleListRef" v-if="lessonContentCells.length > 0">
-          <!-- 课程模块列表 -->
-          <div 
-            v-for="(cell, index) in lessonContentCells" 
-            :key="cell.id || index"
-            :ref="el => setModuleItemRef(el, index)"
-            :data-module-index="index"
-            class="module-item"
-            :class="{
-              'module-item-active': isModuleActive(cell, index),
-              [`module-item-type-${cell.type}`]: true,
-              'module-item-disabled': loading,
-            }"
-            :title="loading ? '切换中，请稍候...' : getModuleTooltip(cell, index)"
-          >
-            <!-- 单选框/复选框 -->
-            <div class="module-item-checkbox" @click.stop="!loading && handleModuleCheckboxClick(cell, index, $event)">
-              <input 
-                :type="isMultiSelectMode ? 'checkbox' : 'radio'"
-                :name="isMultiSelectMode ? `module-display-checkbox-${index}` : 'module-display-radio'"
-                :checked="isModuleActive(cell, index)"
-                :disabled="loading"
-                @change.stop="!loading && handleModuleCheckboxChange(cell, index, $event)"
-                @click.stop
-                class="checkbox-input"
-              />
-            </div>
-            
-            <!-- 模块序号 -->
-            <div class="module-item-number">{{ index + 1 }}</div>
-            
-            <!-- 模块图标 -->
-            <div class="module-item-icon" :class="`icon-${cell.type}`" @click="!loading && handleModuleItemClick(cell, index)">
-              <CellTypeIcon :type="cell.type" />
-            </div>
-            
-            <!-- 模块信息 -->
-            <div class="module-item-content" @click="!loading && handleModuleItemClick(cell, index)">
-              <div class="module-item-title">{{ cell.title || getCellTypeLabel(cell.type) || `模块 ${index + 1}` }}</div>
-              <div class="module-item-subtitle">{{ getCellTypeLabel(cell.type) }}</div>
-            </div>
-            
-            <!-- 活动状态标记 -->
-            <div v-if="cell.type === 'activity' && isModuleActivityActive(cell, index)" class="module-item-activity-badge">
-              🎯
-            </div>
-          </div>
-        </div>
-        <div v-else class="module-empty">
-          <p>暂无课程模块</p>
-        </div>
+        <ModuleList
+          :cells="lessonContentCells"
+          :current-module-index="currentModuleIndex"
+          :loading="loading"
+          :is-multi-select-mode="isMultiSelectMode"
+          :display-cell-orders="displayCellOrders"
+          :session-current-activity-id="session?.current_activity_id"
+          @item-click="handleModuleItemClick"
+          @checkbox-click="handleModuleCheckboxClick"
+          @checkbox-change="handleModuleCheckboxChange"
+          @prev-module="handlePrevModule"
+          @next-module="handleNextModule"
+        />
+
+        <!-- 活动统计面板 -->
+        <ActivityStatisticsPanel
+          v-if="currentCell"
+          :current-cell="currentCell"
+          :activity-statistics="activityStatistics"
+          :loading="loadingActivityStats"
+        />
       </div>
     </div>
   </div>
 
   <!-- 班级选择弹窗（用于创建会话时选择班级） -->
-  <Transition name="modal">
-    <div
-      v-if="showClassroomSelectModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-50 px-4 py-6"
-      @click.self="handleClassroomSelectCancel"
-    >
-      <div class="w-full max-w-xl rounded-lg bg-white shadow-xl">
-        <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <div>
-            <h3 class="text-lg font-semibold text-gray-900">
-              选择班级
-            </h3>
-            <p class="text-xs text-gray-500 mt-1">请选择要上课的班级，学生将加入该班级的课堂</p>
-          </div>
-          <button
-            type="button"
-            class="text-gray-400 hover:text-gray-600"
-            @click="handleClassroomSelectCancel"
-          >
-            <span class="sr-only">关闭</span>
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="max-h-96 overflow-y-auto px-6 py-4">
-          <div v-if="loadingClassrooms" class="flex items-center justify-center py-8 text-gray-500">
-            <svg class="h-5 w-5 animate-spin text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <span class="ml-2">加载班级中...</span>
-          </div>
-
-          <div v-else-if="availableClassrooms.length === 0" class="rounded-md bg-yellow-50 p-4 text-sm text-yellow-700">
-            当前没有可选的班级，请联系管理员配置班级信息。
-          </div>
-
-          <div v-else class="space-y-3">
-            <label
-              v-for="classroom in availableClassrooms"
-              :key="classroom.id"
-              class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
-              :class="selectedClassroomId === classroom.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-400'"
-            >
-              <input
-                type="radio"
-                name="classroom-select"
-                :value="classroom.id"
-                v-model="selectedClassroomId"
-                class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500"
-              />
-              <div>
-                <p class="text-sm font-medium text-gray-900">
-                  {{ classroom.name }}
-                </p>
-                <p class="text-xs text-gray-500">
-                  年级：{{ formatGradeName(classroom.grade_id) }}
-                  <span v-if="classroom.code" class="ml-2">班级编码：{{ classroom.code }}</span>
-                </p>
-              </div>
-            </label>
-          </div>
-
-          <p v-if="classroomSelectError" class="mt-4 text-sm text-red-600">
-            {{ classroomSelectError }}
-          </p>
-        </div>
-
-        <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
-          <button
-            type="button"
-            class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            @click="handleClassroomSelectCancel"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="loadingClassrooms || availableClassrooms.length === 0 || !selectedClassroomId"
-            @click="handleClassroomSelectConfirm"
-          >
-            确认创建
-          </button>
-        </div>
-      </div>
-    </div>
-  </Transition>
+  <ClassroomSelectModal
+    :show="showClassroomSelectModal"
+    :classrooms="availableClassrooms"
+    :loading="loadingClassrooms"
+    v-model="selectedClassroomId"
+    :error="classroomSelectError"
+    @update:show="showClassroomSelectModal = $event"
+    @cancel="handleClassroomSelectCancel"
+    @confirm="handleClassroomSelectConfirm"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, h, provide, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
-import type { Lesson } from '../../types/lesson'
-import type { Cell, ActivityCell } from '../../types/cell'
-import classroomSessionService from '../../services/classroomSession'
-import ClassroomSwitcher from './ClassroomSwitcher.vue'
-import ClassroomControlBoard from './ClassroomControlBoard.vue'
-import { getCellId as getCellIdUtil, buildNavigateRequest, toNumericId, isUUID } from '../../utils/cellId'
-import activityService from '../../services/activity'
-import logger from '@/utils/logger'
-import { isContentWithSections, sectionsToFlatCells, normalizeContentToSections } from '../../utils/lessonContent'
-import { useLessonStore } from '../../store/lesson'
-import type { LessonClassroom } from '../../types/lesson'
+// ============================================================================
+// 1. Vue 核心
+// ============================================================================
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, provide, nextTick } from 'vue'
 
-// Cell类型图标组件 - 使用更明显的图标设计
-const CellTypeIcon = (props: { type: string }) => {
-  const icons: Record<string, any> = {
-    text: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M4 6h16M4 12h16M4 18h16' })
-    ]),
-    code: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' })
-    ]),
-    activity: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' })
-    ]),
-    video: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' })
-    ]),
-    flowchart: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7' })
-    ]),
-    qa: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
-    ]),
-    browser: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9' })
-    ]),
-    interactive: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' })
-    ]),
-    reference_material: () => h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24', 'stroke-width': '2.5' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' })
-    ]),
-  }
-  
-  const IconComponent = icons[props.type] || icons.text
-  return IconComponent()
-}
+// ============================================================================
+// 2. 类型定义
+// ============================================================================
+import type { Lesson } from '../../types/lesson'
+import type { LessonClassroom } from '../../types/lesson'
+import type { Cell, ActivityCell } from '../../types/cell'
+
+// ============================================================================
+// 3. Store
+// ============================================================================
+import { useLessonStore } from '../../store/lesson'
+
+// ============================================================================
+// 4. 服务
+// ============================================================================
+import classroomSessionService from '../../services/classroomSession'
+import activityService from '../../services/activity'
+
+// ============================================================================
+// 5. 子组件
+// ============================================================================
+import SessionDurationDisplay from './SessionDurationDisplay.vue'
+import StudentCountDisplay from './StudentCountDisplay.vue'
+import SessionControlButtons from './SessionControlButtons.vue'
+import ModuleCountDisplay from './ModuleCountDisplay.vue'
+import WaitingForStudentsBanner from './WaitingForStudentsBanner.vue'
+import JoinedStudentsList from './JoinedStudentsList.vue'
+import ModuleList from './ModuleList.vue'
+import ClassroomSelectModal from './ClassroomSelectModal.vue'
+import ActivityStatisticsPanel from './ActivityStatisticsPanel.vue'
+import CellTypeIcon from './CellTypeIcon.vue'
+
+// ============================================================================
+// 6. Composables
+// ============================================================================
+import { useSessionManager } from './composables/useSessionManager'
+import { useWebSocket } from './composables/useWebSocket'
+import { useDurationTimer } from './composables/useDurationTimer'
+import { useNavigation } from './composables/useNavigation'
+import { useDataLoader } from './composables/useDataLoader'
+import { useFullscreen } from './composables/useFullscreen'
+import { useSelectionMode } from './composables/useSelectionMode'
+
+// ============================================================================
+// 7. 工具函数
+// ============================================================================
+import logger from '@/utils/logger'
+import { getCellId as getCellIdUtil, toNumericId, isUUID } from '../../utils/cellId'
+import { isContentWithSections, sectionsToFlatCells, normalizeContentToSections } from '../../utils/lessonContent'
+
+// 学生监控工具
+import {
+  getStudentStatusClass,
+  getStudentTooltip,
+  getStudentAccount,
+  calculateParticipationRate,
+  calculateAverageScore,
+  calculateStudentsBehindCount,
+  hasAlerts as checkHasAlerts,
+  checkLowSubmissionRate
+} from './studentMonitoring'
+
+// Cell 工具函数
+import {
+  getCellTypeLabel,
+  getCellTypeEmoji,
+  isModuleActive,
+  isModuleActivityActive,
+  getModuleTooltip,
+  getCurrentModuleIndex,
+  getCellByOrder,
+  getTextPreview,
+  getCodePreview,
+  handleThumbnailError,
+  setModuleItemRef,
+  scrollToSelectedModule
+} from './cellUtils'
+
+// 格式化工具函数
+import {
+  formatDuration,
+  formatRemainingTime,
+} from './formatUtils'
+
+// ============================================================================
+// 8. 组件定义
+// ============================================================================
 
 interface Props {
   lessonId: number
@@ -463,24 +293,235 @@ interface Props {
 
 const props = defineProps<Props>()
 
+// ============================================================================
+// Props & Emits
+// ============================================================================
+
 // 🔧 定义事件，通知父组件 session 变化
 const emit = defineEmits<{
   'session-changed': [session: any | null]
 }>()
 
-const route = useRoute()
+// ============================================================================
+// Store
+// ============================================================================
+
 const lessonStore = useLessonStore()
-const session = ref<any>(null)
+
+// ============================================================================
+// Composables 初始化
+// ============================================================================
+
+// v2.0: 使用composables管理会话状态
+const sessionManager = useSessionManager({
+  lessonId: props.lessonId,
+  onSessionCreated: (newSession) => {
+    console.log('✅ TeacherControlPanel: 会话已创建，sessionId =', newSession.id, '状态 =', newSession.status)
+    // 立即加载一次学生列表
+    loadParticipants()
+    console.log('✅ 初始学生列表加载完成，学生数:', activeStudents.value.length)
+  },
+  onSessionStarted: (updatedSession) => {
+    // v2.0: 使用 durationTimer composable 管理计时
+    durationTimer.startDurationTimer()
+    // 加载统计信息
+    loadStatistics()
+  },
+  onSessionEnded: () => {
+    durationTimer.stopDurationTimer()
+    wsManager?.disconnect()
+    activeStudents.value = []
+  },
+})
+
+// v2.0: WebSocket 端点 URL（基于 session）
+const wsEndpointUrl = computed(() => {
+  if (!session.value) return ''
+  return `/api/v1/classroom-sessions/sessions/${session.value.id}/ws/teacher`
+})
+
+// v2.0: 使用 WebSocket composable 管理实时通信
+const wsManager = useWebSocket({
+  endpointUrl: wsEndpointUrl,
+  scope: 'session',
+  onConnected: (event) => {
+    console.log('✅ WebSocket 已连接')
+  },
+  onDisconnected: (event) => {
+    console.log('🔌 WebSocket 已断开')
+  },
+  onError: (event) => {
+    console.error('❌ WebSocket 错误:', event)
+  },
+  onParticipantJoined: (data) => {
+    console.log('👨‍🎓 学生加入:', data)
+    // 重新加载学生列表
+    loadParticipants()
+  },
+  onSessionStatusChanged: (data) => {
+    console.log('📢 会话状态变化:', data)
+    // 更新会话状态
+    if (session.value && data.status) {
+      session.value.status = data.status
+    }
+  },
+  onCellChanged: (data) => {
+    console.log('📺 内容切换:', data)
+    // 内容已切换，无需额外处理
+  },
+  onSessionEnded: (data) => {
+    console.log('🏁 会话结束:', data)
+    // 会话结束，断开连接
+    wsManager?.disconnect()
+  },
+  onSubmissionStatisticsUpdated: (data) => {
+    console.log('📊 活动统计更新:', data)
+    // 更新活动统计数据
+    if (activityStatistics.value) {
+      activityStatistics.value.totalStudents = data.total_students || 0
+      activityStatistics.value.submittedCount = data.submitted_count || 0
+      activityStatistics.value.itemStatistics = data.item_statistics || null
+    }
+  },
+})
+
+// v2.0: 使用composables管理计时器
+const durationTimer = useDurationTimer({
+  getSessionStatus: () => sessionManager.normalizedSessionStatus.value,
+  lessonDuration: 40 * 60, // 40分钟
+  onTimerStateChange: (isRunning) => {
+    // 可选：在计时器状态变化时执行操作
+    console.log('⏱️ 计时器状态:', isRunning ? '运行中' : '已停止')
+  },
+})
+
+// 监听会话状态变化，自动启动/停止计时器
+durationTimer.watchSessionStatus(sessionManager.normalizedSessionStatus)
+
+// v2.0: 使用composables管理数据加载
+const dataLoader = useDataLoader({
+  session,
+  lessonId: props.lessonId,
+  currentCell,
+  currentActivityDbCell,
+  containerRef,
+  wsManager: {
+    clearAllPollingIntervals: () => {
+      // WebSocket 不需要轮询，这里是一个适配器方法
+      // 当会话结束时，断开 WebSocket 连接
+      if (wsManager) {
+        wsManager.disconnect()
+      }
+    }
+  },
+  dbCells,
+})
+
+// 从 dataLoader 解构数据加载相关状态和方法
+const {
+  loadingStudents,
+  loadingActivityStats,
+  activeStudents,
+  sessionStatistics,
+  activityStatistics,
+  studentSubmissionStatus,
+  loadParticipants,
+  loadStatistics,
+  loadActivityStatistics,
+  loadDbCells,
+  ensureActivityCellExists,
+  watchCurrentCell,
+} = dataLoader
+
+// v2.0: 使用composables管理全屏控制
+const fullscreenManager = useFullscreen()
+
+// 从 fullscreenManager 解构全屏相关状态和方法
+const {
+  modulePanelFullscreen,
+  isPanelFullscreen,
+  toggleModulePanelFullscreen,
+  togglePanelFullscreen,
+  setupFullscreenListeners,
+  cleanupFullscreenListeners,
+} = fullscreenManager
+
+// v2.0: 使用composables管理选择模式（需要在 navigationManager 之前初始化，因为它提供 isMultiSelectMode）
+const selectionModeManager = useSelectionMode({
+  loading,
+  session,
+  displayCellOrders,
+  lessonContentCells,
+  // handleControlBoardNavigate 将在 navigationManager 初始化后可用
+})
+
+// 从 selectionModeManager 解构
+const { isMultiSelectMode, toggleSelectionMode } = selectionModeManager
+
+// v2.0: 使用composables管理导航（需要在 dataLoader 之后，因为它依赖 dataLoader 的函数）
+const navigationManager = useNavigation({
+  session,
+  loading,
+  selectedCellIndex,
+  lessonContentCells,
+  isMultiSelectMode,
+  normalizedSessionStatus: sessionManager.normalizedSessionStatus,
+  currentModuleIndex,
+  isModuleActive: isModuleActiveWrapper,
+  scrollToSelectedModule: scrollToSelectedModuleWrapper,
+  loadParticipants,
+  ensureActivityCellExists,
+  loadDbCells,
+  dbCells,
+})
+
+// 从 navigationManager 解构导航相关方法
+const {
+  canGoPrev,
+  canGoNext,
+  handleControlBoardNavigate,
+  handleModuleItemClick,
+  handlePrevModule,
+  handleNextModule,
+  handleModuleCheckboxClick,
+  handleModuleCheckboxChange,
+  handleHideAll,
+} = navigationManager
+
+// 从 composable 解构会话相关状态和方法
+const {
+  session,
+  loading,
+  showClassroomSelectModal,
+  selectedClassroomId,
+  classroomSelectError,
+  availableClassrooms,
+  loadingClassrooms,
+  normalizedSessionStatus,
+  statusTitle,
+  statusClass,
+  currentDisplayMode,
+  handleCreateSession,
+  handleClassroomSelectConfirm,
+  handleClassroomSelectCancel,
+  handleBeginClass,
+  handleCancelSession,
+  handlePause,
+  handleResume,
+  handleEnd,
+  handleToggleDisplayMode,
+  handleStartActivity,
+  handleEndActivity,
+} = sessionManager
+
+// 组件 Refs
 const containerRef = ref<HTMLElement | null>(null) // 用于检查组件是否在 DOM 中
 const moduleListRef = ref<HTMLElement | null>(null) // 模块列表容器
 const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map()) // 模块项引用
-
-// 班级选择相关状态
-const showClassroomSelectModal = ref(false)
-const selectedClassroomId = ref<number | null>(null)
-const classroomSelectError = ref<string | null>(null)
-const availableClassrooms = computed<LessonClassroom[]>(() => lessonStore.availableClassrooms || [])
-const loadingClassrooms = computed(() => lessonStore.isLoadingClassrooms)
+// v2.0: 以下状态已移至 useDataLoader composable
+// const activeStudents, const loadingStudents, const sessionStatistics
+// const activityStatistics, const studentSubmissionStatus, const loadingActivityStats
+// 现在从 dataLoader 导入
 
 // 🔧 提供 sessionId 给子组件（通过 provide/inject）
 provide('classroomSessionId', computed(() => session.value?.id))
@@ -496,64 +537,41 @@ watch(session, (newSession) => {
   emit('session-changed', newSession)
 }, { immediate: true, deep: true })
 
-const loading = ref(false)
-const activeStudents = ref<any[]>([])
-const loadingStudents = ref(false)
-const isMultiSelectMode = ref(false) // 多选模式：false=单选，true=多选
-const sessionStatistics = ref<any>(null)
+// v2.0: 以下状态已移至 useDataLoader composable
+// const loadingStudents, const sessionStatistics, const activityStatistics
+// const studentSubmissionStatus, const loadingActivityStats
+// 现在从 dataLoader 导入
+// v2.0: 以下状态已移至 useSelectionMode composable
+// const isMultiSelectMode 现在从 selectionModeManager 导入
 const selectedCellIndex = ref(-1)  // -1表示隐藏所有内容
-const sessionDuration = ref(0)
-const durationInterval = ref<number | null>(null)
 const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])  // 数据库中的 Cell 记录（用于 ID 匹配）
-const modulePanelFullscreen = ref(false)  // 模块面板全屏状态
-const isPanelFullscreen = ref(false)  // 整个导播台全屏状态
+// v2.0: 以下状态已移至 useFullscreen composable
+// const modulePanelFullscreen, const isPanelFullscreen
+// 现在从 fullscreenManager 导入
+
+// v2.0: 从 durationTimer composable 获取 sessionDuration
+const { sessionDuration } = durationTimer
 
 // 一节课的标准时长（40分钟 = 2400秒）
 const LESSON_DURATION = 40 * 60
 
 // 显示的课程时长（只有在 active 状态才显示实际时长）
 const displayDuration = computed(() => {
-  // 如果会话不存在或不是 active 状态，显示 0
-  const status = normalizedSessionStatus.value
-  if (!session.value || status !== 'active') {
-    return 0
-  }
-  return sessionDuration.value || 0
+  // v2.0: 使用 durationTimer composable 的方法
+  return durationTimer.getDisplayDuration()
 })
 
 // 计算剩余时间
 const remainingTime = computed(() => {
-  if (sessionDuration.value === null || sessionDuration.value === undefined) return LESSON_DURATION
-  const remaining = LESSON_DURATION - sessionDuration.value
-  return remaining > 0 ? remaining : 0
+  // v2.0: 使用 durationTimer composable 的方法
+  return durationTimer.getRemainingTime()
 })
 
-// 统一状态值处理：将后端返回的大写状态转换为小写
-const normalizedSessionStatus = computed(() => {
-  if (!session.value || !session.value.status) return null
-  const status = session.value.status
-  // 统一转换为小写
-  return typeof status === 'string' ? status.toLowerCase() : status
-})
-
-// 计算属性
-const statusTitle = computed(() => {
-  if (!session.value) return '未创建会话'
-  const status = normalizedSessionStatus.value
-  const statusMap: Record<string, string> = {
-    pending: '准备中',
-    active: '上课中',
-    paused: '已暂停',
-    ended: '已结束',
-  }
-  return statusMap[status || ''] || '未知状态'
-})
-
-const statusClass = computed(() => {
-  if (!session.value) return 'status-pending'
-  const status = normalizedSessionStatus.value || 'pending'
-  return `status-${status}`
-})
+// v2.0: 以下computed属性已移至 useSessionManager.ts
+// const normalizedSessionStatus
+// const statusTitle
+// const statusClass
+// const currentDisplayMode
 
 const totalStudents = computed(() => {
   return session.value?.total_students || 0
@@ -582,90 +600,24 @@ const lessonContentCells = computed(() => {
   return []
 })
 
-// 学生状态类
-function getStudentStatusClass(student: any): string {
-  // 如果当前是活动模块，根据提交状态显示颜色
-  if (currentCell.value && currentCell.value.type === 'activity' && studentSubmissionStatus.value.size > 0) {
-    // 尝试多种可能的ID字段
-    const studentId = student.id || student.userId || student.user_id || student.studentId || student.student_id
-    const submissionStatus = studentId ? studentSubmissionStatus.value.get(String(studentId)) : null
-    
-    // 已提交：绿色
-    if (submissionStatus === 'submitted' || submissionStatus === 'graded') {
-      return 'indicator-green'
-    }
-    // 未提交（包括 not_started, draft）：红色
-    if (submissionStatus === 'not_started' || submissionStatus === 'draft' || !submissionStatus) {
-      return 'indicator-red'
-    }
-    // 其他状态：黄色
-    return 'indicator-yellow'
-  }
-  
-  // 非活动模块，根据进度显示颜色
-  const progress = student.progressPercentage || student.progress_percentage || 0
-  if (progress >= 80) return 'indicator-green'
-  if (progress >= 50) return 'indicator-yellow'
-  return 'indicator-red'
-}
-
-// 获取学生提示信息
-function getStudentTooltip(student: any): string {
-  const name = student.studentName || student.student_name || '学生'
-  const account = getStudentAccount(student)
-  const progress = Math.round(student.progressPercentage || student.progress_percentage || 0)
-  
-  // 如果当前是活动模块，添加提交状态信息
-  if (currentCell.value && currentCell.value.type === 'activity' && studentSubmissionStatus.value.size > 0) {
-    // 尝试多种可能的ID字段
-    const studentId = student.id || student.userId || student.user_id || student.studentId || student.student_id
-    const submissionStatus = studentId ? studentSubmissionStatus.value.get(String(studentId)) : null
-    const statusLabels: Record<string, string> = {
-      'not_started': '未开始',
-      'draft': '草稿',
-      'submitted': '已提交',
-      'graded': '已评分',
-      'returned': '已退回',
-    }
-    const statusLabel = submissionStatus ? statusLabels[submissionStatus] || submissionStatus : '未开始'
-    return `${name} (${account}) - 进度: ${progress}% - 提交状态: ${statusLabel}`
-  }
-  
-  return `${name} (${account}) - 进度: ${progress}%`
-}
-
-// 获取学生登录账号
-function getStudentAccount(student: any): string {
-  // 尝试多种可能的字段名，但不包括姓名字段
-  return student.username || 
-         student.account || 
-         student.loginAccount || 
-         student.login_account ||
-         student.userAccount ||
-         student.user_account ||
-         student.email ||
-         student.user_id?.toString() ||
-         student.id?.toString() ||
-         '未知账号'
-}
+// v2.0: 学生监控工具函数已移至 studentMonitoring.ts
+// getStudentStatusClass, getStudentTooltip, getStudentAccount 现在从工具文件导入
 
 // 参与度（基于在线学生和总学生的比例，以及平均进度）
 const participationRate = computed(() => {
   if (totalStudents.value === 0) return 0
-  const onlineRatio = (activeStudents.value.length / totalStudents.value) * 100
   const avgProgress = sessionStatistics.value?.average_progress || 0
-  // 综合在线率和平均进度
-  return Math.round((onlineRatio * 0.6 + avgProgress * 0.4))
+  return calculateParticipationRate(activeStudents.value, totalStudents.value, avgProgress)
 })
 
 // 平均得分
 const averageScore = computed(() => {
   if (sessionStatistics.value?.average_score !== undefined) {
-    return Math.round(sessionStatistics.value.average_score)
+    return calculateAverageScore(sessionStatistics.value.average_score, 0)
   }
   // 如果没有得分数据，基于进度估算
   const avgProgress = sessionStatistics.value?.average_progress || 0
-  return Math.round(avgProgress * 0.8) // 假设进度和得分有一定相关性
+  return calculateAverageScore(undefined, avgProgress)
 })
 
 
@@ -758,16 +710,8 @@ const currentModuleIndex = computed(() => {
   return -1
 })
 
-// 判断是否可以上一模块
-const canGoPrev = computed(() => {
-  return currentModuleIndex.value > 0
-})
-
-// 判断是否可以下一模块
-const canGoNext = computed(() => {
-  if (!lessonContentCells.value.length) return false
-  return currentModuleIndex.value >= 0 && currentModuleIndex.value < lessonContentCells.value.length - 1
-})
+// v2.0: 以下computed属性已移至 useNavigation composable
+// const canGoPrev, const canGoNext 现在从 navigationManager 导入
 
 const currentActivityDbCell = computed(() => {
   if (!currentCell.value || currentCell.value.type !== 'activity') {
@@ -796,1402 +740,110 @@ const currentActivityDbCell = computed(() => {
 })
 
 
+// v2.0: Cell工具函数已移至 cellUtils.ts
+// getCellId, getCellTypeLabel, getCellTypeEmoji, isModuleActive, isModuleActivityActive,
+// getModuleTooltip, getCurrentModuleIndex, getCellByOrder, getTextPreview, getCodePreview,
+// handleThumbnailError, setModuleItemRef, scrollToSelectedModule
+// 现在从工具文件导入
+
 // 方法
 // 使用工具函数获取 Cell ID（保留此函数名以兼容现有代码）
 function getCellId(cell: Cell): number | string | null {
   return getCellIdUtil(cell)
 }
 
-function getCellTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    text: '文本',
-    code: '代码',
-    activity: '活动',
-    video: '视频',
-    flowchart: '流程图',
-    qa: '问答',
-  }
-  return labels[type] || type
+// v2.0: 以下函数已移至 cellUtils.ts
+// function getCellTypeLabel(type: string): string
+// function getCellTypeEmoji(type: string): string
+// function isModuleActiveWrapper(cell, index): boolean
+// function isModuleActivityActive(cell, index): boolean
+// function setModuleItemRef(el, index): void
+// function scrollToSelectedModuleWrapper(): void
+// function getModuleTooltip(cell, index): string
+// function getCurrentModuleIndex(): number
+// function getCellByOrder(order): Cell | null
+// function getTextPreview(cell, maxLength): string
+// function getCodePreview(cell): string
+// function handleThumbnailError(event): void
+
+// v2.0: 包装函数 - 调用cellUtils中的工具函数
+function isModuleActiveWrapper(cell: Cell, index: number): boolean {
+  return isModuleActive(cell, index, session.value, displayCellOrders.value, selectedCellIndex.value)
 }
 
-function getCellTypeEmoji(type: string): string {
-  const emojis: Record<string, string> = {
-    text: '📄',
-    code: '💻',
-    activity: '📝',
-    video: '📹',
-    flowchart: '📊',
-    qa: '❓',
-  }
-  return emojis[type] || '📦'
+function isModuleActivityActiveWrapper(cell: Cell, index: number): boolean {
+  return isModuleActivityActive(cell, index, session.value)
 }
 
-// 判断模块是否激活
-function isModuleActive(cell: Cell, index: number): boolean {
-  if (!session.value) return false
-  
-  // 多选模式：优先使用 displayCellOrders
-  if (displayCellOrders.value !== undefined && Array.isArray(displayCellOrders.value)) {
-    const cellOrder = cell.order !== undefined ? cell.order : index
-    return displayCellOrders.value.includes(cellOrder)
-  }
-  
-  // 单选模式：使用 current_cell_id 或 selectedCellIndex
-  if (selectedCellIndex.value >= 0 && selectedCellIndex.value === index) {
-    return true
-  }
-  
-  const currentId = session.value.current_cell_id
-  if (!currentId || currentId === 0) return false
-  
-  const cellId = getCellId(cell)
-  if (typeof cellId === 'number' && cellId === currentId) return true
-  if (typeof cellId === 'string') {
-    const numId = parseInt(cellId)
-    if (!isNaN(numId) && numId === currentId) return true
-  }
-  
-  return false
+function getModuleTooltipWrapper(cell: Cell, index: number): string {
+  const isActive = isModuleActiveWrapper(cell, index)
+  return getModuleTooltip(cell, index, isActive)
 }
 
-// 判断活动模块是否激活
-function isModuleActivityActive(cell: Cell, index: number): boolean {
-  if (cell.type !== 'activity') return false
-  if (!session.value?.current_activity_id) return false
-  
-  const cellId = getCellId(cell)
-  if (typeof cellId === 'number' && cellId === session.value.current_activity_id) return true
-  if (typeof cellId === 'string') {
-    const numId = parseInt(cellId)
-    if (!isNaN(numId) && numId === session.value.current_activity_id) return true
-  }
-  return false
+function scrollToSelectedModuleWrapper() {
+  scrollToSelectedModule(moduleListRef, moduleItemRefs.value, selectedCellIndex.value)
 }
 
-// 设置模块项引用
-function setModuleItemRef(el: any, index: number) {
-  if (el) {
-    // 处理 Vue 组件实例
-    const element = (el as any).$el || el
-    if (element instanceof HTMLElement) {
-      moduleItemRefs.value.set(index, element)
-    }
-  } else {
-    moduleItemRefs.value.delete(index)
-  }
-}
-
-// 滚动到选中的模块
-function scrollToSelectedModule() {
-  if (selectedCellIndex.value < 0 || !moduleListRef.value) return
-  
-  const moduleElement = moduleItemRefs.value.get(selectedCellIndex.value)
-  if (moduleElement) {
-    // 使用平滑滚动，将模块滚动到视口中心
-    moduleElement.scrollIntoView({ 
-      behavior: 'smooth', 
-      block: 'center',
-      inline: 'nearest'
-    })
-  }
-}
-
-// 处理模块项点击
-function handleModuleItemClick(cell: Cell, index: number) {
-  if (loading.value) return
-  
-  // 立即更新 selectedCellIndex，确保按钮状态及时更新
-  selectedCellIndex.value = index
-  
-  const cellId = getCellId(cell)
-  const cellOrder = cell.order !== undefined ? cell.order : index
-  
-  // 根据模式选择 action
-  let action: 'toggle' | 'add' | 'remove' = 'toggle'
-  if (isMultiSelectMode.value) {
-    // 多选模式：对于活动模块，使用 'add'；其他模块使用 'toggle'
-    action = cell.type === 'activity' ? 'add' : 'toggle'
-  } else {
-    // 单选模式：对于活动模块，使用 'add'；其他模块使用 'toggle'
-    action = cell.type === 'activity' ? 'add' : 'toggle'
-  }
-  
-  // 使用 handleControlBoardNavigate 处理导航
-  handleControlBoardNavigate(cellId, cellOrder, action, isMultiSelectMode.value)
-}
-
-// 导航到上一模块
-function handlePrevModule() {
-  if (!canGoPrev.value || !lessonContentCells.value.length) return
-  const prevIndex = currentModuleIndex.value - 1
-  const prevCell = lessonContentCells.value[prevIndex]
-  if (prevCell) {
-    handleModuleItemClick(prevCell, prevIndex)
-  }
-}
-
-// 导航到下一模块
-function handleNextModule() {
-  if (!canGoNext.value || !lessonContentCells.value.length) return
-  const nextIndex = currentModuleIndex.value + 1
-  const nextCell = lessonContentCells.value[nextIndex]
-  if (nextCell) {
-    handleModuleItemClick(nextCell, nextIndex)
-  }
-}
-
-// 处理单选框/复选框点击（防止事件冒泡，并处理取消选中）
-function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
-  event.stopPropagation()
-  
-  if (loading.value) {
-    return
-  }
-  
-  const isCurrentlyActive = isModuleActive(cell, index)
-  const cellId = getCellId(cell)
-  const cellOrder = cell.order !== undefined ? cell.order : index
-  
-  if (isMultiSelectMode.value) {
-    // 多选模式：复选框逻辑
-    if (isCurrentlyActive) {
-      // 取消选中：从选中列表中移除
-      handleControlBoardNavigate(cellId, cellOrder, 'remove', true)
-    } else {
-      // 选中：添加到选中列表
-      handleControlBoardNavigate(cellId, cellOrder, 'add', true)
-    }
-  } else {
-    // 单选模式：单选框逻辑
-    if (isCurrentlyActive) {
-      // 如果点击已选中的单选框，取消选中（隐藏所有内容）
-      event.preventDefault()
-      const target = event.target as HTMLElement
-      const radioInput = target.closest('.module-item-checkbox')?.querySelector('input[type="radio"]') as HTMLInputElement
-      if (radioInput) {
-        radioInput.checked = false
-        // 隐藏所有内容
-        handleControlBoardNavigate(null, null, 'toggle', false)
-      }
-    }
-  }
-}
-
-// 处理单选框/复选框变化
-function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
-  if (loading.value) {
-    return
-  }
-  
-  const target = event.target as HTMLInputElement
-  const isChecked = target.checked
-  const cellId = getCellId(cell)
-  const cellOrder = cell.order !== undefined ? cell.order : index
-  
-  if (isMultiSelectMode.value) {
-    // 多选模式：复选框逻辑（已在 handleModuleCheckboxClick 中处理，这里作为备用）
-    if (isChecked) {
-      handleControlBoardNavigate(cellId, cellOrder, 'add', true)
-    } else {
-      handleControlBoardNavigate(cellId, cellOrder, 'remove', true)
-    }
-  } else {
-    // 单选模式：单选框逻辑
-    // 只处理选中新项的情况（取消选中已在 handleModuleCheckboxClick 中处理）
-    if (!isChecked) {
-      return
-    }
-    
-    // 选中新项（单选模式，multiSelect = false，会自动清除其他选中项）
-    if (cellId && typeof cellId === 'string' && isUUID(cellId)) {
-      handleControlBoardNavigate(null, cellOrder, 'toggle', false)
-    } else {
-      const numericId = toNumericId(cellId)
-      if (numericId) {
-        handleControlBoardNavigate(numericId, null, 'toggle', false)
-      } else {
-        handleControlBoardNavigate(null, cellOrder, 'toggle', false)
-      }
-    }
-  }
-}
+// v2.0: 以下函数已移至 useNavigation composable
+// function handleModuleItemClick, handlePrevModule, handleNextModule
+// function handleModuleCheckboxClick, handleModuleCheckboxChange, handleHideAll
+// function handleControlBoardNavigate
+// 现在从 navigationManager 导入
 
 // 获取模块提示信息
-function getModuleTooltip(cell: Cell, index: number): string {
-  const typeLabel = getCellTypeLabel(cell.type)
-  const title = cell.title || `模块 ${index + 1}`
-  const isActiveCell = isModuleActive(cell, index)
-  const status = isActiveCell ? ' (已选中)' : ''
-  return `${index + 1}. ${title} - ${typeLabel}${status}`
-}
+// v2.0: 已移至 cellUtils.ts as getModuleTooltip
 
 // 获取当前模块索引
-function getCurrentModuleIndex(): number {
-  if (!lessonContentCells.value.length || !currentCell.value) return -1
-  return lessonContentCells.value.findIndex(cell => {
-    const cellId = getCellId(cell)
-    const currentId = session.value?.current_cell_id
-    if (!currentId) return false
-    return cellId === currentId || (typeof cellId === 'string' && parseInt(cellId) === currentId)
-  })
-}
+// v2.0: 已移至 cellUtils.ts as getCurrentModuleIndex
 
 // 计算进度落后学生数量（进度 < 50%）
 const studentsBehindCount = computed(() => {
-  return activeStudents.value.filter(s => {
-    const progress = s.progressPercentage || s.progress_percentage || 0
-    return progress < 50
-  }).length
+  return calculateStudentsBehindCount(activeStudents.value)
 })
 
 // 是否有预警（用于高亮预警栏）
 const hasAlerts = computed(() => {
-  return studentsBehindCount.value > 0 || hasLowSubmissionRate.value
-})
-
-// 是否有低提交率（活动模块）
-const hasLowSubmissionRate = computed(() => {
-  if (!currentCell.value || currentCell.value.type !== 'activity') return false
-  if (!sessionStatistics.value) return false
-  // 假设如果提交率低于 50% 且总学生数 > 5，则显示预警
-  // 这里需要根据实际的提交统计数据来判断
-  return false // TODO: 根据实际数据实现
-})
-
-// 活动统计相关
-const activityStatistics = ref({
-  totalStudents: 0,
-  submittedCount: 0,
-  itemStatistics: null as Record<string, any> | null,
-})
-
-const loadingActivityStats = ref(false)
-
-// 学生提交状态映射（studentId -> submissionStatus）
-const studentSubmissionStatus = ref<Map<number | string, string>>(new Map())
-
-// 获取选择题及其统计
-const choiceItemsWithStats = computed(() => {
-  try {
-    if (!currentCell.value || currentCell.value.type !== 'activity' || !currentCell.value.content?.items || !activityStatistics.value.itemStatistics) {
-      return []
-    }
-    
-    const choiceTypes = ['single-choice', 'multiple-choice', 'true-false']
-    const items = currentCell.value.content.items.filter((item: any) => item && choiceTypes.includes(item.type))
-    
-    if (items.length === 0) {
-      return []
-    }
-    
-    return items.map((item: any, index: number) => {
-      const itemId = item.id
-      const itemStats = activityStatistics.value.itemStatistics?.[itemId]
-      const optionDistribution = itemStats?.option_distribution || itemStats?.options || {}
-      
-      // 获取选项列表
-      let options: Array<{ id: string; label: string; isCorrect?: boolean; count: number; percentage: number }> = []
-      
-      try {
-        if (item.type === 'single-choice' && 'config' in item && item.config && Array.isArray(item.config.options)) {
-          // 单选题：从配置中获取选项
-          const totalResponses: number = (Object.values(optionDistribution).reduce((sum: number, count: any) => sum + (Number(count) || 0), 0) as number) || activityStatistics.value.submittedCount || 1
-          options = item.config.options.map((opt: any) => {
-            const count = Number(optionDistribution[opt.id] || optionDistribution[String(opt.id)] || 0)
-            return {
-              id: opt.id,
-              label: opt.text || opt.label || opt.id,
-              isCorrect: opt.isCorrect,
-              count,
-              percentage: totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0,
-            }
-          })
-        } else if (item.type === 'multiple-choice' && 'config' in item && item.config && Array.isArray(item.config.options)) {
-          // 多选题：从配置中获取选项
-          const totalResponses = activityStatistics.value.submittedCount || 1
-          options = item.config.options.map((opt: any) => {
-            const count = Number(optionDistribution[opt.id] || optionDistribution[String(opt.id)] || 0)
-            return {
-              id: opt.id,
-              label: opt.text || opt.label || opt.id,
-              isCorrect: opt.isCorrect,
-              count,
-              percentage: totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0,
-            }
-          })
-        } else if (item.type === 'true-false') {
-          // 判断题：固定两个选项
-          const totalResponses: number = (Object.values(optionDistribution).reduce((sum: number, count: any) => sum + (Number(count) || 0), 0) as number) || activityStatistics.value.submittedCount || 1
-          const config = 'config' in item ? item.config : null
-          options = [
-            {
-              id: 'true',
-              label: '正确',
-              isCorrect: config && 'correctAnswer' in config ? config.correctAnswer === true : false,
-              count: Number(optionDistribution.true || optionDistribution['true'] || 0),
-              percentage: totalResponses > 0 ? Math.round((Number(optionDistribution.true || optionDistribution['true'] || 0) / totalResponses) * 100) : 0,
-            },
-            {
-              id: 'false',
-              label: '错误',
-              isCorrect: config && 'correctAnswer' in config ? config.correctAnswer === false : false,
-              count: Number(optionDistribution.false || optionDistribution['false'] || 0),
-              percentage: totalResponses > 0 ? Math.round((Number(optionDistribution.false || optionDistribution['false'] || 0) / totalResponses) * 100) : 0,
-            },
-          ]
-        }
-      } catch (error) {
-        console.error('处理选择题选项时出错:', error, item)
-        options = []
-      }
-      
-      return {
-        itemId,
-        order: index,
-        type: item.type,
-        question: item.question || `题目 ${index + 1}`,
-        options,
-      }
-    }).filter((item: any) => item && item.options && item.options.length > 0)
-  } catch (error) {
-    console.error('计算选择题统计时出错:', error)
-    return []
-  }
-})
-
-// 获取题目类型标签
-function getItemTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    'single-choice': '单选题',
-    'multiple-choice': '多选题',
-    'true-false': '判断题',
-  }
-  return labels[type] || type
-}
-
-// 加载活动统计
-async function loadActivityStatistics() {
-  if (!currentCell.value || currentCell.value.type !== 'activity' || !currentActivityDbCell.value || !session.value) {
-    activityStatistics.value = {
-      totalStudents: 0,
-      submittedCount: 0,
-      itemStatistics: null,
-    }
-    studentSubmissionStatus.value.clear()
-    return
-  }
-  
-  loadingActivityStats.value = true
-  try {
-    const numericCellId = typeof currentActivityDbCell.value.id === 'number' 
-      ? currentActivityDbCell.value.id 
-      : toNumericId(currentActivityDbCell.value.id)
-    
-    if (numericCellId === null) {
-      console.warn('⚠️ CellId 是 UUID，无法获取统计数据（需要数字 ID）')
-      return
-    }
-    
-    // 并行加载统计数据和提交列表
-    const [stats, submissions] = await Promise.all([
-      activityService.getStatistics(
-        numericCellId,
-        session.value.id,
-        props.lessonId
-      ),
-      activityService.getCellSubmissions(
-        numericCellId,
-        undefined, // 不过滤状态
-        session.value.id,
-        props.lessonId
-      ).catch(() => []) // 如果失败，返回空数组
-    ])
-    
-    // 转换 API 返回的格式
-    const statsAny = stats as any
-    activityStatistics.value = {
-      totalStudents: stats.totalStudents || statsAny.total_students || 0,
-      submittedCount: stats.submittedCount || statsAny.submitted_count || 0,
-      itemStatistics: stats.itemStatistics ?? statsAny.item_statistics ?? null,
-    }
-    
-    // 建立学生ID到提交状态的映射
-    // 支持多种ID字段：studentId, student_id, userId, user_id
-    studentSubmissionStatus.value.clear()
-    submissions.forEach((submission: any) => {
-      const studentId = submission.studentId || submission.student_id || submission.userId || submission.user_id
-      if (studentId !== null && studentId !== undefined) {
-        const status = submission.status || 'not_started'
-        // 使用字符串作为key，确保类型一致
-        studentSubmissionStatus.value.set(String(studentId), status)
-      }
-    })
-  } catch (error: any) {
-    console.error('❌ 加载活动统计失败:', error)
-  } finally {
-    loadingActivityStats.value = false
-  }
-}
-
-// 滚动到落后学生区域
-function scrollToStudentsBehind() {
-  // 实现滚动逻辑，可以给落后学生添加特殊标记
-  const element = document.querySelector('.students-behind-section')
-  if (element) {
-    element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }
-}
-
-// 滚动到提问区域
-function scrollToQuestions() {
-  // TODO: 实现滚动到提问列表的逻辑
-}
-
-// 根据 order 获取 Cell
-function getCellByOrder(order: number): Cell | null {
-  if (!lessonContentCells.value.length) return null
-  return lessonContentCells.value.find((cell, index) => {
-    const cellOrder = cell.order !== undefined ? cell.order : index
-    return cellOrder === order
-  }) || null
-}
-
-// 获取文本预览（去除HTML标签，截取前N字符）
-function getTextPreview(cell: Cell, maxLength: number = 100): string {
-  if (cell.type !== 'text') return ''
-  const content = (cell as any).content
-  if (!content?.html) return '文本内容'
-  
-  // 去除HTML标签
-  const text = content.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-  return text.slice(0, maxLength) + (text.length > maxLength ? '...' : '')
-}
-
-// 获取代码预览（截取前50行）
-function getCodePreview(cell: Cell): string {
-  if (cell.type !== 'code') return ''
-  const content = (cell as any).content
-  if (!content?.code) return '// 代码内容'
-  
-  const lines = content.code.split('\n')
-  return lines.slice(0, 10).join('\n') + (lines.length > 10 ? '\n...' : '')
-}
-
-// 处理缩略图加载错误
-function handleThumbnailError(event: Event) {
-  const img = event.target as HTMLImageElement
-  if (img) {
-    img.style.display = 'none'
-    // 显示默认图标
-    const parent = img.parentElement
-    if (parent && !parent.querySelector('.preview-thumbnail-content')) {
-      const content = document.createElement('div')
-      content.className = 'preview-thumbnail-content'
-      content.innerHTML = `
-        <svg class="preview-thumbnail-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-      `
-      parent.appendChild(content)
-    }
-  }
-}
-
-// 切换模块面板全屏
-function toggleModulePanelFullscreen() {
-  modulePanelFullscreen.value = !modulePanelFullscreen.value
-}
-
-// 切换整个导播台全屏
-async function togglePanelFullscreen() {
-  if (!isPanelFullscreen.value) {
-    // 进入全屏
-    try {
-      const element = document.documentElement
-      if (element.requestFullscreen) {
-        await element.requestFullscreen()
-      } else if ((element as any).webkitRequestFullscreen) {
-        await (element as any).webkitRequestFullscreen()
-      } else if ((element as any).mozRequestFullScreen) {
-        await (element as any).mozRequestFullScreen()
-      } else if ((element as any).msRequestFullscreen) {
-        await (element as any).msRequestFullscreen()
-      }
-      isPanelFullscreen.value = true
-    } catch (error: any) {
-      console.error('进入全屏失败:', error)
-      // 如果浏览器全屏失败，使用CSS全屏模式
-      isPanelFullscreen.value = true
-    }
-  } else {
-    // 退出全屏
-    try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen()
-      } else if ((document as any).webkitExitFullscreen) {
-        await (document as any).webkitExitFullscreen()
-      } else if ((document as any).mozCancelFullScreen) {
-        await (document as any).mozCancelFullScreen()
-      } else if ((document as any).msExitFullscreen) {
-        await (document as any).msExitFullscreen()
-      }
-      isPanelFullscreen.value = false
-    } catch (error: any) {
-      console.error('退出全屏失败:', error)
-      isPanelFullscreen.value = false
-    }
-  }
-}
-
-// 监听浏览器全屏状态变化
-function handleFullscreenChange() {
-  const isCurrentlyFullscreen = !!(
-    document.fullscreenElement ||
-    (document as any).webkitFullscreenElement ||
-    (document as any).mozFullScreenElement ||
-    (document as any).msFullscreenElement
+  return checkHasAlerts(
+    studentsBehindCount.value,
+    checkLowSubmissionRate(currentCell.value, sessionStatistics.value)
   )
-  
-  if (!isCurrentlyFullscreen && isPanelFullscreen.value) {
-    isPanelFullscreen.value = false
-  }
-}
-
-function formatDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60)
-  // 显示为"15分钟"格式
-  return `${minutes}分钟`
-}
-
-function formatRemainingTime(seconds: number): string {
-  if (seconds <= 0) return '0:00'
-  const minutes = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-}
-
-// 格式化年级名称
-function formatGradeName(gradeId: number): string {
-  const gradeNames: Record<number, string> = {
-    1: '一年级',
-    2: '二年级',
-    3: '三年级',
-    4: '四年级',
-    5: '五年级',
-    6: '六年级',
-    7: '七年级',
-    8: '八年级',
-    9: '九年级',
-    10: '高一',
-    11: '高二',
-    12: '高三',
-  }
-  return gradeNames[gradeId] ?? `年级 ${gradeId}`
-}
-
-// 会话操作
-// 创建课堂会话（保持 PENDING 状态，等待学生加入）
-async function handleCreateSession() {
-  // 先加载可用班级列表
-  try {
-    await lessonStore.loadAvailableClassrooms()
-    
-    // 如果只有一个班级，直接使用；否则显示选择弹窗
-    if (availableClassrooms.value.length === 1) {
-      selectedClassroomId.value = availableClassrooms.value[0].id
-      await createSessionWithClassroom(availableClassrooms.value[0].id)
-    } else if (availableClassrooms.value.length === 0) {
-      alert('当前没有可用的班级，请联系管理员配置班级信息。')
-    } else {
-      // 显示班级选择弹窗
-      showClassroomSelectModal.value = true
-      classroomSelectError.value = null
-    }
-  } catch (error: any) {
-    console.error('加载班级列表失败:', error)
-    alert('加载班级列表失败：' + (error.message || '未知错误'))
-  }
-}
-
-// 确认选择班级并创建会话
-async function handleClassroomSelectConfirm() {
-  if (!selectedClassroomId.value) {
-    classroomSelectError.value = '请选择一个班级'
-    return
-  }
-  
-  classroomSelectError.value = null
-  showClassroomSelectModal.value = false
-  
-  await createSessionWithClassroom(selectedClassroomId.value)
-  
-  // 重置选择
-  selectedClassroomId.value = null
-}
-
-// 取消班级选择
-function handleClassroomSelectCancel() {
-  showClassroomSelectModal.value = false
-  selectedClassroomId.value = null
-  classroomSelectError.value = null
-}
-
-// 使用指定班级创建会话
-async function createSessionWithClassroom(classroomId: number, retryCount: number = 0) {
-  const MAX_RETRIES = 2 // 最多重试2次
-  loading.value = true
-  try {
-    // 创建会话（状态为 PENDING）
-    const newSession = await classroomSessionService.createSession(props.lessonId, {
-      classroom_id: classroomId,
-    })
-    
-    // 检查响应
-    if (!newSession || !newSession.id) {
-      console.error('Invalid session response:', newSession)
-      throw new Error('创建会话失败：服务器返回的数据格式不正确')
-    }
-    
-    // 保持 PENDING 状态，不立即开始
-    session.value = newSession
-    
-    // 🔧 添加调试日志，确认 sessionId 已生成
-    console.log('✅ TeacherControlPanel: 会话已创建，sessionId =', newSession.id, '状态 =', newSession.status)
-    
-    // 立即加载一次学生列表
-    await loadParticipants()
-    console.log('✅ 初始学生列表加载完成，学生数:', activeStudents.value.length)
-    
-    // 启动轮询（根据会话状态）
-    startPollingIfNeeded()
-    console.log('✅ 已启动轮询，状态:', normalizedSessionStatus.value)
-  } catch (createError: any) {
-    console.log('🔍 捕获到创建会话错误:', {
-      message: createError.message,
-      responseStatus: createError.response?.status,
-      responseData: createError.response?.data,
-    })
-    
-    // 如果创建失败，检查是否是因为已有活跃会话
-    // 需要同时检查 error.response?.data?.detail 和 error.message，因为错误可能被包装
-    const errorDetail = createError.response?.data?.detail || createError.message || ''
-    console.log('🔍 错误详情:', errorDetail)
-    
-    // 检查错误消息中是否包含"已有活跃的课堂会话"
-    const hasActiveSessionError = errorDetail.includes('已有活跃的课堂会话') || 
-                                  errorDetail.includes('已有活跃会话')
-    
-    if (hasActiveSessionError && (createError.response?.status === 400 || createError.message)) {
-      console.log('✅ 检测到"已有活跃会话"错误，尝试提取会话ID...')
-      
-      // 从错误信息中提取会话ID（支持多种格式）
-      // 错误消息格式可能是：
-      // - 该班级已有活跃的课堂会话（ID: 139）
-      // - 该班级已有活跃的课堂会话(ID:139)
-      // - 创建会话失败:该班级已有活跃的课堂会话(ID:139),请先结束或使用现有会话
-      const sessionIdMatch = errorDetail.match(/\(ID\s*[：:]\s*(\d+)\)/) ||
-                             errorDetail.match(/（ID\s*[：:]\s*(\d+)）/) ||
-                             errorDetail.match(/ID\s*[：:]\s*(\d+)/) ||
-                             errorDetail.match(/ID\s*[：:]\s*(\d+)/)
-      
-      console.log('🔍 会话ID匹配结果:', sessionIdMatch)
-      
-      if (!sessionIdMatch) {
-        console.error('❌ 无法从错误信息中提取会话ID。错误信息:', errorDetail)
-        // 如果无法提取会话ID，显示错误
-        throw createError
-      }
-      
-        const existingSessionId = parseInt(sessionIdMatch[1])
-        console.log('✅ 从错误信息中提取到会话ID:', existingSessionId)
-        
-        // 直接加载现有会话，并提示用户
-        try {
-          const existingSession = await classroomSessionService.getSession(existingSessionId)
-          if (existingSession) {
-            // 检查会话状态，如果是 ENDED 状态，重新创建新会话
-            if (existingSession.status === 'ended' || existingSession.status === 'ENDED') {
-              console.log('ℹ️ 检测到的会话已经是 ENDED 状态，重新创建新会话')
-              
-              // 如果重试次数未超过限制，重新调用创建会话
-              if (retryCount < MAX_RETRIES) {
-                console.log(`🔄 重试创建会话 (${retryCount + 1}/${MAX_RETRIES})...`)
-                loading.value = false // 先重置 loading，避免 UI 卡住
-                // 等待一小段时间，确保后端状态已更新
-                await new Promise(resolve => setTimeout(resolve, 500))
-                // 递归调用，重新创建会话
-                return await createSessionWithClassroom(classroomId, retryCount + 1)
-              } else {
-                console.error('❌ 重试次数已达上限，无法创建新会话')
-                alert('检测到已结束的会话，但多次重试后仍无法创建新会话。请刷新页面后重试。')
-                throw new Error('重试次数已达上限')
-              }
-            } else {
-              // 会话是活跃状态，加载它并提示用户
-              session.value = existingSession
-              loadParticipants()
-              loadStatistics()
-              startPollingIfNeeded()
-              console.log('✅ 已自动加载现有会话:', existingSession.id)
-              
-              // 提示用户：已加载现有会话，如需创建新会话请先结束当前会话
-              const sessionStatusText = {
-                pending: '待开始',
-                active: '进行中',
-                paused: '已暂停',
-                ended: '已结束',
-              }[existingSession.status] || existingSession.status
-              
-              alert(
-                `📢 检测到已有活跃的课堂会话（ID: ${existingSessionId}，状态：${sessionStatusText}）\n\n` +
-                `已自动加载现有会话。如需创建新会话，请先点击"结束"按钮结束当前会话。`
-              )
-              return
-            }
-          }
-        } catch (loadError: any) {
-          console.error('加载现有会话失败:', loadError)
-          // 如果加载失败（可能是会话不存在或已删除），尝试重新创建
-          if (loadError.response?.status === 404) {
-            console.log('ℹ️ 会话不存在（可能已删除），尝试重新创建新会话')
-            
-            // 如果重试次数未超过限制，重新调用创建会话
-            if (retryCount < MAX_RETRIES) {
-              console.log(`🔄 会话不存在，重试创建会话 (${retryCount + 1}/${MAX_RETRIES})...`)
-              loading.value = false
-              await new Promise(resolve => setTimeout(resolve, 500))
-              return await createSessionWithClassroom(classroomId, retryCount + 1)
-            } else {
-              console.error('❌ 重试次数已达上限')
-              alert('会话不存在，但多次重试后仍无法创建新会话。请刷新页面后重试。')
-              throw loadError
-            }
-          } else {
-            const loadErrorDetail = loadError.response?.data?.detail || loadError.message || '加载会话失败'
-            alert(`检测到已有活跃会话，但无法加载：${loadErrorDetail}\n\n会话ID: ${existingSessionId}\n\n请刷新页面后重试。`)
-            throw loadError
-          }
-        }
-    } else {
-      // 其他错误，显示错误信息
-      console.error('Failed to create session:', createError)
-      // 提取更友好的错误信息
-      let errorMessage = createError.message || createError.response?.data?.detail || '创建课堂失败'
-      
-      // 如果是已知的错误类型，显示更友好的提示
-      if (errorMessage.includes('无权限')) {
-        errorMessage = '无法访问该会话。请确保您是该会话的创建者。'
-      } else if (errorMessage.includes('不存在')) {
-        errorMessage = '会话不存在，请刷新页面重试。'
-      } else if (errorMessage.includes('已有活跃的课堂会话')) {
-        // 这种情况应该已经被处理了，但如果仍然出现，说明加载失败
-        errorMessage = '检测到已有活跃会话，但无法自动加载。请刷新页面重试。'
-      }
-      
-      alert(errorMessage)
-    }
-  } finally {
-    loading.value = false
-  }
-}
-
-// 开始上课（将 PENDING 状态变为 ACTIVE）
-async function handleBeginClass() {
-  const status = normalizedSessionStatus.value
-  if (!session.value || status !== 'pending') return
-  
-  loading.value = true
-  try {
-    session.value = await classroomSessionService.startSession(session.value.id)
-    
-    // 检查开始会话的响应
-    if (!session.value) {
-      throw new Error('开始会话失败：服务器返回的数据格式不正确')
-    }
-    
-    // 开始计时（新会话从0开始）
-    // 注意：计时器会通过 watch 监听 session.status 变化自动启动
-    // 这里确保状态正确即可，watch 会自动处理计时器启动
-    const newStatus = normalizedSessionStatus.value
-    if (newStatus === 'active') {
-      sessionDuration.value = 0  // 新会话从0开始
-      // watch 会自动启动计时器，但为了确保立即启动，这里也调用一次
-      if (!durationInterval.value) {
-        startDurationTimer()
-      }
-    }
-    
-    // 加载统计信息
-    loadStatistics()
-    
-    // 启动轮询（根据会话状态）
-    startPollingIfNeeded()
-  } catch (error: any) {
-    console.error('Failed to start session:', error)
-    const errorMessage = error.message || error.response?.data?.detail || '开始上课失败'
-    alert(errorMessage)
-  } finally {
-    loading.value = false
-  }
-}
-
-// 取消课堂（删除 PENDING 状态的会话）
-async function handleCancelSession() {
-  const status = normalizedSessionStatus.value
-  if (!session.value || status !== 'pending') return
-  
-  // 根据是否有学生进入，显示不同的提示
-  const hasStudents = activeStudents.value.length > 0
-  const confirmMessage = hasStudents 
-    ? '确定要取消课堂吗？当前已有学生进入，这将结束当前会话。'
-    : '确定要取消课堂吗？这将删除当前会话。'
-  
-  if (!confirm(confirmMessage)) return
-  
-  loading.value = true
-  try {
-    // 如果没有学生进入，直接清除本地会话状态，不需要调用后端API
-    if (!hasStudents) {
-      session.value = null
-      activeStudents.value = []
-      stopDurationTimer()
-      return
-    }
-    
-    // 如果有学生进入，调用 endSession API 来结束会话
-    session.value = await classroomSessionService.endSession(session.value.id)
-    stopDurationTimer()
-    // 会话结束后，可以选择清除本地状态或保持 ended 状态
-    // 这里保持 ended 状态，让用户可以看到会话已结束
-  } catch (error: any) {
-    console.error('Failed to cancel session:', error)
-    // 如果 API 调用失败，但如果没有学生，仍然清除本地状态
-    if (!hasStudents) {
-      session.value = null
-      activeStudents.value = []
-      stopDurationTimer()
-    } else {
-      alert('取消课堂失败：' + (error.message || error.response?.data?.detail || '未知错误'))
-    }
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handlePause() {
-  if (!session.value) return
-  loading.value = true
-  try {
-    session.value = await classroomSessionService.pauseSession(session.value.id)
-    stopDurationTimer()
-  } catch (error: any) {
-    console.error('Failed to pause session:', error)
-    alert('暂停失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handleResume() {
-  if (!session.value) return
-  loading.value = true
-  try {
-    session.value = await classroomSessionService.resumeSession(session.value.id)
-    startDurationTimer()
-  } catch (error: any) {
-    console.error('Failed to resume session:', error)
-    alert('继续失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 计算当前显示模式
-const currentDisplayMode = computed(() => {
-  if (!session.value?.settings) return 'window'
-  const settings = session.value.settings as any
-  return settings.display_mode || 'window'
 })
 
-// 切换显示模式
-async function handleToggleDisplayMode() {
-  if (!session.value) return
-  
-  const newMode = currentDisplayMode.value === 'fullscreen' ? 'window' : 'fullscreen'
-  
-  loading.value = true
-  try {
-    session.value = await classroomSessionService.updateDisplayMode(session.value.id, newMode)
-  } catch (error: any) {
-    console.error('切换显示模式失败:', error)
-    alert('切换显示模式失败')
-  } finally {
-    loading.value = false
-  }
-}
+// v2.0: 以下状态和函数已移至 useDataLoader composable
+// function getCellByOrder(order): Cell | null
+// function getTextPreview(cell, maxLength): string
+// function getCodePreview(cell): string
+// function handleThumbnailError(event): void
 
-async function handleEnd() {
-  if (!session.value) return
-  if (!confirm('确定要结束课程吗？')) return
-  
-  loading.value = true
-  const sessionId = session.value.id
-  const oldStatus = session.value.status
-  
-  console.log(`🔄 开始结束会话: ID=${sessionId}, 当前状态=${oldStatus}`)
-  
-  try {
-    // 调用 API 结束会话
-    console.log(`📤 调用结束会话 API: POST /classroom-sessions/sessions/${sessionId}/end`)
-    const endedSession = await classroomSessionService.endSession(sessionId)
-    
-    console.log('✅ 会话已结束，后端返回:', {
-      id: endedSession.id,
-      status: endedSession.status,
-      endedAt: endedSession.endedAt || endedSession.ended_at,
-      fullResponse: endedSession
-    })
-    
-    // 验证返回的状态
-    const returnedStatus = endedSession.status || (endedSession as any).status
-    if (returnedStatus !== 'ended' && returnedStatus !== 'ENDED') {
-      console.warn(`⚠️ 警告：后端返回的状态不是 ENDED，而是: ${returnedStatus}`)
-      // 即使状态不对，也继续清除本地状态，让用户尝试创建新会话
-    }
-    
-    // 结束会话后，清除本地状态，以便可以创建新会话
-    session.value = null
-    activeStudents.value = []
-    stopDurationTimer()
-    clearAllPollingIntervals()
-    
-    console.log('✅ 会话已结束，本地状态已清除，可以创建新会话')
-    // 显示成功提示
-    alert('课程已成功结束，现在可以创建新课堂了')
-  } catch (error: any) {
-    console.error('❌ 结束会话失败:', error)
-    const errorMessage = error.response?.data?.detail || error.message || '结束课程失败'
-    console.error('错误详情:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message,
-      stack: error.stack
-    })
-    
-    // 根据错误类型显示不同的提示
-    let userMessage = '结束课程失败：' + errorMessage
-    if (error.response?.status === 403) {
-      userMessage = '结束课程失败：您没有权限结束此会话'
-    } else if (error.response?.status === 404) {
-      userMessage = '结束课程失败：会话不存在（可能已被删除）'
-    } else if (error.response?.status === 500) {
-      userMessage = '结束课程失败：服务器内部错误，请稍后重试或联系管理员'
-    }
-    
-    alert(userMessage + '\n\n请查看浏览器控制台获取详细信息。')
-    
-    // 即使 API 调用失败，也尝试清除本地状态（如果会话可能已经结束）
-    // 这样用户至少可以尝试创建新会话
-    if (error.response?.status === 404 || errorMessage.includes('不存在')) {
-      console.log('⚠️ 会话可能已经不存在，清除本地状态')
-      session.value = null
-      activeStudents.value = []
-      stopDurationTimer()
-      clearAllPollingIntervals()
-    }
-  } finally {
-    loading.value = false
-  }
-}
+// v2.0: 以下函数已移至 useFullscreen composable
+// function toggleModulePanelFullscreen, togglePanelFullscreen, handleFullscreenChange
+// 现在从 fullscreenManager 导入
 
-// 切换选择模式（单选/多选）
-async function toggleSelectionMode() {
-  if (loading.value || !session.value) return
-  
-  const wasMultiSelect = isMultiSelectMode.value
-  isMultiSelectMode.value = !isMultiSelectMode.value
-  
-  // 如果从多选切换到单选，且当前有多个选中项，只保留第一个
-  if (!isMultiSelectMode.value && wasMultiSelect && displayCellOrders.value.length > 1) {
-    const firstOrder = displayCellOrders.value[0]
-    const cell = lessonContentCells.value.find((cell, idx) => {
-      const cellOrder = cell.order !== undefined ? cell.order : idx
-      return cellOrder === firstOrder
-    })
-    if (cell) {
-      const id = getCellId(cell)
-      const cellIndex = lessonContentCells.value.indexOf(cell)
-      const order = cell.order !== undefined ? cell.order : cellIndex
-      // 切换到单选模式，只显示第一个选中的项
-      await handleControlBoardNavigate(id, order, 'toggle', false)
-    }
-  }
-  // 如果从单选切换到多选，且当前有选中项，保持选中状态（已经是多选模式，可以继续添加）
-}
+// v2.0: 切换选择模式函数已移至 useSelectionMode composable
+// async function toggleSelectionMode(...) {...}
+// 现在从 selectionModeManager 导入
 
 // 隐藏所有内容（通过导播台的"隐藏"节点调用）
-async function handleHideAll() {
-  if (!session.value) return
-  
-  // 🆕 检查会话状态：导航功能要求会话状态必须是 ACTIVE
-  const status = normalizedSessionStatus.value
-  if (status !== 'active') {
-    const statusMessages: Record<string, string> = {
-      'pending': '请先点击"开始上课"按钮，等待教师开始上课',
-      'paused': '会话已暂停，请先继续会话',
-      'ended': '会话已结束，无法隐藏内容'
-    }
-    const message = statusMessages[session.value.status] || '会话状态不正确，无法隐藏内容'
-    alert(message)
-    console.warn('隐藏内容失败：会话状态不是 ACTIVE', {
-      currentStatus: session.value.status,
-      sessionId: session.value.id
-    })
-    return
-  }
-  
-  loading.value = true
-  try {
-    // 🆕 使用 displayCellOrders: [] 来隐藏所有内容
-    session.value = await classroomSessionService.navigateToCell(session.value.id, {
-      displayCellOrders: [],
-    })
-    selectedCellIndex.value = -1
-  } catch (error: any) {
-    console.error('Failed to hide content:', error)
-    const errorMessage = error.response?.data?.detail || error.message || '隐藏内容失败'
-    alert(errorMessage)
-  } finally {
-    loading.value = false
-  }
-}
+// v2.0: 已移至 useNavigation composable
 
+// v2.0: 以下函数已移至 useDataLoader composable
+// function loadParticipants, loadStatistics, loadDbCells, ensureActivityCellExists
+// 现在从 dataLoader 导入
 
-// 活动控制
-async function handleStartActivity() {
-  if (!session.value || !currentCell.value) return
-  
-  // 使用session中的current_cell_id，这是当前显示的Cell
-  const currentCellId = session.value.current_cell_id
-  if (!currentCellId) {
-    alert('无法开始活动：当前没有显示任何Cell')
-    return
-  }
-  
-  loading.value = true
-  try {
-    session.value = await classroomSessionService.startActivity(session.value.id, {
-      cellId: currentCellId,
-    })
-  } catch (error: any) {
-    console.error('Failed to start activity:', error)
-    const errorMessage = error.response?.data?.detail || error.message || '开始活动失败'
-    alert(errorMessage)
-  } finally {
-    loading.value = false
-  }
-}
+// v2.0: 定时器管理已移至 useDurationTimer composable
 
-async function handleEndActivity() {
-  if (!session.value) return
-  
-  loading.value = true
-  try {
-    session.value = await classroomSessionService.endActivity(session.value.id)
-  } catch (error: any) {
-    console.error('Failed to end activity:', error)
-    alert('结束活动失败')
-  } finally {
-    loading.value = false
+// v2.0: 监听会话状态变化，自动连接/断开 WebSocket
+watch(() => sessionManager.normalizedSessionStatus.value, (status, oldStatus) => {
+  // 当会话被创建或状态改变时，连接 WebSocket
+  if (status && status !== oldStatus && status !== 'ended') {
+    wsManager.connect()
+    console.log('✅ 会话状态变化，已连接 WebSocket，新状态:', status)
   }
-}
-
-// 导播台导航处理
-async function handleControlBoardNavigate(
-  cellId: number | string | null, 
-  cellOrder: number | null,
-  action: 'toggle' | 'add' | 'remove' = 'toggle',
-  multiSelect: boolean = false
-) {
-  if (!session.value) {
-    console.warn('无法导航：会话不存在')
-    return
+  // 当会话结束时，断开 WebSocket
+  if (status === 'ended' || status === null) {
+    wsManager.disconnect()
   }
-  
-  // 🆕 检查会话状态：导航功能要求会话状态必须是 ACTIVE
-  const status = normalizedSessionStatus.value
-  if (status !== 'active') {
-    const statusMessages: Record<string, string> = {
-      'pending': '请先点击"开始上课"按钮，等待教师开始上课',
-      'paused': '会话已暂停，请先继续会话',
-      'ended': '会话已结束，无法导航'
-    }
-    const message = statusMessages[session.value.status] || '会话状态不正确，无法导航'
-    alert(message)
-    console.warn('导航失败：会话状态不是 ACTIVE', {
-      currentStatus: session.value.status,
-      sessionId: session.value.id
-    })
-    return
-  }
-  
-  loading.value = true
-  try {
-    // 🆕 新方式：使用 display_cell_orders（推荐）
-    // 获取当前选中的 orders（从 settings 中获取，如果有的话）
-    let displayOrders: number[] = []
-    const currentSettings = session.value.settings as any
-    if (currentSettings?.display_cell_orders) {
-      displayOrders = [...currentSettings.display_cell_orders]
-    } else if (currentSettings?.display_cell_ids && lessonContentCells.value.length > 0) {
-      // 向后兼容：如果只有 display_cell_ids，转换成 orders
-      displayOrders = currentSettings.display_cell_ids
-        .map((id: number) => {
-          const cell = lessonContentCells.value.find((c: any) => getCellId(c) === id)
-          if (cell) {
-            const cellIndex = lessonContentCells.value.indexOf(cell)
-            return cell.order !== undefined ? cell.order : cellIndex
-          }
-          return -1
-        })
-        .filter((order: number) => order >= 0)
-    }
-    
-    // 如果是隐藏所有（cellId === 0、"0" 或 null）且不是多选模式
-    const isHideAll = (cellId === 0 || cellId === "0" || cellId === null) && cellOrder === null && !multiSelect
-    if (isHideAll) {
-      displayOrders = []
-    } else if (cellOrder !== null) {
-      // 根据 action 更新 displayOrders
-      if (action === 'add') {
-        if (!displayOrders.includes(cellOrder)) {
-          displayOrders.push(cellOrder)
-        }
-      } else if (action === 'remove') {
-        displayOrders = displayOrders.filter(o => o !== cellOrder)
-      } else if (action === 'toggle') {
-        if (displayOrders.includes(cellOrder)) {
-          displayOrders = displayOrders.filter(o => o !== cellOrder)
-        } else {
-          displayOrders = multiSelect ? [...displayOrders, cellOrder] : [cellOrder]
-        }
-      }
-    }
-    
-    // 发送新方式的请求
-    const requestData = {
-      displayCellOrders: displayOrders,
-      action,
-    }
-    const updatedSession = await classroomSessionService.navigateToCell(session.value.id, requestData)
-    
-    // 确保更新后的会话状态正确（不要丢失状态）
-    if (updatedSession) {
-      session.value = {
-        ...session.value,
-        ...updatedSession,
-        status: session.value.status, // 保持原有状态，导航不应该改变会话状态
-        id: session.value.id,
-      }
-    }
-    
-    // 导航后立即刷新学生列表
-    loadParticipants()
-    
-    // 🆕 如果点击的是活动模块，确保数据库记录存在
-    if (cellOrder !== null && lessonContentCells.value.length > 0) {
-      const clickedCell = lessonContentCells.value.find((cell, idx) => {
-        const cellOrderValue = cell.order !== undefined ? cell.order : idx
-        return cellOrderValue === cellOrder
-      })
-      
-      if (clickedCell && clickedCell.type === 'activity') {
-        const createdCellId = await ensureActivityCellExists(clickedCell, cellOrder)
-        // 重新加载 dbCells 以获取最新数据
-        await loadDbCells()
-        
-        // 🆕 如果创建成功，等待一小段时间让数据库记录生效
-        if (createdCellId) {
-          await new Promise(resolve => setTimeout(resolve, 500))
-          // 再次加载确保获取到最新数据
-          await loadDbCells()
-        }
-      }
-    }
-    
-    // 🆕 如果 dbCells 为空，重新加载（可能活动模块刚创建）
-    if (dbCells.value.length === 0) {
-      await loadDbCells()
-    }
-    
-    // 更新selectedCellIndex
-    if (cellId === 0) {
-      selectedCellIndex.value = -1
-    } else if (cellOrder !== null && cellOrder !== undefined && lessonContentCells.value.length > 0) {
-      // 🆕 通过 cellOrder 查找对应的数组索引（而不是直接使用 cellOrder）
-      const index = lessonContentCells.value.findIndex((cell, idx) => {
-        const cellOrderValue = cell.order !== undefined ? cell.order : idx
-        return cellOrderValue === cellOrder
-      })
-      if (index >= 0) {
-        selectedCellIndex.value = index
-      } else {
-        // 如果找不到，尝试使用 cellOrder 作为索引（向后兼容）
-        selectedCellIndex.value = cellOrder < lessonContentCells.value.length ? cellOrder : -1
-      }
-    } else if (cellId && lessonContentCells.value.length > 0) {
-      // 通过 cellId 查找索引
-      const index = lessonContentCells.value.findIndex((cell) => {
-        const id = getCellId(cell)
-        if (typeof id === 'number' && id === cellId) return true
-        if (typeof id === 'string') {
-          const numId = parseInt(id, 10)
-          if (!isNaN(numId) && numId === cellId) return true
-        }
-        return false
-      })
-      if (index >= 0) {
-        selectedCellIndex.value = index
-      } else {
-        // 如果找不到，尝试使用返回的 currentCellId 对应的索引
-        if (updatedSession?.currentCellId) {
-          const currentId = updatedSession.currentCellId
-          const foundIndex = lessonContentCells.value.findIndex((cell) => {
-            const id = getCellId(cell)
-            return id === currentId || (typeof id === 'string' && String(id) === String(currentId))
-          })
-          if (foundIndex >= 0) {
-            selectedCellIndex.value = foundIndex
-          }
-        }
-      }
-    }
-    
-    // 🆕 滚动到选中的模块
-    // 使用 nextTick 确保 DOM 已更新
-    await nextTick()
-    setTimeout(() => {
-      scrollToSelectedModule()
-    }, 100)
-  } catch (error: any) {
-    console.error('Failed to navigate from control board:', error)
-    const errorMessage = error.response?.data?.detail || error.message || '切换内容失败'
-    alert(errorMessage)
-  } finally {
-    loading.value = false
-  }
-}
-
-// 加载数据
-async function loadParticipants() {
-  // 🔧 首先检查组件是否还在 DOM 中（如果被 v-if 隐藏，不应该执行）
-  if (!containerRef.value || !containerRef.value.isConnected) {
-    console.log('⏸️ loadParticipants: 组件不在 DOM 中，跳过加载并清理轮询')
-    clearAllPollingIntervals()
-    return
-  }
-  
-  if (!session.value) {
-    console.warn('⏸️ loadParticipants: 会话不存在，跳过加载')
-    return
-  }
-  
-  loadingStudents.value = true
-  try {
-    console.log('🔄 开始加载学生列表，sessionId:', session.value.id)
-    // 获取所有在线学生（is_active=true）
-    const participants = await classroomSessionService.getParticipants(session.value.id, true)
-    console.log('📥 获取到参与者数据:', participants)
-    
-    // 确保是数组且只包含在线学生
-    const activeParticipants = Array.isArray(participants) 
-      ? participants.filter(p => p.isActive !== false)
-      : []
-    
-    console.log('✅ 过滤后的在线学生:', activeParticipants.length, '人', activeParticipants.map(s => ({
-      id: s.id,
-      name: s.studentName || s.student_name,
-      isActive: s.isActive ?? s.is_active,
-    })))
-    
-    activeStudents.value = activeParticipants
-    
-    // 更新会话统计中的在线学生数
-    if (session.value) {
-      session.value.activeStudents = activeStudents.value.length
-      console.log('📊 更新会话统计，在线学生数:', session.value.activeStudents)
-    }
-  } catch (error: any) {
-    console.error('❌ 加载学生列表失败:', error)
-    console.error('错误详情:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-    })
-    activeStudents.value = []
-  } finally {
-    loadingStudents.value = false
-  }
-}
-
-async function loadStatistics() {
-  if (!session.value) return
-  
-  try {
-    sessionStatistics.value = await classroomSessionService.getStatistics(session.value.id)
-  } catch (error) {
-    console.error('Failed to load statistics:', error)
-  }
-}
-
-// 定时器
-function startDurationTimer() {
-  if (durationInterval.value) return
-  
-  // 如果还没有开始计时（值为0或未定义），从0开始
-  // 如果已经有值（比如暂停后继续），保持当前值继续计时
-  if (sessionDuration.value === 0 || sessionDuration.value === null || sessionDuration.value === undefined) {
-    sessionDuration.value = 0
-  }
-  
-  // 每秒递增，直到达到课程时长
-  durationInterval.value = window.setInterval(() => {
-    sessionDuration.value = Math.min(sessionDuration.value + 1, LESSON_DURATION)
-  }, 1000)
-}
-
-function stopDurationTimer() {
-  if (durationInterval.value) {
-    clearInterval(durationInterval.value)
-    durationInterval.value = null
-  }
-}
-
-// 监听session状态变化，自动启动/停止计时器
-watch(() => session.value?.status, (status, oldStatus) => {
-  if (status === 'active') {
-    // 当状态变为 active 时，启动计时器
-    if (!durationInterval.value) {
-      // 如果计时器还没有启动
-      // 只有在从 pending 状态变为 active（新开始）时，才重置为0
-      // 如果是从 paused 恢复（继续），保持当前时长继续计时
-      if (oldStatus === 'pending' || sessionDuration.value === 0) {
-        sessionDuration.value = 0
-      }
-      startDurationTimer()
-    }
-  } else if (status === 'paused') {
-    // 当状态变为 paused 时，停止计时器（但保持当前时长）
-    stopDurationTimer()
-  } else if (status === 'ended') {
-    // 当状态变为 ended 时，停止计时器
-    stopDurationTimer()
-  } else {
-    // 其他状态（如 pending），停止计时器
-    stopDurationTimer()
-  }
-}, { immediate: true })
+}, { immediate: false })
 
 // 监听 selectedCellIndex 变化，自动滚动到对应模块
 watch(selectedCellIndex, (newIndex, oldIndex) => {
@@ -2199,24 +851,14 @@ watch(selectedCellIndex, (newIndex, oldIndex) => {
     // 延迟滚动，确保 DOM 已更新
     nextTick(() => {
       setTimeout(() => {
-        scrollToSelectedModule()
+        scrollToSelectedModuleWrapper()
       }, 150)
     })
   }
 })
 
-// 监听 displayCellOrders 变化，自动同步多选模式状态
-watch(displayCellOrders, (orders) => {
-  if (Array.isArray(orders) && orders.length > 1) {
-    // 如果有多个选中项，自动切换到多选模式
-    if (!isMultiSelectMode.value) {
-      isMultiSelectMode.value = true
-    }
-  } else if (Array.isArray(orders) && orders.length <= 1) {
-    // 如果只有一个或没有选中项，可以保持当前模式（不强制切换）
-    // 这样用户可以手动选择模式
-  }
-}, { immediate: true })
+// v2.0: 监听 displayCellOrders 变化已移至 useSelectionMode composable
+// watch(displayCellOrders, ...) {...}
 
 // 监听session变化，更新selectedCellIndex和displayCellIds
 watch(() => session.value, (newSession) => {
@@ -2267,196 +909,48 @@ watch(() => session.value, (newSession) => {
   }
 }, { immediate: true, deep: true })
 
-// 监听 currentCell 变化，自动加载活动统计
-watch([currentCell, currentActivityDbCell, session], () => {
-  if (currentCell.value && currentCell.value.type === 'activity' && currentActivityDbCell.value && session.value) {
-    loadActivityStatistics()
-  } else {
-    // 如果不是活动模块，清空统计数据
-    activityStatistics.value = {
-      totalStudents: 0,
-      submittedCount: 0,
-      itemStatistics: null,
-    }
-    studentSubmissionStatus.value.clear()
-  }
-}, { immediate: true })
+// v2.0: 监听 currentCell 的逻辑已移至 useDataLoader composable
+// 现在通过 dataLoader.watchCurrentCell() 调用
 
-// 加载数据库中的 Cell 记录
-async function loadDbCells() {
-  try {
-    const { api } = await import('../../services/api')
-    const response = await api.get(`/cells/lesson/${props.lessonId}`)
-    dbCells.value = Array.isArray(response) ? response : ([] as any)
-  } catch (error: any) {
-    console.warn('加载数据库 Cell 记录失败:', error)
-    dbCells.value = []
-  }
-}
-
-// 🆕 确保活动模块的数据库记录存在
-async function ensureActivityCellExists(cell: Cell, order: number): Promise<number | null> {
-  // 如果 dbCells 中已经有匹配的记录，直接返回
-  const existing = dbCells.value.find(dbCell => 
-    dbCell.order === order && 
-    (dbCell.cell_type === 'ACTIVITY' || dbCell.cell_type === 'activity' || dbCell.cell_type?.toUpperCase() === 'ACTIVITY')
-  )
-  if (existing) {
-    return existing.id
-  }
-  
-  // 尝试创建数据库记录
-  try {
-    const { api } = await import('../../services/api')
-    // ActivityCell 有可选的 config 属性
-    const activityCell = cell as ActivityCell
-    const cellCreateData = {
-      lesson_id: props.lessonId,
-      cell_type: 'ACTIVITY',  // 后端使用大写枚举值
-      title: cell.title || '',
-      content: cell.content || {},
-      config: activityCell.config || {},
-      order: order,
-      editable: cell.editable ?? false,
-    }
-    
-    const createResponse = await api.post<{ id: number | string }>('/cells', cellCreateData)
-    const newCell = createResponse
-    
-    if (newCell && newCell.id) {
-      const cellId = typeof newCell.id === 'number' ? newCell.id : parseInt(newCell.id, 10)
-      if (!isNaN(cellId)) {
-        // 添加到 dbCells 数组
-        dbCells.value.push({
-          id: cellId,
-          order: order,
-          cell_type: 'ACTIVITY',
-        })
-        
-        return cellId
-      }
-    }
-  } catch (error: any) {
-    console.error('创建活动模块数据库记录失败:', error)
-  }
-  
-  return null
-}
-
-// 统一管理所有轮询定时器
-const pollingIntervals = ref<Array<ReturnType<typeof setInterval>>>([])
-
-// 清理所有轮询定时器
-function clearAllPollingIntervals() {
-  pollingIntervals.value.forEach(interval => {
-    clearInterval(interval)
-  })
-  pollingIntervals.value = []
-}
-
-// 启动轮询（只在会话存在且需要时启动）
-function startPollingIfNeeded() {
-  // 🔧 检查组件是否真的可见（通过检查 DOM 元素）
-  // 如果组件被 v-if 隐藏，不应该启动轮询
-  console.log('🔍 startPollingIfNeeded 被调用，检查是否应该启动轮询')
-  
-  // 先清理旧的定时器
-  clearAllPollingIntervals()
-  
-  if (!session.value) {
-    return
-  }
-  
-  // 静默启动轮询
-  
-  // 根据会话状态启动不同的轮询
-  const status = normalizedSessionStatus.value
-  if (status === 'pending') {
-    // PENDING 状态：只轮询参与者列表（每3秒）
-    const interval = setInterval(() => {
-      // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
-      if (!containerRef.value || !containerRef.value.isConnected) {
-        console.log('🛑 停止轮询：组件不在 DOM 中')
-        clearAllPollingIntervals()
-        return
-      }
-      // 检查会话是否还存在且状态正确
-      const currentStatus = normalizedSessionStatus.value
-      if (!session.value || currentStatus !== 'pending') {
-        clearAllPollingIntervals()
-        return
-      }
-      // 只在有会话时才加载
-      loadParticipants()
-    }, 3000)
-    pollingIntervals.value.push(interval)
-  } else {
-    const currentStatus = normalizedSessionStatus.value
-    if (currentStatus === 'active' || currentStatus === 'paused') {
-      // ACTIVE/PAUSED 状态：轮询参与者列表和统计（每5秒）
-      const interval = setInterval(() => {
-        // 🔧 检查组件是否还在 DOM 中（如果被 v-if 隐藏，应该停止轮询）
-        if (!containerRef.value || !containerRef.value.isConnected) {
-          clearAllPollingIntervals()
-          return
-        }
-        // 检查会话是否还存在且状态正确
-        const checkStatus = normalizedSessionStatus.value
-        if (!session.value || (checkStatus !== 'active' && checkStatus !== 'paused')) {
-          clearAllPollingIntervals()
-          return
-        }
-        // 只在有会话时才加载
-        loadParticipants()
-        loadStatistics()
-        // 如果当前是活动模块，也刷新活动统计
-        if (currentCell.value && currentCell.value.type === 'activity' && currentActivityDbCell.value) {
-          loadActivityStatistics()
-        }
-      }, 5000)
-      pollingIntervals.value.push(interval)
-    }
-  }
-  // 其他状态不启动轮询
-}
+// v2.0: 以下函数已移至 useDataLoader composable
+// function loadDbCells, ensureActivityCellExists
+// 现在从 dataLoader 导入
 
 // 初始化
 onMounted(async () => {
   // 静默执行，不输出日志
-  
-  // 监听浏览器全屏状态变化
-  document.addEventListener('fullscreenchange', handleFullscreenChange)
-  document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
-  document.addEventListener('mozfullscreenchange', handleFullscreenChange)
-  document.addEventListener('MSFullscreenChange', handleFullscreenChange)
-  
+
+  // v2.0: 设置全屏监听器
+  setupFullscreenListeners()
+
   // 加载数据库 Cell 记录（用于 ID 匹配）
   await loadDbCells()
-  
-  // ✅ 重要：不自动加载会话和启动轮询
+
+  // v2.0: 监听 currentCell 变化，自动加载活动统计
+  watchCurrentCell()
+
+  // ✅ 重要：不自动加载会话和启动 WebSocket
   // 只有在用户明确点击"创建课堂"或"准备上课"时才加载会话
-  // 这样可以避免在非授课模式下不必要的轮询
-  
-  // 确保没有遗留的轮询定时器
-  clearAllPollingIntervals()
+  // 这样可以避免在非授课模式下不必要的 WebSocket 连接
+
+  // 确保没有遗留的 WebSocket 连接
+  wsManager?.disconnect()
 })
 
 // 组件卸载前清理
 onBeforeUnmount(() => {
-  clearAllPollingIntervals()
+  wsManager?.disconnect()
 })
 
 onUnmounted(() => {
-  stopDurationTimer()
-  
-  // 清理所有轮询定时器（双重保险）
-  clearAllPollingIntervals()
-  
-  // 移除全屏状态监听器
-  document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
-  document.removeEventListener('mozfullscreenchange', handleFullscreenChange)
-  document.removeEventListener('MSFullscreenChange', handleFullscreenChange)
+  // v2.0: 使用 durationTimer composable 停止计时
+  durationTimer.stopDurationTimer()
+
+  // 清理 WebSocket 连接（双重保险）
+  wsManager?.disconnect()
+
+  // v2.0: 清理全屏监听器
+  cleanupFullscreenListeners()
 })
 
 // 🔧 暴露 session 给父组件（LessonEditor）使用
@@ -2482,14 +976,6 @@ defineExpose({
 </script>
 
 <style scoped>
-/* 活动统计面板样式 */
-.activity-panel {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
 .teacher-control-panel {
   @apply bg-white rounded-lg border border-gray-200;
   min-height: auto;
@@ -4291,77 +2777,6 @@ input[type="checkbox"].checkbox-input {
   text-align: center;
 }
 
-/* 活动统计部分样式 */
-.activity-statistics-section {
-  margin-top: 12px;
-  padding-top: 12px;
-  @apply border-t border-gray-200;
-}
-
-.activity-stats-header {
-  @apply flex items-center justify-between mb-3;
-}
-
-.activity-stats-title {
-  @apply text-sm font-semibold text-gray-700;
-}
-
-.activity-stats-submission {
-  @apply text-sm font-medium text-blue-600;
-}
-
-.activity-choice-stats {
-  @apply space-y-3;
-}
-
-.activity-choice-item {
-  @apply bg-gray-50 rounded-lg p-3 border border-gray-200;
-}
-
-.activity-choice-header {
-  @apply flex items-center justify-between mb-2;
-}
-
-.activity-choice-order {
-  @apply text-xs font-medium text-gray-700;
-}
-
-.activity-choice-type {
-  @apply text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full;
-}
-
-.activity-choice-options {
-  @apply space-y-1.5;
-}
-
-.activity-option-item {
-  @apply flex items-center justify-between px-2 py-1 bg-white rounded border border-gray-200;
-}
-
-.activity-option-item.is-correct {
-  @apply border-green-300 bg-green-50;
-}
-
-.activity-option-label {
-  @apply text-xs text-gray-800;
-}
-
-.activity-option-percentage {
-  @apply text-xs font-semibold text-blue-600;
-}
-
-.activity-option-item.is-correct .activity-option-percentage {
-  @apply text-green-600;
-}
-
-.activity-stats-loading,
-.activity-stats-empty {
-  @apply text-center py-4 text-sm text-gray-500;
-  padding: 20px;
-  @apply text-gray-500 text-sm;
-  @apply border-t border-gray-200 pt-4;
-}
-
 .monitoring-stats {
   display: flex;
   flex-direction: column;
@@ -4503,13 +2918,6 @@ input[type="checkbox"].checkbox-input {
 
 .btn-danger:hover:not(:disabled) {
   background: #dc2626;
-}
-
-/* 活动统计面板样式 */
-.activity-panel {
-  margin-top: 24px;
-  @apply bg-white rounded-lg border border-gray-200 p-6;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* 响应式布局 */

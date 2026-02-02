@@ -281,19 +281,25 @@ export const classroomSessionService = {
   },
 
   /**
-   * 暂停会话
+   * ❌ v2.0 已废弃：暂停会话功能已移除
+   *
+   * @deprecated v2.0 状态机简化，移除PAUSED状态
+   * @see https://github.com/your-repo/docs/classroom-session-v2-design.md
    */
   async pauseSession(sessionId: number): Promise<ClassSession> {
-    const response = await api.post<ClassSession>(`/classroom-sessions/sessions/${sessionId}/pause`)
-    return response
+    console.warn('⚠️ pauseSession 已废弃 (v2.0)')
+    throw new Error('暂停功能在 v2.0 中已移除')
   },
 
   /**
-   * 继续会话
+   * ❌ v2.0 已废弃：继续会话功能已移除
+   *
+   * @deprecated v2.0 状态机简化，移除PAUSED状态
+   * @see https://github.com/your-repo/docs/classroom-session-v2-design.md
    */
   async resumeSession(sessionId: number): Promise<ClassSession> {
-    const response = await api.post<ClassSession>(`/classroom-sessions/sessions/${sessionId}/resume`)
-    return response
+    console.warn('⚠️ resumeSession 已废弃 (v2.0)')
+    throw new Error('继续功能在 v2.0 中已移除')
   },
 
   /**
