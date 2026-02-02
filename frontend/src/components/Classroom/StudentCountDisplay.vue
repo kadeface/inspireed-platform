@@ -1,8 +1,8 @@
 <template>
-  <div v-if="showDisplay" class="student-count-info">
+  <div v-if="showDisplay" class="student-count-info" data-testid="student-count">
     <span class="student-count-icon">👥</span>
     <span class="student-count-text">
-      <span class="student-count-value">{{ activeCount }}</span>
+      <span class="student-count-value" data-testid="student-count-value">{{ activeCount }}</span>
       <span v-if="totalCount > 0" class="student-count-total">/{{ totalCount }}</span>
       <span class="student-count-label">{{ label }}</span>
     </span>

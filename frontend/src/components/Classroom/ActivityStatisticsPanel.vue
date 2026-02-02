@@ -1,11 +1,11 @@
 <template>
-  <div v-if="showPanel" class="activity-statistics-panel">
+  <div v-if="showPanel" class="activity-statistics-panel" data-testid="activity-statistics">
     <!-- 统计信息头部 -->
     <div class="activity-stats-header">
       <h4 class="activity-stats-title">活动统计</h4>
-      <div v-if="!loading" class="activity-stats-submission">
-        提交: {{ submittedCount }}/{{ totalStudents }}
-        <span class="ml-2 text-xs text-gray-500">
+      <div v-if="!loading" class="activity-stats-submission" data-testid="submission-info">
+        提交: <span data-testid="submitted-count">{{ submittedCount }}</span>/<span data-testid="total-students">{{ totalStudents }}</span>
+        <span class="ml-2 text-xs text-gray-500" data-testid="submission-rate">
           ({{ submissionRate }}%)
         </span>
       </div>

@@ -1,8 +1,9 @@
 <template>
-  <div class="session-control-buttons">
+  <div class="session-control-buttons" data-testid="session-control-buttons">
     <!-- 无会话状态：显示创建按钮 -->
     <template v-if="!hasSession">
       <button
+        data-testid="create-session-button"
         @click="$emit('create')"
         :disabled="loading"
         class="btn btn-primary"
@@ -14,6 +15,7 @@
     <!-- PREPARING 状态：等待学生登录 -->
     <template v-else-if="sessionStatus === 'PREPARING' || sessionStatus === 'preparing'">
       <button
+        data-testid="start-teaching-button"
         @click="$emit('start')"
         :disabled="loading || activeStudentsCount === 0"
         class="btn btn-primary"
@@ -24,6 +26,7 @@
         <span v-if="activeStudentsCount === 0" class="ml-2 text-xs opacity-75">(等待学生加入)</span>
       </button>
       <button
+        data-testid="end-session-button"
         @click="$emit('end')"
         :disabled="loading"
         class="btn btn-danger"
@@ -36,6 +39,7 @@
     <!-- TEACHING 状态：上课中 -->
     <template v-else-if="sessionStatus === 'TEACHING' || sessionStatus === 'teaching'">
       <button
+        data-testid="end-session-button"
         @click="$emit('end')"
         :disabled="loading"
         class="btn btn-danger"
@@ -48,6 +52,7 @@
     <!-- ENDED 状态：已结束 -->
     <template v-else>
       <button
+        data-testid="create-session-button"
         @click="$emit('create')"
         :disabled="loading"
         class="btn btn-primary"

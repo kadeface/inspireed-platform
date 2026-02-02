@@ -1,13 +1,14 @@
 <template>
-  <div class="module-list-container">
+  <div class="module-list-container" data-testid="module-list-container">
     <!-- 导航控制栏（固定在顶部，始终可见） -->
-    <div class="module-navigation-bar" v-if="cells.length > 0">
+    <div class="module-navigation-bar" v-if="cells.length > 0" data-testid="module-navigation-bar">
       <!-- 上一模块按钮 -->
       <button
         class="module-nav-btn module-nav-btn-prev"
         :class="{ 'module-nav-btn-disabled': !canGoPrev }"
         :disabled="!canGoPrev || loading"
         @click="handlePrevModule"
+        data-testid="prev-module-button"
         :title="canGoPrev ? '上一模块' : '已经是第一个模块'"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -22,6 +23,7 @@
         :class="{ 'module-nav-btn-disabled': !canGoNext }"
         :disabled="!canGoNext || loading"
         @click="handleNextModule"
+        data-testid="next-module-button"
         :title="canGoNext ? '下一模块' : '已经是最后一个模块'"
       >
         <span>下一模块</span>
@@ -31,13 +33,14 @@
       </button>
     </div>
 
-    <div class="module-list" ref="moduleListRef" v-if="cells.length > 0">
+    <div class="module-list" ref="moduleListRef" v-if="cells.length > 0" data-testid="module-list">
       <!-- 课程模块列表 -->
       <div
         v-for="(cell, index) in cells"
         :key="cell.id || index"
         :ref="el => setModuleItemRef(el, index)"
         :data-module-index="index"
+        :data-testid="`cell-item-${index}`"
         class="module-item"
         :class="{
           'module-item-active': isModuleActive(cell, index),

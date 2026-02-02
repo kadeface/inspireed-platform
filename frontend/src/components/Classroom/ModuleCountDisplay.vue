@@ -1,8 +1,8 @@
 <template>
-  <div v-if="showDisplay && count > 0" class="module-count-info">
+  <div v-if="showDisplay && count > 0" class="module-count-info" data-testid="module-count">
     <span class="module-count-icon">📚</span>
     <span class="module-count-text">
-      <span class="module-count-value">{{ count }}</span>
+      <span class="module-count-value" data-testid="module-count-value">{{ count }}</span>
       <span class="module-count-label">{{ label }}</span>
     </span>
   </div>

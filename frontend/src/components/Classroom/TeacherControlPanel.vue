@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerRef" class="teacher-control-panel" :class="{ 'panel-fullscreen': isPanelFullscreen }">
+  <div ref="containerRef" class="teacher-control-panel" :class="{ 'panel-fullscreen': isPanelFullscreen }" data-testid="teacher-control-panel">
     <!-- 🎯 优化后的顶部控制栏（固定，始终可见） -->
     <div class="top-control-bar">
       <!-- 第一行：标题和操作按钮 -->

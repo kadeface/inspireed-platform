@@ -2,6 +2,7 @@
   <div
     v-if="showDisplay"
     class="duration-info"
+    data-testid="session-duration"
     :class="{
       'duration-warning': isWarning,
       'duration-danger': isDanger
@@ -11,6 +12,7 @@
     <span class="duration-text">
       <span
         class="duration-value"
+        data-testid="session-duration-value"
         :class="{
           'text-blue-600': !isWarning && !isDanger,
           'text-orange-600': isWarning && !isDanger,
@@ -19,7 +21,7 @@
       >
         {{ formattedDuration }}
       </span>
-      <span v-if="showRemaining" class="duration-remaining">
+      <span v-if="showRemaining" class="duration-remaining" data-testid="session-duration-remaining">
         剩余: {{ formattedRemaining }}
       </span>
     </span>
