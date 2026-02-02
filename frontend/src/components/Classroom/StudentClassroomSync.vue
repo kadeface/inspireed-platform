@@ -1,7 +1,7 @@
 <template>
-  <div v-if="session && (session.status === 'ACTIVE' || session.status === 'PENDING')" class="student-classroom-sync">
+  <div v-if="session && (session.status === 'TEACHING' || session.status === 'PREPARING')" class="student-classroom-sync">
     <!-- PENDING 状态：等待教师开始上课 -->
-    <div v-if="session.status === 'PENDING'" class="waiting-banner">
+    <div v-if="session.status === 'PREPARING'" class="waiting-banner">
       <div class="banner-content">
         <span class="waiting-indicator">⏳</span>
         <div class="banner-text">
@@ -18,7 +18,7 @@
     </div>
     
     <!-- ACTIVE 状态：同步状态提示 -->
-    <div v-else-if="session.status === 'active' && isSyncing" class="sync-status-banner">
+    <div v-else-if="session.status === 'teaching' && isSyncing" class="sync-status-banner">
       <span class="sync-icon">🔄</span>
       <span>教师正在切换内容...</span>
     </div>
@@ -158,7 +158,7 @@ function stopDurationTimer() {
 }
 
 watch(() => props.session?.status, (status) => {
-  if (status === 'active' && props.session?.actualStart) {
+  if (status === 'teaching' && props.session?.actualStart) {
     startDurationTimer()
   } else {
     stopDurationTimer()
@@ -166,13 +166,13 @@ watch(() => props.session?.status, (status) => {
 }, { immediate: true })
 
 watch(() => props.session?.actualStart, (actualStart) => {
-  if (actualStart && props.session?.status === 'active') {
+  if (actualStart && props.session?.status === 'teaching') {
     startDurationTimer()
   }
 })
 
 onMounted(() => {
-  if (props.session?.status === 'active' && props.session?.actualStart) {
+  if (props.session?.status === 'teaching' && props.session?.actualStart) {
     startDurationTimer()
   }
 })
