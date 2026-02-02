@@ -72,14 +72,14 @@ export const useClassroomStore = defineStore('classroom', () => {
    * 在线学生数量
    */
   const activeStudentCount = computed(() => {
-    return students.value.filter(s => s.is_active).length
+    return students.value.filter(s => s.isActive).length
   })
 
   /**
    * 总学生数量
    */
   const totalStudentCount = computed(() => {
-    return session.value?.total_students || students.value.length || 0
+    return session.value?.totalStudents || students.value.length || 0
   })
 
   /**
@@ -107,14 +107,14 @@ export const useClassroomStore = defineStore('classroom', () => {
    * 当前显示的 Cell ID
    */
   const currentCellId = computed(() => {
-    return session.value?.current_cell_id || null
+    return session.value?.currentCellId || null
   })
 
   /**
    * 当前活动 ID
    */
   const currentActivityId = computed(() => {
-    return session.value?.current_activity_id || null
+    return session.value?.currentActivityId || null
   })
 
   /**
@@ -146,8 +146,8 @@ export const useClassroomStore = defineStore('classroom', () => {
     session.value = newSession
 
     // 如果会话有课程 ID，同步更新
-    if (newSession?.lesson_id) {
-      currentLessonId.value = newSession.lesson_id
+    if (newSession?.lessonId) {
+      currentLessonId.value = newSession.lessonId
     }
   }
 
@@ -165,7 +165,7 @@ export const useClassroomStore = defineStore('classroom', () => {
    */
   function updateCurrentCellId(cellId: number | null) {
     if (session.value) {
-      session.value.current_cell_id = cellId
+      session.value.currentCellId = cellId
     }
   }
 
@@ -188,8 +188,8 @@ export const useClassroomStore = defineStore('classroom', () => {
 
     // 同步更新会话中的学生数量
     if (session.value) {
-      session.value.total_students = newStudents.length
-      session.value.active_students = newStudents.filter(s => s.is_active).length
+      session.value.totalStudents = newStudents.length
+      session.value.activeStudents = newStudents.filter(s => s.isActive).length
     }
   }
 
@@ -210,8 +210,8 @@ export const useClassroomStore = defineStore('classroom', () => {
 
     // 同步更新会话统计
     if (session.value) {
-      session.value.total_students = students.value.length
-      session.value.active_students = students.value.filter(s => s.is_active).length
+      session.value.totalStudents = students.value.length
+      session.value.activeStudents = students.value.filter(s => s.isActive).length
     }
   }
 
@@ -219,14 +219,14 @@ export const useClassroomStore = defineStore('classroom', () => {
    * 移除学生
    */
   function removeStudent(studentId: number) {
-    const index = students.value.findIndex(s => s.student_id === studentId)
+    const index = students.value.findIndex(s => s.studentId === studentId)
     if (index !== -1) {
       students.value.splice(index, 1)
 
       // 同步更新会话统计
       if (session.value) {
-        session.value.total_students = students.value.length
-        session.value.active_students = students.value.filter(s => s.is_active).length
+        session.value.totalStudents = students.value.length
+        session.value.activeStudents = students.value.filter(s => s.isActive).length
       }
     }
   }
@@ -235,14 +235,14 @@ export const useClassroomStore = defineStore('classroom', () => {
    * 更新学生在线状态
    */
   function updateStudentStatus(studentId: number, isOnline: boolean) {
-    const student = students.value.find(s => s.student_id === studentId)
+    const student = students.value.find(s => s.studentId === studentId)
     if (student) {
-      student.is_active = isOnline
-      student.last_active_at = new Date().toISOString()
+      student.isActive = isOnline
+      student.lastActiveAt = new Date().toISOString()
 
       // 同步更新会话统计
       if (session.value) {
-        session.value.active_students = students.value.filter(s => s.is_active).length
+        session.value.activeStudents = students.value.filter(s => s.isActive).length
       }
     }
   }
@@ -302,14 +302,14 @@ export const useClassroomStore = defineStore('classroom', () => {
   function cleanupSession() {
     // 标记所有学生为离线
     students.value.forEach(s => {
-      s.is_active = false
-      s.left_at = new Date().toISOString()
+      s.isActive = false
+      s.leftAt = new Date().toISOString()
     })
 
     // 更新会话状态
     if (session.value) {
       session.value.status = 'ended' as any
-      session.value.active_students = 0
+      session.value.activeStudents = 0
     }
 
     // 断开 WebSocket
