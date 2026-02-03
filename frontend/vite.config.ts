@@ -42,13 +42,18 @@ export default defineConfig({
     //   '.cloudstudio.club', // 允许所有 cloudstudio.club 子域名
     //   '.coding.net', // 允许所有 coding.net 子域名
     // ],
-    // 可选：配置代理以避免 CORS 问题
-    // proxy: {
-    //   '/api': {
-    //     target: 'http://localhost:8000',
-    //     changeOrigin: true,
-    //   }
-    // }
+    // 开发环境代理：将 /api 和 /uploads 转发到后端，避免 404 和 CORS；ws: true 支持 WebSocket 升级
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        ws: true,
+      },
+      '/uploads': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     // 增加 chunk 大小警告限制

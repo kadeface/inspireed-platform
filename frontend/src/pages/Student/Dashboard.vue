@@ -952,15 +952,15 @@ const viewLesson = (lessonId: number) => {
 const loadPendingSessions = async () => {
   // 只允许学生访问
   if (!currentUser.value || currentUser.value.role !== 'student') {
-    console.log('⏸️ loadPendingSessions: 用户不是学生或用户信息未加载，跳过')
+    // DEBUG: console.log('⏸️ loadPendingSessions: 用户不是学生或用户信息未加载，跳过')
     return
   }
   
   loadingPendingSessions.value = true
   try {
-    console.log('🔄 开始加载待开始课堂列表...')
+    // DEBUG: console.log('🔄 开始加载待开始课堂列表...')
     const sessions = await classroomSessionService.getStudentPendingSessions()
-    console.log('✅ 获取到待开始课堂:', sessions.length, '个', sessions)
+    // DEBUG: console.log('✅ 获取到待开始课堂:', sessions.length, '个', sessions)
     
     // 前端过滤：只保留最近48小时内的会话（双重保障）
     const now = new Date()
@@ -991,12 +991,12 @@ const loadPendingSessions = async () => {
       // 只返回48小时内的会话
       const isValid = createdAt >= cutoffTime
       if (!isValid) {
-        console.log('⏭️ 会话已过期（超过48小时）:', session.lessonTitle, '创建时间:', createdAt)
+        // DEBUG: console.log('⏭️ 会话已过期（超过48小时）:', session.lessonTitle, '创建时间:', createdAt)
       }
       return isValid
     })
-    
-    console.log('✅ 过滤后的待开始课堂:', filteredSessions.length, '个')
+
+    // DEBUG: console.log('✅ 过滤后的待开始课堂:', filteredSessions.length, '个')
     pendingSessions.value = filteredSessions
   } catch (e: any) {
     console.error('❌ 加载待开始课堂失败:', e)
@@ -1191,8 +1191,8 @@ const startPendingSessionsPolling = () => {
   pendingSessionsPollingInterval = setInterval(() => {
     loadPendingSessions()
   }, PENDING_SESSIONS_POLLING_INTERVAL)
-  
-  console.log('✅ 已启动待开始课堂轮询，间隔:', PENDING_SESSIONS_POLLING_INTERVAL, 'ms')
+
+  // DEBUG: console.log('✅ 已启动待开始课堂轮询，间隔:', PENDING_SESSIONS_POLLING_INTERVAL, 'ms')
 }
 
 // 停止轮询待开始课堂列表

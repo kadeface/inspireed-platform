@@ -236,6 +236,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
+# 安全占位：互动 HTML 可能引用 share-modal.js，若脚本内对不存在的 DOM 调用 addEventListener 会报错，统一返回带空值检查的占位脚本
+SHARE_MODAL_JS_STUB = b"""(function(){
+  function safeAdd(el, ev, fn) { if (el && typeof el.addEventListener === 'function') el.addEventListener(ev, fn); }
+  var byId = function(id) { return document.getElementById ? document.getElementById(id) : null; };
+  safeAdd(byId('share-btn'), 'click', function(){});
+  safeAdd(byId('shareBtn'), 'click', function(){});
+  safeAdd(byId('open-share-modal'), 'click', function(){});
+  safeAdd(document.querySelector('.share-modal-trigger'), 'click', function(){});
+})();
+"""
+
+
 # 配置静态文件服务 - 使用自定义路由确保CORS头被正确添加（支持 GET/HEAD，视频会发 HEAD 探路）
 @app.api_route("/uploads/resources/{file_path:path}", methods=["GET", "HEAD"])
 async def serve_static_file(file_path: str, request: Request):
@@ -243,6 +255,14 @@ async def serve_static_file(file_path: str, request: Request):
     提供静态文件服务，支持视频流（Range请求）和CORS
     支持图片、视频、音频等多媒体文件
     """
+    # 请求 share-modal.js 时统一返回安全占位脚本，避免互动页无对应 DOM 时 addEventListener 报错
+    if file_path.strip().rstrip("/") == "share-modal.js":
+        return Response(
+            content=SHARE_MODAL_JS_STUB,
+            media_type="application/javascript",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+
     # 构建文件路径
     file_full_path = os.path.join("storage/resources", file_path)
     

@@ -1035,20 +1035,19 @@ async def join_session(
         if was_inactive:
             try:
                 from app.api.v1.classroom_sessions import manager
-                await manager.broadcast_to_session(
-                    message={
-                        "type": "participant_joined",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "data": {
-                            "session_id": session_id,
-                            "student_id": current_user.id,
-                            "student_name": current_user.full_name or current_user.username,
-                            "active_students": session.active_students,
-                            "total_students": session.total_students,
-                        }
+                msg = {
+                    "type": "participant_joined",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {
+                        "session_id": session_id,
+                        "student_id": current_user.id,
+                        "student_name": current_user.full_name or current_user.username,
+                        "active_students": session.active_students,
+                        "total_students": session.total_students,
                     },
-                    session_id=session_id
-                )
+                }
+                await manager.broadcast_to_session(message=msg, session_id=session_id)
+                await manager.send_to_teacher(event=msg, scope="session", channel_id=session_id)
                 logger.info(f"📢 已广播学生重新加入消息（会话 {session_id}，学生 {current_user.id}）")
             except Exception as ws_error:
                 logger.warning(f"⚠️ 广播学生重新加入消息失败: {ws_error}")
@@ -1076,23 +1075,22 @@ async def join_session(
     await db.commit()
     await db.refresh(participation)
 
-    # 🆕 通过 WebSocket 通知教师有学生加入
+    # 🆕 通过 WebSocket 通知教师有学生加入（broadcast_to_session 只发给学生，教师需单独 send_to_teacher）
     try:
         from app.api.v1.classroom_sessions import manager
-        await manager.broadcast_to_session(
-            message={
-                "type": "participant_joined",
-                "timestamp": datetime.utcnow().isoformat(),
-                "data": {
-                    "session_id": session_id,
-                    "student_id": current_user.id,
-                    "student_name": current_user.full_name or current_user.username,
-                    "active_students": session.active_students,
-                    "total_students": session.total_students,
-                }
+        msg = {
+            "type": "participant_joined",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "session_id": session_id,
+                "student_id": current_user.id,
+                "student_name": current_user.full_name or current_user.username,
+                "active_students": session.active_students,
+                "total_students": session.total_students,
             },
-            session_id=session_id
-        )
+        }
+        await manager.broadcast_to_session(message=msg, session_id=session_id)
+        await manager.send_to_teacher(event=msg, scope="session", channel_id=session_id)
         logger.info(f"📢 已广播学生加入消息（会话 {session_id}，学生 {current_user.id}）")
     except Exception as ws_error:
         # WebSocket 通知失败不影响加入流程

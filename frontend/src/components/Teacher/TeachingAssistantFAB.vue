@@ -25,7 +25,7 @@
                 <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span class="fab-menu-tip-text">请先发布教案并选择班级</span>
+                <span class="fab-menu-tip-text">请先发布教案，上课时选择班级</span>
               </div>
 
               <!-- 点名考勤 -->
@@ -33,7 +33,7 @@
                 @click="handleAttendance"
                 class="fab-menu-item"
                 :disabled="!classroomId"
-                :title="!classroomId ? '请先选择班级' : '快速点名'"
+                :title="!classroomId ? '上课时选择班级后可用' : '快速点名'"
               >
                 <div class="fab-menu-item-icon bg-blue-500">
                   <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -54,7 +54,7 @@
                 @click="handlePositiveBehavior"
                 class="fab-menu-item"
                 :disabled="!classroomId"
-                :title="!classroomId ? '请先选择班级' : '记录课堂表现'"
+                :title="!classroomId ? '上课时选择班级后可用' : '记录课堂表现'"
               >
                 <div class="fab-menu-item-icon bg-green-500">
                   <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,7 +75,7 @@
                 @click="handleDiscipline"
                 class="fab-menu-item"
                 :disabled="!classroomId"
-                :title="!classroomId ? '请先选择班级' : '记录纪律'"
+                :title="!classroomId ? '上课时选择班级后可用' : '记录纪律'"
               >
                 <div class="fab-menu-item-icon bg-amber-500">
                   <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,7 +96,7 @@
                 @click="handleDuty"
                 class="fab-menu-item"
                 :disabled="!classroomId"
-                :title="!classroomId ? '请先选择班级' : '查看值日安排'"
+                :title="!classroomId ? '上课时选择班级后可用' : '查看值日安排'"
               >
                 <div class="fab-menu-item-icon bg-purple-500">
                   <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,7 +117,7 @@
                 @click="handleClassAssistant"
                 class="fab-menu-item"
                 :disabled="!classroomId"
-                :title="!classroomId ? '请先选择班级' : '进入班级助手'"
+                :title="!classroomId ? '上课时选择班级后可用' : '进入班级助手'"
               >
                 <div class="fab-menu-item-icon bg-indigo-500">
                   <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,7 +211,7 @@ const emit = defineEmits<{
 // 处理点名考勤
 const handleAttendance = () => {
   if (!props.classroomId) {
-    alert('请先选择班级')
+    alert('请先进入授课并选择班级')
     return
   }
   emit('open-drawer', 'attendance')
@@ -221,7 +221,7 @@ const handleAttendance = () => {
 // 处理课堂表现
 const handlePositiveBehavior = () => {
   if (!props.classroomId) {
-    alert('请先选择班级')
+    alert('请先进入授课并选择班级')
     return
   }
   emit('open-drawer', 'behavior')
@@ -231,7 +231,7 @@ const handlePositiveBehavior = () => {
 // 处理纪律记录
 const handleDiscipline = () => {
   if (!props.classroomId) {
-    alert('请先选择班级')
+    alert('请先进入授课并选择班级')
     return
   }
   emit('open-drawer', 'discipline')
@@ -241,7 +241,7 @@ const handleDiscipline = () => {
 // 处理值日管理
 const handleDuty = () => {
   if (!props.classroomId) {
-    alert('请先选择班级')
+    alert('请先进入授课并选择班级')
     return
   }
   emit('open-drawer', 'duty')

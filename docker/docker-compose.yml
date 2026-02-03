@@ -83,7 +83,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - backend_storage:/app/storage
+      # 挂载宿主机 backend/storage，使本机资源文件可被后端访问（否则 /uploads/resources/ 会 404）
+      - ../backend/storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy

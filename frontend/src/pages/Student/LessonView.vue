@@ -191,8 +191,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <!-- PENDING 状态：等待教师开始上课 -->
-            <template v-if="classroomSession?.status === 'PENDING'">
+            <!-- preparing 状态：等待教师开始上课 -->
+            <template v-if="classroomSession?.status === 'preparing'">
               <h3 class="text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-3">等待教师开始上课</h3>
               <p class="text-sm text-gray-700 font-medium mb-2">
                 已成功加入课堂，请等待教师开始上课...
@@ -454,7 +454,9 @@ import { useClassroomSession } from '@/composables/useClassroomSession'
 import classroomSessionService from '@/services/classroomSession'
 import type { ClassSession } from '@/types/classroomSession'
 import { isContentWithSections, normalizeContentToSections, sectionsToFlatCells } from '@/utils/lessonContent'
+import { createLogger } from '@/utils/logger'
 
+const log = createLogger('LessonView')
 const route = useRoute()
 const router = useRouter()
 
@@ -518,7 +520,6 @@ async function toggleFullscreen(mode: 'fullscreen' | 'window') {
       } else if ((element as any).msRequestFullscreen) {
         await (element as any).msRequestFullscreen()
       }
-      console.log('✅ 已进入全屏模式')
       showFullscreenPrompt.value = false
       pendingFullscreenMode.value = null
     } else {
@@ -532,7 +533,6 @@ async function toggleFullscreen(mode: 'fullscreen' | 'window') {
       } else if ((document as any).msExitFullscreen) {
         await (document as any).msExitFullscreen()
       }
-      console.log('✅ 已退出全屏模式')
       showFullscreenPrompt.value = false
       pendingFullscreenMode.value = null
     }
@@ -540,7 +540,7 @@ async function toggleFullscreen(mode: 'fullscreen' | 'window') {
     console.error('❌ 全屏切换失败:', error)
     // 如果用户拒绝全屏请求，不显示错误提示（这是正常的浏览器行为）
     if (error.name !== 'NotAllowedError') {
-      console.warn('⚠️ 全屏切换被拒绝或浏览器不支持')
+      log.warn('全屏切换被拒绝或浏览器不支持')
     }
     showFullscreenPrompt.value = false
     pendingFullscreenMode.value = null
@@ -570,7 +570,7 @@ function handleFullscreenChange() {
   
   // 如果用户手动退出全屏，但教师端仍设置为全屏模式，可以重新进入全屏
   // 但为了避免循环，这里只记录状态，不自动重新进入
-  console.log('📺 浏览器全屏状态变化:', isCurrentlyFullscreen ? '全屏' : '窗口')
+  log.debug('全屏状态', isCurrentlyFullscreen ? '全屏' : '窗口')
 }
 
 const {
@@ -613,25 +613,11 @@ async function handleExitClassroom() {
   
   try {
     await leaveSession()
-    console.log('✅ 已成功退出上课')
   } catch (error: any) {
     console.error('❌ 退出上课失败:', error)
     alert('退出上课失败，请稍后重试')
   }
 }
-
-// 🔍 调试：监听 classroomSession 变化
-watch(classroomSession, (newSession, oldSession) => {
-  // 只在有实际变化时输出日志（避免初始化时的 undefined 日志）
-  if (newSession || oldSession) {
-    console.log('🔍 LessonView classroomSession 变化:', {
-      sessionId: newSession?.id,
-      status: newSession?.status,
-      lessonId: newSession?.lessonId || newSession?.lesson_id,
-      hasSession: !!newSession,
-    })
-  }
-}, { deep: true })
 
 // 自动保存定时器
 let notesAutoSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -684,8 +670,8 @@ const filteredCells = computed(() => {
   const cells = lessonContentCells.value
   if (!cells || cells.length === 0) return []
   
-  // 🆕 关键修复：在 PENDING 状态下，学生不能看到任何内容（等待教师开始上课）
-  if (isInClassroomMode.value && classroomSession.value?.status === 'PENDING') {
+  // 🆕 关键修复：在 preparing 状态下，学生不能看到任何内容（等待教师开始上课）
+  if (isInClassroomMode.value && classroomSession.value?.status === 'preparing') {
     return []
   }
   
@@ -754,14 +740,14 @@ const filteredCells = computed(() => {
       
       // 如果 dbCells 为空，发出详细警告
       if (dbCells.value.length === 0) {
-        console.warn('⚠️ dbCells 为空！无法进行 ID 到索引的映射。')
-        console.warn('当前状态:', {
+        log.warn('dbCells 为空，无法映射')
+        log.warn('当前状态', {
           lessonId: lessonId.value,
           lessonContentCount: lesson.value.content.length,
           multiSelectIds: multiSelectIds,
           sessionId: classroomSession.value?.id,
         })
-        console.warn('建议：刷新页面重新加载 dbCells，或检查后端 API /cells/lesson/' + lessonId.value)
+        log.warn('建议刷新或检查 /cells/lesson/' + lessonId.value)
       }
       
       // 获取所有对应的索引列表
@@ -823,8 +809,8 @@ const filteredCells = computed(() => {
         const now = Date.now()
         if (now - lastErrorLogTime > ERROR_LOG_DEBOUNCE) {
           lastErrorLogTime = now
-          console.warn(`⚠️ 匹配结果不完整: 只匹配到 ${sortedCells.length}/${multiSelectIds.length} 个 Cell`)
-          console.warn('调试信息:', {
+          log.warn(`匹配不完整 ${sortedCells.length}/${multiSelectIds.length}`)
+          log.warn('匹配信息', {
             targetIds: multiSelectIds,
             matchedCount: sortedCells.length,
             dbCellsCount: dbCells.value.length,
@@ -960,16 +946,16 @@ const loadLesson = async () => {
     
     // 异步加载数据库中的 Cell 记录（用于 ID 匹配）
     loadDbCells().catch(err => {
-      console.warn('加载Cell记录失败，但不影响页面显示:', err)
+      log.warn('加载 Cell 记录失败', err)
     })
     
     // 异步查找并加入课堂会话（不阻塞页面显示）
     findAndJoinSession().then(session => {
       if (!session) {
-        console.log('ℹ️ 当前没有可加入的课堂会话，学生可以自主学习')
+        log.debug('无课堂会话，学生可自主学习')
       }
     }).catch(err => {
-      console.warn('⚠️ 加入会话失败，但不影响页面显示:', err)
+      log.warn('加入会话失败', err)
       // 不显示错误提示，因为可能是正常的（没有正在进行的会话）
     })
   } catch (e: any) {
@@ -1108,9 +1094,9 @@ watch(
     
     if (newOrdersStr !== oldOrdersStr && Array.isArray(newOrders)) {
       // 更新学生进度
-      // 计算已勾选的模块数
+      // 计算已勾选的模块数（用 lessonContentCells 兼容 content 数组 / sections 两种格式）
       const checkedModules = newOrders.length
-      const totalModules = lesson.value?.content.length || 1
+      const totalModules = lessonContentCells.value?.length || 1
       const progressPercentage = Math.round((checkedModules / totalModules) * 100)
       
       // 将 orders 转换为 cellIds（用于 updateProgress）
@@ -1133,12 +1119,6 @@ watch(
       // 更新进度（通过 WebSocket 发送到后端）
       if (updateProgress) {
         await updateProgress(completedCellIds, undefined, progressPercentage)
-        console.log('✅ 学生进度已更新:', {
-          checkedModules,
-          totalModules,
-          progressPercentage,
-          completedCellIds,
-        })
       }
     }
   },
@@ -1253,7 +1233,7 @@ const autoSaveNotes = () => {
 const handleReviewUpdated = () => {
   // 评论更新后，可以选择刷新课程数据以更新评分
   // 目前不需要特别处理，因为评分组件自己管理状态
-  console.log('Review updated')
+  log.debug('Review updated')
 }
 
 // 问答相关方法

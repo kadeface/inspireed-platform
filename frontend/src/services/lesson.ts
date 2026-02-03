@@ -289,7 +289,7 @@ class LessonService {
   }
 
   /**
-   * 获取可用于发布的班级列表
+   * 获取教师可用的班级列表（用于上课时选择班级等）
    */
   async fetchAvailableClassrooms(): Promise<LessonClassroom[]> {
     try {

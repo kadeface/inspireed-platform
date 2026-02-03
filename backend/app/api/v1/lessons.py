@@ -964,7 +964,8 @@ async def update_lesson(
             )
 
         # 比较内容是否真正发生变化（兼容 list 与 {sections}）
-        content_changed = (old_content != new_content)
+        # cast: 避免类型检查器将 lesson.content 的 != 推断为 ColumnElement[bool]
+        content_changed = cast(bool, old_content != new_content)
         if content_changed:
             content_updated = True
             oc, nc = _content_cell_count(old_content), _content_cell_count(new_content)
@@ -1155,88 +1156,95 @@ async def publish_lesson(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
-    """发布教案"""
-    lesson = await _get_lesson_with_relations(db, lesson_id)
+    """发布教案（可不选班级，班级在上课时选择）"""
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        lesson = await _get_lesson_with_relations(db, lesson_id)
+        if not lesson:
+            raise HTTPException(status_code=404, detail="教案不存在")
 
-    if not lesson:
-        raise HTTPException(status_code=404, detail="教案不存在")
+        lesson_id_value = cast(int, lesson.id)  # 尽早赋值，避免空 classroom_ids 时未定义
+        if cast(Optional[int], lesson.creator_id) != current_user.id:
+            raise HTTPException(status_code=403, detail="无权发布该教案")
 
-    if cast(Optional[int], lesson.creator_id) != current_user.id:
-        raise HTTPException(status_code=403, detail="无权发布该教案")
+        classroom_ids = set(publish_in.classroom_ids) if publish_in.classroom_ids else set()
 
-    classroom_ids = set(publish_in.classroom_ids) if publish_in.classroom_ids else set()
-    
-    # 如果提供了班级ID，验证并创建关系（向后兼容）
-    if classroom_ids:
-        # Use ClassroomQueryService to validate classrooms (checks is_active)
-        classrooms_result = await db.execute(
-            select(Classroom).where(
-                Classroom.id.in_(classroom_ids),
-                Classroom.is_active == True  # ✅ Explicitly check is_active
-            )
-        )
-        classrooms = classrooms_result.scalars().all()
-        existing_classroom_ids = {cast(int, classroom.id) for classroom in classrooms}
-        missing_ids = classroom_ids - existing_classroom_ids
-        if missing_ids:
-            missing_str = ", ".join(str(cid) for cid in sorted(missing_ids))
-            raise HTTPException(status_code=404, detail=f"班级不存在或未激活: {missing_str}")
-
-        role_value = cast(str, getattr(current_user.role, "value", current_user.role))
-        try:
-            user_role = UserRole(role_value)
-        except ValueError:
-            raise HTTPException(status_code=403, detail="当前用户角色无效")
-
-        if user_role == UserRole.TEACHER:
-            from app.services.permission_service import PermissionService
-
-            permission_service = PermissionService()
-            for classroom in classrooms:
-                if not await permission_service.can_teacher_publish_to_classroom(
-                    db, current_user, classroom
-                ):
-                    raise HTTPException(
-                        status_code=403,
-                        detail=f"无权将教案发布到班级 {classroom.name}",
-                    )
-
-        existing_relations = {
-            cast(int, relation.classroom_id): relation
-            for relation in lesson.lesson_classrooms
-        }
-
-        for classroom_id, relation in list(existing_relations.items()):
-            if classroom_id not in classroom_ids:
-                await db.delete(relation)
-
-        now = datetime.utcnow()
-        lesson_id_value = cast(int, lesson.id)
-        for classroom in classrooms:
-            classroom_id_value = cast(int, classroom.id)
-            relation = existing_relations.get(classroom_id_value)
-            if relation:
-                relation.assigned_by = current_user.id
-                relation.assigned_at = now
-            else:
-                db.add(
-                    LessonClassroom(
-                        lesson_id=lesson_id_value,
-                        classroom_id=classroom_id_value,
-                        assigned_by=current_user.id,
-                        assigned_at=now,
-                    )
+        # 如果提供了班级ID，验证并创建关系（向后兼容）
+        if classroom_ids:
+            # Use ClassroomQueryService to validate classrooms (checks is_active)
+            classrooms_result = await db.execute(
+                select(Classroom).where(
+                    Classroom.id.in_(classroom_ids),
+                    Classroom.is_active == True  # ✅ Explicitly check is_active
                 )
+            )
+            classrooms = classrooms_result.scalars().all()
+            existing_classroom_ids = {cast(int, classroom.id) for classroom in classrooms}
+            missing_ids = classroom_ids - existing_classroom_ids
+            if missing_ids:
+                missing_str = ", ".join(str(cid) for cid in sorted(missing_ids))
+                raise HTTPException(status_code=404, detail=f"班级不存在或未激活: {missing_str}")
 
-    setattr(lesson, "status", LessonStatus.PUBLISHED)
-    setattr(lesson, "published_at", datetime.utcnow())
+            role_value = cast(str, getattr(current_user.role, "value", current_user.role))
+            try:
+                user_role = UserRole(role_value)
+            except ValueError:
+                raise HTTPException(status_code=403, detail="当前用户角色无效")
 
-    await db.commit()
-    lesson = await _get_lesson_with_relations(db, lesson_id_value)
-    if not lesson:
-        raise HTTPException(status_code=500, detail="教案发布后加载失败")
+            if user_role == UserRole.TEACHER:
+                from app.services.permission_service import PermissionService
 
-    return _lesson_to_response(lesson, request)
+                permission_service = PermissionService()
+                for classroom in classrooms:
+                    if not await permission_service.can_teacher_publish_to_classroom(
+                        db, current_user, classroom
+                    ):
+                        raise HTTPException(
+                            status_code=403,
+                            detail=f"无权将教案发布到班级 {classroom.name}",
+                        )
+
+            existing_relations = {
+                cast(int, relation.classroom_id): relation
+                for relation in (lesson.lesson_classrooms or [])
+            }
+
+            for classroom_id, relation in list(existing_relations.items()):
+                if classroom_id not in classroom_ids:
+                    await db.delete(relation)
+
+            now = datetime.utcnow()
+            for classroom in classrooms:
+                classroom_id_value = cast(int, classroom.id)
+                relation = existing_relations.get(classroom_id_value)
+                if relation:
+                    relation.assigned_by = current_user.id
+                    relation.assigned_at = now
+                else:
+                    db.add(
+                        LessonClassroom(
+                            lesson_id=lesson_id_value,
+                            classroom_id=classroom_id_value,
+                            assigned_by=current_user.id,
+                            assigned_at=now,
+                        )
+                    )
+
+        setattr(lesson, "status", LessonStatus.PUBLISHED)
+        setattr(lesson, "published_at", datetime.utcnow())
+
+        await db.commit()
+        lesson = await _get_lesson_with_relations(db, lesson_id_value)
+        if not lesson:
+            raise HTTPException(status_code=500, detail="教案发布后加载失败")
+
+        return _lesson_to_response(lesson, request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("publish_lesson failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"发布失败: {str(e)}")
 
 
 @router.post("/{lesson_id}/unpublish", response_model=LessonResponse)

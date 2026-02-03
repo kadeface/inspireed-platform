@@ -88,16 +88,6 @@
       @insert="handleAiInsert"
     />
 
-    <ClassroomSelectorModal
-      v-model="showPublishModal"
-      :classrooms="availableClassrooms"
-      :initial-selected-ids="selectedClassroomIds"
-      :loading="isLoadingClassrooms"
-      :error="publishModalError"
-      @confirm="handlePublishConfirm"
-      @cancel="handlePublishCancel"
-    />
-
     <!-- MVP: PDF 查看器 -->
     <PDFViewerModal v-model="showPDFViewer" :resource-id="referenceResource?.id || null" />
 
@@ -301,7 +291,6 @@ import SectionContainer from '../../components/Lesson/SectionContainer.vue'
 import { isContentWithSections } from '../../utils/lessonContent'
 import ReferenceResourcePanel from '../../components/Resource/ReferenceResourcePanel.vue'
 import PDFViewerModal from '../../components/Resource/PDFViewerModal.vue'
-import ClassroomSelectorModal from '../../components/Lesson/ClassroomSelectorModal.vue'
 import LessonAiAssistantDrawer from '@/components/Teacher/LessonAiAssistantDrawer.vue'
 import TeacherClassroomControlPanel from '@/components/Classroom/TeacherControlPanel.vue'
 import TeachingAssistantFAB from '@/components/Teacher/TeachingAssistantFAB.vue'
@@ -384,7 +373,6 @@ const classroomPanelData = computed(() => {
       formatDuration: panel.formatDuration,
       formatRemainingTime: panel.formatRemainingTime,
       handleToggleDisplayMode: panel.handleToggleDisplayMode,
-      handlePause: panel.handlePause,
       handleEnd: panel.handleEnd,
     }
   } catch (e) {
@@ -413,7 +401,7 @@ const filteredCells = computed(() => {
 const displayCells = computed(() => (isPreviewMode.value ? filteredCells.value : cells.value))
 const { slideMode, currentSlideIndex, slideFullscreen, showSlideControls, currentCell, isSlideNativeFullscreen, toggleSlideFullscreen, goToPreviousSlide, goToNextSlide, goToSlide, scrollToTop, handleSlideMouseMove, handleSlideMouseLeave, handleControlsMouseEnter, handleControlsMouseLeave, resetControlsTimer, clearControlsTimer, handleSlideKeydown } = useLessonEditorSlides(slideContainerRef, displayCells, isFullscreenPreview)
 const { coverImageInput, isUploadingCoverImage, showCoverImagePreview, coverImagePreviewUrl, coverImagePreviewFile, coverImagePreview, imageQuality, maxImageWidth, maxImageHeight, coverImageLoadError, coverImageUrl, triggerCoverImageUpload, handleCoverImageSelect, cancelCoverImageEdit, processAndUploadCoverImage } = useLessonEditorCover(showToast)
-const { showPublishModal, selectedClassroomIds, publishError, publishModalError, handlePublish, handlePublishConfirm, handlePublishCancel } = useLessonEditorPublish(showToast)
+const { handlePublish } = useLessonEditorPublish(showToast)
 const currentLesson = computed(() => lessonStore.currentLesson)
 
 provide('classroomSession', providedSessionRef)
@@ -456,9 +444,6 @@ watch([isPreviewMode, () => currentLesson.value?.status], ([preview, status]) =>
 }, { immediate: true })
 
 const isSaving = computed(() => lessonStore.isSaving)
-const availableClassrooms = computed(() => lessonStore.availableClassrooms)
-const isLoadingClassrooms = computed(() => lessonStore.isLoadingClassrooms)
-const classroomsError = computed(() => lessonStore.classroomsError)
 
 const lessonOutline = computed(() => {
   const list = cells.value || []

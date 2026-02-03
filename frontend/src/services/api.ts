@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig } from 'axios'
+import { useUserStore } from '../store/user'
 
 /**
  * 动态获取API基础URL
@@ -12,6 +13,16 @@ function getApiBaseUrl(): string {
   // 在 CloudStudio 中，前端通常是 HTTPS，后端也应该是 HTTPS
   const protocol = window.location.protocol
   const port = window.location.port
+
+  // 方案 C：本地开发 / Docker 前端一律走代理，避免跨域导致 Authorization 未发送、教案接口 401
+  // DEV+5173：Vite 代理；端口 80：Docker 前端 nginx 代理
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0'
+  const isViteDevPort = port === '5173'
+  const isDockerFrontendPort = port === '80' || port === ''
+  if (isLocalHost && (import.meta.env.DEV || isViteDevPort || isDockerFrontendPort)) {
+    console.log('📍 [API] 使用代理 /api/v1，避免跨域导致 token 未发送')
+    return '/api/v1'
+  }
 
   // 判断是否为生产环境（非 localhost、非 127.0.0.1、非 IP 地址）
   const isProduction = !['localhost', '127.0.0.1'].includes(hostname) && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname)
@@ -67,6 +78,16 @@ function getApiBaseUrl(): string {
   if (import.meta.env.VITE_API_BASE_URL) {
     let envApiUrl = import.meta.env.VITE_API_BASE_URL
 
+    // 本地开发（localhost:5173）时，若环境变量指向 localhost:8000，强制走代理避免跨域导致 Authorization 未发送
+    if (import.meta.env.DEV && (hostname === 'localhost' || hostname === '127.0.0.1')) {
+      if (envApiUrl.includes('localhost:8000') || envApiUrl.includes('127.0.0.1:8000')) {
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ [API] 本地开发已强制使用代理 /api/v1，避免跨域导致 token 未发送')
+        }
+        return '/api/v1'
+      }
+    }
+
     // 在 CloudStudio 环境中，如果环境变量包含 localhost，完全忽略它
     // 重新计算 CloudStudio 的 URL 并返回
     if ((hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) &&
@@ -105,15 +126,14 @@ function getApiBaseUrl(): string {
     return envApiUrl
   }
 
-  // 本地开发环境：前端端口5173 -> 后端端口8000
-  // 注意：在 CloudStudio 中，如果 hostname 不包含 cloudstudio.club，也会走到这里
-  // 但这种情况应该很少见
-  // 如果页面是 HTTPS，也使用 HTTPS API
+  // 本地开发环境：使用相对路径 /api/v1，由 Vite 代理到后端 8000，避免 404 和 CORS
+  if (import.meta.env.DEV) {
+    console.log('📍 [API] 本地开发，使用代理相对路径: /api/v1')
+    return '/api/v1'
+  }
+  // 非 DEV（如 build 后本地预览）仍用绝对地址
   const apiProtocol = protocol === 'https:' ? 'https:' : 'http:'
   const apiUrl = `${apiProtocol}//${hostname}:8000/api/v1`
-  if (import.meta.env.DEV) {
-    console.log('📍 [API] 本地环境，使用后端地址:', apiUrl)
-  }
   return apiUrl
 }
 const API_BASE_URL = getApiBaseUrl()
@@ -134,6 +154,15 @@ class ApiService {
   constructor() {
     // 再次检查并确保在 HTTPS 页面使用 HTTPS API
     let finalBaseURL = API_BASE_URL
+    // 运行时兜底：若当前是 localhost:5173 或 :80 但 baseURL 是直连 8000，强制改为代理路径，避免跨域 401
+    const hn = window.location.hostname
+    const pt = window.location.port
+    const useProxyPort = pt === '5173' || pt === '80' || pt === ''
+    if ((hn === 'localhost' || hn === '127.0.0.1' || hn === '0.0.0.0') && useProxyPort &&
+        (finalBaseURL.startsWith('http://localhost:8000') || finalBaseURL.startsWith('http://127.0.0.1:8000'))) {
+      console.warn('📍 [API] 运行时兜底：强制使用代理 /api/v1，避免跨域导致教案 401')
+      finalBaseURL = '/api/v1'
+    }
     if (window.location.protocol === 'https:' && finalBaseURL.startsWith('http://')) {
       if (import.meta.env.DEV) {
         console.warn('⚠️ [API] 检测到混合内容，自动将 HTTP 转换为 HTTPS')
@@ -171,11 +200,19 @@ class ApiService {
     // 请求拦截器
     this.axiosInstance.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem('access_token')
+        // 优先 localStorage，若无则从 store 取（避免登录后首请求时未同步导致 Not authenticated）
+        let token = localStorage.getItem('access_token')
+        if (!token) {
+          try {
+            token = useUserStore().token ?? null
+          } catch {
+            token = null
+          }
+        }
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
-        
+
         // 如果是FormData，删除Content-Type让浏览器自动设置
         if (config.data instanceof FormData) {
           delete config.headers['Content-Type']
@@ -253,9 +290,16 @@ class ApiService {
         if (error.response?.status === 401) {
           const requestUrl = error.config?.url ?? ''
           const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register')
-
-          if (!isAuthRequest) {
-            localStorage.removeItem('access_token')
+          const isSessionCheck = requestUrl.includes('/auth/me')
+          // 仅当「会话校验」接口 401 时清除并跳转登录，避免数据接口（如 /lessons）401 导致登录后闪退
+          if (!isAuthRequest && isSessionCheck) {
+            try {
+              useUserStore().logout()
+            } catch {
+              localStorage.removeItem('access_token')
+              localStorage.removeItem('user')
+              sessionStorage.removeItem('access_token')
+            }
             window.location.href = '/login'
           }
         } else if (error.response?.status === 403) {

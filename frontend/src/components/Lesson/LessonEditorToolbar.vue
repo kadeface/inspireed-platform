@@ -31,12 +31,14 @@
 
         <!-- 右侧：操作按钮 -->
         <div class="flex items-center gap-3">
-          <!-- 上课模式：导播台信息 -->
+          <!-- 上课模式：仅显示导播台只读信息（结束/窗口等操作仅在下方导播台内，避免重复） -->
           <template
             v-if="
               isPreviewMode &&
               classroomPanelData?.session &&
-              classroomPanelData.session.status === 'active'
+              (classroomPanelData.session.status === 'active' ||
+                classroomPanelData.session.status === 'teaching' ||
+                classroomPanelData.session.status === 'TEACHING')
             "
           >
             <div class="flex items-center gap-2.5 text-xs border-r border-gray-200 pr-3 mr-3">
@@ -78,30 +80,6 @@
                     ''
                   }}
                 </span>
-              </div>
-              <!-- 操作按钮组 -->
-              <div class="flex items-center gap-1.5 ml-1">
-                <button
-                  @click="classroomPanelData?.handleToggleDisplayMode?.()"
-                  class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition-colors"
-                  title="全屏显示"
-                >
-                  全屏
-                </button>
-                <button
-                  @click="classroomPanelData?.handlePause?.()"
-                  class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition-colors"
-                  title="暂停课程"
-                >
-                  ⏸️ 暂停
-                </button>
-                <button
-                  @click="classroomPanelData?.handleEnd?.()"
-                  class="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 rounded text-red-700 transition-colors"
-                  title="结束课程"
-                >
-                  ⏹️ 结束
-                </button>
               </div>
             </div>
           </template>

@@ -110,6 +110,11 @@ class LessonResponse(LessonBase):
     classroom_ids: List[int] = Field(default_factory=list)
     classrooms: List[LessonClassroomInfo] = Field(default_factory=list)
 
+    # 教案统计（列表与详情均返回，供卡片显示单元数等）
+    cell_count: int = Field(0, description="单元/cell 数量")
+    estimated_duration: Optional[int] = Field(None, description="预计时长（分钟）")
+    view_count: int = Field(0, description="查看次数")
+
     # 教师信息
     creator_name: Optional[str] = None
     creator_avatar: Optional[str] = None
@@ -144,10 +149,11 @@ class LessonListResponse(BaseModel):
 
 
 class LessonPublishRequest(BaseModel):
-    """教案发布请求"""
+    """教案发布请求。班级在上课时选择，发布时可不传班级。"""
 
     classroom_ids: List[int] = Field(
-        ..., min_length=1, description="教案发布的目标班级ID列表"
+        default_factory=list,
+        description="教案发布时可选的目标班级ID列表，为空表示仅发布不关联班级",
     )
 
 

@@ -134,7 +134,7 @@ export function useNavigation(options: UseNavigationOptions) {
       }
       const message = statusMessages[status!] || '会话状态不正确，无法导航'
       alert(message)
-      console.warn('导航失败：会话状态不是 ACTIVE', {
+      console.warn('导航失败：当前会话状态不允许导航（需先开始上课）', {
         currentStatus: status,
         sessionId: session.value.id
       })

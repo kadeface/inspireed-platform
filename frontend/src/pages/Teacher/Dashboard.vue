@@ -647,16 +647,6 @@
       @success="handleImportSuccess"
     />
 
-    <ClassroomSelectorModal
-      v-model="showPublishModal"
-      :classrooms="availableClassrooms"
-      :initial-selected-ids="selectedClassroomIds"
-      :loading="isLoadingClassrooms"
-      :error="publishModalError"
-      @confirm="handlePublishConfirm"
-      @cancel="handlePublishCancel"
-    />
-
     <!-- 删除确认对话框 -->
     <ConfirmDialog
       v-model="showDeleteConfirm"
@@ -729,7 +719,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDebounceFn } from '@vueuse/core'
 import { useUserStore } from '../../store/user'
@@ -738,7 +728,6 @@ import { LessonStatus } from '../../types/lesson'
 import type { Lesson, LessonCreate, LessonRelatedMaterial } from '../../types/lesson'
 import LessonCard from '../../components/Lesson/LessonCard.vue'
 import CreateLessonModal from '../../components/Lesson/CreateLessonModal.vue'
-import ClassroomSelectorModal from '../../components/Lesson/ClassroomSelectorModal.vue'
 import ConfirmDialog from '../../components/Common/ConfirmDialog.vue'
 import CurriculumWithResources from '../../components/Curriculum/CurriculumWithResources.vue'
 import CurriculumTreeView from '../../components/Curriculum/CurriculumTreeView.vue'
@@ -799,10 +788,6 @@ const sharedLessons = ref<any[]>([]) // 共享教案列表
 const sharedLessonsTotal = ref(0) // 共享教案总数
 const sharedLessonsPage = ref(1) // 共享教案当前页
 const isLoadingSharedLessons = ref(false) // 加载共享教案状态
-const showPublishModal = ref(false)
-const publishError = ref<string | null>(null)
-const publishTargetLessonId = ref<number | null>(null)
-const selectedClassroomIds = ref<number[]>([])
 const showAssistantModal = ref(false)
 
 // Toast 提示
@@ -811,13 +796,6 @@ const toast = ref({
   type: 'success' as 'success' | 'error',
   message: '',
 })
-
-const availableClassrooms = computed(() => lessonStore.availableClassrooms)
-const isLoadingClassrooms = computed(() => lessonStore.isLoadingClassrooms)
-const classroomsError = computed(() => lessonStore.classroomsError)
-const publishModalError = computed(
-  () => publishError.value || classroomsError.value || null
-)
 
 // 状态筛选器
 const statusFilters = [
@@ -1370,63 +1348,19 @@ async function handleUnpublish(lessonId: number) {
   }
 }
 
-// 发布教案
+// 发布教案（不选择班级，班级在上课时选择）
 async function handlePublish(lessonId: number) {
-  publishError.value = null
-  publishTargetLessonId.value = lessonId
-
   try {
     if (lessonStore.currentLesson?.id !== lessonId) {
       await lessonStore.loadLesson(lessonId)
     }
-
-    await lessonStore.loadAvailableClassrooms()
-
-    const existingIds = lessonStore.currentLesson?.classroom_ids ?? []
-    selectedClassroomIds.value = [...existingIds]
-
-    if (
-      selectedClassroomIds.value.length === 0 &&
-      availableClassrooms.value.length === 1
-    ) {
-      selectedClassroomIds.value = [availableClassrooms.value[0].id]
-    }
-
-    showPublishModal.value = true
-  } catch (error: any) {
-    publishTargetLessonId.value = null
-    showToast('error', error.message || '加载班级信息失败')
-  }
-}
-
-async function handlePublishConfirm(classroomIds: number[]) {
-  if (classroomIds.length === 0) {
-    publishError.value = '请选择至少一个班级'
-    return
-  }
-
-  publishError.value = null
-
-  try {
-    if (publishTargetLessonId.value && lessonStore.currentLesson?.id !== publishTargetLessonId.value) {
-      await lessonStore.loadLesson(publishTargetLessonId.value)
-    }
-
-    await lessonStore.publishCurrentLesson(classroomIds)
-    selectedClassroomIds.value = [...classroomIds]
-    showPublishModal.value = false
-    publishTargetLessonId.value = null
+    await lessonStore.publishCurrentLesson([])
     showToast('success', '教案发布成功')
     loadLessons()
     refreshPdcaOverview()
   } catch (error: any) {
-    publishError.value = error.message || '发布教案失败'
+    showToast('error', error.message || '发布教案失败')
   }
-}
-
-function handlePublishCancel() {
-  publishError.value = null
-  publishTargetLessonId.value = null
 }
 
 // 上一页
@@ -1523,13 +1457,24 @@ async function loadAvailableChapters() {
 // 页面加载时获取数据
 onMounted(() => {
   const initialize = async () => {
-    if (!userStore.user) {
-      try {
-        const currentUser = await authService.getCurrentUser()
-        userStore.setUser(currentUser)
-      } catch (error) {
-        console.error('Failed to load current user info:', error)
+    await nextTick()
+    const hasToken = userStore.isAuthenticated || !!localStorage.getItem('access_token')
+    if (!hasToken) {
+      window.location.href = '/login'
+      return
+    }
+
+    // 先执行一次带 token 的请求，确保后续 /lessons 等请求不会因 token 未就绪而 401
+    try {
+      const currentUser = await authService.getCurrentUser()
+      userStore.setUser(currentUser)
+    } catch (error: any) {
+      console.error('Failed to load current user info:', error)
+      if (error?.response?.status === 401) {
+        userStore.logout()
+        window.location.href = '/login'
       }
+      return
     }
 
     loadLessons()

@@ -3,6 +3,9 @@
  */
 
 import { getServerBaseUrl } from '../utils/url'
+import { createLogger } from '../utils/logger'
+
+const log = createLogger('WebSocket')
 
 export interface WebSocketMessage {
   type: string
@@ -21,6 +24,8 @@ export class WebSocketService {
   private heartbeatInterval: number = 30000 // 30秒
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private isManualClose: boolean = false
+  /** 正在主动断开（含 CONNECTING 时断开），用于抑制 onerror 报错 */
+  private isDisconnecting: boolean = false
   
   // 事件监听器
   private eventListeners: Map<string, Set<WebSocketEventCallback>> = new Map()
@@ -28,7 +33,7 @@ export class WebSocketService {
   /**
    * 连接 WebSocket
    */
-  connect(sessionId: number, token: string, timeout: number = 10000): Promise<void> {
+  connect(sessionId: number, token: string, timeout: number = 20000): Promise<void> {
     return new Promise((resolve, reject) => {
       // 构建 WebSocket URL
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -40,7 +45,7 @@ export class WebSocketService {
       this.url = `${wsProtocol}//${wsBase}/api/v1/classroom-sessions/sessions/${sessionId}/ws?token=${token}`
       
       // 连接 WebSocket
-      console.log(`🔌 尝试连接 WebSocket: ${this.url}`)
+      log.debug('连接', this.url.replace(/\?.*/, ''))
       
       // 设置连接超时
       let timeoutId: ReturnType<typeof setTimeout> | null = null
@@ -57,7 +62,7 @@ export class WebSocketService {
         if (!isResolved) {
           isResolved = true
           cleanup()
-          console.log('✅ WebSocket 连接成功（Promise resolved）')
+          log.debug('连接成功')
           resolve()
         }
       }
@@ -70,25 +75,28 @@ export class WebSocketService {
         }
       }
       
-      // 设置超时（增加到10秒）
+      // 超时：关闭连接并 reject；设 isDisconnecting 避免 onerror 再报一次
       timeoutId = setTimeout(() => {
-        if (this.ws) {
-          console.warn(`⏰ WebSocket 连接超时（${timeout}ms），readyState=${this.ws.readyState}`)
+        if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+          log.warn(`连接超时 ${timeout}ms，请检查网络或后端`)
+          this.isManualClose = true
+          this.isDisconnecting = true
           this.ws.close()
           this.ws = null
+          this.isDisconnecting = false
         }
-        rejectOnce(new Error(`WebSocket连接超时（${timeout}ms）`))
+        rejectOnce(new Error(`WebSocket连接超时（${timeout}ms），请检查网络或后端是否可访问`))
       }, timeout)
       
       try {
         this.ws = new WebSocket(this.url)
         this.isManualClose = false
         
-        console.log('🔌 WebSocket 对象已创建，等待连接...')
+        log.debug('创建 WebSocket，等待连接')
         
         // 连接成功
         this.ws.onopen = () => {
-          console.log('🎉 WebSocket onopen 事件触发')
+          log.debug('onopen')
           this.reconnectAttempts = 0
           this.startHeartbeat()
           resolveOnce()
@@ -98,11 +106,10 @@ export class WebSocketService {
         this.ws.onmessage = (event) => {
           try {
             const message: WebSocketMessage = JSON.parse(event.data)
-            console.log(`📨 收到 WebSocket 消息: type=${message.type}`)
-            
-            // 🆕 如果收到 connected 消息，也认为连接成功
+            if (message.type !== 'pong') {
+              log.debug('消息', message.type)
+            }
             if (message.type === 'connected') {
-              console.log('📥 收到 connected 消息，确认连接成功')
               resolveOnce()
             }
             
@@ -116,11 +123,11 @@ export class WebSocketService {
         this.ws.onclose = (event) => {
           this.stopHeartbeat()
           
-          console.log(`🔌 WebSocket 连接关闭: code=${event.code}, reason=${event.reason || '无原因'}, isManualClose=${this.isManualClose}`)
+          log.debug('连接关闭', event.code, event.reason || '', this.isManualClose)
           
           // 🆕 code=1005 通常是客户端主动关闭（例如组件卸载）
           if (event.code === 1005) {
-            console.log('ℹ️ WebSocket 关闭代码 1005（无状态接收），通常是客户端主动关闭或页面刷新')
+            log.debug('关闭 1005 客户端主动')
           }
           
           // 如果不是手动关闭，尝试重连
@@ -128,7 +135,7 @@ export class WebSocketService {
             // 检查关闭代码，某些代码不应该重连（如会话已结束）
             if (event.code === 1008) {
               // 1008: Policy Violation，通常是服务器主动关闭（如会话已结束）
-              console.warn('⚠️ 服务器主动关闭连接，可能原因:', event.reason || '会话已结束或权限不足')
+              log.warn('服务器关闭', event.reason || '')
               this.handleMessage({
                 type: 'connection_closed',
                 timestamp: new Date().toISOString(),
@@ -136,11 +143,11 @@ export class WebSocketService {
               })
             } else if (event.code === 1005 || event.code === 1006) {
               // 🆕 1005/1006: 异常断开，但不应该触发 connection_closed（避免误判为会话结束）
-              console.log('⚠️ WebSocket 异常断开（code=1005/1006），尝试重连而不触发 connection_closed')
+              log.debug('异常断开 1005/1006，尝试重连')
               this.reconnect(sessionId, token)
             } else {
               // 其他情况，尝试重连
-              console.log(`⚠️ WebSocket 关闭（code=${event.code}），尝试重连...`)
+              log.debug('关闭，尝试重连', event.code)
               this.reconnect(sessionId, token)
             }
           } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -151,12 +158,13 @@ export class WebSocketService {
               data: { sessionId, attempts: this.reconnectAttempts }
             })
           } else if (this.isManualClose) {
-            console.log('✅ WebSocket 手动关闭，不会重连')
+            log.debug('手动关闭，不重连')
           }
         }
         
-        // 连接错误
+        // 连接错误（若正在主动断开连接中，不报错、不 reject，避免「closed before established」刷屏）
         this.ws.onerror = (error) => {
+          if (this.isDisconnecting) return
           console.error('❌ WebSocket 错误:', error)
           rejectOnce(error)
         }
@@ -170,19 +178,21 @@ export class WebSocketService {
   
   /**
    * 断开连接
+   * 若当前仍在 CONNECTING，关闭会导致浏览器报「closed before the connection is established」；
+   * 已通过 isDisconnecting 在 onerror 中抑制重复报错。
    */
   disconnect() {
-    console.log('🔌 [主动断开] disconnect() 被调用, isManualClose 将设为 true')
+    log.debug('disconnect')
     this.isManualClose = true
     this.stopHeartbeat()
     
     if (this.ws) {
-      console.log('🔌 [主动断开] 正在关闭 WebSocket 连接...')
+      const wasConnecting = this.ws.readyState === WebSocket.CONNECTING
+      if (wasConnecting) this.isDisconnecting = true
+      log.debug('关闭连接', wasConnecting ? '(连接尚未建立)' : '')
       this.ws.close()
       this.ws = null
-      console.log('✅ [主动断开] WebSocket 已关闭')
-    } else {
-      console.log('ℹ️ [主动断开] WebSocket 已经是关闭状态，无需操作')
+      if (wasConnecting) this.isDisconnecting = false
     }
   }
   
@@ -193,7 +203,7 @@ export class WebSocketService {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message))
     } else {
-      console.warn('WebSocket not connected, cannot send message')
+      log.warn('未连接，无法发送')
     }
   }
   
@@ -215,7 +225,14 @@ export class WebSocketService {
       this.eventListeners.get(messageType)!.delete(callback)
     }
   }
-  
+
+  /**
+   * 移除所有事件监听（断开时调用，避免重连后重复注册）
+   */
+  removeAllListeners() {
+    this.eventListeners.clear()
+  }
+
   /**
    * 处理接收到的消息
    */
@@ -252,7 +269,7 @@ export class WebSocketService {
    */
   private reconnect(sessionId: number, token: string) {
     this.reconnectAttempts++
-    console.log(`🔄 尝试重连 WebSocket (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
+    log.debug('重连', this.reconnectAttempts, this.maxReconnectAttempts)
     
     // 使用指数退避策略，但最大延迟不超过30秒
     const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000)

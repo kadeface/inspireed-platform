@@ -428,13 +428,9 @@ export const useLessonStore = defineStore('lesson', () => {
   /**
    * 发布当前教案
    */
-  async function publishCurrentLesson(classroomIds: number[]) {
+  async function publishCurrentLesson(classroomIds: number[] = []) {
     if (!currentLesson.value?.id) {
       throw new Error('没有要发布的教案')
-    }
-
-    if (!classroomIds || classroomIds.length === 0) {
-      throw new Error('请选择至少一个班级')
     }
 
     isSaving.value = true

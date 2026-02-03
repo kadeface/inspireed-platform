@@ -89,32 +89,31 @@ async def get_cell_uuid_from_db_id(
             print(f"⚠️ get_cell_uuid_from_db_id: Lesson {lesson_id} 不存在")
             return str(cell_id)
         
-        # 检查 content 是否存在且不为空
-        lesson_content = getattr(lesson, "content", None)
-        if not lesson_content:
+        raw_content = getattr(lesson, "content", None)
+        if not raw_content:
             print(f"⚠️ get_cell_uuid_from_db_id: Lesson {lesson_id} 的 content 为空")
             return str(cell_id)
-        
-        lesson_content = cast(Optional[List[Dict[str, Any]]], lesson.content)
+
+        lesson_content = _content_cells_flat(raw_content)
         if not lesson_content:
-            print(f"⚠️ get_cell_uuid_from_db_id: Lesson {lesson_id} 的 content 列表为空")
+            print(f"⚠️ get_cell_uuid_from_db_id: Lesson {lesson_id} 的 content 无 cells")
             return str(cell_id)
-        
+
         # 通过 order 和 type 匹配
         for idx, cell_data in enumerate(lesson_content):
             cell_order_in_content = cell_data.get("order")
             cell_type_in_content = cell_data.get("type") or cell_data.get("cell_type")
             cell_uuid_in_content = cell_data.get("id")
-            
-            if (cell_order_in_content == cell_order and 
-                str(cell_type_in_content).upper() == str(cell_type).upper()):
+
+            if (cell_order_in_content == cell_order and
+                    str(cell_type_in_content).upper() == str(cell_type).upper()):
                 if cell_uuid_in_content:
                     uuid_str = str(cell_uuid_in_content)
                     print(f"✅ get_cell_uuid_from_db_id: 找到匹配 (cell_id={cell_id}, order={cell_order}, type={cell_type}) -> UUID={uuid_str}")
                     return uuid_str
                 else:
                     print(f"⚠️ get_cell_uuid_from_db_id: 找到匹配但 UUID 为空 (cell_id={cell_id}, order={cell_order}, index={idx})")
-        
+
         # 如果找不到，记录详细信息
         print(f"⚠️ get_cell_uuid_from_db_id: 未找到匹配 (cell_id={cell_id}, lesson_id={lesson_id}, cell_order={cell_order}, cell_type={cell_type})")
         print(f"   尝试匹配的 content 项数量: {len(lesson_content)}")
@@ -129,6 +128,20 @@ async def get_cell_uuid_from_db_id(
         return str(cell_id)
 
 
+def _content_cells_flat(content: Any) -> List[Dict[str, Any]]:
+    """从 lesson.content 提取扁平 cell 列表，支持 List[dict] 或 {sections:[{cells:[]}]}"""
+    if not content:
+        return []
+    if isinstance(content, list):
+        return content
+    if isinstance(content, dict) and "sections" in content:
+        cells: List[Dict[str, Any]] = []
+        for sec in content.get("sections") or []:
+            cells.extend(sec.get("cells") or [])
+        return cells
+    return []
+
+
 async def get_db_id_from_cell_uuid(
     db: AsyncSession,
     cell_uuid: str,
@@ -136,49 +149,57 @@ async def get_db_id_from_cell_uuid(
 ) -> Optional[int]:
     """
     从 UUID 获取对应的数据库 cell ID（从 lesson.content 中查找）
-    
-    参数:
-        db: 数据库会话
-        cell_uuid: Cell 的 UUID 字符串
-        lesson_id: 教案 ID
-    
-    返回:
-        数据库中的 cell ID（数字），如果找不到则返回 None
+    支持 content 为 List[dict] 或 {sections:[{cells:[]}]} 两种格式。
     """
     try:
         from app.models.lesson import Lesson
         from app.models.cell import Cell
         from sqlalchemy import select
-        
+
         lesson = await db.get(Lesson, lesson_id)
         if not lesson:
             return None
-        # 检查 content 是否存在且不为空
-        lesson_content = getattr(lesson, "content", None)
-        if not lesson_content:
+        raw_content = getattr(lesson, "content", None)
+        if not raw_content:
             return None
-        
-        lesson_content = cast(Optional[List[Dict[str, Any]]], lesson.content)
-        if not lesson_content:
+
+        cells_flat = _content_cells_flat(raw_content)
+        if not cells_flat:
             return None
-        
-        # 在 lesson.content 中查找匹配的 UUID
-        for cell_data in lesson_content:
+
+        matched_index = None
+        cell_order_from_content = None
+        for idx, cell_data in enumerate(cells_flat):
             cell_uuid_in_content = cell_data.get("id")
             if str(cell_uuid_in_content) == cell_uuid:
-                # 找到了匹配的 UUID，通过 order 查找数据库 ID
-                cell_order = cell_data.get("order")
-                cell_type = cell_data.get("type") or cell_data.get("cell_type")
-                if cell_order is not None:
-                    cell_result = await db.execute(
-                        select(Cell)
-                        .where(Cell.lesson_id == lesson_id)
-                        .where(Cell.order == cell_order)
-                    )
-                    matched_cell = cell_result.scalar_one_or_none()
-                    if matched_cell:
-                        return cast(int, matched_cell.id)
-        
+                matched_index = idx
+                cell_order_from_content = cell_data.get("order")
+                break
+
+        if matched_index is None:
+            return None
+
+        # 优先用 content 里的 order 匹配数据库 Cell（兼容旧格式与全局 order）
+        if cell_order_from_content is not None:
+            cell_result = await db.execute(
+                select(Cell)
+                .where(Cell.lesson_id == lesson_id)
+                .where(Cell.order == cell_order_from_content)
+            )
+            matched_cell = cell_result.scalar_one_or_none()
+            if matched_cell:
+                return cast(int, matched_cell.id)
+
+        # sections 格式下 order 可能为节内顺序，用扁平列表中的位置匹配第 N 个 Cell
+        cell_result = await db.execute(
+            select(Cell)
+            .where(Cell.lesson_id == lesson_id)
+            .order_by(Cell.order.asc(), Cell.id.asc())
+        )
+        all_cells = cell_result.scalars().all()
+        if matched_index < len(all_cells):
+            return cast(int, all_cells[matched_index].id)
+
         return None
     except Exception as e:
         print(f"⚠️ 从 UUID 获取 cell ID 失败: {str(e)}")
@@ -1070,14 +1091,14 @@ async def get_cell_flowchart_snapshots(
 
 @router.get(
     "/cells/{cell_id}/my-submission",
-    response_model=ActivitySubmissionResponse,
+    response_model=Optional[ActivitySubmissionResponse],
 )
 async def get_my_cell_submission(
     cell_id: int,
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
-    """获取我在某个 Cell 的提交（学生端）"""
+    """获取我在某个 Cell 的提交（学生端）。无提交时返回 200 + null，避免 404 刷屏。"""
 
     result = await db.execute(
         select(ActivitySubmission).where(
@@ -1090,7 +1111,7 @@ async def get_my_cell_submission(
     submission = result.scalar_one_or_none()
 
     if not submission:
-        raise HTTPException(status_code=404, detail="提交不存在")
+        return None
 
     return submission
 

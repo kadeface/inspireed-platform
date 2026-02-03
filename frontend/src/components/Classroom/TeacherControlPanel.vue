@@ -49,11 +49,11 @@
             :remaining="remainingTime"
           />
         </div>
+        <!-- 导航条控制区：仅保留 SessionControlButtons + 上课中时的「窗口」切换，勿再增加 v-if 块（避免重复/暂停/继续），见 docs/2026-02-03-teacher-nav-duplicate-root-cause.md -->
         <div class="header-controls">
-          <!-- v2.0: 使用子组件显示会话控制按钮 -->
           <SessionControlButtons
             :has-session="!!session"
-            :session-status="session?.status"
+            :session-status="normalizedSessionStatus ?? session?.status"
             :loading="loading"
             :active-students-count="activeStudents.length"
             @create="handleCreateSession"
@@ -61,11 +61,10 @@
             @end="handleEnd"
           />
         
-        <!-- ACTIVE 状态：上课中 -->
+        <!-- 上课中：仅增加窗口/全屏切换（结束由 SessionControlButtons 统一显示） -->
         <template v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')">
-          <!-- 显示模式切换按钮 -->
           <div class="display-mode-controls">
-            <button 
+            <button
               @click="handleToggleDisplayMode"
               :disabled="loading"
               class="btn btn-display-mode"
@@ -81,57 +80,8 @@
               <span class="ml-1">{{ currentDisplayMode === 'fullscreen' ? '全屏' : '窗口' }}</span>
             </button>
           </div>
-          <button 
-            @click="handlePause"
-            :disabled="loading"
-            class="btn btn-secondary"
-          >
-            ⏸️ 暂停
-          </button>
-          <button 
-            @click="handleEnd"
-            :disabled="loading"
-            class="btn btn-danger"
-          >
-            ⏹️ 结束
-          </button>
         </template>
         
-        <!-- PAUSED 状态：已暂停 -->
-        <template v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')">
-          <!-- 显示模式切换按钮 -->
-          <div class="display-mode-controls">
-            <button 
-              @click="handleToggleDisplayMode"
-              :disabled="loading"
-              class="btn btn-display-mode"
-              :class="{ 'active': currentDisplayMode === 'fullscreen' }"
-              :title="currentDisplayMode === 'fullscreen' ? '当前：全屏模式' : '当前：窗口模式'"
-            >
-              <svg v-if="currentDisplayMode === 'window'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-              </svg>
-              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-              </svg>
-              <span class="ml-1">{{ currentDisplayMode === 'fullscreen' ? '全屏' : '窗口' }}</span>
-            </button>
-          </div>
-          <button 
-            @click="handleResume"
-            :disabled="loading"
-            class="btn btn-primary"
-          >
-            ▶️ 继续
-          </button>
-          <button 
-            @click="handleEnd"
-            :disabled="loading"
-            class="btn btn-danger"
-          >
-            ⏹️ 结束
-          </button>
-        </template>
         </div>
       </div>
     </div>
@@ -238,6 +188,7 @@ import { useWebSocket } from './composables/useWebSocket'
 import { useDurationTimer } from './composables/useDurationTimer'
 import { useNavigation } from './composables/useNavigation'
 import { useDataLoader } from './composables/useDataLoader'
+import { usePolling } from './composables/usePolling'
 import { useFullscreen } from './composables/useFullscreen'
 import { useSelectionMode } from './composables/useSelectionMode'
 
@@ -535,6 +486,13 @@ const durationTimer = useDurationTimer({
 // 监听会话状态变化，自动启动/停止计时器
 durationTimer.watchSessionStatus(sessionManager.normalizedSessionStatus)
 
+// 轮询清理函数（在 usePolling 创建后赋值，用于 dataLoader 与卸载时统一清理）
+const pollingManager = {
+  clearAllPollingIntervals: () => {
+    if (wsManager) wsManager.disconnect()
+  }
+}
+
 // v2.0: 使用composables管理数据加载
 const dataLoader = useDataLoader({
   session,
@@ -542,11 +500,7 @@ const dataLoader = useDataLoader({
   currentCell,
   currentActivityDbCell,
   containerRef,
-  pollingManager: {
-    clearAllPollingIntervals: () => {
-      if (wsManager) wsManager.disconnect()
-    }
-  },
+  pollingManager,
   dbCells,
 })
 
@@ -565,6 +519,22 @@ const {
   ensureActivityCellExists,
   watchCurrentCell,
 } = dataLoader
+
+// v2.0: PREPARING 时轮询参与者列表，保证「人已进入」在 WebSocket 未达或延迟时也能自动更新
+const polling = usePolling({
+  isComponentVisible: () => !!containerRef.value?.isConnected,
+  getSessionStatus: () => sessionManager.normalizedSessionStatus.value ?? null,
+  hasSession: () => !!session.value,
+  loadParticipants,
+  loadStatistics,
+  loadActivityStatistics,
+  isCurrentCellActivity: () => !!currentActivityDbCell.value,
+})
+// 统一清理：轮询 + WebSocket
+pollingManager.clearAllPollingIntervals = () => {
+  polling.clearAllPollingIntervals()
+  if (wsManager) wsManager.disconnect()
+}
 
 // v2.0: 使用composables管理全屏控制
 const fullscreenManager = useFullscreen()
@@ -770,6 +740,17 @@ watch(() => sessionManager.normalizedSessionStatus.value, (status, oldStatus) =>
   }
 }, { immediate: false })
 
+// PREPARING/teaching 时启动轮询，保证「人已进入」在 WebSocket 未达或延迟时也能自动更新
+watch(
+  () => [session.value?.id, sessionManager.normalizedSessionStatus.value] as const,
+  () => {
+    if (session.value && (sessionManager.normalizedSessionStatus.value === 'preparing' || sessionManager.normalizedSessionStatus.value === 'teaching')) {
+      polling.startPollingIfNeeded()
+    }
+  },
+  { immediate: true }
+)
+
 // 监听 selectedCellIndex 变化，自动滚动到对应模块
 watch(selectedCellIndex, (newIndex, oldIndex) => {
   if (newIndex >= 0 && newIndex !== oldIndex) {
@@ -862,9 +843,9 @@ onMounted(async () => {
   wsManager?.disconnect()
 })
 
-// 组件卸载前清理
+// 组件卸载前清理（轮询 + WebSocket）
 onBeforeUnmount(() => {
-  wsManager?.disconnect()
+  pollingManager.clearAllPollingIntervals()
 })
 
 onUnmounted(() => {
@@ -889,7 +870,6 @@ defineExpose({
   formatDuration,
   formatRemainingTime,
   handleToggleDisplayMode,
-  handlePause,
   handleEnd,
   // 添加调试日志
   getSessionId: () => {

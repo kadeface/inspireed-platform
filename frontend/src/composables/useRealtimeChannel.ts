@@ -5,6 +5,9 @@
 import { ref, computed, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import { useUserStore } from '../store/user'
 import { getServerBaseUrl } from '../utils/url'
+import { createLogger } from '../utils/logger'
+
+const log = createLogger('RealtimeChannel')
 
 export interface ChannelDescriptor {
   scope: 'session' | 'lesson'
@@ -82,7 +85,7 @@ export class RealtimeChannelManager {
           endpoint = `/api/v1/classroom-sessions/sessions/${channel.id}/ws`
         } else {
           // 学生课后模式暂时没有独立端点，可以复用课堂端点或不连接
-          console.warn('⚠️ 学生端课后模式暂不支持 WebSocket')
+          log.warn('学生端课后模式暂不支持 WebSocket')
           reject(new Error('Student lesson WebSocket not supported yet'))
           return
         }
@@ -246,20 +249,27 @@ export class RealtimeChannelManager {
       }
     }
     
-    // 收到实时消息
-    console.log('📨 RealtimeChannelManager: 收到 WebSocket 消息', {
-      type: message.type,
-      channel: message.channel,
-      hasListeners: this.eventListeners.has(message.type),
-      listenersCount: this.eventListeners.has(message.type) ? this.eventListeners.get(message.type)!.size : 0,
-      timestamp: new Date().toLocaleTimeString(),
-      data: message.data,
-    })
-    
-    // 触发对应类型的监听器
+    // 收到实时消息（pong/心跳等不刷屏，使用 debug 级别）
+    const optionalLogTypes = ['pong', 'connected', 'teacher_connected']
+    const skipLog = optionalLogTypes.includes(String(message.type || '').toLowerCase())
+    if (!skipLog) {
+      log.debug('收到 WebSocket 消息', {
+        type: message.type,
+        channel: message.channel,
+        hasListeners: this.eventListeners.has(message.type),
+        listenersCount: this.eventListeners.has(message.type) ? this.eventListeners.get(message.type)!.size : 0,
+        timestamp: new Date().toLocaleTimeString(),
+        data: message.data,
+      })
+    }
+
+    // 触发对应类型的监听器（pong/ping 等不刷屏）
     if (this.eventListeners.has(message.type)) {
       const callbacks = this.eventListeners.get(message.type)!
-      console.log(`✅ 触发 ${message.type} 监听器，回调数量: ${callbacks.size}`)
+      const skipTriggerLog = ['pong', 'ping', 'connected', 'teacher_connected'].includes(String(message.type || '').toLowerCase())
+      if (!skipTriggerLog) {
+        log.debug(`触发 ${message.type} 监听器，回调数量: ${callbacks.size}`)
+      }
       callbacks.forEach(callback => {
         try {
           callback(message)
@@ -268,10 +278,16 @@ export class RealtimeChannelManager {
         }
       })
     } else {
-      console.warn(`⚠️ 没有注册 ${message.type} 类型的监听器`, {
-        registeredTypes: Array.from(this.eventListeners.keys()),
-        receivedType: message.type,
-      })
+      // 系统/心跳类消息不需要注册监听器，不打印警告
+      const typeLower = String(message.type ?? '').toLowerCase()
+      const optionalTypes = ['teacher_connected', 'connected', 'pong', 'ping']
+      const isOptional = optionalTypes.includes(typeLower) || typeLower === 'pong' || typeLower === 'ping'
+      if (!isOptional) {
+        log.warn('没有注册该类型的监听器', {
+          type: message.type,
+          registeredTypes: Array.from(this.eventListeners.keys()),
+        })
+      }
     }
   }
 
@@ -375,11 +391,12 @@ export function useRealtimeChannel(
     const channel = channelRef.value
     const token = userStore.token
     
-    console.log('🔍 WebSocket 连接调试信息:')
-    console.log('  - userStore.user:', userStore.user)
-    console.log('  - userStore.user?.role:', userStore.user?.role)
-    console.log('  - isTeacher.value:', isTeacher.value)
-    console.log('  - channel:', channel)
+    log.debug('WebSocket 连接调试信息', {
+      user: userStore.user,
+      role: userStore.user?.role,
+      isTeacher: isTeacher.value,
+      channel,
+    })
     
     if (!token) {
       error.value = new Error('未登录')
@@ -399,12 +416,12 @@ export function useRealtimeChannel(
       
       manager = channelManagers.get(channelKey)!
       
-      console.log('🔌 准备连接，isTeacher =', isTeacher.value)
+      log.debug('准备连接', { isTeacher: isTeacher.value })
       await manager.connect(channel, token, isTeacher.value)
       
       // 使用 getter 实时获取连接状态
       isConnected.value = manager.isConnected
-      console.log('✅ 连接完成，isConnected =', isConnected.value)
+      log.debug('连接完成', { isConnected: isConnected.value })
       
       // 清理旧的检查定时器
       if (statusCheckInterval) {
@@ -416,7 +433,7 @@ export function useRealtimeChannel(
         if (manager) {
           const currentState = manager.isConnected
           if (isConnected.value !== currentState) {
-            console.log('🔄 连接状态变化:', isConnected.value, '->', currentState)
+            log.debug('连接状态变化', { from: isConnected.value, to: currentState })
             isConnected.value = currentState
           }
         } else {
@@ -462,7 +479,7 @@ export function useRealtimeChannel(
    */
   function registerListener(type: string, handler: MessageHandler) {
     if (!manager) {
-      console.warn('⚠️ 管理器未初始化，请先连接')
+      log.warn('管理器未初始化，请先连接')
       return
     }
     
@@ -485,7 +502,7 @@ export function useRealtimeChannel(
     if (manager) {
       // 实时检查连接状态
       const actuallyConnected = manager.isConnected
-      console.log('📊 请求统计信息:', { 
+      log.debug('请求统计信息', { 
         cellId, 
         lessonId, 
         isConnected: isConnected.value,
@@ -500,17 +517,17 @@ export function useRealtimeChannel(
           isConnected.value = true
         }
       } else {
-        console.warn('⚠️ WebSocket 未连接，无法请求统计信息')
+        log.warn('WebSocket 未连接，无法请求统计信息')
         // 尝试重新连接
         if (!isConnecting.value) {
-          console.log('🔄 尝试重新连接...')
+          log.debug('尝试重新连接')
           connect().catch(err => {
             console.error('❌ 重连失败:', err)
           })
         }
       }
     } else {
-      console.warn('⚠️ 管理器未初始化，无法请求统计信息')
+      log.warn('管理器未初始化，无法请求统计信息')
     }
   }
 

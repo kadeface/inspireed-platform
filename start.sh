@@ -8,7 +8,8 @@
 # - 前端端口：5173，后端端口：8000
 #
 # 其他启动脚本：
-# - start-prod.sh: 生产环境（全容器化，前端端口 80）
+# - start-docker.sh: 全 Docker（前后端也在容器，前端 80）：./start-docker.sh 或 ./start-docker.sh prod
+# - start-prod.sh: 生产环境（见 scripts/other/，全容器化，前端端口 80）
 # - start-cloudstudio.sh: CloudStudio 云端环境（全容器化，前端端口 5173）
 #
 # 详细说明请查看：START_SCRIPTS_GUIDE.md
@@ -302,6 +303,7 @@ echo "📋 管理命令："
 echo "   查看日志: tail -f logs/backend.log 或 tail -f logs/frontend.log"
 echo "   停止服务: ./stop.sh"
 echo "   重启服务: ./restart.sh"
+echo "   全 Docker 启动/停止: ./start-docker.sh 与 ./stop-docker.sh"
 echo "   网络配置: ./get-network-info.sh"
 echo ""
 echo "🌐 局域网配置："

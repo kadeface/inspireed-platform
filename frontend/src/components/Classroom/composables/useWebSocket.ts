@@ -6,6 +6,9 @@
 
 import { ref, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { useUserStore } from '@/store/user'
+import { createLogger } from '@/utils/logger'
+
+const log = createLogger('ClassroomWebSocket')
 
 export interface WebSocketMessage {
   type: string
@@ -152,7 +155,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
     if (ws.value && isConnected.value) {
       ws.value.send(JSON.stringify(message))
     } else {
-      console.warn('WebSocket 未连接，无法发送消息:', message)
+      log.warn('WebSocket 未连接，无法发送消息', message)
     }
   }
 
@@ -178,7 +181,10 @@ export function useWebSocket(options: UseWebSocketOptions) {
       const message: WebSocketMessage = JSON.parse(event.data)
       const { type, data } = message
 
-      console.log('📨 收到 WebSocket 消息:', type, data)
+      // 心跳等不刷屏，其他消息用 debug 级别
+      if (type !== 'pong') {
+        log.debug('收到 WebSocket 消息', type, data)
+      }
 
       switch (type) {
         case 'teacher_connected':
@@ -214,7 +220,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
           break
 
         default:
-          console.log('⚠️ 未知 WebSocket 消息类型:', type)
+          log.warn('未知 WebSocket 消息类型', type)
       }
     } catch (error) {
       console.error('❌ 解析 WebSocket 消息失败:', error)
@@ -231,12 +237,12 @@ export function useWebSocket(options: UseWebSocketOptions) {
     }
 
     if (ws.value?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket 已连接，跳过')
+      log.debug('WebSocket 已连接，跳过')
       return
     }
 
     if (isConnecting.value) {
-      console.log('WebSocket 正在连接中，跳过')
+      log.debug('WebSocket 正在连接中，跳过')
       return
     }
 
@@ -245,12 +251,12 @@ export function useWebSocket(options: UseWebSocketOptions) {
     try {
       const wsUrl = buildWebSocketUrl()
       const logUrl = wsUrl.includes('?') ? wsUrl.split('?')[0] : wsUrl
-      console.log('🔌 连接 WebSocket:', logUrl)
+      log.debug('连接 WebSocket', logUrl)
 
       ws.value = new WebSocket(wsUrl)
 
       ws.value.onopen = (event) => {
-        console.log('✅ WebSocket 已连接')
+        log.debug('WebSocket 已连接')
         isConnected.value = true
         isConnecting.value = false
         reconnectAttempts.value = 0
@@ -270,7 +276,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
       }
 
       ws.value.onclose = (event) => {
-        console.log('🔌 WebSocket 已关闭:', event.code, event.reason)
+        log.debug('WebSocket 已关闭', event.code, event.reason)
         isConnected.value = false
         isConnecting.value = false
 
@@ -282,7 +288,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
         // 如果不是手动关闭，尝试重连
         if (event.code !== 1000 && reconnectAttempts.value < maxReconnectAttempts) {
           reconnectAttempts.value++
-          console.log(`🔄 ${reconnectDelay / 1000}秒后尝试重连 (${reconnectAttempts.value}/${maxReconnectAttempts})...`)
+          log.debug(`${reconnectDelay / 1000}秒后尝试重连`, reconnectAttempts.value, maxReconnectAttempts)
 
           setTimeout(() => {
             if (!isConnected.value) {
