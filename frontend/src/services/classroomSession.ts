@@ -82,7 +82,6 @@ export const classroomSessionService = {
         updatedAt: (response as any).updated_at || (response as any).updatedAt,
       } as ClassSession
       
-      console.log('✅ Session created successfully:', session.id)
       return session
     } catch (error: any) {
       // 增强错误日志，显示完整的错误信息

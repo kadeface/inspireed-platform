@@ -134,8 +134,6 @@ export function useSessionManager(options: UseSessionManagerOptions) {
 
       // 调用回调
       onSessionCreated?.(newSession)
-
-      console.log('✅ 会话已创建，sessionId =', newSession.id, '状态 =', newSession.status)
     } catch (createError: any) {
       console.log('🔍 捕获到创建会话错误:', {
         message: createError.message,

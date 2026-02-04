@@ -348,32 +348,6 @@ interface Props {
     return injectedSessionId?.value
   })
   
-  // 监听 sessionId 变化，输出调试信息
-  watch(sessionId, (newId, oldId) => {
-    if (newId !== oldId) {
-      if (newId !== undefined) {
-        const source = props.sessionId !== undefined ? 'props' : 'inject'
-        console.log('✅ UnifiedSubmissionPanel: sessionId 已设置:', newId, {
-          cellId: props.cellId,
-          lessonId: props.lessonId,
-          source,
-          propsSessionId: props.sessionId,
-          injectedSessionId: injectedSessionId?.value,
-          timestamp: new Date().toLocaleTimeString(),
-        })
-      } else {
-        console.warn('⚠️ UnifiedSubmissionPanel: sessionId 为 undefined', {
-          cellId: props.cellId,
-          lessonId: props.lessonId,
-          propsSessionId: props.sessionId,
-          hasInjectedSessionId: !!injectedSessionId,
-          injectedSessionIdValue: injectedSessionId?.value,
-          timestamp: new Date().toLocaleTimeString(),
-        })
-      }
-    }
-  }, { immediate: true })
-  
   // 统计数据
   const statistics = ref({
     totalStudents: 0,
