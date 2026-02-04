@@ -80,7 +80,6 @@ export function useDataLoader(options: UseDataLoaderOptions) {
   async function loadParticipants() {
     // 首先检查组件是否还在 DOM 中（如果被 v-if 隐藏，不应该执行）
     if (!containerRef.value || !containerRef.value.isConnected) {
-      console.log('⏸️ loadParticipants: 组件不在 DOM 中，跳过加载并清理轮询')
       pollingManager.clearAllPollingIntervals()
       return
     }
@@ -92,28 +91,19 @@ export function useDataLoader(options: UseDataLoaderOptions) {
 
     loadingStudents.value = true
     try {
-      console.log('🔄 开始加载学生列表，sessionId:', session.value.id)
       // 获取所有在线学生（is_active=true）
       const participants = await classroomSessionService.getParticipants(session.value.id, true)
-      console.log('📥 获取到参与者数据:', participants)
 
       // 确保是数组且只包含在线学生
       const activeParticipants = Array.isArray(participants)
         ? participants.filter(p => p.isActive !== false)
         : []
 
-      console.log('✅ 过滤后的在线学生:', activeParticipants.length, '人', activeParticipants.map(s => ({
-        id: s.id,
-        name: s.studentName || s.student_name,
-        isActive: s.isActive ?? s.is_active,
-      })))
-
       activeStudents.value = activeParticipants
 
       // 更新会话统计中的在线学生数
       if (session.value) {
         session.value.activeStudents = activeStudents.value.length
-        console.log('📊 更新会话统计，在线学生数:', session.value.activeStudents)
       }
     } catch (error: any) {
       console.error('❌ 加载学生列表失败:', error)
