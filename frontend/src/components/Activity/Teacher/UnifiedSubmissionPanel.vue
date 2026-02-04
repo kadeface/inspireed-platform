@@ -689,9 +689,6 @@ interface Props {
   // 加载统计数据
   async function loadStatistics() {
     refreshing.value = true
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c6c4c6dc-4a65-45f7-90d1-b2cc5ae1b5ec', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'UnifiedSubmissionPanel.vue:loadStatistics', message: 'loadStatistics entry', data: { cellId: props.cellId, sessionId: sessionId.value, lessonId: props.lessonId, cellIdType: typeof props.cellId }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'B' }) }).catch(() => {})
-    // #endregion
     try {
       // 移除频繁的轮询日志
       
@@ -728,9 +725,6 @@ interface Props {
   // 加载提交列表
   async function loadSubmissions() {
     loading.value = true
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/c6c4c6dc-4a65-45f7-90d1-b2cc5ae1b5ec', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'UnifiedSubmissionPanel.vue:loadSubmissions', message: 'loadSubmissions entry', data: { cellId: props.cellId, sessionId: sessionId.value, lessonId: props.lessonId }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'B' }) }).catch(() => {})
-    // #endregion
     try {
       // 移除频繁的调试日志，只在必要时输出
       
