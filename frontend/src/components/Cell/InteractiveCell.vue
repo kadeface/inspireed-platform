@@ -225,9 +225,10 @@
         <p v-if="displayContent.description" class="interactive-description">{{ displayContent.description }}</p>
       </div>
 
-      <!-- iframe 嵌入 -->
+      <!-- iframe 嵌入：ref 用于卸载前清空 src，避免 blob 被 revoke 后报错 -->
       <div class="iframe-container">
         <iframe
+          ref="interactiveIframeRef"
           :src="displayUrl"
           class="interactive-iframe"
           :style="{
@@ -442,6 +443,7 @@ function generateBlobUrlFromHtml(html: string): string {
 
 // 非编辑模式下的HTML Blob URL（避免重复生成）
 const displayHtmlBlobUrl = ref<string | null>(null)
+const interactiveIframeRef = ref<HTMLIFrameElement | null>(null)
 
 // 在编辑模式下使用 localContent，非编辑模式下使用 props
 const displayUrl = computed(() => {
@@ -869,8 +871,11 @@ onMounted(() => {
   }
 })
 
-// 组件卸载时清理Blob URL
+// 组件卸载时先清空 iframe src 再 revoke blob，避免 "Not allowed to load local resource: blob:..."
 onBeforeUnmount(() => {
+  if (interactiveIframeRef.value?.src && interactiveIframeRef.value.src.startsWith('blob:')) {
+    interactiveIframeRef.value.src = 'about:blank'
+  }
   if (htmlBlobUrl.value) {
     URL.revokeObjectURL(htmlBlobUrl.value)
     htmlBlobUrl.value = null

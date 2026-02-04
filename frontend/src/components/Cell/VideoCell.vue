@@ -904,8 +904,12 @@ function formatTime(seconds: number): string {
   return formatDuration(seconds)
 }
 
-// 组件卸载前清理 blob URL
+// 组件卸载前先清空 video src 再 revoke blob，避免 "Not allowed to load local resource: blob:..."
 onBeforeUnmount(() => {
+  if (videoPlayer.value?.src && videoPlayer.value.src.startsWith('blob:')) {
+    videoPlayer.value.removeAttribute('src')
+    videoPlayer.value.load()
+  }
   if (blobUrl.value) {
     URL.revokeObjectURL(blobUrl.value)
     blobUrl.value = null

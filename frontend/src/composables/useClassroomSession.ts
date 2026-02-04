@@ -24,6 +24,8 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
   const session = ref<ClassSession | null>(null)
   const participation = ref<StudentParticipation | null>(null)
   const currentCellId = ref<number | null>(null)
+  /** 显示版本：每次收到 cell_changed/connected 更新显示内容时递增，供学生端用 :key 强制刷新视图 */
+  const displayVersion = ref(0)
   const isInClassroomMode = computed(() => {
     // v2.0: 在 PREPARING 和 TEACHING 状态下都认为是课堂模式
     if (!session.value?.status) return false
@@ -33,6 +35,14 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
   // 轮询定时器（用于定期获取会话状态）- 降级方案
   let pollingInterval: ReturnType<typeof setInterval> | null = null
   const POLLING_INTERVAL = 5000 // 降级时使用5秒轮询（减少负载）
+  
+  // 未加入会话时定期尝试发现并加入（教师可能稍后才开始上课）
+  let sessionDiscoveryInterval: ReturnType<typeof setInterval> | null = null
+  const SESSION_DISCOVERY_INTERVAL = 12000 // 12 秒
+  
+  // 已有会话但 WebSocket 未连接时定期尝试重连，以便能收到 cell_changed
+  let reconnectInterval: ReturnType<typeof setInterval> | null = null
+  const RECONNECT_INTERVAL = 15000 // 15 秒
   
   // WebSocket连接状态
   const isWebSocketConnected = ref<boolean>(false)
@@ -146,16 +156,29 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         
         // 尝试建立 WebSocket 连接（不阻塞，后台异步连接）
         if (useWebSocket.value && session.value) {
-          // 🆕 添加一个短暂延迟，让页面资源加载完成后再建立 WebSocket 连接
-          // 这可以避免首次连接时因资源竞争导致的超时问题
-          setTimeout(() => {
-            // 异步连接WebSocket，不阻塞页面加载
-            connectWebSocket(session.value!.id).catch((error) => {
-              log.warn('WebSocket 连接失败，降级轮询', error)
-              startPolling()
+          // 尽快连接 WebSocket，以便能收到教师切换模块的 cell_changed（延迟过大会导致收不到）
+          const sessionId = session.value.id
+          console.log('🔌 [findAndJoinSession] 准备调用 connectWebSocket:', {
+            sessionId,
+            useWebSocket: useWebSocket.value,
+            timestamp: new Date().toISOString()
+          })
+          connectWebSocket(sessionId).catch((error) => {
+            console.error('❌ [findAndJoinSession] WebSocket 连接失败，降级轮询:', {
+              error: error.message,
+              sessionId,
+              timestamp: new Date().toISOString()
             })
-          }, 500)  // 延迟 500ms
+            log.warn('WebSocket 连接失败，降级轮询并定期重连', error)
+            startPolling()
+            startReconnectInterval()
+          })
         } else {
+          console.warn('⚠️ [findAndJoinSession] WebSocket 未启用，使用轮询模式:', {
+            useWebSocket: useWebSocket.value,
+            hasSession: !!session.value,
+            sessionId: session.value?.id
+          })
           // 不使用 WebSocket，直接使用轮询
           startPolling()
         }
@@ -250,7 +273,8 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         // 更新 currentCellId
         const cellId = (updatedSession as any)?.current_cell_id ?? updatedSession.currentCellId ?? null
         currentCellId.value = cellId
-        
+        displayVersion.value += 1
+
         // 会话状态已更新
       }
     } catch (error) {
@@ -281,9 +305,64 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
    */
   function stopPolling() {
     if (pollingInterval) {
-      // 停止轮询会话状态
       clearInterval(pollingInterval)
       pollingInterval = null
+    }
+  }
+  
+  /**
+   * 启动“发现会话”轮询：未加入会话时定期尝试 findAndJoinSession（教师可能稍后才开始上课）
+   */
+  function startSessionDiscovery() {
+    if (sessionDiscoveryInterval) return
+    sessionDiscoveryInterval = setInterval(() => {
+      if (session.value) {
+        if (sessionDiscoveryInterval) {
+          clearInterval(sessionDiscoveryInterval)
+          sessionDiscoveryInterval = null
+        }
+        return
+      }
+      log.debug('定期尝试发现课堂会话…')
+      findAndJoinSession().then((s) => {
+        if (s && sessionDiscoveryInterval) {
+          clearInterval(sessionDiscoveryInterval)
+          sessionDiscoveryInterval = null
+        }
+      })
+    }, SESSION_DISCOVERY_INTERVAL)
+  }
+  
+  function stopSessionDiscovery() {
+    if (sessionDiscoveryInterval) {
+      clearInterval(sessionDiscoveryInterval)
+      sessionDiscoveryInterval = null
+    }
+  }
+  
+  /**
+   * 启动“重连 WebSocket”轮询：已有会话但未连接时定期尝试连接，以便收到 cell_changed
+   */
+  function startReconnectInterval() {
+    if (reconnectInterval) return
+    reconnectInterval = setInterval(() => {
+      if (!session.value || isWebSocketConnected.value) {
+        if (reconnectInterval) {
+          clearInterval(reconnectInterval)
+          reconnectInterval = null
+        }
+        return
+      }
+      log.debug('定期尝试重连 WebSocket…')
+      disconnectWebSocket()
+      connectWebSocket(session.value!.id).catch(() => startPolling())
+    }, RECONNECT_INTERVAL)
+  }
+  
+  function stopReconnectInterval() {
+    if (reconnectInterval) {
+      clearInterval(reconnectInterval)
+      reconnectInterval = null
     }
   }
   
@@ -293,19 +372,51 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
    */
   async function connectWebSocket(sessionId: number) {
     try {
+      console.log('🔌 [useClassroomSession] ========== connectWebSocket 被调用 ==========')
+      console.log('🔌 [useClassroomSession] 连接参数:', {
+        sessionId,
+        sessionValueId: session.value?.id,
+        isWebSocketConnected: isWebSocketConnected.value,
+        timestamp: new Date().toISOString()
+      })
+
       const token = getAuthToken()
       if (!token) {
-        console.error('❌ 未找到认证 Token')
+        console.error('❌ [useClassroomSession] Token 验证失败:')
+        console.error('   Token 为空或未定义')
+        console.error('   可能原因: 用户未登录或 token 已过期')
         throw new Error('No auth token')
       }
+
+      console.log('✅ [useClassroomSession] Token 验证通过:', {
+        tokenLength: token.length,
+        tokenPrefix: token.substring(0, 20) + '...'
+      })
+
+      // 🔍 调试：记录连接前的状态
+      console.log('🔌 [useClassroomSession] 准备连接 WebSocket:', {
+        sessionId,
+        currentSessionId: session.value?.id,
+        isWebSocketConnected: isWebSocketConnected.value,
+        timestamp: new Date().toISOString()
+      })
 
       // 先注册监听器，再建立连接，确保不会错过连接后的首条消息
       setupWebSocketListeners()
 
       await websocketService.connect(sessionId, token)
       isWebSocketConnected.value = true
+      console.log('✅ [useClassroomSession] WebSocket 连接成功:', {
+        sessionId,
+        isWebSocketConnected: isWebSocketConnected.value
+      })
+      stopPolling()
+      stopReconnectInterval()
     } catch (error) {
-      console.error('❌ WebSocket 连接失败:', error)
+      console.error('❌ [useClassroomSession] WebSocket 连接失败:', error, {
+        sessionId,
+        errorMessage: error instanceof Error ? error.message : String(error)
+      })
       isWebSocketConnected.value = false
       throw error
     }
@@ -317,16 +428,18 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
   function setupWebSocketListeners() {
     // 1. 监听连接成功消息
     websocketService.on('connected', (message: WebSocketMessage) => {
+      console.log('📨 学生端收到 connected 消息:', message)
+
       if (message.data.current_state && session.value) {
-        // 🔧 修复：创建新对象以触发 Vue 响应式更新
-        const newSession = { ...session.value }
+        // 🔧 修复：使用深拷贝创建新对象以触发 Vue 响应式更新
+        const newSession = JSON.parse(JSON.stringify(session.value))
         newSession.status = message.data.current_state.status
         newSession.settings = {
-          ...session.value.settings,
+          ...newSession.settings,
           display_cell_orders: message.data.current_state.display_cell_orders,
           display_mode: message.data.current_state.display_mode || 'window',
         }
-        
+
         // 🆕 保留或更新教师和课程信息（如果 WebSocket 消息中包含）
         if (message.data.current_state.teacher_name !== undefined) {
           newSession.teacherName = message.data.current_state.teacher_name
@@ -337,31 +450,49 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         if (message.data.current_state.classroom_name !== undefined) {
           newSession.classroomName = message.data.current_state.classroom_name
         }
-        
+
         // 🔧 重新赋值整个 session 对象
         session.value = newSession
         currentCellId.value = message.data.current_state.current_cell_id
-        
+        displayVersion.value += 1
+
+        console.log('✅ 初始状态已加载（深拷贝）:', {
+          status: session.value.status,
+          displayOrders: session.value.settings?.display_cell_orders
+        })
+
         // 如果初始状态包含display_mode，触发回调
         if (message.data.current_state.display_mode && onDisplayModeChanged) {
           onDisplayModeChanged(message.data.current_state.display_mode as 'fullscreen' | 'window')
         }
-        
+
         // 初始状态已更新
       }
     })
     
-    // 2. 监听内容切换消息（核心）
+    // 2. 监听内容切换消息（核心）- 教师切换模块时后端会发此消息
+    log.debug('已注册 cell_changed 监听器（教师切换模块时会收到）')
+    console.log('📝 [useClassroomSession] 注册 cell_changed 监听器:', {
+      sessionId: session.value?.id,
+      timestamp: new Date().toISOString()
+    })
     websocketService.on('cell_changed', (message: WebSocketMessage) => {
-      console.log('📨 学生端收到 cell_changed 消息:', message)
+      console.log('📨 [useClassroomSession] 学生端收到 cell_changed 消息:', {
+        message,
+        currentSessionId: session.value?.id,
+        display_cell_orders: message.data?.display_cell_orders,
+        current_cell_id: message.data?.current_cell_id,
+        timestamp: message.timestamp
+      })
 
       if (session.value) {
         // 🆕 保存原始状态，确保 cell_changed 消息不会改变会话状态
         const originalStatus = session.value.status
         const originalDisplayOrders = session.value.settings?.display_cell_orders
 
-        // 🔧 修复：创建新对象以触发 Vue 响应式更新
-        const newSession = { ...session.value }
+        // 🔧 修复：完全创建新对象以触发 Vue 响应式更新
+        // 使用 JSON 方法确保深拷贝，避免引用同一对象
+        const newSession = JSON.parse(JSON.stringify(session.value))
 
         // 🆕 显式保持会话状态不变
         newSession.status = originalStatus
@@ -369,7 +500,7 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         // 更新 display_cell_orders
         if (message.data.display_cell_orders !== undefined) {
           newSession.settings = {
-            ...session.value.settings,
+            ...newSession.settings,
             display_cell_orders: message.data.display_cell_orders,
           }
           console.log('✅ display_cell_orders 已更新:', {
@@ -383,11 +514,20 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
           currentCellId.value = message.data.current_cell_id
         }
 
+        // 🔧 关键：重新赋值整个 session 对象，确保 Vue 能够检测到变化
         session.value = newSession
-        console.log('🔄 session 已更新:', {
+        displayVersion.value += 1
+
+        console.log('🔄 [useClassroomSession] session 已更新（深拷贝）:', {
           status: session.value.status,
-          displayOrders: session.value.settings?.display_cell_orders
+          displayOrders: session.value.settings?.display_cell_orders,
+          displayVersion: displayVersion.value,
+          sessionId: session.value?.id,
+          filteredCellsWillUpdate: true // 标记 filteredCells 应该会更新
         })
+        
+        // 🔍 调试：验证 filteredCells 是否会重新计算
+        console.log('🔍 [useClassroomSession] 等待 Vue 响应式更新 filteredCells...')
 
         // 🆕 验证状态未被错误修改
         if (session.value.status !== originalStatus) {
@@ -487,9 +627,10 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
     
     // 7. 监听重连失败事件
     websocketService.on('reconnect_failed', (message: WebSocketMessage) => {
-      log.warn('WebSocket 重连失败，降级轮询')
+      log.warn('WebSocket 重连失败，降级轮询并定期重连')
       isWebSocketConnected.value = false
       startPolling()
+      startReconnectInterval()
     })
     
     // 8. 监听连接关闭事件（服务器主动关闭）
@@ -497,19 +638,19 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
       log.warn('WebSocket 被服务器关闭', message.data)
       isWebSocketConnected.value = false
       
-      // 🆕 更严格的判断：只有在确认是会话结束的情况下才修改状态
       const code = message.data?.code
       const reason = message.data?.reason || ''
       
-      // 只有 code=1008 且原因明确包含"结束"相关词汇时，才认为会话结束
       if (code === 1008 && (reason.includes('ended') || reason.includes('结束') || reason.includes('已结束'))) {
         console.error('🛑 服务器确认会话已结束')
         if (session.value) {
           session.value.status = 'ended'
         }
         stopPolling()
+        stopReconnectInterval()
       } else {
         startPolling()
+        startReconnectInterval()
       }
     })
   }
@@ -666,12 +807,29 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
   //   await findAndJoinSession()
   // })
   
+  // 页面重新可见时：刷新会话；若 WebSocket 未连接则尝试重连，以便后续能收到 cell_changed
+  function onVisibilityChange() {
+    if (document.visibilityState !== 'visible' || !session.value || !isInClassroomMode.value) return
+    refreshSession().catch((err) => log.warn('可见时刷新会话失败', err))
+    if (!isWebSocketConnected.value && session.value) {
+      log.debug('页面可见且 WebSocket 未连接，尝试重连')
+      disconnectWebSocket()
+      connectWebSocket(session.value.id).catch(() => startPolling())
+    }
+  }
+
+  onMounted(() => {
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    // 未加入会话时定期尝试发现（教师可能稍后才开始上课），便于自动加入并连接 WebSocket
+    startSessionDiscovery()
+  })
+
   onUnmounted(() => {
-    // 断开 WebSocket
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+    stopSessionDiscovery()
+    stopReconnectInterval()
     disconnectWebSocket()
-    // 停止轮询
     stopPolling()
-    // 离开会话
     leaveSession()
   })
   
@@ -679,6 +837,7 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
     session,
     participation,
     currentCellId,
+    displayVersion,
     isInClassroomMode,
     isWebSocketConnected,
     displayCellId,

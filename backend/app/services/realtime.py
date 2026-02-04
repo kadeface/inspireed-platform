@@ -17,6 +17,20 @@ from app.models.activity import ActivitySubmission
 from app.models.user import User
 
 
+def _content_cells_flat(content: Any) -> List[Dict[str, Any]]:
+    """从 lesson.content 提取扁平 cell 列表，支持 List[dict] 或 {sections:[{cells:[]}]}"""
+    if not content:
+        return []
+    if isinstance(content, list):
+        return content
+    if isinstance(content, dict) and "sections" in content:
+        cells: List[Dict[str, Any]] = []
+        for sec in content.get("sections") or []:
+            cells.extend(sec.get("cells") or [])
+        return cells
+    return []
+
+
 @dataclass(frozen=True)
 class Channel:
     """WebSocket 通道描述符"""
@@ -273,24 +287,23 @@ async def get_submission_statistics(
             
             lesson = await db.get(Lesson, lesson_id)
             if lesson is not None and lesson.content is not None:
-                lesson_content = cast(Optional[List[Dict[str, Any]]], lesson.content)
-                if lesson_content:
-                    for cell_data in lesson_content:
-                        cell_uuid = cell_data.get("id")
-                        if str(cell_uuid) == cell_id:
-                            # 找到了匹配的 UUID，通过 order 查找数据库 ID
-                            cell_order = cell_data.get("order")
-                            cell_type = cell_data.get("type") or cell_data.get("cell_type")
-                            if cell_order is not None:
-                                cell_result = await db.execute(
-                                    sql_select(Cell)
-                                    .where(Cell.lesson_id == lesson_id)
-                                    .where(Cell.order == cell_order)
-                                )
-                                matched_cell = cell_result.scalar_one_or_none()
-                                if matched_cell:
-                                    actual_cell_id = cast(int, matched_cell.id)
-                                    break
+                # 支持 content 为 List[dict] 或 {sections:[{cells:[]}]}，统一扁平化为 cell 列表
+                lesson_content = _content_cells_flat(lesson.content)
+                for cell_data in lesson_content:
+                    cell_uuid = cell_data.get("id")
+                    if str(cell_uuid) == cell_id:
+                        # 找到了匹配的 UUID，通过 order 查找数据库 ID
+                        cell_order = cell_data.get("order")
+                        if cell_order is not None:
+                            cell_result = await db.execute(
+                                sql_select(Cell)
+                                .where(Cell.lesson_id == lesson_id)
+                                .where(Cell.order == cell_order)
+                            )
+                            matched_cell = cell_result.scalar_one_or_none()
+                            if matched_cell:
+                                actual_cell_id = cast(int, matched_cell.id)
+                                break
     
     # 确保 actual_cell_id 是整数类型，否则无法查询数据库
     if not isinstance(actual_cell_id, int):

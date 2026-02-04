@@ -1,114 +1,90 @@
-# 发现记录
+# Findings: 学生端不随教师端模块切换而更新
 
-## 初步发现
+## 问题描述
+教师端开始上课并切换模块后，学生端界面不自动跟随切换，必须手动刷新页面才更新。
 
-### 1. 分支差异统计
-- 65 个文件有差异
-- 主要差异文件：
-  - frontend/src/services/api.ts (67 行变化) ⚠️ **关键差异**
-  - frontend/src/store/lesson.ts (9 行变化)
-  - docker/docker-compose.prod.yml (39 行变化)
-  - backend/app/api/v1/semesters.py (42 行变化)
+## 根本原因（Root Cause）
 
-### 2. 教案内容处理逻辑
-- 前端支持两种格式：
-  - 旧格式：`Cell[]` 平铺数组
-  - 新格式：`{ sections: [...] }` 分节格式
-- 转换函数在 `frontend/src/utils/lessonContent.ts`
-- Store 中有处理两种格式的逻辑
+**网络配置错误**：教师端和学生端使用不同的地址访问系统，导致 WebSocket 连接失败。
 
-### 3. 关键差异：API 服务配置 ⚠️
+### 问题场景：
+- 教师端使用：`http://localhost:5173` → WebSocket 连接到 `ws://localhost:8000` ✓
+- 学生端使用：`http://192.168.1.102:5173` → WebSocket 连接到 `ws://192.168.1.102:8000` ✗
+- 后端运行在教师机器上，学生机器的 192.168.1.102:8000 没有服务运行
+- 结果：学生端无法建立 WebSocket 连接，`broadcast_to_session` 找不到学生连接
 
-#### frontend/src/services/api.ts 的差异
+### 解决方案：
+**所有用户（教师和学生）必须使用相同的服务器地址访问系统：**
 
-**dev 分支**：
-```typescript
-function getApiBaseUrl(): string {
-  // 动态获取当前主机名（优先于环境变量，确保 CloudStudio 环境能正确检测）
-  const hostname = window.location.hostname
-  // ... 动态检测逻辑 ...
-  // 如果环境变量中配置了API地址，检查并处理
-  if (import.meta.env.VITE_API_BASE_URL) {
-    // ... 处理环境变量 ...
-  }
-}
+**选项 1：全部使用 IP 地址（局域网环境推荐）**
+```
+教师端：http://192.168.1.102:5173
+学生端：http://192.168.1.102:5173
 ```
 
-**production-deploy 分支**：
-```typescript
-function getApiBaseUrl(): string {
-  // 优先使用环境变量中的 API 地址（如果已配置）
-  if (import.meta.env.VITE_API_BASE_URL) {
-    // ... 直接返回环境变量 ...
-    return envApiUrl
-  }
-  // 如果没有配置环境变量，使用动态检测
-  // ... 动态检测逻辑 ...
-}
+**选项 2：全部使用域名（生产环境推荐）**
+```
+教师端：http://inspireed.local:5173
+学生端：http://inspireed.local:5173
 ```
 
-**关键问题**：
-- production-deploy 分支**优先使用环境变量**，如果环境变量配置错误或指向了错误的后端地址，会导致：
-  1. API 请求失败
-  2. 返回错误的数据
-  3. 内容无法正确加载
+**选项 3：全部使用 localhost（仅单机测试）**
+```
+教师端：http://localhost:5173
+学生端：http://localhost:5173（同一机器不同浏览器）
+```
 
-### 4. Store 差异
-- production-deploy 分支在创建新教案时有额外的格式转换逻辑（将 sections 转为 Cell[]）
-- 但这只影响创建，不影响读取
+## 链路梳理
 
-### 5. 后端代码
-- 后端代码在两个分支中**没有差异**
-- `_lesson_to_response` 函数正常处理 content
-- `_validate_content_cells` 函数支持两种格式
+### 教师端
+- 切换模块：`ModuleList` / 上一页/下一页 → `useNavigation.handleModuleItemClick` / `handlePrevModule` / `handleNextModule` → `handleControlBoardNavigate` → `classroomSessionService.navigateToCell(sessionId, { displayCellOrders })` → HTTP POST `/api/v1/classroom-sessions/sessions/{id}/navigate`。
+- 后端 `navigate_to_cell` 会更新 `session.settings["display_cell_orders"]` 和 `session.current_cell_id`，并调用 `manager.broadcast_to_session(message, session_id)`，消息类型为 `cell_changed`，payload 含 `display_cell_orders`、`current_cell_id`。
 
-## 根本原因分析 ✅
+### 后端
+- `broadcast_to_session(session_id)` 向 `active_connections[session_id]` 内所有学生 WebSocket 发送该消息。
+- 学生只有在已连接 `/sessions/{session_id}/ws` 并成功 `manager.connect()` 后才会出现在 `active_connections` 中。
 
-### 问题根源
+### 学生端
+- `LessonView` 使用 `useClassroomSession(lessonId)`，得到 `session`（即 `classroomSession`）。
+- 加入流程：`findAndJoinSession()` → 加入后延迟 500ms → `connectWebSocket(sessionId)` → 先 `setupWebSocketListeners()` 再 `websocketService.connect()`。
+- `setupWebSocketListeners()` 注册 `cell_changed`：收到后 `session.value = newSession`（含新 `settings.display_cell_orders`），`currentCellId.value = message.data.current_cell_id`。
+- `filteredCells` 依赖 `classroomSession.value?.settings?.display_cell_orders`，理论上 `session` 更新后应重新计算并驱动视图。
 
-**API 地址检测逻辑的优先级差异**导致 production-deploy 分支在生产环境中可能使用了错误的 API 地址。
+## 可能原因归纳
 
-### 详细分析
+1. **WebSocket 未连接或已断开**
+   - 学生未打开本课页、连接失败或中途断开，则收不到 `cell_changed`；若未降级到轮询或轮询未拉取 `display_cell_orders`，则只能通过刷新拿到最新状态。
 
-1. **代码差异**：
-   - **dev 分支**：先动态检测环境（CloudStudio、生产环境等），然后才检查环境变量
-   - **production-deploy 分支**：优先使用环境变量 `VITE_API_BASE_URL`，如果没有环境变量才动态检测
+2. **连接/监听时序**
+   - 监听器在 `connectWebSocket` 内、在 `connect()` 之前注册，理论上不会漏首条消息；若存在重复进入教室或重复调用 `findAndJoinSession` 的路径，需确认不会重复注册或清空监听器导致漏消息。
 
-2. **Docker 构建配置**：
-   ```yaml
-   # docker-compose.prod.yml
-   frontend:
-     build:
-       args:
-         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}  # 如果未设置，传入空字符串
-   ```
-   
-   ```dockerfile
-   # frontend/Dockerfile
-   ARG VITE_API_BASE_URL=http://localhost:8000/api/v1  # 默认值
-   ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-   ```
+3. **后端未把该学生加入广播列表**
+   - 仅当学生已成功连接 `/sessions/{session_id}/ws` 且 `manager.connect()` 完成时才会在 `active_connections[session_id]` 中；若学生用错 `session_id` 或连接未完成就收到教师切换，则不会收到广播。
 
-3. **问题场景**：
-   - 如果生产环境构建时 `VITE_API_BASE_URL` 未设置或为空
-   - Dockerfile 会使用默认值 `http://localhost:8000/api/v1`
-   - production-deploy 分支会优先使用这个环境变量
-   - 导致前端尝试连接到 `localhost:8000`，而不是实际的后端地址
-   - 结果：无法获取教案内容或获取到错误的数据
+4. **页面不可见时未再同步**
+   - 若浏览器后台/切页时 WebSocket 断连或漏消息，再切回页面时若没有用 API 拉一次最新会话，界面会一直停留在旧状态直到用户手动刷新。
 
-4. **为什么 dev 分支正常**：
-   - dev 分支优先动态检测，即使环境变量配置错误，也能通过动态检测找到正确的后端地址
-   - 更适合开发和测试环境
+## 技术结论
+- 教师端会正确调用 navigate API 并触发后端广播。
+- 后端会向该 session 下所有已注册学生发送 `cell_changed`。
+- 学生端有 `cell_changed` 监听且会更新 `session` 与 `currentCellId`，依赖的 `filteredCells` 会随 `classroomSession` 变化而更新。
+- 最可能的问题是：**学生未通过 WebSocket 收到 `cell_changed`**（未连接、断连、或未在 `active_connections` 中），且**没有其它机制在未收到时或页面重新可见时拉取最新会话**。
 
-### 解决方案建议
+## 建议修复
 
-1. **方案一（推荐）**：修改 production-deploy 分支的 API 检测逻辑，使其与 dev 分支一致
-   - 优先动态检测，环境变量作为备选
-   - 确保在生产环境中也能正确检测后端地址
+### ✅ 已修复：网络配置问题
 
-2. **方案二**：确保生产环境构建时正确设置 `VITE_API_BASE_URL`
-   - 在构建脚本或 CI/CD 中设置正确的环境变量
-   - 确保环境变量指向正确的后端地址
+**问题：** 教师端使用 `localhost`，学生端使用 `192.168.1.102`，导致 WebSocket 连接失败。
 
-3. **方案三**：改进 Dockerfile 默认值处理
-   - 如果环境变量为空，不设置默认值，让前端代码使用动态检测
+**解决方案：**
+1. 确保所有用户（教师和学生）使用相同的服务器地址访问系统
+2. 局域网环境推荐使用服务器的 IP 地址（如 `http://192.168.1.102:5173`）
+3. 生产环境推荐使用域名（如 `http://inspireed.example.com`）
+
+**详细配置指南：** 参见 `NETWORK_CONFIGURATION.md`
+
+### 2. 可选增强：页面可见时刷新会话（已实现）
+
+在课堂模式下，监听 `document.visibilitychange`，当页面从隐藏变为可见时调用 `refreshSession()`，用 API 拉取最新 `display_cell_orders` 等，避免因 WebSocket 临时断开导致必须手动刷新。
+
+**实现位置：** `frontend/src/composables/useClassroomSession.ts:onVisibilityChange()`

@@ -214,8 +214,8 @@
           </div>
         </div>
 
-        <!-- Cell 内容 -->
-        <div v-if="filteredCells.length > 0" class="w-full">
+        <!-- Cell 内容：key 随教师切换模块变化，确保收到 cell_changed 后界面立即刷新 -->
+        <div v-if="filteredCells.length > 0" class="w-full" :key="classroomDisplayKey">
           <!-- 正常内容显示 -->
           <div class="space-y-6 px-6">
             <!-- 🎓 学习科学优化：使用 CellWrapper 组件实现认知脚手架 -->
@@ -575,6 +575,7 @@ function handleFullscreenChange() {
 
 const {
   session: classroomSession,  // 直接使用 composable 返回的 session（会通过 WebSocket 实时更新）
+  displayVersion,  // 每次 cell_changed/connected 递增，用于 :key 强制刷新内容区
   isInClassroomMode,
   isWebSocketConnected,  // WebSocket 连接状态
   displayCellId,
@@ -669,12 +670,28 @@ let lastFilterState = ''
 const filteredCells = computed(() => {
   const cells = lessonContentCells.value
   if (!cells || cells.length === 0) return []
-  
+
+  // 🔍 调试：详细记录计算时的状态
+  const currentDisplayOrders = classroomSession.value?.settings?.display_cell_orders
+  console.log('🔍 [filteredCells] 计算开始:', {
+    isInClassroomMode: isInClassroomMode.value,
+    shouldSyncDisplay: shouldSyncDisplay.value,
+    sessionStatus: classroomSession.value?.status,
+    sessionId: classroomSession.value?.id,
+    displayCellOrders: currentDisplayOrders,
+    displayCellOrdersType: Array.isArray(currentDisplayOrders) ? 'array' : typeof currentDisplayOrders,
+    displayCellOrdersLength: Array.isArray(currentDisplayOrders) ? currentDisplayOrders.length : 'N/A',
+    totalCells: cells.length,
+    displayVersion: displayVersion.value,
+    timestamp: new Date().toISOString()
+  })
+
   // 🆕 关键修复：在 preparing 状态下，学生不能看到任何内容（等待教师开始上课）
   if (isInClassroomMode.value && classroomSession.value?.status === 'preparing') {
+    console.log('⏸️ [filteredCells] 状态为 preparing，返回空数组')
     return []
   }
-  
+
   // 只在状态变化时输出日志
   const currentState = JSON.stringify({
     isInClassroomMode: isInClassroomMode.value,
@@ -682,43 +699,63 @@ const filteredCells = computed(() => {
     displayCellOrders: classroomSession.value?.settings?.display_cell_orders,
     sessionStatus: classroomSession.value?.status,
   })
-  
+
   if (currentState !== lastFilterState) {
     lastFilterState = currentState
   }
-  
+
   // 如果不在课堂模式，显示所有Cell
   if (!isInClassroomMode.value) {
+    console.log('📖 [filteredCells] 非课堂模式，显示所有模块')
     return cells
   }
-  
+
   // 课堂模式：严格同步，只显示教师指定的Cell
   if (shouldSyncDisplay.value) {
     const settings = classroomSession.value?.settings
-    
+
     // 🆕 新方式：优先使用 display_cell_orders（推荐）
     const displayOrders = settings?.display_cell_orders
     if (displayOrders && Array.isArray(displayOrders)) {
       // 如果 displayOrders 是空数组，返回空数组（隐藏所有Cell）
       if (displayOrders.length === 0) {
+        console.log('🚫 [filteredCells] display_cell_orders 为空数组，隐藏所有模块')
         return []
       }
-      
+
       // 直接根据 order 过滤，无需映射，无需 dbCells
       const filteredByOrders = cells.filter((cell, index) => {
         const cellOrder = cell.order !== undefined ? cell.order : index
         return displayOrders.includes(cellOrder)
       })
-      
+
+      console.log('✅ [filteredCells] 根据订单过滤完成:', {
+        displayOrders,
+        filteredCount: filteredByOrders.length,
+        totalCount: cells.length
+      })
+
       return filteredByOrders
     }
-    
+
     // 如果没有 display_cell_orders，返回空数组（隐藏所有Cell）
+    console.log('⚠️ [filteredCells] 没有 display_cell_orders，返回空数组')
     return []
   }
-  
+
   // 非严格同步模式，显示所有Cell
+  console.log('📖 [filteredCells] 非严格同步模式，显示所有模块')
   return cells
+})
+
+// 课堂模式下内容区域的 key：displayVersion 在收到 cell_changed 时递增，确保界面自动刷新
+const classroomDisplayKey = computed(() => {
+  if (!isInClassroomMode.value) return 'default'
+  const v = displayVersion.value
+  const orders = classroomSession.value?.settings?.display_cell_orders
+  const id = displayCellId.value ?? (classroomSession.value as any)?.current_cell_id ?? ''
+  if (!orders || !Array.isArray(orders)) return `v${v}-empty-${id}`
+  return `v${v}-${orders.join(',')}-${id}`
 })
 
 // ========== 旧代码（已废弃）==========
