@@ -414,15 +414,6 @@ export const classroomAssistantService = {
   },
 
   /**
-   * 获取今日值日任务
-   */
-  async getTodayDuty(classroomId: number): Promise<DutyAssignment[]> {
-    return api.get<DutyAssignment[]>(
-      `/classroom-assistant/classrooms/${classroomId}/duty/today`
-    )
-  },
-
-  /**
    * 更新值日任务状态
    */
   async updateDutyAssignment(

@@ -160,9 +160,6 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
           const sessionId = session.value.id
           connectWebSocket(sessionId).catch((error) => {
             log.warn('WebSocket 连接失败，降级轮询并定期重连', error)
-              timestamp: new Date().toISOString()
-            })
-            log.warn('WebSocket 连接失败，降级轮询并定期重连', error)
             startPolling()
             startReconnectInterval()
           })
