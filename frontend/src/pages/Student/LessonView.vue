@@ -671,24 +671,8 @@ const filteredCells = computed(() => {
   const cells = lessonContentCells.value
   if (!cells || cells.length === 0) return []
 
-  // 🔍 调试：详细记录计算时的状态
-  const currentDisplayOrders = classroomSession.value?.settings?.display_cell_orders
-  console.log('🔍 [filteredCells] 计算开始:', {
-    isInClassroomMode: isInClassroomMode.value,
-    shouldSyncDisplay: shouldSyncDisplay.value,
-    sessionStatus: classroomSession.value?.status,
-    sessionId: classroomSession.value?.id,
-    displayCellOrders: currentDisplayOrders,
-    displayCellOrdersType: Array.isArray(currentDisplayOrders) ? 'array' : typeof currentDisplayOrders,
-    displayCellOrdersLength: Array.isArray(currentDisplayOrders) ? currentDisplayOrders.length : 'N/A',
-    totalCells: cells.length,
-    displayVersion: displayVersion.value,
-    timestamp: new Date().toISOString()
-  })
-
-  // 🆕 关键修复：在 preparing 状态下，学生不能看到任何内容（等待教师开始上课）
+  // 关键修复：在 preparing 状态下，学生不能看到任何内容（等待教师开始上课）
   if (isInClassroomMode.value && classroomSession.value?.status === 'preparing') {
-    console.log('⏸️ [filteredCells] 状态为 preparing，返回空数组')
     return []
   }
 
@@ -706,7 +690,6 @@ const filteredCells = computed(() => {
 
   // 如果不在课堂模式，显示所有Cell
   if (!isInClassroomMode.value) {
-    console.log('📖 [filteredCells] 非课堂模式，显示所有模块')
     return cells
   }
 
@@ -714,12 +697,11 @@ const filteredCells = computed(() => {
   if (shouldSyncDisplay.value) {
     const settings = classroomSession.value?.settings
 
-    // 🆕 新方式：优先使用 display_cell_orders（推荐）
+    // 新方式：优先使用 display_cell_orders（推荐）
     const displayOrders = settings?.display_cell_orders
     if (displayOrders && Array.isArray(displayOrders)) {
       // 如果 displayOrders 是空数组，返回空数组（隐藏所有Cell）
       if (displayOrders.length === 0) {
-        console.log('🚫 [filteredCells] display_cell_orders 为空数组，隐藏所有模块')
         return []
       }
 
@@ -729,22 +711,14 @@ const filteredCells = computed(() => {
         return displayOrders.includes(cellOrder)
       })
 
-      console.log('✅ [filteredCells] 根据订单过滤完成:', {
-        displayOrders,
-        filteredCount: filteredByOrders.length,
-        totalCount: cells.length
-      })
-
       return filteredByOrders
     }
 
     // 如果没有 display_cell_orders，返回空数组（隐藏所有Cell）
-    console.log('⚠️ [filteredCells] 没有 display_cell_orders，返回空数组')
     return []
   }
 
   // 非严格同步模式，显示所有Cell
-  console.log('📖 [filteredCells] 非严格同步模式，显示所有模块')
   return cells
 })
 

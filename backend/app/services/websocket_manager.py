@@ -74,53 +74,31 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, session_id: int, student_id: int):
         """旧版连接方法（兼容性保留）"""
         
-        # 🔍 调试：记录连接前的状态
-        print(f"🔌 [connect] 开始注册连接: session_id={session_id}, student_id={student_id}")
-        print(f"   连接前活跃会话: {list(self.active_connections.keys())}")
-        
         if session_id not in self.active_connections:
             self.active_connections[session_id] = {}
-            print(f"   ✅ 创建新会话记录: session_id={session_id}")
         
         # 如果学生已有连接，先断开旧连接（处理重复连接）
         if student_id in self.active_connections[session_id]:
             old_ws = self.active_connections[session_id][student_id]
-            print(f"   ⚠️ 学生 {student_id} 已有连接，先断开旧连接")
             try:
                 await old_ws.close()
-            except Exception as e:
-                print(f"   ⚠️ 断开旧连接时出错: {e}")
+            except Exception:
+                pass
         
         # 注册新连接
         self.active_connections[session_id][student_id] = websocket
-        print(f"   ✅ 连接已注册到旧版存储: session_id={session_id}, student_id={student_id}")
         
         # 同时注册到新版存储
-        try:
-            await self.connect_v2(
-                websocket=websocket,
-                scope="session",
-                channel_id=session_id,
-                user_id=student_id,
-                role=UserRole.STUDENT
-            )
-            print(f"   ✅ 连接已注册到新版存储: session_id={session_id}, student_id={student_id}")
-        except Exception as e:
-            print(f"   ❌ 注册到新版存储失败: {e}")
-            import traceback
-            traceback.print_exc()
+        await self.connect_v2(
+            websocket=websocket,
+            scope="session",
+            channel_id=session_id,
+            user_id=student_id,
+            role=UserRole.STUDENT
+        )
         
-        # 🔍 调试：详细记录连接注册后的状态
-        print(f"✅ [connect] 学生 {student_id} 连接到会话 {session_id}")
-        print(f"📊 [connect] 会话 {session_id} 当前在线: {len(self.active_connections[session_id])} 人")
-        print(f"📊 [connect] 会话 {session_id} 所有在线学生ID: {list(self.active_connections[session_id].keys())}")
-        print(f"📊 [connect] 所有活跃会话: {list(self.active_connections.keys())}")
-        
-        # 🔍 验证：检查连接是否真的注册成功
-        if session_id in self.active_connections and student_id in self.active_connections[session_id]:
-            print(f"   ✅ 验证成功: 连接确实在 active_connections 中")
-        else:
-            print(f"   ❌ 验证失败: 连接不在 active_connections 中！")
+        print(f"✅ 学生 {student_id} 连接到会话 {session_id}")
+        print(f"📊 会话 {session_id} 当前在线: {len(self.active_connections[session_id])} 人")
     
     async def disconnect_v2(
         self,
@@ -200,32 +178,12 @@ class ConnectionManager:
     ):
         """广播消息给会话内所有学生"""
 
-        # 🔍 调试：详细记录广播前的状态
-        student_count = len(self.active_connections.get(session_id, {}))
-        student_ids = list(self.active_connections.get(session_id, {}).keys())
-        
-        # 🔍 调试：同时检查新版存储
         channel_key = self._make_channel_key("session", session_id)
-        new_student_count = len(self.student_connections.get(channel_key, {}))
-        new_student_ids = list(self.student_connections.get(channel_key, {}).keys())
-        
-        print(f"🔍 [broadcast_to_session] 开始广播:")
-        print(f"   session_id: {session_id}")
-        print(f"   旧版存储 - 当前在线学生数: {student_count}")
-        print(f"   旧版存储 - 在线学生ID列表: {student_ids}")
-        print(f"   新版存储 - 当前在线学生数: {new_student_count}")
-        print(f"   新版存储 - 在线学生ID列表: {new_student_ids}")
-        print(f"   消息类型: {message.get('type', 'unknown')}")
-        if message.get('type') == 'cell_changed':
-            print(f"   cell_changed 详情: display_cell_orders={message.get('data', {}).get('display_cell_orders')}, current_cell_id={message.get('data', {}).get('current_cell_id')}")
-        print(f"   所有活跃会话 (旧版): {list(self.active_connections.keys())}")
-        print(f"   所有活跃通道 (新版): {list(self.student_connections.keys())}")
 
-        # 🔧 修复：如果旧版存储为空，尝试使用新版存储
+        # 如果旧版存储为空，尝试使用新版存储
         if session_id not in self.active_connections:
             # 检查新版存储
             if channel_key in self.student_connections and len(self.student_connections[channel_key]) > 0:
-                print(f"⚠️ [broadcast_to_session] 旧版存储为空，但新版存储有连接，使用新版存储广播")
                 # 使用新版存储广播
                 message_text = json.dumps(message) if "timestamp" in message else json.dumps({**message, "timestamp": datetime.utcnow().isoformat()})
                 sent_count = 0
@@ -235,19 +193,13 @@ class ConnectionManager:
                     try:
                         await websocket.send_text(message_text)
                         sent_count += 1
-                        print(f"✅ [broadcast_to_session] 成功发送给学生 {user_id} (使用新版存储)")
-                    except Exception as e:
-                        print(f"❌ [broadcast_to_session] 广播失败（学生 {user_id}）: {str(e)}")
-                print(f"📢 [broadcast_to_session] 使用新版存储广播完成: 已发送 {sent_count} 人")
+                    except Exception:
+                        pass
                 return
-            # 🔍 详细错误日志
-            # 🔍 详细错误日志（如果新版存储也没有）
+            
+            # 如果新版存储也没有连接，记录警告
             if channel_key not in self.student_connections or len(self.student_connections.get(channel_key, {})) == 0:
-                print(f"❌ [broadcast_to_session] 会话 {session_id} 不在活跃连接中！")
-                print(f"❌ [broadcast_to_session] 无学生 WebSocket 连接，cell_changed 无法推送。")
-                print(f"❌ [broadcast_to_session] 可用会话 (旧版): {list(self.active_connections.keys())}")
-                print(f"❌ [broadcast_to_session] 可用通道 (新版): {list(self.student_connections.keys())}")
-                print(f"❌ [broadcast_to_session] 可能原因: 学生未连接 WebSocket 或连接已断开")
+                print(f"⚠️ [broadcast_to_session] 会话 {session_id} 无学生 WebSocket 连接")
                 return
 
         # 添加时间戳
@@ -256,9 +208,6 @@ class ConnectionManager:
 
         message_text = json.dumps(message)
 
-        # 🔍 调试：记录消息内容（简化）
-        print(f"📤 [broadcast_to_session] 准备发送消息: type={message.get('type', 'unknown')}, 消息长度={len(message_text)} 字节")
-
         # 记录要删除的连接（发送失败的）
         disconnected_students = []
         sent_count = 0
@@ -266,41 +215,18 @@ class ConnectionManager:
         for student_id, websocket in self.active_connections[session_id].items():
             # 跳过排除的学生
             if exclude_student_id and student_id == exclude_student_id:
-                print(f"⏭️ [broadcast_to_session] 跳过学生 {student_id}（排除）")
                 continue
 
             try:
-                # 🔍 调试：记录发送前的连接状态
-                websocket_state = websocket.client_state if hasattr(websocket, 'client_state') else 'unknown'
-                print(f"📤 [broadcast_to_session] 发送给学生 {student_id} (连接状态: {websocket_state})")
-                
                 await websocket.send_text(message_text)
                 sent_count += 1
-                print(f"✅ [broadcast_to_session] 成功发送给学生 {student_id} (type={message.get('type', 'unknown')})")
             except Exception as e:
-                print(f"❌ [broadcast_to_session] 广播失败（学生 {student_id}）: {str(e)}")
-                print(f"   错误类型: {type(e).__name__}")
-                import traceback
-                print(f"   错误堆栈: {traceback.format_exc()}")
+                print(f"❌ 广播失败（学生 {student_id}）: {str(e)}")
                 disconnected_students.append(student_id)
 
         # 清理断开的连接
         for student_id in disconnected_students:
             await self.disconnect(session_id, student_id)
-
-        print(f"📢 [broadcast_to_session] 会话 {session_id} 广播完成:")
-        print(f"   已发送: {sent_count} 人")
-        print(f"   失败: {len(disconnected_students)} 人")
-        print(f"   消息类型: {message.get('type', 'unknown')}")
-        
-        if sent_count == 0:
-            print(f"⚠️ [broadcast_to_session] 无学生收到消息！")
-            print(f"   可能原因:")
-            print(f"   1. 学生端 WebSocket 未连接")
-            print(f"   2. 学生连接的 session_id 不匹配（学生连接的是其他 session_id）")
-            print(f"   3. 所有学生连接都已断开")
-            print(f"   当前活跃会话: {list(self.active_connections.keys())}")
-            print(f"   会话 {session_id} 的在线学生: {list(self.active_connections.get(session_id, {}).keys())}")
     
     def get_session_connections_count(self, session_id: int) -> int:
         """获取会话的在线人数"""

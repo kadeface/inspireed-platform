@@ -158,15 +158,8 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         if (useWebSocket.value && session.value) {
           // 尽快连接 WebSocket，以便能收到教师切换模块的 cell_changed（延迟过大会导致收不到）
           const sessionId = session.value.id
-          console.log('🔌 [findAndJoinSession] 准备调用 connectWebSocket:', {
-            sessionId,
-            useWebSocket: useWebSocket.value,
-            timestamp: new Date().toISOString()
-          })
           connectWebSocket(sessionId).catch((error) => {
-            console.error('❌ [findAndJoinSession] WebSocket 连接失败，降级轮询:', {
-              error: error.message,
-              sessionId,
+            log.warn('WebSocket 连接失败，降级轮询并定期重连', error)
               timestamp: new Date().toISOString()
             })
             log.warn('WebSocket 连接失败，降级轮询并定期重连', error)
@@ -174,11 +167,6 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
             startReconnectInterval()
           })
         } else {
-          console.warn('⚠️ [findAndJoinSession] WebSocket 未启用，使用轮询模式:', {
-            useWebSocket: useWebSocket.value,
-            hasSession: !!session.value,
-            sessionId: session.value?.id
-          })
           // 不使用 WebSocket，直接使用轮询
           startPolling()
         }
@@ -372,51 +360,21 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
    */
   async function connectWebSocket(sessionId: number) {
     try {
-      console.log('🔌 [useClassroomSession] ========== connectWebSocket 被调用 ==========')
-      console.log('🔌 [useClassroomSession] 连接参数:', {
-        sessionId,
-        sessionValueId: session.value?.id,
-        isWebSocketConnected: isWebSocketConnected.value,
-        timestamp: new Date().toISOString()
-      })
-
       const token = getAuthToken()
       if (!token) {
-        console.error('❌ [useClassroomSession] Token 验证失败:')
-        console.error('   Token 为空或未定义')
-        console.error('   可能原因: 用户未登录或 token 已过期')
+        console.error('❌ 未找到认证 Token')
         throw new Error('No auth token')
       }
-
-      console.log('✅ [useClassroomSession] Token 验证通过:', {
-        tokenLength: token.length,
-        tokenPrefix: token.substring(0, 20) + '...'
-      })
-
-      // 🔍 调试：记录连接前的状态
-      console.log('🔌 [useClassroomSession] 准备连接 WebSocket:', {
-        sessionId,
-        currentSessionId: session.value?.id,
-        isWebSocketConnected: isWebSocketConnected.value,
-        timestamp: new Date().toISOString()
-      })
 
       // 先注册监听器，再建立连接，确保不会错过连接后的首条消息
       setupWebSocketListeners()
 
       await websocketService.connect(sessionId, token)
       isWebSocketConnected.value = true
-      console.log('✅ [useClassroomSession] WebSocket 连接成功:', {
-        sessionId,
-        isWebSocketConnected: isWebSocketConnected.value
-      })
       stopPolling()
       stopReconnectInterval()
     } catch (error) {
-      console.error('❌ [useClassroomSession] WebSocket 连接失败:', error, {
-        sessionId,
-        errorMessage: error instanceof Error ? error.message : String(error)
-      })
+      console.error('❌ WebSocket 连接失败:', error)
       isWebSocketConnected.value = false
       throw error
     }
@@ -428,10 +386,8 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
   function setupWebSocketListeners() {
     // 1. 监听连接成功消息
     websocketService.on('connected', (message: WebSocketMessage) => {
-      console.log('📨 学生端收到 connected 消息:', message)
-
       if (message.data.current_state && session.value) {
-        // 🔧 修复：使用深拷贝创建新对象以触发 Vue 响应式更新
+        // 使用深拷贝创建新对象以触发 Vue 响应式更新
         const newSession = JSON.parse(JSON.stringify(session.value))
         newSession.status = message.data.current_state.status
         newSession.settings = {
@@ -440,7 +396,7 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
           display_mode: message.data.current_state.display_mode || 'window',
         }
 
-        // 🆕 保留或更新教师和课程信息（如果 WebSocket 消息中包含）
+        // 保留或更新教师和课程信息（如果 WebSocket 消息中包含）
         if (message.data.current_state.teacher_name !== undefined) {
           newSession.teacherName = message.data.current_state.teacher_name
         }
@@ -451,50 +407,30 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
           newSession.classroomName = message.data.current_state.classroom_name
         }
 
-        // 🔧 重新赋值整个 session 对象
+        // 重新赋值整个 session 对象
         session.value = newSession
         currentCellId.value = message.data.current_state.current_cell_id
         displayVersion.value += 1
-
-        console.log('✅ 初始状态已加载（深拷贝）:', {
-          status: session.value.status,
-          displayOrders: session.value.settings?.display_cell_orders
-        })
 
         // 如果初始状态包含display_mode，触发回调
         if (message.data.current_state.display_mode && onDisplayModeChanged) {
           onDisplayModeChanged(message.data.current_state.display_mode as 'fullscreen' | 'window')
         }
-
-        // 初始状态已更新
       }
     })
     
     // 2. 监听内容切换消息（核心）- 教师切换模块时后端会发此消息
     log.debug('已注册 cell_changed 监听器（教师切换模块时会收到）')
-    console.log('📝 [useClassroomSession] 注册 cell_changed 监听器:', {
-      sessionId: session.value?.id,
-      timestamp: new Date().toISOString()
-    })
     websocketService.on('cell_changed', (message: WebSocketMessage) => {
-      console.log('📨 [useClassroomSession] 学生端收到 cell_changed 消息:', {
-        message,
-        currentSessionId: session.value?.id,
-        display_cell_orders: message.data?.display_cell_orders,
-        current_cell_id: message.data?.current_cell_id,
-        timestamp: message.timestamp
-      })
-
       if (session.value) {
-        // 🆕 保存原始状态，确保 cell_changed 消息不会改变会话状态
+        // 保存原始状态，确保 cell_changed 消息不会改变会话状态
         const originalStatus = session.value.status
-        const originalDisplayOrders = session.value.settings?.display_cell_orders
 
-        // 🔧 修复：完全创建新对象以触发 Vue 响应式更新
+        // 完全创建新对象以触发 Vue 响应式更新
         // 使用 JSON 方法确保深拷贝，避免引用同一对象
         const newSession = JSON.parse(JSON.stringify(session.value))
 
-        // 🆕 显式保持会话状态不变
+        // 显式保持会话状态不变
         newSession.status = originalStatus
 
         // 更新 display_cell_orders
@@ -503,10 +439,6 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
             ...newSession.settings,
             display_cell_orders: message.data.display_cell_orders,
           }
-          console.log('✅ display_cell_orders 已更新:', {
-            from: originalDisplayOrders,
-            to: message.data.display_cell_orders
-          })
         }
 
         // 更新 current_cell_id
@@ -514,20 +446,17 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
           currentCellId.value = message.data.current_cell_id
         }
 
-        // 🔧 关键：重新赋值整个 session 对象，确保 Vue 能够检测到变化
+        // 关键：重新赋值整个 session 对象，确保 Vue 能够检测到变化
         session.value = newSession
         displayVersion.value += 1
 
-        console.log('🔄 [useClassroomSession] session 已更新（深拷贝）:', {
-          status: session.value.status,
-          displayOrders: session.value.settings?.display_cell_orders,
-          displayVersion: displayVersion.value,
-          sessionId: session.value?.id,
-          filteredCellsWillUpdate: true // 标记 filteredCells 应该会更新
-        })
-        
-        // 🔍 调试：验证 filteredCells 是否会重新计算
-        console.log('🔍 [useClassroomSession] 等待 Vue 响应式更新 filteredCells...')
+        // 验证状态未被错误修改
+        if (session.value.status !== originalStatus) {
+          console.error('⚠️ 严重错误: cell_changed 消息导致会话状态变化!', {
+            original: originalStatus,
+            current: session.value.status
+          })
+        }
 
         // 🆕 验证状态未被错误修改
         if (session.value.status !== originalStatus) {

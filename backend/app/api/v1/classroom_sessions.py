@@ -749,22 +749,10 @@ async def navigate_to_cell(
 ) -> Any:
     """切换当前显示的Cell（使用 display_cell_orders 数组）"""
     
-    # 🔍 调试：记录函数入口
-    print(f"🎯 [navigate_to_cell] 函数被调用:")
-    print(f"   session_id: {session_id}")
-    print(f"   current_user_id: {current_user.id}")
-    print(f"   display_cell_orders: {data.display_cell_orders if hasattr(data, 'display_cell_orders') else 'N/A'}")
-    print(f"   request_data: {data}")
-    
     try:
-        print(f"🎯 [navigate_to_cell] 导航请求: session_id={session_id}, display_cell_orders={data.display_cell_orders if hasattr(data, 'display_cell_orders') else 'N/A'}")
-
         session = await db.get(ClassSession, session_id)
         if not session:
-            print(f"❌ [navigate_to_cell] 会话不存在: session_id={session_id}")
             raise HTTPException(status_code=404, detail="会话不存在")
-
-        print(f"✅ [navigate_to_cell] 会话存在: session_id={session_id}, status={session.status}")
 
         session_teacher_id = cast(int, session.teacher_id)
         current_user_id = cast(int, current_user.id)
@@ -812,16 +800,13 @@ async def navigate_to_cell(
         await db.commit()
         await db.refresh(session)
         
-        # 🆕 验证状态未被错误修改
+        # 验证状态未被错误修改
         # 使用 type: ignore 避免 SQLAlchemy ColumnElement 的 linter 警告
         if session.status != original_status:  # type: ignore[comparison-overlap]
-            print(f"⚠️ 警告: 导航过程中会话状态发生了变化! 原始={original_status}, 当前={session.status}")
+            logger.warning(f"导航过程中会话状态发生了变化! 原始={original_status}, 当前={session.status}")
             # 这不应该发生，记录错误但继续执行
         
-        print(f"✅ 导航成功: session_id={session_id}, display_cell_orders={data.display_cell_orders}, current_cell_id={session.current_cell_id}")
-        print(f"📊 会话状态: status={session.status}, settings={session.settings}")
-        
-        # ✅ 新增：通过 WebSocket 广播变化
+        # 通过 WebSocket 广播变化
         from app.services.websocket_manager import manager as ws_manager
         
         broadcast_message = {
@@ -838,44 +823,21 @@ async def navigate_to_cell(
             }
         }
         
-        # 🔍 调试：详细记录广播前的状态
-        recipient_count_before = ws_manager.get_session_connections_count(session_id)
-        all_active_sessions = ws_manager.get_all_session_ids()
-        
-        print(f"📤 [navigate] 准备广播 cell_changed:")
-        print(f"   session_id: {session_id}")
-        print(f"   display_cell_orders: {data.display_cell_orders}")
-        print(f"   current_cell_id: {session.current_cell_id}")
-        print(f"   当前该会话在线学生数: {recipient_count_before}")
-        print(f"   所有活跃会话: {all_active_sessions}")
-        print(f"   广播消息: {json.dumps(broadcast_message, indent=2, ensure_ascii=False)}")
-        
         await ws_manager.broadcast_to_session(
             message=broadcast_message,
             session_id=session_id,
         )
         
-        recipient_count_after = ws_manager.get_session_connections_count(session_id)
-        print(f"📢 [navigate] 广播调用完成:")
-        print(f"   会话 {session_id} 广播前在线学生数: {recipient_count_before}")
-        print(f"   会话 {session_id} 广播后在线学生数: {recipient_count_after}")
-        print(f"   display_cell_orders: {data.display_cell_orders}")
-        
         return session
     
-    except HTTPException as http_ex:
-        # 🔍 调试：记录 HTTP 异常
-        print(f"❌ [navigate_to_cell] HTTP 异常: status_code={http_ex.status_code}, detail={http_ex.detail}")
-        import traceback
-        print(f"   堆栈跟踪: {traceback.format_exc()}")
+    except HTTPException:
         # 重新抛出 HTTP 异常
         raise
     except Exception as e:
         # 捕获其他异常
         import traceback
-        print(f"❌ [navigate_to_cell] 导航异常: {type(e).__name__}: {str(e)}")
-        print(f"   完整堆栈跟踪:")
-        print(traceback.format_exc())
+        logger.error(f"导航异常: {type(e).__name__}: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
             detail=f"导航失败: {str(e)}"
@@ -1427,136 +1389,78 @@ async def websocket_endpoint(
     连接URL: ws://api/v1/classroom-sessions/sessions/{session_id}/ws?token={jwt}
     """
 
-    print(f"🚨 [CRITICAL] 学生WebSocket端点被调用: session_id={session_id}")
     logger.info(f"🔌 学生WebSocket连接请求: session_id={session_id}")
-    print(f"🔌 [websocket_endpoint] 收到 WebSocket 连接请求: session_id={session_id}")
 
     # 初始化 student_id 避免未绑定错误
     student_id: Optional[int] = None
 
     # 先接受连接
-    print(f"📡 [websocket_endpoint] 准备接受 WebSocket 连接...")
     await websocket.accept()
-    print(f"✅ [websocket_endpoint] WebSocket 连接已接受")
 
     # 使用辅助函数验证Origin
-    print(f"🔍 [websocket_endpoint] 验证 Origin...")
     if not await validate_websocket_origin(websocket):
-        print(f"❌ [websocket_endpoint] CORS 验证失败")
         await websocket.close(code=1008, reason="CORS validation failed")
         return
-    print(f"✅ [websocket_endpoint] Origin 验证通过")
 
     try:
         # 使用辅助函数验证Token并获取用户信息
-        print(f"🔍 [websocket_endpoint] 验证 Token...")
         current_user = await authenticate_websocket_token(token, db)
         if not current_user:
-            print(f"❌ [websocket_endpoint] Token 验证失败")
             await websocket.close(code=1008, reason="Invalid token")
             return
-        print(f"✅ [websocket_endpoint] Token 验证通过: user_id={current_user.id}")
 
         # 验证会话存在性
-        print(f"🔍 [websocket_endpoint] 验证会话存在性: session_id={session_id}")
         session = await db.get(ClassSession, session_id)
         if not session:
-            print(f"❌ [websocket_endpoint] 会话不存在: session_id={session_id}")
             logger.error(f"❌ 会话不存在: session_id={session_id}")
             await websocket.close(code=1008, reason="Session not found")
             return
-        print(f"✅ [websocket_endpoint] 会话存在: session_id={session_id}, status={session.status}")
 
         # 使用辅助函数验证学生访问权限（角色 + 状态 + 班级权限）
-        print(f"🔍 [websocket_endpoint] 验证学生访问权限...")
         if not await validate_student_websocket_access(current_user, session, db):
-            print(f"❌ [websocket_endpoint] 学生访问权限验证失败")
             await websocket.close(code=1008, reason="Access denied")
             return
-        print(f"✅ [websocket_endpoint] 学生访问权限验证通过")
 
         student_id = cast(int, current_user.id)
         logger.info(f"✅ 学生验证通过: user_id={student_id}, session_id={session_id}")
 
-        # 🔍 调试：记录连接注册前的状态
-        all_sessions_before = manager.get_all_session_ids()
-        connections_before = manager.get_session_connections_count(session_id)
-        
         # 注册连接
         await manager.connect(websocket, session_id, student_id)
-        
-        # 🔍 调试：记录连接注册后的状态
-        all_sessions_after = manager.get_all_session_ids()
-        connections_after = manager.get_session_connections_count(session_id)
-        
-        logger.info(f"✅ 连接已注册:")
-        logger.info(f"   session_id: {session_id}")
-        logger.info(f"   student_id: {student_id}")
-        logger.info(f"   注册前该会话在线数: {connections_before}")
-        logger.info(f"   注册后该会话在线数: {connections_after}")
-        logger.info(f"   注册前所有活跃会话: {all_sessions_before}")
-        logger.info(f"   注册后所有活跃会话: {all_sessions_after}")
+        logger.info(f"✅ 连接已注册: session_id={session_id}, student_id={student_id}")
 
         # 发送初始状态
-        print(f"📤 [websocket_endpoint] 准备发送初始状态...")
         await send_initial_state(websocket, session, db)
-        print(f"✅ [websocket_endpoint] 初始状态已发送")
-
-        # 🔍 调试：发送初始状态后，验证连接是否还在
-        connections_after_send = manager.get_session_connections_count(session_id)
-        print(f"🔍 [websocket_endpoint] 发送初始状态后，该会话在线数: {connections_after_send}")
-        if session_id not in manager.active_connections or student_id not in manager.active_connections.get(session_id, {}):
-            print(f"❌ [websocket_endpoint] 警告：发送初始状态后，连接不在 active_connections 中！")
-        else:
-            print(f"✅ [websocket_endpoint] 验证成功：连接仍在 active_connections 中")
 
         # 更新学生在线状态
         await update_student_online_status(db, session_id, student_id, is_online=True)
 
         # 监听客户端消息
-        print(f"👂 [websocket_endpoint] 开始监听客户端消息...")
         while True:
-            try:
-                data = await websocket.receive_text()
-                message = json.loads(data)
-                print(f"📨 [websocket_endpoint] 收到客户端消息: type={message.get('type', 'unknown')}")
-            except Exception as receive_error:
-                print(f"❌ [websocket_endpoint] 接收消息时出错: {type(receive_error).__name__}: {str(receive_error)}")
-                raise  # 重新抛出异常，让外层 catch 处理
+            data = await websocket.receive_text()
+            message = json.loads(data)
 
-            try:
-                await handle_client_message(
-                    message=message,
-                    session_id=session_id,
-                    student_id=student_id,
-                    websocket=websocket,
-                    db=db,
-                )
-            except Exception as handle_error:
-                print(f"❌ [websocket_endpoint] 处理消息时出错: {type(handle_error).__name__}: {str(handle_error)}")
-                # 不重新抛出，继续监听下一条消息
+            await handle_client_message(
+                message=message,
+                session_id=session_id,
+                student_id=student_id,
+                websocket=websocket,
+                db=db,
+            )
 
     except WebSocketDisconnect:
-        print(f"🔌 [websocket_endpoint] 学生断开连接: session_id={session_id}, student_id={student_id}")
         logger.info(f"🔌 学生断开连接: session_id={session_id}, student_id={student_id}")
     except Exception as e:
-        print(f"❌ [websocket_endpoint] WebSocket异常: {type(e).__name__}: {str(e)}")
-        import traceback
-        print(f"   堆栈跟踪:")
-        traceback.print_exc()
         logger.error(f"❌ WebSocket异常: {str(e)}")
+        import traceback
         traceback.print_exc()
     finally:
         # 清理连接
-        print(f"🧹 [websocket_endpoint] 开始清理连接: session_id={session_id}, student_id={student_id}")
         if student_id is not None:
             try:
                 await manager.disconnect(session_id, student_id)
                 await update_student_online_status(db, session_id, student_id, is_online=False)
-                print(f"✅ [websocket_endpoint] 连接已清理: session_id={session_id}, student_id={student_id}")
                 logger.info(f"✅ 连接已清理: session_id={session_id}, student_id={student_id}")
             except Exception as e:
-                print(f"⚠️ [websocket_endpoint] 清理连接时出错: {str(e)}")
                 logger.error(f"⚠️ 清理连接时出错: {str(e)}")
 
 

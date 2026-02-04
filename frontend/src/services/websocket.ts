@@ -43,19 +43,6 @@ export class WebSocketService {
       const wsBase = serverBaseUrl.replace('http://', '').replace('https://', '')
 
       this.url = `${wsProtocol}//${wsBase}/api/v1/classroom-sessions/sessions/${sessionId}/ws?token=${token}`
-
-      // 🔍 调试：记录连接时的 session_id
-      console.log('🔌 [WebSocket] ========== 开始连接流程 ==========')
-      console.log('🔌 [WebSocket] 连接参数:', {
-        sessionId,
-        token: token ? `${token.substring(0, 20)}...` : 'MISSING',
-        url: this.url.replace(/\?.*/, ''),
-        fullUrl: this.url,
-        wsProtocol,
-        serverBaseUrl,
-        wsBase,
-        timestamp: new Date().toISOString()
-      })
       
       // 连接 WebSocket
       log.debug('连接', this.url.replace(/\?.*/, ''))
@@ -91,18 +78,6 @@ export class WebSocketService {
       // 超时：关闭连接并 reject；设 isDisconnecting 避免 onerror 再报一次
       timeoutId = setTimeout(() => {
         if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
-          console.error('❌ [WebSocket] ========== 连接超时 ==========')
-          console.error('❌ [WebSocket] 超时详情:', {
-            sessionId,
-            timeout: `${timeout}ms`,
-            url: this.url.replace(/\?.*/, ''),
-            readyState: this.ws?.readyState,
-            timestamp: new Date().toISOString()
-          })
-          console.error('❌ [WebSocket] 可能原因:')
-          console.error('   1. 后端响应缓慢（性能问题）')
-          console.error('   2. 网络延迟过高')
-          console.error('   3. 后端 WebSocket 端点存在阻塞操作')
           log.warn(`连接超时 ${timeout}ms，请检查网络或后端`)
           this.isManualClose = true
           this.isDisconnecting = true
@@ -116,24 +91,12 @@ export class WebSocketService {
       try {
         this.ws = new WebSocket(this.url)
         this.isManualClose = false
-
-        console.log('🔌 [WebSocket] WebSocket 对象已创建:', {
-          url: this.url.replace(/\?.*/, ''),
-          sessionId,
-          timestamp: new Date().toISOString()
-        })
+        
         log.debug('创建 WebSocket，等待连接')
         
         // 连接成功
         this.ws.onopen = () => {
-          console.log('✅ [WebSocket] ========== 连接成功 ==========')
-          console.log('✅ [WebSocket] 连接详情:', {
-            sessionId,
-            url: this.url.replace(/\?.*/, ''),
-            timestamp: new Date().toISOString()
-          })
           log.debug('onopen')
-          console.log('✅ [WebSocket] 连接已建立 (session_id=' + sessionId + ')')
           this.reconnectAttempts = 0
           this.startHeartbeat()
           resolveOnce()
@@ -143,33 +106,16 @@ export class WebSocketService {
         this.ws.onmessage = (event) => {
           try {
             const message: WebSocketMessage = JSON.parse(event.data)
-            
-            // 🔍 调试：记录所有收到的消息（包括 pong）
             if (message.type !== 'pong') {
               log.debug('消息', message.type)
-              console.log('📨 [WebSocket] 收到消息:', {
-                type: message.type,
-                timestamp: message.timestamp,
-                data: message.data,
-                sessionId: sessionId, // 记录当前连接的 session_id
-                rawMessage: event.data.substring(0, 200) // 记录原始消息的前200字符
-              })
-            } else {
-              // 🔍 调试：pong 消息也记录（但简化）
-              console.log('💓 [WebSocket] 收到 pong (session_id=' + sessionId + ')')
             }
-            
             if (message.type === 'connected') {
-              console.log('✅ [WebSocket] 连接成功确认 (session_id=' + sessionId + ')')
               resolveOnce()
             }
 
             this.handleMessage(message)
           } catch (error) {
-            console.error('❌ 解析消息失败:', error, {
-              sessionId,
-              rawData: event.data?.substring(0, 200)
-            })
+            console.error('❌ 解析消息失败:', error)
           }
         }
         
@@ -280,10 +226,8 @@ export class WebSocketService {
   on(messageType: string, callback: WebSocketEventCallback) {
     if (!this.eventListeners.has(messageType)) {
       this.eventListeners.set(messageType, new Set())
-      console.log(`📝 [WebSocket] 注册新监听器: ${messageType}`)
     }
     this.eventListeners.get(messageType)!.add(callback)
-    console.log(`➕ [WebSocket] 添加 ${messageType} 监听器，总数: ${this.eventListeners.get(messageType)!.size}`)
   }
   
   /**
@@ -306,53 +250,15 @@ export class WebSocketService {
    * 处理接收到的消息
    */
   private handleMessage(message: WebSocketMessage) {
-    // 🔍 调试：详细记录消息处理过程
-    const hasListeners = this.eventListeners.has(message.type)
-    const listenerCount = this.eventListeners.get(message.type)?.size || 0
-    
-    console.log('🔔 [WebSocket] handleMessage 开始处理:', {
-      type: message.type,
-      hasListeners,
-      listenerCount,
-      allTypes: Array.from(this.eventListeners.keys()),
-      messageData: message.type === 'cell_changed' ? {
-        display_cell_orders: message.data?.display_cell_orders,
-        current_cell_id: message.data?.current_cell_id,
-        action: message.data?.action
-      } : (message.type !== 'pong' ? message.data : 'pong')
-    })
-
     // 触发对应类型的监听器
     if (this.eventListeners.has(message.type)) {
       const callbacks = this.eventListeners.get(message.type)!
-      console.log(`✅ [WebSocket] 触发 ${message.type} 监听器，数量: ${callbacks.size}`)
-      
-      // 🔍 调试：特别追踪 cell_changed 消息
-      if (message.type === 'cell_changed') {
-        console.log('🎯 [WebSocket] cell_changed 消息详情:', {
-          display_cell_orders: message.data?.display_cell_orders,
-          current_cell_id: message.data?.current_cell_id,
-          callbackCount: callbacks.size,
-          timestamp: message.timestamp
-        })
-      }
-      
-      callbacks.forEach((callback, index) => {
+      callbacks.forEach((callback) => {
         try {
-          console.log(`  → [WebSocket] 执行回调 ${index + 1}/${callbacks.size} (type=${message.type})`)
           callback(message)
-          console.log(`  ✓ [WebSocket] 回调 ${index + 1} 执行完成`)
         } catch (error) {
-          console.error(`❌ [WebSocket] 回调 ${index + 1} 执行错误:`, error, {
-            messageType: message.type,
-            errorStack: error instanceof Error ? error.stack : undefined
-          })
+          console.error('❌ 消息处理回调错误:', error)
         }
-      })
-    } else {
-      console.log(`⚠️ [WebSocket] 没有找到 ${message.type} 类型的监听器`, {
-        availableTypes: Array.from(this.eventListeners.keys()),
-        receivedType: message.type
       })
     }
 

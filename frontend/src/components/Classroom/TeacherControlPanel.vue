@@ -267,9 +267,7 @@ const lessonStore = useLessonStore()
 const sessionManager = useSessionManager({
   lessonId: props.lessonId,
   onSessionCreated: (newSession) => {
-    console.log('✅ TeacherControlPanel: 会话已创建，sessionId =', newSession.id, '状态 =', newSession.status)
     loadParticipants()
-    console.log('✅ 初始学生列表加载完成，学生数:', activeStudents.value.length)
   },
   onSessionStarted: (updatedSession) => {
     durationTimer.startDurationTimer()
@@ -433,10 +431,10 @@ const wsManager = useWebSocket({
   endpointUrl: wsEndpointUrl,
   scope: 'session',
   onConnected: (event) => {
-    console.log('✅ WebSocket 已连接')
+    // WebSocket 已连接
   },
   onDisconnected: (event) => {
-    console.log('🔌 WebSocket 已断开')
+    // WebSocket 已断开
   },
   onError: (event) => {
     console.error('❌ WebSocket 错误:', event)
@@ -732,7 +730,6 @@ watch(() => sessionManager.normalizedSessionStatus.value, (status, oldStatus) =>
   // 当会话被创建或状态改变时，连接 WebSocket
   if (status && status !== oldStatus && status !== 'ended') {
     wsManager.connect()
-    console.log('✅ 会话状态变化，已连接 WebSocket，新状态:', status)
   }
   // 当会话结束时，断开 WebSocket
   if (status === 'ended' || status === null) {
@@ -873,9 +870,7 @@ defineExpose({
   handleEnd,
   // 添加调试日志
   getSessionId: () => {
-    const id = session.value?.id
-    console.log('🔍 TeacherControlPanel defineExpose getSessionId:', id, session.value)
-    return id
+    return session.value?.id
   },
 })
 </script>

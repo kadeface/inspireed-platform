@@ -205,18 +205,7 @@ export function useNavigation(options: UseNavigationOptions) {
         action,
       }
 
-      console.log('📤 [教师端] 发送导航请求:', {
-        sessionId: session.value.id,
-        requestData,
-        displayOrders,
-      })
-
       const updatedSession = await classroomSessionService.navigateToCell(session.value.id, requestData)
-
-      console.log('✅ [教师端] 导航请求成功:', {
-        displayCellOrders: updatedSession.settings?.display_cell_orders,
-        status: updatedSession.status,
-      })
 
       // 确保更新后的会话状态正确（不要丢失状态）
       if (updatedSession) {

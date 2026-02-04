@@ -225,12 +225,6 @@ function handleCheckboxClick(cell: Cell, index: number, event: Event) {
 }
 
 function handleCheckboxChange(cell: Cell, index: number, event: Event) {
-  console.log('🔔 [ModuleList] checkbox-change 事件触发:', {
-    cellTitle: cell.title,
-    cellOrder: cell.order,
-    index,
-    checked: (event.target as HTMLInputElement).checked
-  })
   emit('checkbox-change', cell, index, event)
 }
 
