@@ -339,19 +339,12 @@ export function useSessionManager(options: UseSessionManagerOptions) {
 
     try {
       // 调用 API 结束会话
-      const endedSession = await classroomSessionService.endSession(sessionId)
-
-      console.log('✅ 会话已结束，后端返回:', {
-        id: endedSession.id,
-        status: endedSession.status,
-        endedAt: endedSession.endedAt || endedSession.ended_at,
-      })
+      await classroomSessionService.endSession(sessionId)
 
       // 结束会话后，清除本地状态
       session.value = null
 
       onSessionEnded?.()
-      console.log('✅ 会话已结束，本地状态已清除')
       alert('课程已成功结束，现在可以创建新课堂了')
     } catch (error: any) {
       console.error('❌ 结束会话失败:', error)

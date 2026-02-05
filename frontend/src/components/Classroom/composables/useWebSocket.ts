@@ -296,7 +296,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
             }
           }, reconnectDelay)
         } else if (reconnectAttempts.value >= maxReconnectAttempts) {
-          console.error('❌ 达到最大重连次数，停止重连')
+          // 达到最大重连次数，停止重连
         }
       }
     } catch (error) {
