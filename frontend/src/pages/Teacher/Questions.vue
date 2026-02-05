@@ -5,6 +5,7 @@
       title="过程性评估总览"
       subtitle="汇集课堂提交、流程表现与互动反馈，全景洞察学习进展"
       :user-name="userName"
+      :role-name="roleName"
       :region-name="regionName"
       :school-name="schoolName"
       :grade-name="gradeName"
@@ -504,6 +505,7 @@ import { authService } from '@/services/auth'
 import activityService from '@/services/activity'
 import { lessonService } from '@/services/lesson'
 import questionService from '@/services/question'
+import { getRoleDisplayName } from '@/types/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import type { Lesson } from '@/types/lesson'
 import type {
@@ -526,6 +528,7 @@ const userStore = useUserStore()
 
 // 用户信息
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '教师')
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 const regionName = computed(() => userStore.user?.region_name || null)
 const schoolName = computed(() => userStore.user?.school_name || null)
 const gradeName = computed(() => userStore.user?.grade_name || null)

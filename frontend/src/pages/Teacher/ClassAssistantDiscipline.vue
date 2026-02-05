@@ -4,6 +4,7 @@
       title="纪律记录"
       subtitle="记录课堂纪律事件，形成可回顾的数据"
       :user-name="userName"
+      :role-name="roleName"
       :region-name="regionName"
       :school-name="schoolName"
       :grade-name="gradeName"
@@ -176,6 +177,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { getRoleDisplayName } from '@/types/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import { classroomAssistantService } from '@/services/classroomAssistant'
 import type {
@@ -192,6 +194,7 @@ const userStore = useUserStore()
 const classroomId = computed(() => Number(route.params.classroomId))
 
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '')
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 const regionName = computed(() => userStore.user?.region_name || null)
 const schoolName = computed(() => userStore.user?.school_name || null)
 const gradeName = computed(() => userStore.user?.grade_name || null)

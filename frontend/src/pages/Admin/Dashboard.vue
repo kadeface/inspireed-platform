@@ -5,6 +5,7 @@
       title="平台数据看板"
       subtitle="管理员专属 - 查看平台运行数据和统计信息"
       :user-name="userName"
+      :role-name="roleName"
       @logout="handleLogout"
     />
 
@@ -106,6 +107,7 @@ import adminService, {
 } from '@/services/admin'
 import { useToast } from '@/composables/useToast'
 import { useUserStore } from '@/store/user'
+import { getRoleDisplayName } from '@/types/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 
 // Import new components
@@ -125,6 +127,8 @@ const dashboard = ref<DashboardOverview | null>(null)
 
 // 用户名
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '管理员')
+// 角色显示名
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 
 // 退出登录
 function handleLogout() {

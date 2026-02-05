@@ -5,6 +5,7 @@
       title="教师工作台"
       subtitle="管理您的教案和课程资源"
       :user-name="userName"
+      :role-name="roleName"
       :region-name="regionName"
       :school-name="schoolName"
       :grade-name="gradeName"
@@ -739,6 +740,7 @@ import { lessonService } from '@/services/lesson'
 import curriculumService from '@/services/curriculum'
 import { getSubjectGroupStatistics } from '@/services/subjectGroup'
 import { authService } from '@/services/auth'
+import { getRoleDisplayName } from '@/types/user'
 import type { QuestionStats } from '@/types/question'
 import type { SubjectGroupStatistics } from '@/types/subjectGroup'
 
@@ -764,6 +766,7 @@ const isPdcaLoading = ref(false)
 
 // 用户名
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '教师')
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 const regionName = computed(() => userStore.user?.region_name || '')
 const schoolName = computed(() => userStore.user?.school_name || '')
 const gradeName = computed(() => userStore.user?.grade_name || '')

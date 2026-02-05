@@ -4,6 +4,7 @@
       title="班级教学助手 - 成员管理"
       :subtitle="selectedClassroom ? `班级：${selectedClassroom.name}` : '选择班级开始管理'"
       :user-name="userName"
+      :role-name="roleName"
       :region-name="regionName"
       :school-name="schoolName"
       :grade-name="gradeName"
@@ -319,6 +320,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { getRoleDisplayName } from '@/types/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import { classroomAssistantService } from '@/services/classroomAssistant'
 import adminService, { type User } from '@/services/admin'
@@ -337,6 +339,7 @@ const userStore = useUserStore()
 const classroomId = computed(() => Number(route.params.classroomId))
 
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '')
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 const regionName = computed(() => userStore.user?.region_name || null)
 const schoolName = computed(() => userStore.user?.school_name || null)
 const gradeName = computed(() => userStore.user?.grade_name || null)

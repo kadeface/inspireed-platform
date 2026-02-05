@@ -13,6 +13,7 @@
         title="学生工作台"
         subtitle="开始您的学习之旅"
         :user-name="userName"
+        :role-name="roleName"
         :region-name="regionName"
         :school-name="schoolName"
         :grade-name="gradeName"
@@ -682,6 +683,7 @@ import type { Lesson } from '@/types/lesson'
 import type { Subject } from '@/types/curriculum'
 import type { StudentPendingSession } from '@/types/classroomSession'
 import type { StudentProject } from '@/types/student_project'
+import { getRoleDisplayName } from '@/types/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import CurriculumTreeViewStudent from '@/components/Student/CurriculumTreeViewStudent.vue'
 
@@ -728,6 +730,7 @@ const ACTIVE_SESSIONS_POLLING_INTERVAL = 5000 // 5秒轮询一次
 // 计算属性
 const currentUser = computed(() => userStore.user)
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '学生')
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 const regionName = computed(() => userStore.user?.region_name || null)
 const schoolName = computed(() => userStore.user?.school_name || null)
 const gradeName = computed(() => userStore.user?.grade_name || null)

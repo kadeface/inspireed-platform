@@ -4,6 +4,7 @@
       title="我的收藏"
       subtitle="您收藏的课程"
       :user-name="userName"
+      :role-name="roleName"
       @logout="handleLogout"
     />
 
@@ -117,6 +118,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { favoriteService } from '@/services/favorite'
 import type { FavoriteWithLesson } from '@/services/favorite'
+import { getRoleDisplayName } from '@/types/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 
 const router = useRouter()
@@ -127,6 +129,7 @@ const error = ref<string | null>(null)
 const favorites = ref<FavoriteWithLesson[]>([])
 
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '学生')
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 
 const fetchData = async () => {
   loading.value = true

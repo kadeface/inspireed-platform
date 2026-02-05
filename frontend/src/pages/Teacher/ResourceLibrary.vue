@@ -5,6 +5,7 @@
       title="资源库"
       subtitle="管理和分享学校的教学资源"
       :user-name="userName"
+      :role-name="roleName"
       :region-name="regionName"
       :school-name="schoolName"
       :grade-name="gradeName"
@@ -262,6 +263,7 @@ import { getAssetTypeIcon, getAssetTypeName, getVisibilityName, formatFileSize }
 import UploadAssetModal from '@/components/Library/UploadAssetModal.vue'
 import AssetDetailModal from '@/components/Library/AssetDetailModal.vue'
 import ResourceDirectoryTree from '@/components/Library/ResourceDirectoryTree.vue'
+import { getRoleDisplayName } from '@/types/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import { getServerBaseUrl } from '@/utils/url'
 
@@ -269,6 +271,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '教师')
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 const regionName = computed(() => userStore.user?.region_name || '')
 const schoolName = computed(() => userStore.user?.school_name || '')
 const gradeName = computed(() => userStore.user?.grade_name || '')

@@ -7,6 +7,21 @@ export enum UserRole {
   SCHOOL_ADMIN = 'school_admin',
 }
 
+/** 将 UserRole 映射为中文显示名称 */
+export function getRoleDisplayName(role: UserRole | string | undefined): string {
+  if (!role) return '管理员'
+  const r = typeof role === 'string' ? role : String(role)
+  const map: Record<string, string> = {
+    admin: '管理员',
+    teacher: '教师',
+    student: '学生',
+    researcher: '教研员',
+    district_admin: '区县考试管理员',
+    school_admin: '校级管理员',
+  }
+  return map[r] ?? '管理员'
+}
+
 export interface User {
   id: number
   email: string

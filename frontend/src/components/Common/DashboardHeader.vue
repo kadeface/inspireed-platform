@@ -48,7 +48,7 @@
                 >
                   {{ userName }}
                 </div>
-                <div class="text-xs text-slate-400">管理员</div>
+                <div class="text-xs text-slate-400">{{ roleName ?? '管理员' }}</div>
               </div>
               <el-avatar
                 :size="36"
@@ -105,6 +105,7 @@ const props = defineProps<{
   title: string
   subtitle?: string
   userName: string
+  roleName?: string
   showProfileButton?: boolean
   regionName?: string | null
   schoolName?: string | null
@@ -112,7 +113,7 @@ const props = defineProps<{
   classroomName?: string | null
 }>()
 
-const { title, userName, regionName, schoolName, gradeName, classroomName } = toRefs(props)
+const { title, userName, roleName, regionName, schoolName, gradeName, classroomName } = toRefs(props)
 
 const organizationInfo = computed(() => {
   const info: string[] = []

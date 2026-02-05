@@ -5,6 +5,7 @@
       title="学科教研组"
       subtitle="与同事协作，共享优质教学设计"
       :user-name="userName"
+      :role-name="roleName"
       :region-name="regionName"
       :school-name="schoolName"
       :grade-name="gradeName"
@@ -312,6 +313,7 @@ import {
   getSubjectGroupStatistics,
 } from '@/services/subjectGroup'
 import { curriculumService } from '@/services/curriculum'
+import { getRoleDisplayName } from '@/types/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 import type {
   SubjectGroup,
@@ -327,6 +329,7 @@ const userStore = useUserStore()
 
 // 用户信息
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '教师')
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 const regionName = computed(() => userStore.user?.region_name || null)
 const schoolName = computed(() => userStore.user?.school_name || null)
 const gradeName = computed(() => userStore.user?.grade_name || null)

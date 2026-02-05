@@ -5,6 +5,7 @@
       title="教研工作台"
       subtitle="管理课程体系和教学资源"
       :user-name="userName"
+      :role-name="roleName"
       @logout="handleLogout"
     />
 
@@ -89,6 +90,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { getRoleDisplayName } from '@/types/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 
 const router = useRouter()
@@ -96,6 +98,7 @@ const userStore = useUserStore()
 
 // 用户名
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '教研员')
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 
 // 退出登录
 function handleLogout() {

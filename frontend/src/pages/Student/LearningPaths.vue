@@ -4,6 +4,7 @@
       title="学习路径"
       subtitle="系统化的学习计划"
       :user-name="userName"
+      :role-name="roleName"
       @logout="handleLogout"
     />
 
@@ -140,6 +141,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { learningPathService } from '@/services/learningPath'
 import type { LearningPathListItem, LearningPathWithLessons } from '@/services/learningPath'
+import { getRoleDisplayName } from '@/types/user'
 import DashboardHeader from '@/components/Common/DashboardHeader.vue'
 
 const router = useRouter()
@@ -151,6 +153,7 @@ const learningPaths = ref<LearningPathListItem[]>([])
 const selectedPath = ref<LearningPathWithLessons | null>(null)
 
 const userName = computed(() => userStore.user?.full_name || userStore.user?.username || '学生')
+const roleName = computed(() => getRoleDisplayName(userStore.user?.role))
 
 const fetchData = async () => {
   loading.value = true
