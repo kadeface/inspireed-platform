@@ -143,21 +143,16 @@ export function useSessionManager(options: UseSessionManagerOptions) {
 
       // 如果创建失败，检查是否是因为已有活跃会话
       const errorDetail = createError.response?.data?.detail || createError.message || ''
-      console.log('🔍 错误详情:', errorDetail)
 
       // 检查错误消息中是否包含"已有活跃的课堂会话"
       const hasActiveSessionError = errorDetail.includes('已有活跃的课堂会话') ||
                                     errorDetail.includes('已有活跃会话')
 
       if (hasActiveSessionError && (createError.response?.status === 400 || createError.message)) {
-        console.log('✅ 检测到"已有活跃会话"错误，尝试提取会话ID...')
-
         // 从错误信息中提取会话ID
         const sessionIdMatch = errorDetail.match(/\(ID\s*[：:]\s*(\d+)\)/) ||
                                errorDetail.match(/（ID\s*[：:]\s*(\d+)）/) ||
                                errorDetail.match(/ID\s*[：:]\s*(\d+)/)
-
-        console.log('🔍 会话ID匹配结果:', sessionIdMatch)
 
         if (!sessionIdMatch) {
           console.error('❌ 无法从错误信息中提取会话ID。错误信息:', errorDetail)
@@ -165,7 +160,6 @@ export function useSessionManager(options: UseSessionManagerOptions) {
         }
 
         const existingSessionId = parseInt(sessionIdMatch[1])
-        console.log('✅ 从错误信息中提取到会话ID:', existingSessionId)
 
         // 直接加载现有会话，并提示用户
         try {
@@ -189,7 +183,6 @@ export function useSessionManager(options: UseSessionManagerOptions) {
             } else {
               // 会话是活跃状态，加载它并提示用户
               session.value = existingSession
-              console.log('✅ 已自动加载现有会话:', existingSession.id)
 
               const sessionStatusText = {
                 pending: '待开始',
