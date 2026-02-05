@@ -135,12 +135,6 @@ export function useSessionManager(options: UseSessionManagerOptions) {
       // 调用回调
       onSessionCreated?.(newSession)
     } catch (createError: any) {
-      console.log('🔍 捕获到创建会话错误:', {
-        message: createError.message,
-        responseStatus: createError.response?.status,
-        responseData: createError.response?.data,
-      })
-
       // 如果创建失败，检查是否是因为已有活跃会话
       const errorDetail = createError.response?.data?.detail || createError.message || ''
 
