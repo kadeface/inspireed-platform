@@ -35,11 +35,6 @@ export const classroomSessionService = {
       // 后端会合并默认设置
       requestBody.settings = {}
       
-      console.log('📤 Creating session with request:', {
-        url: `/classroom-sessions/lessons/${lessonId}/sessions`,
-        body: requestBody,
-      })
-      
       const response = await api.post(`/classroom-sessions/lessons/${lessonId}/sessions`, requestBody)
       
       // api.post 已经返回 response.data，所以 response 就是数据本身
