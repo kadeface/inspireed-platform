@@ -29,8 +29,6 @@ export function getDefaultCell(cellType: (typeof CellType)[keyof typeof CellType
         content: { code: '# 在此编写代码\nprint("Hello, World!")', language: 'python' as const },
         config: { environment: 'jupyterlite' as const },
       } as Cell
-    case CellType.PARAM:
-      return { ...baseCell, type: CellType.PARAM, content: { schema: {}, values: {} } } as Cell
     case CellType.SIM:
       return {
         ...baseCell,

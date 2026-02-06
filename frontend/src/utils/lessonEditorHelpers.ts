@@ -38,7 +38,6 @@ export function markdownToHtml(markdown: string): string {
 const CELL_TYPE_NAMES: Record<string, string> = {
   [CellType.TEXT]: '文本单元',
   [CellType.CODE]: '代码单元',
-  [CellType.PARAM]: '参数单元',
   [CellType.SIM]: '仿真单元',
   [CellType.CHART]: '图表单元',
   [CellType.CONTEST]: '竞赛单元',
@@ -59,7 +58,6 @@ export function summarizeCell(cell: Cell, index: number): string | null {
   const typeMap: Record<string, string> = {
     [CellType.TEXT]: '文本',
     [CellType.CODE]: '代码',
-    [CellType.PARAM]: '参数',
     [CellType.SIM]: '仿真',
     [CellType.CHART]: '图表',
     [CellType.CONTEST]: '竞赛',

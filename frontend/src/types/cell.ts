@@ -9,7 +9,6 @@ export const CellType = {
   // QA: 'qa', // 已移除教师端问答功能
   CHART: 'chart',
   CONTEST: 'contest',
-  PARAM: 'param',
   ACTIVITY: 'activity',  // 教学活动（测验、问卷、作业、评价）
   FLOWCHART: 'flowchart',  // 流程图
   BROWSER: 'browser',  // 浏览器单元
@@ -63,16 +62,6 @@ export interface CodeCell extends CellBase {
     maxMemory?: number
     environment?: 'jupyterlite' | 'jupyterhub'
   }
-}
-
-export interface ParamCellContent {
-  schema: any // JSON Schema
-  values: Record<string, any>
-}
-
-export interface ParamCell extends CellBase {
-  type: typeof CellType.PARAM
-  content: ParamCellContent
 }
 
 export interface SimCellContent {
@@ -261,7 +250,6 @@ export interface InteractiveCell extends CellBase {
 export type Cell =
   | TextCell
   | CodeCell
-  | ParamCell
   | SimCell
   | ChartCell
   | ContestCell

@@ -30,7 +30,6 @@ class CellType(str, Enum):
     QA = "QA"  # 问答交互单元
     CHART = "CHART"  # 数据可视化单元
     CONTEST = "CONTEST"  # 竞技任务单元
-    PARAM = "PARAM"  # 参数设置单元
     ACTIVITY = "ACTIVITY"  # 教学活动单元（测验、问卷、作业、评价）
     FLOWCHART = "FLOWCHART"  # 流程图单元
     BROWSER = "BROWSER"  # 浏览器单元
