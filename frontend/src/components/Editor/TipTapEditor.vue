@@ -57,6 +57,63 @@
       >
         &lt;/&gt;
       </button>
+      <div v-if="editor.isActive('codeBlock')" class="relative inline-block">
+        <select
+          @change="setCodeBlockLanguage"
+          class="menu-btn language-selector"
+          :value="getCurrentCodeLanguage()"
+        >
+          <option value="plaintext">Plain Text</option>
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
+          <option value="python">Python</option>
+          <option value="java">Java</option>
+          <option value="cpp">C++</option>
+          <option value="c">C</option>
+          <option value="csharp">C#</option>
+          <option value="go">Go</option>
+          <option value="rust">Rust</option>
+          <option value="php">PHP</option>
+          <option value="ruby">Ruby</option>
+          <option value="swift">Swift</option>
+          <option value="kotlin">Kotlin</option>
+          <option value="sql">SQL</option>
+          <option value="html">HTML</option>
+          <option value="css">CSS</option>
+          <option value="json">JSON</option>
+          <option value="xml">XML</option>
+          <option value="yaml">YAML</option>
+          <option value="bash">Bash</option>
+          <option value="markdown">Markdown</option>
+        </select>
+      </div>
+      <button
+        @click="insertInlineMath"
+        :class="{ 'is-active': editor.isActive('math_inline') }"
+        class="menu-btn"
+        title="Inline Math (Ctrl+M)"
+        style="display: none;"
+      >
+        ∑x
+      </button>
+      <button
+        @click="insertBlockMath"
+        :class="{ 'is-active': editor.isActive('math_block') }"
+        class="menu-btn"
+        title="Block Math (Ctrl+Shift+M)"
+        style="display: none;"
+      >
+        ∑
+      </button>
+      <button
+        @click="insertMermaidDiagram"
+        :class="{ 'is-active': editor.isActive('mermaid') }"
+        class="menu-btn"
+        title="Insert Diagram"
+        style="display: none;"
+      >
+        📊 Diagram
+      </button>
       <button @click="triggerImageUpload" class="menu-btn">🖼️ Image</button>
       <div class="relative inline-block">
         <button 
@@ -152,11 +209,19 @@ import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { common, createLowlight } from 'lowlight'
 import { watch, onBeforeUnmount, ref } from 'vue'
 import api from '../../services/api'
 import { getServerBaseUrl } from '@/utils/url'
 import AssetPicker from '@/components/Library/AssetPicker.vue'
 import type { LibraryAssetSummary } from '@/types/library'
+// Temporarily disabled
+// import Mathematics from '@tiptap/extension-mathematics'
+// import { MermaidNode } from './extensions/MermaidNode'
+
+// Create lowlight instance with common languages
+const lowlight = createLowlight(common)
 
 interface Props {
   content: string
@@ -268,7 +333,16 @@ function normalizeImageUrls(html: string): string {
 const editor = useEditor({
   content: normalizeImageUrls(props.content),
   extensions: [
-    StarterKit,
+    StarterKit.configure({
+      codeBlock: false, // Disable default CodeBlock to use CodeBlockLowlight instead
+    }),
+    CodeBlockLowlight.configure({
+      lowlight,
+      defaultLanguage: 'plaintext',
+    }),
+    // Temporarily disable to debug
+    // Mathematics,
+    // MermaidNode,
     Image.configure({
       inline: true,
       allowBase64: true,
@@ -713,6 +787,144 @@ function getFileIcon(filename: string): string {
   return iconMap[ext] || '📎'
 }
 
+// Code block language functions
+function getCurrentCodeLanguage(): string {
+  if (!editor.value) return 'plaintext'
+  const { state } = editor.value
+  const { from, to } = state.selection
+  let language = 'plaintext'
+
+  state.doc.nodesBetween(from, to, (node) => {
+    if (node.type.name === 'codeBlock') {
+      language = node.attrs.language || 'plaintext'
+      return false // Stop traversal
+    }
+  })
+
+  return language
+}
+
+function setCodeBlockLanguage(event: Event) {
+  if (!editor.value) return
+  const target = event.target as HTMLSelectElement
+  const language = target.value
+
+  editor.value
+    .chain()
+    .focus()
+    .updateAttributes('codeBlock', { language })
+    .run()
+}
+
+// Math formula functions
+function insertInlineMath() {
+  if (!editor.value) return
+  const math = window.prompt('Enter inline math formula (LaTeX):', 'E = mc^2')
+  if (math) {
+    editor.value.chain().focus().insertMath(math).run()
+  }
+}
+
+function insertBlockMath() {
+  if (!editor.value) return
+  const math = window.prompt('Enter block math formula (LaTeX):', '\\int_{a}^{b} f(x) dx = F(b) - F(a)')
+  if (math) {
+    editor.value.chain().focus().insertMath(math).run()
+  }
+}
+
+// Mermaid diagram templates
+const diagramTemplates = {
+  flowchart: `graph TD
+    A[Start] --> B{Is it working?}
+    B -->|Yes| C[Great!]
+    B -->|No| D[Debug]
+    D --> B`,
+  sequence: `sequenceDiagram
+    participant Alice
+    participant Bob
+    Alice->>John: Hello John, how are you?
+    loop Healthcheck
+        John->>John: Fight against hypochondria
+    end
+    Note right of John: Rational thoughts <br/>prevail!
+    John-->>Alice: Great!
+    John->>Bob: How about you?
+    Bob-->>John: Jolly good!`,
+  class: `classDiagram
+    Animal <|-- Duck
+    Animal <|-- Fish
+    Animal <|-- Zebra
+    Animal : +int age
+    Animal : +String gender
+    Animal: +isMammal()
+    class Duck{
+        +String beakColor
+        +swim()
+        +quack()
+    }
+    class Fish{
+        -int sizeInFeet
+        -canEat()
+    }
+    class Zebra{
+        +bool is_wild
+        +run()
+    }`,
+  state: `stateDiagram-v2
+    [*] --> Still
+    Still --> [*]
+    Still --> Moving
+    Moving --> Still
+    Moving --> Crash
+    Crash --> [*]`,
+  er: `erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ LINE-ITEM : contains
+    CUSTOMER }|..|{ DELIVERY-ADDRESS : uses`,
+  gantt: `gantt
+    title A Gantt Diagram
+    dateFormat  YYYY-MM-DD
+    section Section
+    A task           :a1, 2014-01-01, 30d
+    Another task     :after a1  , 20d
+    section Another
+    Task in sec      :2014-01-12  , 12d
+    anther task      : 24d`,
+  pie: `pie title Pets adopted by volunteers
+    "Dogs" : 386
+    "Cats" : 85
+    "Rats" : 15`,
+  mindmap: `mindmap
+  root((mindmap))
+    Origins
+      Long history
+      ::icon(fa fa-book)
+      Popularisation
+        British popular psychology author Tony Buzan
+    Research
+      On effectiveness<br/>and features
+      On Automatic creation
+        Uses
+            Creative techniques
+            Strategic planning
+            Argument mapping`,
+}
+
+function insertMermaidDiagram() {
+  if (!editor.value) return
+
+  // Simple implementation: insert a default flowchart
+  // The user can then edit it by clicking the "Edit" button on the diagram
+  const defaultCode = diagramTemplates.flowchart
+
+  editor.value.chain().focus().insertMermaid({
+    code: defaultCode,
+    type: 'flowchart',
+  }).run()
+}
+
+
 // 处理从资源库选择的资源
 async function handleLibraryAssetSelect(asset: LibraryAssetSummary | null) {
   if (!asset || !editor.value) {
@@ -889,6 +1101,25 @@ onBeforeUnmount(() => {
 
 :deep(.ProseMirror pre) {
   @apply bg-gray-900 text-gray-100 p-4 rounded my-2 overflow-x-auto;
+}
+
+/* Code block with syntax highlighting */
+:deep(.ProseMirror pre code) {
+  @apply font-mono text-sm;
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* Language selector */
+.language-selector {
+  @apply cursor-pointer;
+  appearance: none;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1.5em 1.5em;
 }
 
 :deep(.ProseMirror img) {

@@ -4,10 +4,13 @@
 
 from datetime import datetime
 from typing import Any, List, Optional, Union
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
+import logging
 
 from app.models.lesson import LessonStatus
 from app.schemas.curriculum import CourseResponse
+
+logger = logging.getLogger(__name__)
 
 
 class LessonClassroomInfo(BaseModel):
@@ -134,6 +137,46 @@ class LessonResponse(LessonBase):
         if isinstance(v, str):
             return v.lower()
         return v
+
+    @field_serializer("content")
+    def serialize_content(self, content: Union[List[dict], dict]) -> Union[List[dict], dict]:
+        """序列化content时，将cell_type转换为type（前端兼容性）"""
+        def convert_cell(cell: dict) -> dict:
+            if not isinstance(cell, dict):
+                return cell
+            # 创建新的cell字典
+            converted = {**cell}
+            if "cell_type" in converted:
+                # 将cell_type转换为大写并重命名为type
+                cell_type_value = converted.pop("cell_type")
+                if isinstance(cell_type_value, str):
+                    # 确保是大写（兼容旧数据的小写值）
+                    converted["type"] = cell_type_value.upper()
+                else:
+                    # 如果是枚举或其他类型，转换为字符串
+                    converted["type"] = str(cell_type_value).upper()
+            # 如果已经有type字段，确保是大写
+            elif "type" in converted and isinstance(converted["type"], str):
+                converted["type"] = converted["type"].upper()
+            return converted
+
+        if isinstance(content, list):
+            return [convert_cell(cell) for cell in content]
+        elif isinstance(content, dict) and "sections" in content:
+            # 新格式：{sections: [{cells: [...]}]}
+            sections = content.get("sections", [])
+            converted_sections = []
+            for section in sections:
+                if not isinstance(section, dict):
+                    converted_sections.append(section)
+                    continue
+                converted_section = {**section}
+                if "cells" in section and isinstance(section["cells"], list):
+                    converted_section["cells"] = [convert_cell(cell) for cell in section["cells"]]
+                converted_sections.append(converted_section)
+            return {"sections": converted_sections}
+        else:
+            return content
 
     class Config:
         from_attributes = True

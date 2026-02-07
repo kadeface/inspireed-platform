@@ -62,7 +62,17 @@ class Cell(Base):
     section_id = Column(Integer, ForeignKey("sections.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Cell类型
-    cell_type = Column(SQLEnum(CellType, name="celltype"), nullable=False)
+    cell_type = Column(
+        SQLEnum(CellType, name="celltype"),
+        nullable=False,
+        name="cell_type"  # 数据库列名
+    )
+
+    # 别名：前端期望的是 'type' 字段
+    @property
+    def type(self) -> str:
+        """前端兼容性：将 cell_type 暴露为 type"""
+        return self.cell_type
 
     # Cell标题
     title = Column(String(200), nullable=True)

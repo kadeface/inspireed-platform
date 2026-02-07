@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* KaTeX Math Styles - import at component level instead */
+/* @import 'katex/dist/katex.min.css'; */
+
 /* 自定义样式 */
 :root {
   /* Force light form-controls rendering (avoid dark OS theme inputs) */
@@ -49,5 +52,113 @@ body {
 
 .btn-secondary {
   @apply bg-gray-200 text-gray-800 hover:bg-gray-300;
+}
+
+/* Code Syntax Highlighting Styles */
+/* These styles work with lowlight library for code block syntax highlighting */
+
+/* Atom One Dark theme for code blocks */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+  background: #282c34;
+  color: #abb2bf;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #5c6370;
+  font-style: italic;
+}
+
+.hljs-doctag,
+.hljs-keyword,
+.hljs-formula {
+  color: #c678dd;
+}
+
+.hljs-section,
+.hljs-name,
+.hljs-selector-tag,
+.hljs-deletion,
+.hljs-subst {
+  color: #e06c75;
+}
+
+.hljs-literal {
+  color: #56b6c2;
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta-string {
+  color: #98c379;
+}
+
+.hljs-built_in,
+.hljs-class .hljs-title {
+  color: #e6c07b;
+}
+
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-type,
+.hljs-selector-class,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: #d19a66;
+}
+
+.hljs-bullet,
+.hljs-link {
+  color: #61aeee;
+}
+
+.hljs-meta {
+  color: #282c34;
+}
+
+.hljs-number,
+.hljs-symbol {
+  color: #d19a66;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+.hljs-link {
+  text-decoration: underline;
+}
+
+/* Math Formula Styles */
+.math-inline {
+  display: inline;
+  padding: 0 0.2em;
+}
+
+.math-block {
+  display: block;
+  margin: 1em 0;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Ensure math formulas are properly sized */
+.katex {
+  font-size: 1em;
+}
+
+.katex-display {
+  margin: 0.5em 0;
 }
 
