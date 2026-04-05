@@ -21,7 +21,7 @@ class Region(Base):
     code = Column(String(20), unique=True, nullable=False, comment="区域编码")
     level = Column(Integer, nullable=False, comment="区域级别：1-省，2-市，3-区")
     parent_id = Column(
-        Integer, ForeignKey("regions.id"), nullable=True, comment="父级区域ID"
+        Integer, ForeignKey("regions.id"), nullable=True, index=True, comment="父级区域ID"
     )
     is_active = Column(Boolean, default=True, comment="是否激活")
     description = Column(Text, nullable=True, comment="区域描述")
@@ -50,7 +50,7 @@ class School(Base):
     name = Column(String(200), nullable=False, comment="学校名称")
     code = Column(String(50), unique=True, nullable=False, comment="学校编码")
     region_id = Column(
-        Integer, ForeignKey("regions.id"), nullable=False, comment="所属区域ID"
+        Integer, ForeignKey("regions.id"), nullable=False, index=True, comment="所属区域ID"
     )
     school_type = Column(String(50), nullable=False, comment="学校类型：小学、初中、高中、大学等")
     address = Column(String(500), nullable=True, comment="学校地址")
@@ -89,10 +89,10 @@ class Classroom(Base):
     name = Column(String(100), nullable=False, comment="班级名称（如 一年级一班）")
     code = Column(String(50), nullable=True, comment="班级编码，可选")
     school_id = Column(
-        Integer, ForeignKey("schools.id"), nullable=False, comment="所属学校ID"
+        Integer, ForeignKey("schools.id"), nullable=False, index=True, comment="所属学校ID"
     )
     grade_id = Column(
-        Integer, ForeignKey("grades.id"), nullable=False, comment="所属年级ID"
+        Integer, ForeignKey("grades.id"), nullable=False, index=True, comment="所属年级ID"
     )
     enrollment_year = Column(Integer, nullable=True, comment="入学年份/届别")
 

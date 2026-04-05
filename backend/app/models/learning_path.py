@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import Enum
 from sqlalchemy import (
     Column,
+    Index,
     Integer,
     String,
     Text,
@@ -36,7 +37,7 @@ class LearningPath(Base):
     title = Column(String(200), nullable=False, comment="路径标题")
     description = Column(Text, nullable=True, comment="路径描述")
     creator_id = Column(
-        Integer, ForeignKey("users.id"), nullable=False, comment="创建者ID"
+        Integer, ForeignKey("users.id"), nullable=False, index=True, comment="创建者ID"
     )
     difficulty_level = Column(
         SQLEnum(DifficultyLevel),
@@ -74,13 +75,16 @@ class LearningPathLesson(Base):
     """学习路径课程关联模型"""
 
     __tablename__ = "learning_path_lessons"
+    __table_args__ = (
+        Index("ix_lpl_path_order", "learning_path_id", "order_index"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     learning_path_id = Column(
-        Integer, ForeignKey("learning_paths.id"), nullable=False, comment="学习路径ID"
+        Integer, ForeignKey("learning_paths.id"), nullable=False, index=True, comment="学习路径ID"
     )
     lesson_id = Column(
-        Integer, ForeignKey("lessons.id"), nullable=False, comment="课程ID"
+        Integer, ForeignKey("lessons.id"), nullable=False, index=True, comment="课程ID"
     )
     order_index = Column(Integer, nullable=False, comment="顺序索引")
     is_required = Column(Boolean, default=True, nullable=False, comment="是否必修")

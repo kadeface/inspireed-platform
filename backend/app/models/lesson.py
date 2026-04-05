@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import Enum
 from sqlalchemy import (
     Column,
+    Index,
     Integer,
     String,
     Text,
@@ -42,13 +43,16 @@ class Lesson(Base):
     """教案模型"""
 
     __tablename__ = "lessons"
+    __table_args__ = (
+        Index("ix_lessons_creator_status", "creator_id", "status"),
+        Index("ix_lessons_course_status", "course_id", "status"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
 
-    # 教案创建者
-    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # 所属课程
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False, index=True)

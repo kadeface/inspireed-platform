@@ -56,11 +56,24 @@ export default defineConfig({
     },
   },
   build: {
-    // 增加 chunk 大小警告限制
-    chunkSizeWarningLimit: 1000
+    target: 'es2020',
+    cssCodeSplit: true,
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          'http': ['axios'],
+          'editor': ['@tiptap/vue-3', '@tiptap/starter-kit'],
+          'charts': ['echarts'],
+          'diagram': ['@antv/x6'],
+          'codemirror': ['codemirror', '@codemirror/lang-python', '@codemirror/lang-javascript'],
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000,
   },
   optimizeDeps: {
-    // 预构建依赖，避免动态导入问题
     include: ['vue', 'vue-router', 'pinia', 'axios']
   }
 })

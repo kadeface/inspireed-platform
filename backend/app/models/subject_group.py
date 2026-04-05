@@ -68,15 +68,14 @@ class SubjectGroup(Base):
         comment="教研组范围",
     )
     school_id = Column(
-        Integer, ForeignKey("schools.id"), nullable=True, comment="关联学校（校级）"
+        Integer, ForeignKey("schools.id"), nullable=True, index=True, comment="关联学校（校级）"
     )
     region_id = Column(
-        Integer, ForeignKey("regions.id"), nullable=True, comment="关联区域（区域级）"
+        Integer, ForeignKey("regions.id"), nullable=True, index=True, comment="关联区域（区域级）"
     )
 
-    # 创建者
     creator_id = Column(
-        Integer, ForeignKey("users.id"), nullable=False, comment="创建者ID"
+        Integer, ForeignKey("users.id"), nullable=False, index=True, comment="创建者ID"
     )
 
     # 状态
@@ -185,7 +184,7 @@ class SharedLesson(Base):
     lesson_id = Column(
         Integer, ForeignKey("lessons.id"), nullable=False, index=True, comment="教案ID"
     )
-    sharer_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="分享者ID")
+    sharer_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True, comment="分享者ID")
 
     # 分享说明
     share_note = Column(Text, nullable=True, comment="分享说明")

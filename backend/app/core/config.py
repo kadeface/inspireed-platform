@@ -3,11 +3,16 @@
 """
 
 import json
+import logging
 import os
+import secrets
 from typing import Any, Dict, List, Optional, Union
+
 from pydantic import AnyHttpUrl, PostgresDsn, field_validator, BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Annotated
+
+logger = logging.getLogger(__name__)
 
 
 def parse_cors(v: Any) -> List[str]:
@@ -50,11 +55,27 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "InspireEd"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
+    ENVIRONMENT: str = "development"
+
+    # API 文档开关 — 生产环境应设为 False
+    DOCS_ENABLED: bool = True
 
     # 安全配置
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
+
+    @field_validator("SECRET_KEY", mode="before")
+    @classmethod
+    def ensure_secret_key(cls, v: Optional[str]) -> str:
+        if not v or v == "your-secret-key-change-in-production":
+            generated = secrets.token_urlsafe(64)
+            logger.warning(
+                "SECRET_KEY not set or using placeholder — "
+                "auto-generated a random key. Set SECRET_KEY in .env for production."
+            )
+            return generated
+        return v
 
     # CORS - 允许局域网访问
     # 在生产环境中，应该设置具体的域名而不是使用通配符
@@ -116,7 +137,7 @@ class Settings(BaseSettings):
 
     # JupyterHub配置
     JUPYTERHUB_URL: str = "http://localhost:8000"
-    JUPYTERHUB_API_TOKEN: str = "your-jupyterhub-token"
+    JUPYTERHUB_API_TOKEN: str = ""
 
     # OpenAI配置
     # 注意：配置优先级（从高到低）：
