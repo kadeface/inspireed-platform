@@ -445,7 +445,7 @@
                 <span v-else>{{ isLogin ? '登 录' : '注 册' }}</span>
               </button>
 
-              <div class="text-center mt-6">
+              <div class="text-center mt-6 space-y-3">
                 <button
                   type="button"
                   @click="toggleMode"
@@ -453,6 +453,15 @@
                 >
                   {{ isLogin ? '还没有账户？立即注册' : '已有账户？立即登录' }}
                 </button>
+                <div class="pt-3 border-t border-slate-100">
+                  <RouterLink
+                    to="/guest"
+                    class="inline-flex flex-col items-center gap-0.5 text-sm text-slate-500 hover:text-emerald-600 transition-colors sm:inline-flex sm:flex-row sm:gap-1.5"
+                  >
+                    <span class="font-medium">访客观摩</span>
+                    <span class="text-slate-400 text-xs">无需登录 · 使用课堂接入码</span>
+                  </RouterLink>
+                </div>
               </div>
             </form>
           </div>
