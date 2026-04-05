@@ -13,6 +13,7 @@ import type {
   StartActivityRequest,
   SessionStatistics,
   StudentPendingSession,
+  GuestSessionInfo,
 } from '../types/classroomSession'
 
 export const classroomSessionService = {
@@ -538,6 +539,50 @@ export const classroomSessionService = {
       console.error('更新显示模式失败:', error)
       throw error
     }
+  },
+}
+
+  // ========== 访客模式 ==========
+
+  /**
+   * 教师开启/关闭访客模式
+   */
+  async toggleGuestAccess(sessionId: number, enabled: boolean): Promise<ClassSession> {
+    const response = await api.post<ClassSession>(
+      `/classroom-sessions/sessions/${sessionId}/guest-access`,
+      { enabled },
+    )
+    return response
+  },
+
+  /**
+   * 访客通过接入码查找课堂（无需登录）
+   */
+  async guestLookupSession(accessCode: string): Promise<GuestSessionInfo> {
+    const response = await api.get(`/classroom-sessions/guest/join/${accessCode}`)
+    const r = response as any
+    return {
+      sessionId: r.session_id,
+      lessonId: r.lesson_id,
+      lessonTitle: r.lesson_title,
+      teacherName: r.teacher_name,
+      classroomName: r.classroom_name,
+      status: r.status,
+      currentCellId: r.current_cell_id,
+      displayCellOrders: r.display_cell_orders || [],
+      guestCount: r.guest_count || 0,
+    }
+  },
+
+  /**
+   * 访客获取当前可见 Cell 内容
+   */
+  async guestGetCells(sessionId: number, accessCode: string): Promise<any> {
+    const response = await api.get(
+      `/classroom-sessions/guest/session/${sessionId}/cells`,
+      { params: { access_code: accessCode } },
+    )
+    return response
   },
 }
 

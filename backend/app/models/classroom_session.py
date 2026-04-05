@@ -7,6 +7,7 @@ from enum import Enum
 from sqlalchemy import (
     Column,
     Integer,
+    String,
     DateTime,
     ForeignKey,
     Boolean,
@@ -24,9 +25,9 @@ from app.core.database import Base
 class ClassSessionStatus(str, Enum):
     """课堂会话状态"""
 
-    PREPARING = "PREPARING"  # 准备中（教师已创建但未开始）
-    TEACHING = "TEACHING"    # 上课中
-    ENDED = "ENDED"          # 已结束
+    PREPARING = "PREPARING"
+    TEACHING = "TEACHING"
+    ENDED = "ENDED"
 
 
 class ClassSession(Base):
@@ -57,30 +58,34 @@ class ClassSession(Base):
     )
 
     # 时间信息
-    scheduled_start = Column(DateTime, nullable=True)  # 计划开始时间
-    actual_start = Column(DateTime, nullable=True)  # 实际开始时间
-    ended_at = Column(DateTime, nullable=True)  # 结束时间
-    duration_minutes = Column(Integer, nullable=True)  # 实际时长（分钟）
+    scheduled_start = Column(DateTime, nullable=True)
+    actual_start = Column(DateTime, nullable=True)
+    ended_at = Column(DateTime, nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
 
     # 当前状态
     current_cell_id = Column(
         Integer, ForeignKey("cells.id"), nullable=True, index=True
-    )  # 当前显示的Cell
-    current_activity_id = Column(Integer, nullable=True, index=True)  # 当前活动的Cell ID
+    )
+    current_activity_id = Column(Integer, nullable=True, index=True)
 
     # 会话设置（JSON格式）
-    # 示例：
-    # {
-    #   "allow_advance": true,      # 允许学生提前查看
-    #   "sync_mode": "strict",      # 同步模式：strict/free
-    #   "show_leaderboard": false,  # 显示排行榜
-    #   "auto_save": true           # 自动保存学生答案
-    # }
     settings = Column(JSON, nullable=True, default=dict)
 
+    # 访客模式
+    guest_access_enabled = Column(
+        Boolean, default=False, nullable=False,
+        comment="是否开启访客观摩模式",
+    )
+    guest_access_code = Column(
+        String(8), nullable=True, unique=True, index=True,
+        comment="6位访客接入码",
+    )
+
     # 统计数据
-    total_students = Column(Integer, default=0, nullable=False)  # 参与学生数
-    active_students = Column(Integer, default=0, nullable=False)  # 在线学生数
+    total_students = Column(Integer, default=0, nullable=False)
+    active_students = Column(Integer, default=0, nullable=False)
+    guest_count = Column(Integer, default=0, nullable=False, comment="当前访客数")
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

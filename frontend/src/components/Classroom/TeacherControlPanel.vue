@@ -93,6 +93,17 @@
       :active-count="activeStudents.length"
     />
 
+    <!-- 访客观摩开关 -->
+    <GuestAccessToggle
+      v-if="session"
+      :session-id="session.id"
+      :guest-access-enabled="session.guest_access_enabled || session.guestAccessEnabled || false"
+      :guest-access-code="session.guest_access_code || session.guestAccessCode || null"
+      :guest-count="session.guest_count || session.guestCount || 0"
+      @updated="handleGuestAccessUpdated"
+      class="px-4 py-2"
+    />
+
     <!-- 已加入学生列表 -->
     <JoinedStudentsList
       v-if="session && session.status === 'PREPARING'"
@@ -175,6 +186,7 @@ import SessionControlButtons from './SessionControlButtons.vue'
 import ModuleCountDisplay from './ModuleCountDisplay.vue'
 import WaitingForStudentsBanner from './WaitingForStudentsBanner.vue'
 import JoinedStudentsList from './JoinedStudentsList.vue'
+import GuestAccessToggle from './GuestAccessToggle.vue'
 import ModuleList from './ModuleList.vue'
 import ClassroomSelectModal from './ClassroomSelectModal.vue'
 import ActivityStatisticsPanel from './ActivityStatisticsPanel.vue'
@@ -701,6 +713,21 @@ const hasAlerts = computed(() => {
     checkLowSubmissionRate(currentCell.value, sessionStatistics.value)
   )
 })
+
+function handleGuestAccessUpdated(updatedSession: any) {
+  if (sessionManager.session.value && updatedSession) {
+    sessionManager.session.value = {
+      ...sessionManager.session.value,
+      ...updatedSession,
+      guest_access_enabled: updatedSession.guest_access_enabled,
+      guestAccessEnabled: updatedSession.guest_access_enabled,
+      guest_access_code: updatedSession.guest_access_code,
+      guestAccessCode: updatedSession.guest_access_code,
+      guest_count: updatedSession.guest_count ?? 0,
+      guestCount: updatedSession.guest_count ?? 0,
+    }
+  }
+}
 
 // v2.0: 以下状态和函数已移至 useDataLoader composable
 // function getCellByOrder(order): Cell | null

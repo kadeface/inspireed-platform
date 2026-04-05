@@ -35,6 +35,8 @@ from app.schemas.classroom_session import (
     EndSessionRequest,
     SessionStatistics,
     StudentPendingSessionResponse,
+    GuestAccessToggleRequest,
+    GuestSessionInfoResponse,
 )
 from app.services.session_state_machine import (
     SessionStateMachine,
@@ -1362,6 +1364,151 @@ async def get_session_statistics(
     )
 
 
+# ========== 访客模式 ==========
+
+
+def _generate_guest_code() -> str:
+    """生成6位数字+字母混合接入码"""
+    import secrets
+    import string
+    alphabet = string.ascii_uppercase + string.digits
+    # 去除容易混淆的字符
+    alphabet = alphabet.replace("O", "").replace("0", "").replace("I", "").replace("1", "").replace("L", "")
+    return "".join(secrets.choice(alphabet) for _ in range(6))
+
+
+@router.post("/sessions/{session_id}/guest-access", response_model=ClassSessionResponse)
+async def toggle_guest_access(
+    session_id: int,
+    data: GuestAccessToggleRequest,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """教师开启/关闭访客观摩模式"""
+
+    session = await db.get(ClassSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    if cast(int, session.teacher_id) != cast(int, current_user.id):
+        raise HTTPException(status_code=403, detail="无权操作")
+
+    if data.enabled:
+        session.guest_access_enabled = True  # type: ignore[assignment]
+        if not session.guest_access_code:
+            for _ in range(10):
+                code = _generate_guest_code()
+                existing = await db.execute(
+                    select(ClassSession).where(ClassSession.guest_access_code == code)
+                )
+                if not existing.scalar_one_or_none():
+                    session.guest_access_code = code  # type: ignore[assignment]
+                    break
+            else:
+                raise HTTPException(status_code=500, detail="无法生成唯一接入码，请重试")
+    else:
+        session.guest_access_enabled = False  # type: ignore[assignment]
+
+    await db.commit()
+    await db.refresh(session)
+    return session
+
+
+@router.get("/guest/join/{access_code}", response_model=GuestSessionInfoResponse)
+async def guest_lookup_session(
+    access_code: str,
+    db: AsyncSession = Depends(deps.get_db),
+) -> Any:
+    """访客通过接入码查找课堂（无需登录）"""
+
+    result = await db.execute(
+        select(ClassSession)
+        .where(ClassSession.guest_access_code == access_code.upper())
+        .options(
+            selectinload(ClassSession.lesson),
+            selectinload(ClassSession.teacher),
+            selectinload(ClassSession.classroom),
+        )
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="无效的接入码")
+
+    if not session.guest_access_enabled:
+        raise HTTPException(status_code=403, detail="该课堂未开启访客模式")
+
+    if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
+        raise HTTPException(status_code=400, detail="课堂已结束")
+
+    display_cell_orders = (session.settings or {}).get("display_cell_orders", [])
+
+    return GuestSessionInfoResponse(
+        session_id=cast(int, session.id),
+        lesson_id=cast(int, session.lesson_id),
+        lesson_title=session.lesson.title if session.lesson else None,
+        teacher_name=(
+            session.teacher.full_name or session.teacher.username
+            if session.teacher else None
+        ),
+        classroom_name=session.classroom.name if session.classroom else None,
+        status=cast(ClassSessionStatus, session.status),
+        current_cell_id=session.current_cell_id,
+        display_cell_orders=display_cell_orders,
+        guest_count=session.guest_count or 0,
+    )
+
+
+@router.get("/guest/session/{session_id}/cells")
+async def guest_get_session_cells(
+    session_id: int,
+    access_code: str,
+    db: AsyncSession = Depends(deps.get_db),
+) -> Any:
+    """访客获取当前可见的 Cell 内容（只读，无需登录）"""
+
+    session = await db.get(ClassSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    if (
+        not session.guest_access_enabled
+        or session.guest_access_code != access_code.upper()
+    ):
+        raise HTTPException(status_code=403, detail="访客访问未授权")
+
+    if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
+        raise HTTPException(status_code=400, detail="课堂已结束")
+
+    display_orders = (session.settings or {}).get("display_cell_orders", [])
+    if not display_orders:
+        return {"cells": [], "current_cell_id": session.current_cell_id}
+
+    result = await db.execute(
+        select(Cell)
+        .where(Cell.lesson_id == session.lesson_id, Cell.order.in_(display_orders))
+        .order_by(Cell.order)
+    )
+    cells = result.scalars().all()
+
+    cells_data = []
+    for cell in cells:
+        cells_data.append({
+            "id": cell.id,
+            "cell_type": cell.cell_type.value if hasattr(cell.cell_type, "value") else str(cell.cell_type),
+            "title": cell.title,
+            "content": cell.content,
+            "config": cell.config,
+            "order": cell.order,
+        })
+
+    return {
+        "cells": cells_data,
+        "current_cell_id": session.current_cell_id,
+        "display_cell_orders": display_orders,
+    }
+
+
 # ========== WebSocket 实时同步 ==========
 
 
@@ -1553,6 +1700,77 @@ async def update_student_progress(
         participation.progress_percentage = progress_percentage  # type: ignore[comparison-overlap]
         participation.last_active_at = datetime.utcnow()  # type: ignore[comparison-overlap]
         await db.commit()
+
+
+# ========== 访客 WebSocket（只读观摩） ==========
+
+
+@router.websocket("/sessions/{session_id}/ws/guest")
+async def websocket_guest_endpoint(
+    websocket: WebSocket,
+    session_id: int,
+    code: str,
+    db: AsyncSession = Depends(deps.get_db),
+):
+    """访客 WebSocket — 只读观摩，无需登录。
+
+    访客只能接收 cell_changed / session_ended 等广播，不能发送进度或提交活动。
+    """
+
+    await websocket.accept()
+
+    session = await db.get(ClassSession, session_id)
+    if (
+        not session
+        or not session.guest_access_enabled
+        or session.guest_access_code != code.upper()
+    ):
+        await websocket.close(code=1008, reason="Access denied")
+        return
+
+    if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
+        await websocket.close(code=1008, reason="Session ended")
+        return
+
+    session.guest_count = (session.guest_count or 0) + 1  # type: ignore[assignment]
+    await db.commit()
+
+    guest_key = f"guest:{session_id}"
+    if not hasattr(manager, "_guest_connections"):
+        manager._guest_connections = {}  # type: ignore[attr-defined]
+    manager._guest_connections.setdefault(guest_key, set())  # type: ignore[attr-defined]
+    manager._guest_connections[guest_key].add(websocket)  # type: ignore[attr-defined]
+
+    try:
+        await send_initial_state(websocket, session, db)
+
+        while True:
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+            if msg.get("type") == "ping":
+                await websocket.send_text(json.dumps({
+                    "type": "pong",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {},
+                }))
+    except WebSocketDisconnect:
+        logger.info("Guest disconnected from session %s", session_id)
+    except Exception as e:
+        logger.error("Guest WS error: %s", e)
+    finally:
+        if hasattr(manager, "_guest_connections"):
+            conns = manager._guest_connections.get(guest_key)  # type: ignore[attr-defined]
+            if conns:
+                conns.discard(websocket)
+                if not conns:
+                    del manager._guest_connections[guest_key]  # type: ignore[attr-defined]
+        try:
+            session_refresh = await db.get(ClassSession, session_id)
+            if session_refresh:
+                session_refresh.guest_count = max((session_refresh.guest_count or 0) - 1, 0)  # type: ignore[assignment]
+                await db.commit()
+        except Exception:
+            pass
 
 
 # ========== 教师端 WebSocket 实时通知 ==========

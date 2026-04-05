@@ -26,6 +26,9 @@ export interface ClassSession {
   settings?: Record<string, any>
   totalStudents: number
   activeStudents: number
+  guestAccessEnabled?: boolean
+  guestAccessCode?: string
+  guestCount?: number
   createdAt: string
   updatedAt: string
   
@@ -33,6 +36,18 @@ export interface ClassSession {
   lessonTitle?: string
   classroomName?: string
   teacherName?: string
+}
+
+export interface GuestSessionInfo {
+  sessionId: number
+  lessonId: number
+  lessonTitle?: string
+  teacherName?: string
+  classroomName?: string
+  status: ClassSessionStatus
+  currentCellId?: number
+  displayCellOrders: number[]
+  guestCount: number
 }
 
 export interface ClassSessionCreate {

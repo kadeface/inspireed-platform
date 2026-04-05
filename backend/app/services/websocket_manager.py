@@ -227,7 +227,19 @@ class ConnectionManager:
         # 清理断开的连接
         for student_id in disconnected_students:
             await self.disconnect(session_id, student_id)
-    
+
+        # 同步广播给访客连接（只读观摩）
+        guest_key = f"guest:{session_id}"
+        guest_conns = getattr(self, "_guest_connections", {}).get(guest_key, set())
+        dead_guests = []
+        for gws in guest_conns:
+            try:
+                await gws.send_text(message_text)
+            except Exception:
+                dead_guests.append(gws)
+        for gws in dead_guests:
+            guest_conns.discard(gws)
+
     def get_session_connections_count(self, session_id: int) -> int:
         """获取会话的在线人数"""
         

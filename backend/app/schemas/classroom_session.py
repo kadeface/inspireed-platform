@@ -24,6 +24,8 @@ __all__ = [
     "UpdateDisplayModeRequest",
     "SessionStatistics",
     "StudentPendingSessionResponse",
+    "GuestAccessToggleRequest",
+    "GuestSessionInfoResponse",
 ]
 
 
@@ -68,6 +70,9 @@ class ClassSessionResponse(ClassSessionBase):
     current_activity_id: Optional[int] = None
     total_students: int
     active_students: int
+    guest_access_enabled: bool = False
+    guest_access_code: Optional[str] = None
+    guest_count: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -205,5 +210,26 @@ class StudentPendingSessionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ========== 访客模式 Schemas ==========
+
+
+class GuestAccessToggleRequest(BaseModel):
+    """切换访客访问开关"""
+    enabled: bool
+
+
+class GuestSessionInfoResponse(BaseModel):
+    """访客通过接入码查看的会话摘要（无需登录）"""
+    session_id: int
+    lesson_id: int
+    lesson_title: Optional[str] = None
+    teacher_name: Optional[str] = None
+    classroom_name: Optional[str] = None
+    status: ClassSessionStatus
+    current_cell_id: Optional[int] = None
+    display_cell_orders: List[int] = Field(default_factory=list)
+    guest_count: int = 0
 
 

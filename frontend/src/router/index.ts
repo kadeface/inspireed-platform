@@ -16,6 +16,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '登录 - InspireEd' },
   },
   {
+    path: '/guest',
+    name: 'GuestJoin',
+    component: () => import('../pages/Guest/GuestJoin.vue'),
+    meta: { title: '访客观摩 - InspireEd' },
+  },
+  {
     path: '/subjects/:subjectCode/courses',
     name: 'SubjectCourses',
     component: () => import('../pages/InfoTechCourses.vue'),
