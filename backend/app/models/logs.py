@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import Enum
 from sqlalchemy import (
     Column,
+    Index,
     Integer,
     String,
     Text,
@@ -35,15 +36,16 @@ class ExecutionLog(Base):
     """执行日志模型"""
 
     __tablename__ = "execution_logs"
+    __table_args__ = (
+        Index("ix_exec_logs_user_lesson", "user_id", "lesson_id"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
 
-    # 关联的教案和Cell
-    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False)
-    cell_id = Column(Integer, ForeignKey("cells.id"), nullable=False)
+    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
+    cell_id = Column(Integer, ForeignKey("cells.id"), nullable=False, index=True)
 
-    # 执行者
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # 执行状态
     status = Column(
@@ -85,12 +87,10 @@ class QARecord(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    # 关联的教案和Cell（可选）
-    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=True)
-    cell_id = Column(Integer, ForeignKey("cells.id"), nullable=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=True, index=True)
+    cell_id = Column(Integer, ForeignKey("cells.id"), nullable=True, index=True)
 
-    # 提问者
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # 问题
     question = Column(Text, nullable=False)

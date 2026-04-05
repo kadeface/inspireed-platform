@@ -463,13 +463,10 @@ async def reset_user_password(
 
     await db.commit()
 
-    # TODO: 发送邮件通知用户新密码
-    # 这里应该发送邮件，暂时返回密码用于测试
-
     return {
         "message": "密码重置成功",
-        "new_password": new_password,  # 生产环境中不应该返回密码
-        "note": "请通过邮件或安全渠道告知用户新密码",
+        "password_length": len(new_password),
+        "note": "新密码已生成，请通过安全渠道告知用户。密码不会在响应中返回。",
     }
 
 
