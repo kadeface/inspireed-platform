@@ -35,7 +35,11 @@ export function getServerBaseUrl(): string {
     }
   }
   
-  // 本地开发环境：前端端口5173 -> 后端端口8000
+  // 生产构建：与页面同源（Nginx 反代 /api、/uploads）
+  if (!import.meta.env.DEV) {
+    return window.location.origin
+  }
+  // 本地开发：前端 5173，资源常指向后端 8000
   return `${protocol}//${hostname}:8000`
 }
 

@@ -5,6 +5,7 @@
  */
 
 import axios from 'axios';
+import { productionSameOriginApiV1, sanitizeViteApiUrlForProduction } from '@/utils/runtimeApiBase';
 import type {
   Semester,
   SemesterCreate,
@@ -40,6 +41,8 @@ function getApiBaseUrl(): string {
     const envApiUrl = import.meta.env.VITE_API_BASE_URL
     // 如果环境变量已经包含完整路径，直接返回
     if (envApiUrl.startsWith('http://') || envApiUrl.startsWith('https://')) {
+      const sanitized = sanitizeViteApiUrlForProduction(envApiUrl)
+      if (sanitized) return sanitized
       return envApiUrl
     }
   }
@@ -52,7 +55,9 @@ function getApiBaseUrl(): string {
     }
   }
   
-  // 本地开发环境：前端端口5173 -> 后端端口8000
+  if (!import.meta.env.DEV) {
+    return productionSameOriginApiV1()
+  }
   const apiProtocol = protocol === 'https:' ? 'https:' : 'http:'
   return `${apiProtocol}//${hostname}:8000/api/v1`
 }

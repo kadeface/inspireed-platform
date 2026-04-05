@@ -301,6 +301,7 @@ import {
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { useSemesterStore } from '@/store/semester'
+import { productionSameOriginApiV1, sanitizeViteApiUrlForProduction } from '@/utils/runtimeApiBase'
 
 const router = useRouter()
 const semesterStore = useSemesterStore()
@@ -327,6 +328,8 @@ function getApiBaseUrl(): string {
   if (import.meta.env.VITE_API_BASE_URL) {
     const envApiUrl = import.meta.env.VITE_API_BASE_URL
     if (envApiUrl.startsWith('http://') || envApiUrl.startsWith('https://')) {
+      const sanitized = sanitizeViteApiUrlForProduction(envApiUrl)
+      if (sanitized) return sanitized
       return envApiUrl
     }
   }
@@ -338,6 +341,9 @@ function getApiBaseUrl(): string {
     }
   }
 
+  if (!import.meta.env.DEV) {
+    return productionSameOriginApiV1()
+  }
   const apiProtocol = protocol === 'https:' ? 'https:' : 'http:'
   return `${apiProtocol}//${hostname}:8000/api/v1`
 }

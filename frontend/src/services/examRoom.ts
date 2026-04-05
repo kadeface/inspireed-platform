@@ -3,6 +3,7 @@
  */
 
 import axios from 'axios'
+import { productionSameOriginApiV1, sanitizeViteApiUrlForProduction } from '@/utils/runtimeApiBase'
 import type {
   ExamRoom,
   ExamRoomStudent,
@@ -22,7 +23,10 @@ function getApiBaseUrl(): string {
 
   // 优先使用环境变量
   if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL
+    const u = import.meta.env.VITE_API_BASE_URL
+    const sanitized = sanitizeViteApiUrlForProduction(u)
+    if (sanitized) return sanitized
+    return u
   }
 
   // CloudStudio云开发环境
@@ -35,7 +39,9 @@ function getApiBaseUrl(): string {
     return `${protocol}//${hostname}:8000/api/v1`
   }
 
-  // 默认：本地开发环境
+  if (!import.meta.env.DEV) {
+    return productionSameOriginApiV1()
+  }
   return `${protocol}//${hostname}:8000/api/v1`
 }
 

@@ -18,8 +18,8 @@ RUN pnpm install
 # 复制源代码
 COPY . ./
 
-# 构建参数（API 地址）
-ARG VITE_API_BASE_URL=http://111.230.61.28:8000/api/v1
+# 构建参数：留空则运行时走同源 /api/v1（Nginx 反代 backend，仅对外开放 80）
+ARG VITE_API_BASE_URL=
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # 构建应用
@@ -31,7 +31,8 @@ FROM nginx:alpine
 # 复制构建产物到 Nginx 目录
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# 复制 Nginx 配置
+# Nginx：map 须在 http 上下文（conf.d 内先于 server）
+COPY nginx-map.conf /etc/nginx/conf.d/00-map.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # 暴露端口

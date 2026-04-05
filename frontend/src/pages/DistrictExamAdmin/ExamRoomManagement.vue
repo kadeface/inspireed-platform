@@ -281,6 +281,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import axios from 'axios'
 import type { UploadInstance, UploadFile } from 'element-plus'
+import { productionSameOriginApiV1, sanitizeViteApiUrlForProduction } from '@/utils/runtimeApiBase'
 
 const route = useRoute()
 const router = useRouter()
@@ -338,10 +339,17 @@ const assignFormRef = ref()
 const hasRooms = computed(() => rooms.value.length > 0)
 const totalStudents = computed(() => rooms.value.reduce((sum, room) => sum + (room.seat_count || 0), 0))
 
-// API 基础 URL
+// API 基础 URL（生产仅 80：同源 /api/v1）
 const getApiBaseUrl = () => {
   const hostname = window.location.hostname
   const protocol = window.location.protocol
+
+  if (import.meta.env.VITE_API_BASE_URL) {
+    const u = import.meta.env.VITE_API_BASE_URL
+    const s = sanitizeViteApiUrlForProduction(u)
+    if (s) return s
+    return u
+  }
 
   if (hostname.includes('cloudstudio.club') || hostname.includes('coding.net')) {
     if (hostname.includes('--')) {
@@ -349,6 +357,9 @@ const getApiBaseUrl = () => {
       return `${protocol}//${backendHostname}/api/v1`
     }
     return `${protocol}//${hostname}:8000/api/v1`
+  }
+  if (!import.meta.env.DEV) {
+    return productionSameOriginApiV1()
   }
   return `${protocol}//${hostname}:8000/api/v1`
 }

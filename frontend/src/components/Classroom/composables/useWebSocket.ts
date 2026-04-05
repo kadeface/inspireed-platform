@@ -105,7 +105,12 @@ export function useWebSocket(options: UseWebSocketOptions) {
    * 构建完整的 WebSocket URL（含 JWT，后端教师端 ws/teacher 需要 token 校验）
    */
   function buildWebSocketUrl(): string {
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    let apiBase = import.meta.env.VITE_API_BASE_URL || ''
+    if (!apiBase) {
+      apiBase = import.meta.env.DEV ? 'http://localhost:8000' : `${window.location.origin}/api/v1`
+    } else if (!import.meta.env.DEV && /(^|\/\/)[^/?#]*:8000(?:\/|$|\?|#)/.test(apiBase)) {
+      apiBase = `${window.location.origin}/api/v1`
+    }
     const wsProtocol = apiBase.startsWith('https') ? 'wss:' : 'ws:'
     const wsHost = apiBase.replace(/^https?:\/\//, '').replace(/\/api\/v1\/?$/, '')
     const token = getToken()

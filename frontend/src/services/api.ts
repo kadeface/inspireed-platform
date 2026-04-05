@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { useUserStore } from '../store/user'
+import { productionSameOriginApiV1, sanitizeViteApiUrlForProduction } from '@/utils/runtimeApiBase'
 
 /** 本机或局域网私网 IP（用 5173 开发时也应走 Vite 代理，避免直连 localhost:8000 跨域） */
 function isLocalOrPrivateLanHostname(hostname: string): boolean {
@@ -144,6 +145,8 @@ function getApiBaseUrl(): string {
     if (import.meta.env.DEV) {
       console.log('🔧 [API] 使用环境变量配置的 API 地址:', envApiUrl)
     }
+    const sanitized = sanitizeViteApiUrlForProduction(envApiUrl)
+    if (sanitized) return sanitized
     return envApiUrl
   }
 
@@ -152,10 +155,8 @@ function getApiBaseUrl(): string {
     console.log('📍 [API] 本地开发，使用代理相对路径: /api/v1')
     return '/api/v1'
   }
-  // 非 DEV（如 build 后本地预览）仍用绝对地址
-  const apiProtocol = protocol === 'https:' ? 'https:' : 'http:'
-  const apiUrl = `${apiProtocol}//${hostname}:8000/api/v1`
-  return apiUrl
+  // 生产构建：Docker 仅开放 80 时与页面同源，由 Nginx 反代（勿直连 :8000）
+  return productionSameOriginApiV1()
 }
 const API_BASE_URL = getApiBaseUrl()
 

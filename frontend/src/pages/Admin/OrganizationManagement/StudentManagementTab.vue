@@ -548,6 +548,7 @@ import curriculumService from '@/services/curriculum'
 import type { UploadFile } from 'element-plus'
 import type { Grade } from '@/types/curriculum'
 import * as XLSX from 'xlsx'
+import { sanitizeViteApiUrlForProduction } from '@/utils/runtimeApiBase'
 
 // 状态管理
 const students = ref<User[]>([])
@@ -1199,10 +1200,10 @@ const startImport = async () => {
         apiBaseUrl = `${protocol}//${hostname}:8000/api/v1`
       }
     } else if (import.meta.env.VITE_API_BASE_URL) {
-      // 使用环境变量（如果配置了）
       apiBaseUrl = import.meta.env.VITE_API_BASE_URL
-    } else {
-      // 本地开发环境
+      const s = sanitizeViteApiUrlForProduction(apiBaseUrl)
+      if (s) apiBaseUrl = s
+    } else if (import.meta.env.DEV) {
       apiBaseUrl = `${protocol}//${hostname}:8000/api/v1`
     }
 
