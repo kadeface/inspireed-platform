@@ -447,7 +447,7 @@ async def get_class_session(
         except:
             settings = {}
     
-    print(f"📤 返回会话数据: session_id={session_id}, settings={settings}")
+    logger.debug("Session response: session_id=%s", session_id)
 
     response_dict = {
         "id": session.id,
@@ -569,11 +569,11 @@ async def start_session(
         new_settings["display_cell_orders"] = [first_cell_order] # type: ignore[assignment]
         setattr(session, "settings", new_settings)
         session.current_cell_id = cast(int, first_cell.id) # type: ignore[comparison-overlap]
-        print(f"✅ 开始上课时自动显示第一个 cell: order={first_cell_order}, cell_id={first_cell.id}")
+        logger.info("Auto-showing first cell: order=%s, cell_id=%s", first_cell_order, first_cell.id)
     else:
         # 如果没有找到 cell，保持为空（等待教师手动切换）
         session.current_cell_id = None # type: ignore[comparison-overlap]
-        print(f"⚠️ 课程 {session_lesson_id} 没有 cell，等待教师手动切换")
+        logger.info("Lesson %s has no cells; waiting for teacher to navigate", session_lesson_id)
 
     await db.commit()
     await db.refresh(session)
@@ -591,7 +591,7 @@ async def start_session(
         },
         session_id=session_id
     )
-    print(f"📢 已广播会话状态变化（会话 {session_id}）：pending -> active")
+    logger.info("Broadcast session status change: session %s -> TEACHING", session_id)
     
     # 🆕 如果初始化了 display_cell_orders，也广播内容变化消息
     if first_cell:
@@ -631,12 +631,10 @@ async def start_session(
                 message=broadcast_message,
                 session_id=session_id,
             )
-            print(f"📢 已广播内容初始化（会话 {session_id}），显示第一个 cell")
+            logger.info("Broadcast initial cell for session %s", session_id)
 
     return session
 
-
-@router.post("/sessions/{session_id}/pause", response_model=ClassSessionResponse)
 
 @router.post("/sessions/{session_id}/end", response_model=ClassSessionResponse)
 async def end_session(
@@ -656,21 +654,17 @@ async def end_session(
     if session_teacher_id != current_user_id:
         raise HTTPException(status_code=403, detail="无权操作")
 
-    # 🆕 幂等操作：如果会话已结束，直接返回（不报错）
     if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
-        print(f"ℹ️ 会话 {session_id} 已经是 ENDED 状态，直接返回（幂等操作）")
+        logger.info("Session %s already ENDED (idempotent)", session_id)
         return session
 
-    # 使用状态机转换状态（保留幂等性）
     try:
         old_status = session.status
         await transition_session_state(session, ClassSessionStatus.ENDED)
     except HTTPException as e:
-        # 如果已经是ENDED状态，则忽略（幂等操作）
         if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
-            print(f"ℹ️ 会话 {session_id} 已经是 ENDED 状态，直接返回（幂等操作）")
+            logger.info("Session %s already ENDED (idempotent)", session_id)
             return session
-        # 其他错误则抛出
         raise e
 
     # 更新结束时间
@@ -695,27 +689,22 @@ async def end_session(
         participation.is_active = False # type: ignore[comparison-overlap]
         participation.left_at = datetime.utcnow() # type: ignore[comparison-overlap]
 
-    # 提交到数据库
     try:
         await db.commit()
-        print(f"✅ 会话 {session_id} 状态已更新为 ENDED，已提交到数据库")
+        logger.info("Session %s committed as ENDED", session_id)
     except Exception as commit_error:
-        print(f"❌ 提交数据库失败: {commit_error}")
+        logger.error("DB commit failed for session %s: %s", session_id, commit_error)
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"结束会话失败：数据库提交错误 - {str(commit_error)}")
-    
-    # 刷新会话以获取最新状态
-    await db.refresh(session)
-    
-    # 验证状态是否真的更新了
-    if session.status != ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
-        print(f"⚠️ 警告：会话 {session_id} 状态更新后验证失败！期望: ENDED, 实际: {session.status}")
-        raise HTTPException(status_code=500, detail="结束会话失败：状态更新验证失败")
-    
-    print(f"✅ 会话 {session_id} 已成功结束：状态从 {old_status} 更新为 {session.status}")
+        raise HTTPException(status_code=500, detail="结束会话失败")
 
-    # 🆕 通过 WebSocket 通知所有学生会话已结束
-    # 注意：WebSocket 广播失败不应该影响数据库提交，所以放在 try-except 中
+    await db.refresh(session)
+
+    if session.status != ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
+        logger.error("Session %s status verification failed: expected ENDED, got %s", session_id, session.status)
+        raise HTTPException(status_code=500, detail="结束会话失败：状态更新验证失败")
+
+    logger.info("Session %s ended: %s -> ENDED", session_id, old_status)
+
     try:
         await manager.broadcast_to_session(
             message={
@@ -723,18 +712,15 @@ async def end_session(
                 "timestamp": datetime.utcnow().isoformat(),
                 "data": {
                     "session_id": session_id,
-                    "ended_at": session.ended_at.isoformat() if session.ended_at else None, # type: ignore[union-attr]
-                    "message": "课程已结束"
-                }
+                    "ended_at": session.ended_at.isoformat() if session.ended_at else None,  # type: ignore[union-attr]
+                    "message": "课程已结束",
+                },
             },
-            session_id=session_id
+            session_id=session_id,
         )
-        print(f"✅ 已通过 WebSocket 通知所有学生会话 {session_id} 已结束")
+        logger.info("Broadcast session_ended for session %s", session_id)
     except Exception as ws_error:
-        # WebSocket 广播失败不应该影响数据库提交
-        print(f"⚠️ WebSocket 广播失败（不影响数据库提交）: {ws_error}")
-        import traceback
-        traceback.print_exc()
+        logger.warning("WS broadcast failed for session %s (DB committed): %s", session_id, ws_error)
 
     return session
 
@@ -773,7 +759,7 @@ async def navigate_to_cell(
         
         # 🆕 记录原始状态，确保导航不会改变会话状态
         original_status = session.status
-        print(f"🔍 导航前会话状态: {original_status}")
+        logger.debug("Navigate: session %s pre-status=%s", session_id, original_status)
         
         # 保存 display_cell_orders 到 settings
         new_settings = dict(session.settings) if session.settings else {} # type: ignore[assignment]
@@ -1581,10 +1567,12 @@ async def websocket_endpoint(
         # 更新学生在线状态
         await update_student_online_status(db, session_id, student_id, is_online=True)
 
-        # 监听客户端消息
         while True:
             data = await websocket.receive_text()
-            message = json.loads(data)
+            try:
+                message = json.loads(data)
+            except (json.JSONDecodeError, ValueError):
+                continue
 
             await handle_client_message(
                 message=message,
@@ -1595,11 +1583,9 @@ async def websocket_endpoint(
             )
 
     except WebSocketDisconnect:
-        logger.info(f"🔌 学生断开连接: session_id={session_id}, student_id={student_id}")
-    except Exception as e:
-        logger.error(f"❌ WebSocket异常: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.info("Student disconnected: session_id=%s, student_id=%s", session_id, student_id)
+    except Exception:
+        logger.exception("WebSocket error: session_id=%s, student_id=%s", session_id, student_id)
     finally:
         # 清理连接
         if student_id is not None:
@@ -1643,8 +1629,7 @@ async def handle_client_message(
         )
     
     else:
-        # 未知消息类型
-        print(f"⚠️ 未知消息类型: {message_type}")
+        logger.warning("Unknown WS message type: %s (session=%s, student=%s)", message_type, session_id, student_id)
 
 
 async def update_student_online_status(
@@ -1746,7 +1731,10 @@ async def websocket_guest_endpoint(
 
         while True:
             data = await websocket.receive_text()
-            msg = json.loads(data)
+            try:
+                msg = json.loads(data)
+            except (json.JSONDecodeError, ValueError):
+                continue
             if msg.get("type") == "ping":
                 await websocket.send_text(json.dumps({
                     "type": "pong",

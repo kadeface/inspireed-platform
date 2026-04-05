@@ -21,7 +21,6 @@ __all__ = [
     "StartActivityRequest",
     "StudentProgressUpdate",
     "StartSessionRequest",
-    "UpdateDisplayModeRequest",
     "SessionStatistics",
     "StudentPendingSessionResponse",
     "GuestAccessToggleRequest",
@@ -161,10 +160,6 @@ class StudentProgressUpdate(BaseModel):
 
 class StartSessionRequest(BaseModel):
     """开始会话请求"""
-
-    pass
-
-
 
     pass
 

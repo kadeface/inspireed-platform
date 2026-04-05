@@ -3,13 +3,17 @@ WebSocket 连接管理器
 支持学生和教师的双角色连接管理
 """
 
+import json
+import logging
+from datetime import datetime
 from typing import Dict, Optional, List
+
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
-import json
-from datetime import datetime
 
 from app.models.user import UserRole
+
+logger = logging.getLogger(__name__)
 
 
 class ConnectionManager:
@@ -68,8 +72,7 @@ class ConnectionManager:
         store[channel_key][user_id] = websocket
         
         role_name = "教师" if role == UserRole.TEACHER else "学生"
-        print(f"✅ {role_name} {user_id} 连接到 {scope} {channel_id}")
-        print(f"📊 {scope} {channel_id} 当前在线 {role_name}: {len(store[channel_key])} 人")
+        logger.info("%s %s connected to %s %s (online: %d)", role_name, user_id, scope, channel_id, len(store[channel_key]))
     
     async def connect(self, websocket: WebSocket, session_id: int, student_id: int):
         """旧版连接方法（兼容性保留）"""
@@ -97,8 +100,7 @@ class ConnectionManager:
             role=UserRole.STUDENT
         )
         
-        print(f"✅ 学生 {student_id} 连接到会话 {session_id}")
-        print(f"📊 会话 {session_id} 当前在线: {len(self.active_connections[session_id])} 人")
+        logger.info("Student %s connected to session %s (online: %d)", student_id, session_id, len(self.active_connections[session_id]))
     
     async def disconnect_v2(
         self,
@@ -124,12 +126,10 @@ class ConnectionManager:
             store[channel_key].pop(user_id, None)
             
             role_name = "教师" if role == UserRole.TEACHER else "学生"
-            print(f"🔌 {role_name} {user_id} 断开连接（{scope} {channel_id}）")
-            
-            # 如果通道没有连接了，删除通道记录
+            logger.info("%s %s disconnected from %s %s", role_name, user_id, scope, channel_id)
+
             if not store[channel_key]:
                 del store[channel_key]
-                print(f"🗑️ {scope} {channel_id} 已无在线{role_name}，清理记录")
     
     async def disconnect(self, session_id: int, student_id: int):
         """旧版断开连接方法（兼容性保留）"""
@@ -137,12 +137,12 @@ class ConnectionManager:
         if session_id in self.active_connections:
             if student_id in self.active_connections[session_id]:
                 del self.active_connections[session_id][student_id]
-                print(f"🔌 学生 {student_id} 断开连接（会话 {session_id}）")
-            
+                logger.info("Student %s disconnected from session %s", student_id, session_id)
+
             # 如果会话没有连接了，删除会话记录
             if not self.active_connections[session_id]:
                 del self.active_connections[session_id]
-                print(f"🗑️ 会话 {session_id} 已无在线学生，清理记录")
+                logger.debug("Session %s has no online students, cleaned up", session_id)
         
         # 同时从新版存储断开
         await self.disconnect_v2(
@@ -166,7 +166,7 @@ class ConnectionManager:
                 try:
                     await websocket.send_text(json.dumps(message))
                 except Exception as e:
-                    print(f"❌ 发送消息失败（学生 {student_id}）: {str(e)}")
+                    logger.warning("Failed to send to student %s: %s", student_id, e)
                     # 连接已断开，清理
                     await self.disconnect(session_id, student_id)
     
@@ -184,22 +184,29 @@ class ConnectionManager:
         if session_id not in self.active_connections:
             # 检查新版存储
             if channel_key in self.student_connections and len(self.student_connections[channel_key]) > 0:
-                # 使用新版存储广播
                 message_text = json.dumps(message) if "timestamp" in message else json.dumps({**message, "timestamp": datetime.utcnow().isoformat()})
-                sent_count = 0
+                dead_ids: list[int] = []
                 for user_id, websocket in self.student_connections[channel_key].items():
                     if exclude_student_id and user_id == exclude_student_id:
                         continue
                     try:
                         await websocket.send_text(message_text)
-                        sent_count += 1
                     except Exception:
-                        pass
+                        dead_ids.append(user_id)
+                for uid in dead_ids:
+                    self.student_connections[channel_key].pop(uid, None)
+                if not self.student_connections[channel_key]:
+                    del self.student_connections[channel_key]
+
+                self._broadcast_to_guests(session_id, message_text)
                 return
             
             # 如果新版存储也没有连接，记录警告
             if channel_key not in self.student_connections or len(self.student_connections.get(channel_key, {})) == 0:
-                print(f"⚠️ [broadcast_to_session] 会话 {session_id} 无学生 WebSocket 连接")
+                logger.debug("No student WS connections for session %s", session_id)
+                if "timestamp" not in message:
+                    message["timestamp"] = datetime.utcnow().isoformat()
+                await self._broadcast_to_guests(session_id, json.dumps(message))
                 return
 
         # 添加时间戳
@@ -221,23 +228,26 @@ class ConnectionManager:
                 await websocket.send_text(message_text)
                 sent_count += 1
             except Exception as e:
-                print(f"❌ 广播失败（学生 {student_id}）: {str(e)}")
+                logger.warning("Broadcast failed for student %s: %s", student_id, e)
                 disconnected_students.append(student_id)
 
         # 清理断开的连接
         for student_id in disconnected_students:
             await self.disconnect(session_id, student_id)
 
-        # 同步广播给访客连接（只读观摩）
+        self._broadcast_to_guests(session_id, message_text)
+
+    async def _broadcast_to_guests(self, session_id: int, message_text: str) -> None:
+        """Forward a pre-serialized message to guest WebSocket connections."""
         guest_key = f"guest:{session_id}"
         guest_conns = getattr(self, "_guest_connections", {}).get(guest_key, set())
-        dead_guests = []
+        dead = []
         for gws in guest_conns:
             try:
                 await gws.send_text(message_text)
             except Exception:
-                dead_guests.append(gws)
-        for gws in dead_guests:
+                dead.append(gws)
+        for gws in dead:
             guest_conns.discard(gws)
 
     def get_session_connections_count(self, session_id: int) -> int:
@@ -359,7 +369,7 @@ class ConnectionManager:
             try:
                 await websocket.send_text(message_text)
             except Exception as e:
-                print(f"❌ 发送消息失败（用户 {user_id}）: {str(e)}")
+                logger.warning("Failed to send to user %s: %s", user_id, e)
                 disconnected_users.append(user_id)
         
         # 清理断开的连接

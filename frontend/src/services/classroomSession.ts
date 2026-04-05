@@ -540,13 +540,9 @@ export const classroomSessionService = {
       throw error
     }
   },
-}
 
   // ========== 访客模式 ==========
 
-  /**
-   * 教师开启/关闭访客模式
-   */
   async toggleGuestAccess(sessionId: number, enabled: boolean): Promise<ClassSession> {
     const response = await api.post<ClassSession>(
       `/classroom-sessions/sessions/${sessionId}/guest-access`,
@@ -555,9 +551,6 @@ export const classroomSessionService = {
     return response
   },
 
-  /**
-   * 访客通过接入码查找课堂（无需登录）
-   */
   async guestLookupSession(accessCode: string): Promise<GuestSessionInfo> {
     const response = await api.get(`/classroom-sessions/guest/join/${accessCode}`)
     const r = response as any
@@ -574,9 +567,6 @@ export const classroomSessionService = {
     }
   },
 
-  /**
-   * 访客获取当前可见 Cell 内容
-   */
   async guestGetCells(sessionId: number, accessCode: string): Promise<any> {
     const response = await api.get(
       `/classroom-sessions/guest/session/${sessionId}/cells`,
