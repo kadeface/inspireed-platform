@@ -294,6 +294,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'district_admin', title: '增值评价 - InspireEd' },
   },
   {
+    path: '/district-admin/monitoring-reports',
+    name: 'MonitoringReportList',
+    component: () => import('../pages/DistrictExamAdmin/MonitoringReportList.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '质量监测报告 - InspireEd' },
+  },
+  {
+    path: '/district-admin/monitoring-reports/:id',
+    name: 'MonitoringReportDetail',
+    component: () => import('../pages/DistrictExamAdmin/MonitoringReportDetail.vue'),
+    meta: { requiresAuth: true, role: 'district_admin', title: '质量监测报告详情 - InspireEd' },
+  },
+  {
     path: '/district-admin/evaluation-report',
     name: 'DistrictEvaluationReport',
     component: () => import('../pages/DistrictExamAdmin/EvaluationReport.vue'),

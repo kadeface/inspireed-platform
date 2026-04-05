@@ -376,6 +376,38 @@ export interface ValueAddedEvaluationSummary {
 }
 
 // ============================================================================
+// 质量监测报告
+// ============================================================================
+
+export interface MonitoringReport {
+  id: number;
+  name: string;
+  report_type: 'primary' | 'junior_high';
+  academic_year: string;
+  semester_type: string;
+  region_id?: number;
+  source_file?: string;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MonitoringReportSchool {
+  id: number;
+  report_id: number;
+  school_code?: string;
+  school_id?: number;
+  school_name: string;
+  display_order: number;
+  remarks?: string;
+  [key: string]: any;
+}
+
+export interface MonitoringReportDetail extends MonitoringReport {
+  school_rows: MonitoringReportSchool[];
+}
+
+// ============================================================================
 // 通用类型
 // ============================================================================
 

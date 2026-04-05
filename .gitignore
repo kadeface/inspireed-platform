@@ -36,7 +36,7 @@ dist/
 dist-ssr/
 *.local
 
-# IDEs
+# IDEs & Tools
 .vscode/
 .idea/
 *.swp
@@ -44,6 +44,12 @@ dist-ssr/
 *~
 .DS_Store
 .cursor/
+.claude/
+.cloudstudio/
+.codebuddy/
+.opencode/
+.agents/
+.shared/
 
 # Environment Variables
 .env
@@ -71,6 +77,10 @@ logs/
 htmlcov/
 .tox/
 .hypothesis/
+frontend/playwright-report/
+frontend/test-results/
+frontend/coverage/
+tests/
 
 # Storage & Uploads
 backend/storage/resources/*
@@ -86,6 +96,8 @@ uploads/
 *.swp
 *.swo
 *~
+tmp_*/
+screenshots/
 
 # Generated Excel/Data Files
 exported_*.xlsx
@@ -98,7 +110,8 @@ exported_*.xlsx
 Thumbs.db
 Desktop.ini
 
-# Documentation Build
+# Documentation
+docs/
 docs/_build/
 site/
 

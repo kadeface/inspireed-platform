@@ -122,6 +122,8 @@ until nc -z 127.0.0.1 5432 2>/dev/null; do
 done
 echo "✅ PostgreSQL 已就绪"
 
+mkdir -p logs
+
 # 检查服务状态
 echo "🔍 检查服务状态..."
 (docker compose -f docker/docker-compose.yml ps 2>/dev/null || docker-compose -f docker/docker-compose.yml ps) || true
@@ -172,6 +174,64 @@ else
     echo "❌ 后端服务启动失败，请检查日志: logs/backend.log"
 fi
 
+# 检测是否使用 HTTPS（通过环境变量或检测是否为公网环境；须在 pnpm dev 之前设置 VITE_DEV_HTTPS）
+USE_HTTPS=${USE_HTTPS:-false}
+
+get_local_ip() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        hostname -I | awk '{print $1}'
+    else
+        echo ""
+    fi
+}
+
+is_private_ip() {
+    local ip=$1
+    if [[ -z "$ip" ]]; then
+        return 0
+    fi
+    if [[ "$ip" =~ ^10\. ]] || \
+       [[ "$ip" =~ ^192\.168\. ]] || \
+       [[ "$ip" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
+       [[ "$ip" =~ ^127\. ]]; then
+        return 0
+    fi
+    return 1
+}
+
+get_public_ip() {
+    if command -v curl &> /dev/null; then
+        curl -s --max-time 2 ifconfig.me 2>/dev/null || \
+        curl -s --max-time 2 ipinfo.io/ip 2>/dev/null || echo ""
+    else
+        echo ""
+    fi
+}
+
+LOCAL_IP=$(get_local_ip)
+PUBLIC_IP=$(get_public_ip)
+
+PROTOCOL="http"
+if [[ "$USE_HTTPS" == "true" ]]; then
+    PROTOCOL="https"
+elif [[ ! -z "$PUBLIC_IP" ]] && ! is_private_ip "$PUBLIC_IP"; then
+    PROTOCOL="https"
+fi
+
+# Node.js 22.21+ 与 @vitejs/plugin-basic-ssl 会导致 Vite dev 崩溃（5173 无监听）
+if [[ "$PROTOCOL" == "https" ]] && node -e 'const m=process.version.match(/^v(\d+)\.(\d+)/); if(!m) process.exit(1); const maj=+m[1], min=+m[2]; process.exit((maj===22 && min>=21) ? 0 : 1);' 2>/dev/null; then
+    echo "⚠️  当前 Node $(node -v) 与 Vite HTTPS 开发不兼容，前端改为 HTTP（见 frontend/env.example 中 VITE_DEV_HTTPS 说明）。"
+    PROTOCOL="http"
+fi
+
+if [[ "$PROTOCOL" == "https" ]]; then
+    export VITE_DEV_HTTPS=true
+else
+    export VITE_DEV_HTTPS=false
+fi
+
 # 启动前端服务
 echo "🎨 启动前端服务..."
 cd frontend
@@ -197,66 +257,6 @@ cd ..
 # 等待前端启动
 echo "⏳ 等待前端服务启动..."
 sleep 5
-
-# 创建日志目录
-mkdir -p logs
-
-# 检测是否使用 HTTPS（通过环境变量或检测是否为公网环境）
-# 如果 USE_HTTPS 环境变量设置为 true，则使用 https
-# 如果检测到公网 IP，则使用 https
-USE_HTTPS=${USE_HTTPS:-false}
-
-# 获取本机 IP 地址
-get_local_ip() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        # Linux
-        hostname -I | awk '{print $1}'
-    else
-        # 其他系统
-        echo ""
-    fi
-}
-
-# 检测是否为私有 IP
-is_private_ip() {
-    local ip=$1
-    if [[ -z "$ip" ]]; then
-        return 0  # 空值视为私有
-    fi
-    # 私有 IP 段：10.x.x.x, 192.168.x.x, 172.16-31.x.x, 127.x.x.x
-    if [[ "$ip" =~ ^10\. ]] || \
-       [[ "$ip" =~ ^192\.168\. ]] || \
-       [[ "$ip" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
-       [[ "$ip" =~ ^127\. ]]; then
-        return 0  # 是私有 IP
-    fi
-    return 1  # 不是私有 IP（可能是公网 IP）
-}
-
-# 获取公网 IP（用于判断是否为互联网部署）
-get_public_ip() {
-    if command -v curl &> /dev/null; then
-        curl -s --max-time 2 ifconfig.me 2>/dev/null || \
-        curl -s --max-time 2 ipinfo.io/ip 2>/dev/null || echo ""
-    else
-        echo ""
-    fi
-}
-
-LOCAL_IP=$(get_local_ip)
-PUBLIC_IP=$(get_public_ip)
-
-# 判断是否使用 HTTPS
-PROTOCOL="http"
-if [[ "$USE_HTTPS" == "true" ]]; then
-    PROTOCOL="https"
-elif [[ ! -z "$PUBLIC_IP" ]] && ! is_private_ip "$PUBLIC_IP"; then
-    # 如果获取到公网 IP 且不是私有 IP，说明是互联网部署，使用 https
-    PROTOCOL="https"
-fi
 
 echo ""
 echo "🎉 服务启动完成！"

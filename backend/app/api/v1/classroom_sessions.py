@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.api import deps
 from app.models.user import User, UserRole
@@ -23,6 +24,11 @@ from app.models.cell import Cell
 from app.models.organization import Classroom
 from app.models.classroom_assistant import ClassroomMembership
 from app.core.classroom_utils import get_user_classroom_ids, check_user_in_classroom
+from app.utils.lesson_content_flat import (
+    build_json_cells_by_effective_order,
+    guest_payload_from_lesson_cell_dict,
+    lesson_content_to_guest_outline,
+)
 from app.schemas.classroom_session import (
     ClassSessionCreate,
     ClassSessionUpdate,
@@ -392,8 +398,35 @@ async def create_class_session(
     )
 
     db.add(session)
-    await db.commit()
-    await db.refresh(session)
+    try:
+        await db.commit()
+        await db.refresh(session)
+    except IntegrityError as exc:
+        await db.rollback()
+        logger.warning(
+            "create_class_session integrity error lesson_id=%s classroom_id=%s: %s",
+            lesson_id,
+            data.classroom_id,
+            exc,
+        )
+        # 与部分唯一索引 uq_active_session_lesson_classroom 或 lesson_classrooms 冲突
+        raise HTTPException(
+            status_code=409,
+            detail="无法创建课堂：该教案与班级下已有未结束的会话，或数据冲突。请先结束现有会话后重试。",
+        ) from exc
+    except DBAPIError as exc:
+        await db.rollback()
+        err_txt = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
+        if "guest_access" in err_txt or "guest_count" in err_txt or "does not exist" in err_txt:
+            logger.exception("create_class_session DB schema mismatch: %s", err_txt)
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "数据库表 class_sessions 缺少访客相关字段或与当前代码不一致。"
+                    "请在 backend 目录执行：alembic upgrade head"
+                ),
+            ) from exc
+        raise
 
     return session
 
@@ -1451,6 +1484,20 @@ async def guest_lookup_session(
     )
 
 
+def _serialize_cell_for_guest(cell: Cell) -> Dict[str, Any]:
+    """ORM Cell → guest cells 列表项（与历史 JSON 字段一致）。"""
+    return {
+        "id": cell.id,
+        "cell_type": cell.cell_type.value
+        if hasattr(cell.cell_type, "value")
+        else str(cell.cell_type),
+        "title": cell.title,
+        "content": cell.content,
+        "config": cell.config,
+        "order": cell.order,
+    }
+
+
 @router.get("/guest/session/{session_id}/cells")
 async def guest_get_session_cells(
     session_id: int,
@@ -1472,32 +1519,138 @@ async def guest_get_session_cells(
     if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
         raise HTTPException(status_code=400, detail="课堂已结束")
 
-    display_orders = (session.settings or {}).get("display_cell_orders", [])
-    if not display_orders:
-        return {"cells": [], "current_cell_id": session.current_cell_id}
+    lesson_id_int = cast(int, session.lesson_id)
+    lesson_row = await db.get(Lesson, lesson_id_int)
+    lesson_content = getattr(lesson_row, "content", None) if lesson_row else None
 
-    result = await db.execute(
-        select(Cell)
-        .where(Cell.lesson_id == session.lesson_id, Cell.order.in_(display_orders))
-        .order_by(Cell.order)
+    raw_orders = (session.settings or {}).get("display_cell_orders") or []
+    display_orders: List[int] = []
+    if isinstance(raw_orders, list):
+        for x in raw_orders:
+            try:
+                display_orders.append(int(x))
+            except (TypeError, ValueError):
+                continue
+
+    cells_data: List[Dict[str, Any]] = []
+
+    if display_orders:
+        # 同一 order：优先 Lesson.content（与导播台模块类型/顺序一致）；cells 表作活动题目补全与无 JSON 时的兜底
+        db_by_order: Dict[int, Cell] = {}
+        db_rows = await db.execute(
+            select(Cell)
+            .where(Cell.lesson_id == lesson_id_int, Cell.order.in_(display_orders))
+            .order_by(Cell.order.asc(), Cell.id.asc())
+        )
+        for cell in db_rows.scalars().all():
+            if cell.order is not None:
+                db_by_order[int(cell.order)] = cell
+
+        json_by_order = build_json_cells_by_effective_order(lesson_content)
+        for o in display_orders:
+            jc = json_by_order.get(o)
+            db_c = db_by_order.get(o)
+
+            # 与导播台一致：以 Lesson.content 扁平结果为准（类型/顺序与教师看到的相同）。
+            # cells 表中同一 lesson_id+order 可能残留多条 ACTIVITY（同步/历史），若优先 DB
+            # 会把前几个 order 错显示成活动，而实际教案已是 TEXT/BROWSER。
+            if jc is not None:
+                j_raw = jc.get("type") or jc.get("cell_type") or "TEXT"
+                j_type = (
+                    j_raw.value
+                    if hasattr(j_raw, "value")
+                    else str(j_raw)
+                ).upper()
+
+                if j_type == "ACTIVITY" and db_c is not None:
+                    db_type = (
+                        db_c.cell_type.value
+                        if hasattr(db_c.cell_type, "value")
+                        else str(db_c.cell_type)
+                    )
+                    if db_type == "ACTIVITY":
+                        jcont = jc.get("content") if isinstance(jc, dict) else None
+                        jitems = (
+                            jcont.get("items")
+                            if isinstance(jcont, dict)
+                            else None
+                        )
+                        db_cont = db_c.content
+                        db_items = (
+                            db_cont.get("items")
+                            if isinstance(db_cont, dict)
+                            else None
+                        )
+                        if isinstance(db_items, list) and len(db_items) > 0 and (
+                            not isinstance(jitems, list) or len(jitems) == 0
+                        ):
+                            cells_data.append(_serialize_cell_for_guest(db_c))
+                            continue
+
+                cells_data.append(guest_payload_from_lesson_cell_dict(jc, o))
+            elif db_c is not None:
+                cells_data.append(_serialize_cell_for_guest(db_c))
+    else:
+        if session.current_cell_id:
+            cc = await db.get(Cell, cast(int, session.current_cell_id))
+            if cc is not None and cast(int, cc.lesson_id) == lesson_id_int:
+                cells_data.append(_serialize_cell_for_guest(cc))
+                if cc.order is not None and int(cc.order) not in display_orders:
+                    display_orders = [int(cc.order)]
+
+        if (
+            not cells_data
+            and session.status == ClassSessionStatus.TEACHING  # type: ignore[comparison-overlap]
+        ):
+            result = await db.execute(
+                select(Cell)
+                .where(Cell.lesson_id == lesson_id_int)
+                .order_by(Cell.order.asc(), Cell.id.asc())
+                .limit(1)
+            )
+            first_cell = result.scalar_one_or_none()
+            if first_cell is not None:
+                cells_data.append(_serialize_cell_for_guest(first_cell))
+                display_orders = (
+                    [int(first_cell.order)]
+                    if first_cell.order is not None
+                    else [0]
+                )
+
+    # 全课模块目录：与教师导播台一致，来自 Lesson.content（sections 平铺）
+    lesson_outline: List[Dict[str, Any]] = []
+    if lesson_row is not None:
+        lesson_outline = lesson_content_to_guest_outline(lesson_content)
+
+    if not lesson_outline:
+        outline_result = await db.execute(
+            select(Cell.id, Cell.order, Cell.title, Cell.cell_type)
+            .where(Cell.lesson_id == lesson_id_int)
+            .order_by(Cell.order.asc(), Cell.id.asc())
+        )
+        for row in outline_result.all():
+            ct = row.cell_type
+            lesson_outline.append(
+                {
+                    "id": int(row.id),
+                    "order": int(row.order) if row.order is not None else None,
+                    "title": (row.title or "").strip(),
+                    "cell_type": ct.value if hasattr(ct, "value") else str(ct),
+                }
+            )
+
+    status_val = (
+        session.status.value
+        if hasattr(session.status, "value")
+        else str(session.status)
     )
-    cells = result.scalars().all()
-
-    cells_data = []
-    for cell in cells:
-        cells_data.append({
-            "id": cell.id,
-            "cell_type": cell.cell_type.value if hasattr(cell.cell_type, "value") else str(cell.cell_type),
-            "title": cell.title,
-            "content": cell.content,
-            "config": cell.config,
-            "order": cell.order,
-        })
 
     return {
         "cells": cells_data,
         "current_cell_id": session.current_cell_id,
         "display_cell_orders": display_orders,
+        "status": status_val,
+        "lesson_outline": lesson_outline,
     }
 
 

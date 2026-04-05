@@ -81,6 +81,8 @@ from app.models.evaluation import (
     MetricCategory,
     ValueAddedEvaluation,
     EvaluationDetail,
+    MonitoringReport,
+    MonitoringReportSchool,
     ImportTask,
     ImportStatus,
 )
@@ -177,6 +179,8 @@ __all__ = [
     "MetricCategory",
     "ValueAddedEvaluation",
     "EvaluationDetail",
+    "MonitoringReport",
+    "MonitoringReportSchool",
     "ImportTask",
     "ImportStatus",
     # 教师教学任务

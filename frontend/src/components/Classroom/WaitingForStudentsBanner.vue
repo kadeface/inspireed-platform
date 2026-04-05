@@ -4,17 +4,18 @@
       <div class="waiting-banner-icon">⏳</div>
       <div class="waiting-banner-text">
         <div class="waiting-banner-title">
-          等待学生加入课堂
-          <span v-if="activeCount > 0" class="student-count-badge">
-            {{ activeCount }} 人已加入
-          </span>
+          <span v-if="activeCount === 0">讲授型模式：可随时开始上课</span>
+          <template v-else>
+            互动型模式
+            <span class="student-count-badge">{{ activeCount }} 人已加入</span>
+          </template>
         </div>
         <div class="waiting-banner-subtitle">
           <span v-if="activeCount === 0">
-            已创建课堂，学生正在加入中... 请等待至少1名学生加入后再开始上课
+            讲授型模式：无学生时可直接开始上课，将以幻灯片模式展示
           </span>
           <span v-else>
-            已有 {{ activeCount }} 名学生加入，可以开始上课了
+            互动型模式：已有 {{ activeCount }} 名学生加入，可以开始上课
           </span>
         </div>
       </div>

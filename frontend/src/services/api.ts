@@ -2,6 +2,21 @@ import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { useUserStore } from '../store/user'
 
+/** 本机或局域网私网 IP（用 5173 开发时也应走 Vite 代理，避免直连 localhost:8000 跨域） */
+function isLocalOrPrivateLanHostname(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
+    return true
+  }
+  const m = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (!m) return false
+  const a = Number(m[1])
+  const b = Number(m[2])
+  if (a === 10) return true
+  if (a === 192 && b === 168) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  return false
+}
+
 /**
  * 动态获取API基础URL
  * 根据当前访问的主机名自动适配后端地址
@@ -16,10 +31,12 @@ function getApiBaseUrl(): string {
 
   // 方案 C：本地开发 / Docker 前端一律走代理，避免跨域导致 Authorization 未发送、教案接口 401
   // DEV+5173：Vite 代理；端口 80：Docker 前端 nginx 代理
-  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0'
   const isViteDevPort = port === '5173'
   const isDockerFrontendPort = port === '80' || port === ''
-  if (isLocalHost && (import.meta.env.DEV || isViteDevPort || isDockerFrontendPort)) {
+  if (
+    isLocalOrPrivateLanHostname(hostname) &&
+    (import.meta.env.DEV || isViteDevPort || isDockerFrontendPort)
+  ) {
     console.log('📍 [API] 使用代理 /api/v1，避免跨域导致 token 未发送')
     return '/api/v1'
   }
@@ -78,8 +95,12 @@ function getApiBaseUrl(): string {
   if (import.meta.env.VITE_API_BASE_URL) {
     let envApiUrl = import.meta.env.VITE_API_BASE_URL
 
-    // 本地开发（localhost:5173）时，若环境变量指向 localhost:8000，强制走代理避免跨域导致 Authorization 未发送
-    if (import.meta.env.DEV && (hostname === 'localhost' || hostname === '127.0.0.1')) {
+    // 本机或局域网 IP + 5173 时，若环境变量指向 localhost:8000，强制走代理避免跨域导致 Authorization 未发送
+    if (
+      import.meta.env.DEV &&
+      isLocalOrPrivateLanHostname(hostname) &&
+      (isViteDevPort || isDockerFrontendPort)
+    ) {
       if (envApiUrl.includes('localhost:8000') || envApiUrl.includes('127.0.0.1:8000')) {
         if (import.meta.env.DEV) {
           console.warn('⚠️ [API] 本地开发已强制使用代理 /api/v1，避免跨域导致 token 未发送')
@@ -158,7 +179,7 @@ class ApiService {
     const hn = window.location.hostname
     const pt = window.location.port
     const useProxyPort = pt === '5173' || pt === '80' || pt === ''
-    if ((hn === 'localhost' || hn === '127.0.0.1' || hn === '0.0.0.0') && useProxyPort &&
+    if (isLocalOrPrivateLanHostname(hn) && useProxyPort &&
         (finalBaseURL.startsWith('http://localhost:8000') || finalBaseURL.startsWith('http://127.0.0.1:8000'))) {
       console.warn('📍 [API] 运行时兜底：强制使用代理 /api/v1，避免跨域导致教案 401')
       finalBaseURL = '/api/v1'
@@ -311,6 +332,27 @@ class ApiService {
         return Promise.reject(error)
       }
     )
+  }
+
+  /**
+   * 与当前 axios baseURL 同源的课堂 WebSocket URL。
+   * 访客页等场景若仍用页面 host 拼 WS，在 CloudStudio（前端 --5173 / 后端 --8000）等环境会连错端口，收不到 cell_changed。
+   */
+  buildClassroomWebSocketUrl(relPath: string): string {
+    const base = (this.axiosInstance.defaults.baseURL || '/api/v1').replace(/\/$/, '')
+    const rel = relPath.replace(/^\//, '')
+    const pageIsSecure = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    const fallbackWsProto = pageIsSecure ? 'wss:' : 'ws:'
+
+    if (base.startsWith('http://') || base.startsWith('https://')) {
+      const u = new URL(base.endsWith('/') ? base : `${base}/`)
+      const wss = u.protocol === 'https:' ? 'wss:' : 'ws:'
+      const pathBase = u.pathname.replace(/\/$/, '')
+      return `${wss}//${u.host}${pathBase}/${rel}`
+    }
+
+    const prefix = base.startsWith('/') ? base : `/${base}`
+    return `${fallbackWsProto}//${window.location.host}${prefix}/${rel}`
   }
 
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {

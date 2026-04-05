@@ -522,3 +522,119 @@ class ImportTaskResponse(ImportTaskBase):
 
 # Alias for compatibility (ImportTaskResponse already includes progress)
 ImportTaskWithProgressResponse = ImportTaskResponse
+
+
+# ============================================================================
+# 质量监测报告（MonitoringReport, MonitoringReportSchool）
+# ============================================================================
+
+class MonitoringReportResponse(BaseModel):
+    """质量监测报告响应"""
+    id: int
+    name: str
+    report_type: str
+    academic_year: str
+    semester_type: str
+    region_id: Optional[int]
+    source_file: Optional[str]
+    created_by: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MonitoringReportSchoolResponse(BaseModel):
+    """质量监测报告学校明细响应"""
+    id: int
+    report_id: int
+    school_code: Optional[str]
+    school_id: Optional[int]
+    school_name: str
+    display_order: int
+    remarks: Optional[str]
+    # 初中
+    g9_one_point: Optional[float] = None
+    g9_excellent_rate: Optional[float] = None
+    g9_good_rate: Optional[float] = None
+    g9_pass_rate: Optional[float] = None
+    g9_low_rate: Optional[float] = None
+    g9_comprehensive: Optional[float] = None
+    g9_score: Optional[float] = None
+    g9_rank: Optional[int] = None
+    g8_one_point: Optional[float] = None
+    g8_excellent_rate: Optional[float] = None
+    g8_good_rate: Optional[float] = None
+    g8_pass_rate: Optional[float] = None
+    g8_low_rate: Optional[float] = None
+    g8_comprehensive: Optional[float] = None
+    g8_score: Optional[float] = None
+    g8_rank: Optional[int] = None
+    g7_one_point: Optional[float] = None
+    g7_excellent_rate: Optional[float] = None
+    g7_good_rate: Optional[float] = None
+    g7_pass_rate: Optional[float] = None
+    g7_low_rate: Optional[float] = None
+    g7_comprehensive: Optional[float] = None
+    g7_score: Optional[float] = None
+    g7_rank: Optional[int] = None
+    g789_one_point: Optional[float] = None
+    g789_excellent_rate: Optional[float] = None
+    g789_good_rate: Optional[float] = None
+    g789_pass_rate: Optional[float] = None
+    g789_low_rate: Optional[float] = None
+    g789_total_score: Optional[float] = None
+    g789_rank: Optional[int] = None
+    g9_value_added_score: Optional[float] = None
+    g9_value_added_rank: Optional[int] = None
+    g8_value_added_score: Optional[float] = None
+    g8_value_added_rank: Optional[int] = None
+    g7_value_added_score: Optional[float] = None
+    g7_value_added_rank: Optional[int] = None
+    g789_value_added_score: Optional[float] = None
+    g789_value_added_rank: Optional[int] = None
+    # 小学
+    g6_one_point: Optional[float] = None
+    g6_excellent_rate: Optional[float] = None
+    g6_good_rate: Optional[float] = None
+    g6_pass_rate: Optional[float] = None
+    g6_comprehensive: Optional[float] = None
+    g6_score: Optional[float] = None
+    g6_rank: Optional[int] = None
+    g5_one_point: Optional[float] = None
+    g5_excellent_rate: Optional[float] = None
+    g5_good_rate: Optional[float] = None
+    g5_pass_rate: Optional[float] = None
+    g5_comprehensive: Optional[float] = None
+    g5_score: Optional[float] = None
+    g5_rank: Optional[int] = None
+    g4_one_point: Optional[float] = None
+    g4_excellent_rate: Optional[float] = None
+    g4_good_rate: Optional[float] = None
+    g4_pass_rate: Optional[float] = None
+    g4_comprehensive: Optional[float] = None
+    g4_score: Optional[float] = None
+    g4_rank: Optional[int] = None
+    g456_one_point: Optional[float] = None
+    g456_excellent_rate: Optional[float] = None
+    g456_good_rate: Optional[float] = None
+    g456_pass_rate: Optional[float] = None
+    g456_total_score: Optional[float] = None
+    g456_rank: Optional[int] = None
+    g6_value_added_score: Optional[float] = None
+    g6_value_added_rank: Optional[int] = None
+    g5_value_added_score: Optional[float] = None
+    g5_value_added_rank: Optional[int] = None
+    g4_value_added_score: Optional[float] = None
+    g4_value_added_rank: Optional[int] = None
+    g456_value_added_score: Optional[float] = None
+    g456_value_added_rank: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MonitoringReportDetailResponse(MonitoringReportResponse):
+    """质量监测报告详情（含学校明细）"""
+    school_rows: List[MonitoringReportSchoolResponse] = []

@@ -547,6 +547,137 @@ class EvaluationDetail(Base):
     )
 
 
+class MonitoringReport(Base):
+    """质量监测报告（导入外部统计表）"""
+    __tablename__ = "monitoring_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False, comment="报告名称")
+    report_type = Column(String(20), nullable=False, comment="报告类型：primary=小学, junior_high=初中")
+    academic_year = Column(String(20), nullable=False, comment="学年，如 2025-2026")
+    semester_type = Column(String(20), nullable=False, comment="学期：up=上学期, down=下学期")
+    region_id = Column(Integer, ForeignKey("regions.id"), nullable=True, comment="区县ID")
+    source_file = Column(String(500), nullable=True, comment="原始文件名")
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    region = relationship("Region", foreign_keys=[region_id])
+    creator = relationship("User", foreign_keys=[created_by])
+    school_rows = relationship("MonitoringReportSchool", back_populates="report", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("idx_monitoring_report_year", "academic_year"),
+        Index("idx_monitoring_report_region", "region_id"),
+    )
+
+
+class MonitoringReportSchool(Base):
+    """质量监测报告-按导入表结构：每学校一行。初中=四率+七八九，小学=三率+四五六"""
+    __tablename__ = "monitoring_report_schools"
+
+    id = Column(Integer, primary_key=True, index=True)
+    report_id = Column(Integer, ForeignKey("monitoring_reports.id", ondelete="CASCADE"), nullable=False)
+    school_code = Column(String(50), nullable=True, comment="学校代码")
+    school_id = Column(Integer, ForeignKey("schools.id"), nullable=True, comment="学校ID")
+    school_name = Column(String(200), nullable=False, comment="学校名称")
+    display_order = Column(Integer, default=0, nullable=False, comment="显示顺序")
+
+    # === 初中：一分、四率(4字段)、综合、得分、排名 ===
+    # 九年级
+    g9_one_point = Column(Float, nullable=True)
+    g9_excellent_rate = Column(Float, nullable=True)
+    g9_good_rate = Column(Float, nullable=True)
+    g9_pass_rate = Column(Float, nullable=True)
+    g9_low_rate = Column(Float, nullable=True)
+    g9_comprehensive = Column(Float, nullable=True)
+    g9_score = Column(Float, nullable=True)
+    g9_rank = Column(Integer, nullable=True)
+    # 八年级
+    g8_one_point = Column(Float, nullable=True)
+    g8_excellent_rate = Column(Float, nullable=True)
+    g8_good_rate = Column(Float, nullable=True)
+    g8_pass_rate = Column(Float, nullable=True)
+    g8_low_rate = Column(Float, nullable=True)
+    g8_comprehensive = Column(Float, nullable=True)
+    g8_score = Column(Float, nullable=True)
+    g8_rank = Column(Integer, nullable=True)
+    # 七年级
+    g7_one_point = Column(Float, nullable=True)
+    g7_excellent_rate = Column(Float, nullable=True)
+    g7_good_rate = Column(Float, nullable=True)
+    g7_pass_rate = Column(Float, nullable=True)
+    g7_low_rate = Column(Float, nullable=True)
+    g7_comprehensive = Column(Float, nullable=True)
+    g7_score = Column(Float, nullable=True)
+    g7_rank = Column(Integer, nullable=True)
+    g9_value_added_score = Column(Float, nullable=True)
+    g9_value_added_rank = Column(Integer, nullable=True)
+    g8_value_added_score = Column(Float, nullable=True)
+    g8_value_added_rank = Column(Integer, nullable=True)
+    g7_value_added_score = Column(Float, nullable=True)
+    g7_value_added_rank = Column(Integer, nullable=True)
+    # 初中3级合计（七八九）
+    g789_one_point = Column(Float, nullable=True)
+    g789_excellent_rate = Column(Float, nullable=True)
+    g789_good_rate = Column(Float, nullable=True)
+    g789_pass_rate = Column(Float, nullable=True)
+    g789_low_rate = Column(Float, nullable=True)
+    g789_total_score = Column(Float, nullable=True)
+    g789_rank = Column(Integer, nullable=True)
+    g789_value_added_score = Column(Float, nullable=True)
+    g789_value_added_rank = Column(Integer, nullable=True)
+
+    # === 小学：一分、三率(3字段)、综合、得分、排名 ===
+    # 六年级
+    g6_one_point = Column(Float, nullable=True)
+    g6_excellent_rate = Column(Float, nullable=True)
+    g6_good_rate = Column(Float, nullable=True)
+    g6_pass_rate = Column(Float, nullable=True)
+    g6_comprehensive = Column(Float, nullable=True)
+    g6_score = Column(Float, nullable=True)
+    g6_rank = Column(Integer, nullable=True)
+    g6_value_added_score = Column(Float, nullable=True)
+    g6_value_added_rank = Column(Integer, nullable=True)
+    # 五年级
+    g5_one_point = Column(Float, nullable=True)
+    g5_excellent_rate = Column(Float, nullable=True)
+    g5_good_rate = Column(Float, nullable=True)
+    g5_pass_rate = Column(Float, nullable=True)
+    g5_comprehensive = Column(Float, nullable=True)
+    g5_score = Column(Float, nullable=True)
+    g5_rank = Column(Integer, nullable=True)
+    g5_value_added_score = Column(Float, nullable=True)
+    g5_value_added_rank = Column(Integer, nullable=True)
+    # 四年级
+    g4_one_point = Column(Float, nullable=True)
+    g4_excellent_rate = Column(Float, nullable=True)
+    g4_good_rate = Column(Float, nullable=True)
+    g4_pass_rate = Column(Float, nullable=True)
+    g4_comprehensive = Column(Float, nullable=True)
+    g4_score = Column(Float, nullable=True)
+    g4_rank = Column(Integer, nullable=True)
+    g4_value_added_score = Column(Float, nullable=True)
+    g4_value_added_rank = Column(Integer, nullable=True)
+    # 小学3级合计（四五六）
+    g456_one_point = Column(Float, nullable=True)
+    g456_excellent_rate = Column(Float, nullable=True)
+    g456_good_rate = Column(Float, nullable=True)
+    g456_pass_rate = Column(Float, nullable=True)
+    g456_total_score = Column(Float, nullable=True)
+    g456_rank = Column(Integer, nullable=True)
+    g456_value_added_score = Column(Float, nullable=True)
+    g456_value_added_rank = Column(Integer, nullable=True)
+
+    remarks = Column(String(500), nullable=True, comment="备注")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    report = relationship("MonitoringReport", back_populates="school_rows")
+    school = relationship("School", foreign_keys=[school_id])
+
+    __table_args__ = (Index("idx_monitoring_school_report", "report_id"),)
+
+
 class ImportTask(Base):
     """导入任务表（异步导入）"""
     __tablename__ = "import_tasks"

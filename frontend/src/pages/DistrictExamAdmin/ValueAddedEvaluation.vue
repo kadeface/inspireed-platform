@@ -40,6 +40,25 @@
         </div>
       </el-card>
 
+      <!-- 质量监测报告 -->
+      <el-card shadow="hover" class="function-card" @click="navigateToMonitoringReports">
+        <div class="card-content">
+          <div class="card-icon">
+            <el-icon :size="48" color="#17a2b8"><Document /></el-icon>
+          </div>
+          <div class="card-info">
+            <h3>质量监测报告</h3>
+            <p class="description">导入并查看小学/初中质量监测统计表，支持按学年查询</p>
+            <div class="stats">
+              <el-tag size="small" type="info">导入 Excel</el-tag>
+            </div>
+          </div>
+        </div>
+        <div class="card-arrow">
+          <el-icon><ArrowRight /></el-icon>
+        </div>
+      </el-card>
+
       <!-- 学期表现 -->
       <el-card shadow="hover" class="function-card" @click="navigateToSemesterPerformance">
         <div class="card-content">
@@ -303,6 +322,10 @@ function navigateToSubjectAnalysis() {
 function navigateToProgressAnalysis() {
   ElMessage.info('进步幅度分析功能开发中...')
   // router.push('/district-admin/progress-analysis')
+}
+
+function navigateToMonitoringReports() {
+  router.push('/district-admin/monitoring-reports')
 }
 
 onMounted(() => {

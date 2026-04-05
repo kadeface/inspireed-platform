@@ -616,6 +616,56 @@ export const evaluationApi = {
 };
 
 // ============================================================================
+// 质量监测报告 API
+// ============================================================================
+
+export const monitoringReportApi = {
+  /** 导入 Excel */
+  import: async (
+    file: File,
+    data: {
+      report_type: 'primary' | 'junior_high';
+      name: string;
+      academic_year: string;
+      semester_type: 'up' | 'down';
+      region_id?: number;
+    }
+  ) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('report_type', data.report_type);
+    formData.append('name', data.name);
+    formData.append('academic_year', data.academic_year);
+    formData.append('semester_type', data.semester_type);
+    if (data.region_id != null) {
+      formData.append('region_id', String(data.region_id));
+    }
+    return apiClient.post('/monitoring-reports/import', formData);
+  },
+
+  /** 列表 */
+  list: async (params?: {
+    academic_year?: string;
+    semester_type?: string;
+    report_type?: string;
+    skip?: number;
+    limit?: number;
+  }) => {
+    return apiClient.get('/monitoring-reports/', { params });
+  },
+
+  /** 详情 */
+  get: async (id: number) => {
+    return apiClient.get(`/monitoring-reports/${id}`);
+  },
+
+  /** 删除 */
+  delete: async (id: number) => {
+    return apiClient.delete(`/monitoring-reports/${id}`);
+  },
+};
+
+// ============================================================================
 // 导出所有API
 // ============================================================================
 
@@ -627,6 +677,7 @@ export const evaluationService = {
   totalScore: totalScoreApi,
   importTask: importTaskApi,
   evaluation: evaluationApi,
+  monitoringReport: monitoringReportApi,
 };
 
 export default evaluationService;

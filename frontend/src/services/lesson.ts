@@ -23,6 +23,8 @@ import type {
  */
 class LessonService {
   private readonly basePath = '/lessons'
+  /** 集合根路径须带尾部 /，否则 FastAPI 307 到 /lessons/，重定向后浏览器会去掉 Authorization → 401 Not authenticated */
+  private readonly collectionPath = '/lessons/'
 
   /**
    * 获取教案列表
@@ -31,7 +33,7 @@ class LessonService {
    */
   async fetchLessons(params?: LessonListParams): Promise<LessonListResponse> {
     try {
-      const response = await api.get<LessonListResponse>(this.basePath, {
+      const response = await api.get<LessonListResponse>(this.collectionPath, {
         params: {
           page: params?.page || 1,
           page_size: params?.page_size || 20,
@@ -73,7 +75,7 @@ class LessonService {
    */
   async createLesson(data: LessonCreate): Promise<Lesson> {
     try {
-      const response = await api.post<Lesson>(this.basePath, data)
+      const response = await api.post<Lesson>(this.collectionPath, data)
       return response
     } catch (error: any) {
       console.error('Failed to create lesson:', error)

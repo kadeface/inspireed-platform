@@ -57,7 +57,7 @@
             :loading="loading"
             :active-students-count="activeStudents.length"
             @create="handleCreateSession"
-            @start="handleBeginClass"
+            @start="() => handleBeginClass(activeStudents.length)"
             @end="handleEnd"
           />
         
@@ -310,13 +310,22 @@ const {
   handleClassroomSelectCancel,
   handleBeginClass,
   handleCancelSession,
-  handlePause,
-  handleResume,
   handleEnd,
-  handleToggleDisplayMode,
   handleStartActivity,
   handleEndActivity,
 } = sessionManager
+
+/** 切换窗口/全屏展示（仅存于 session.settings，与导播台 UI 一致） */
+async function handleToggleDisplayMode() {
+  if (!session.value) return
+  const prev = (session.value.settings || {}) as Record<string, unknown>
+  const cur = (prev.display_mode as string) || 'window'
+  const next = cur === 'fullscreen' ? 'window' : 'fullscreen'
+  session.value = {
+    ...session.value,
+    settings: { ...prev, display_mode: next },
+  }
+}
 
 // 组件 Refs（需在 dataLoader 之前定义）
 const containerRef = ref<HTMLElement | null>(null)

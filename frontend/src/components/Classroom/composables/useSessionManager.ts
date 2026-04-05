@@ -97,12 +97,18 @@ export function useSessionManager(options: UseSessionManagerOptions) {
     }
 
     classroomSelectError.value = null
-    showClassroomSelectModal.value = false
+    const classroomId = selectedClassroomId.value
 
-    await createSessionWithClassroom(selectedClassroomId.value)
-
-    // 重置选择
-    selectedClassroomId.value = null
+    try {
+      await createSessionWithClassroom(classroomId)
+      showClassroomSelectModal.value = false
+      selectedClassroomId.value = null
+    } catch (e: any) {
+      // 创建失败时保持弹窗关闭逻辑由具体错误处理；若仅未捕获的异常，提示并保留可重试
+      const msg = e?.message || e?.response?.data?.detail || '创建课堂失败'
+      classroomSelectError.value = typeof msg === 'string' ? msg : String(msg)
+      console.error('handleClassroomSelectConfirm:', e)
+    }
   }
 
   // 取消班级选择
@@ -135,24 +141,54 @@ export function useSessionManager(options: UseSessionManagerOptions) {
       onSessionCreated?.(newSession)
     } catch (createError: any) {
       // 如果创建失败，检查是否是因为已有活跃会话
-      const errorDetail = createError.response?.data?.detail || createError.message || ''
+      const rawDetail = createError.response?.data?.detail ?? createError.message ?? ''
+      const errorDetail =
+        typeof rawDetail === 'string'
+          ? rawDetail
+          : Array.isArray(rawDetail)
+            ? rawDetail.map((e: any) => e?.msg || JSON.stringify(e)).join('; ')
+            : String(rawDetail)
 
       // 检查错误消息中是否包含"已有活跃的课堂会话"
       const hasActiveSessionError = errorDetail.includes('已有活跃的课堂会话') ||
                                     errorDetail.includes('已有活跃会话')
 
       if (hasActiveSessionError && (createError.response?.status === 400 || createError.message)) {
-        // 从错误信息中提取会话ID
-        const sessionIdMatch = errorDetail.match(/\(ID\s*[：:]\s*(\d+)\)/) ||
-                               errorDetail.match(/（ID\s*[：:]\s*(\d+)）/) ||
-                               errorDetail.match(/ID\s*[：:]\s*(\d+)/)
+        // 从错误信息中提取会话ID（后端使用全角括号「（ID: 123）」时，旧正则匹配失败会导致未提示且 session 为空）
+        const sessionIdMatch =
+          errorDetail.match(/[（(]ID\s*[：:]\s*(\d+)[）)]/i) ||
+          errorDetail.match(/ID\s*[：:]\s*(\d+)/i)
 
-        if (!sessionIdMatch) {
-          console.error('❌ 无法从错误信息中提取会话ID。错误信息:', errorDetail)
-          throw createError
+        let existingSessionId = sessionIdMatch ? parseInt(sessionIdMatch[1], 10) : NaN
+
+        if (!Number.isFinite(existingSessionId)) {
+          try {
+            const sessions = await classroomSessionService.listSessions(lessonId)
+            const active = sessions.find((s: any) => {
+              const st = String(s.status || '').toUpperCase()
+              const cid = s.classroomId ?? s.classroom_id
+              return (
+                (st === 'PREPARING' || st === 'TEACHING') &&
+                cid === classroomId
+              )
+            })
+            if (active?.id) {
+              existingSessionId = active.id as number
+            }
+          } catch (listErr) {
+            console.warn('listSessions fallback failed:', listErr)
+          }
         }
 
-        const existingSessionId = parseInt(sessionIdMatch[1])
+        if (!Number.isFinite(existingSessionId)) {
+          console.error('❌ 无法解析已有会话 ID。错误信息:', errorDetail)
+          alert(
+            errorDetail ||
+              '该班级可能已有未结束的课堂，请先在导播台点击「结束」或刷新页面后重试。'
+          )
+          onError?.(createError)
+          throw createError
+        }
 
         // 直接加载现有会话，并提示用户
         try {
@@ -218,7 +254,13 @@ export function useSessionManager(options: UseSessionManagerOptions) {
       } else {
         // 其他错误，显示错误信息
         console.error('Failed to create session:', createError)
-        let errorMessage = createError.message || createError.response?.data?.detail || '创建课堂失败'
+        let errorMessage: string =
+          typeof createError.message === 'string' ? createError.message : ''
+        const d = createError.response?.data?.detail
+        if (!errorMessage && d != null) {
+          errorMessage = typeof d === 'string' ? d : Array.isArray(d) ? JSON.stringify(d) : String(d)
+        }
+        if (!errorMessage) errorMessage = '创建课堂失败'
 
         if (errorMessage.includes('无权限')) {
           errorMessage = '无法访问该会话。请确保您是该会话的创建者。'
@@ -230,14 +272,17 @@ export function useSessionManager(options: UseSessionManagerOptions) {
 
         alert(errorMessage)
         onError?.(createError)
+        throw createError
       }
     } finally {
       loading.value = false
     }
   }
 
-  // 开始上课（将 PENDING 状态变为 ACTIVE）
-  async function handleBeginClass() {
+  // 开始上课（将 PENDING/PREPARING 状态变为 TEACHING）
+  // 讲授型模式（activeStudentsCount === 0）：无学生时自动切换为 fullscreen 幻灯片模式
+  // 互动型模式（activeStudentsCount > 0）：保持 window 模式
+  async function handleBeginClass(activeStudentsCount: number = 0) {
     const status = normalizedSessionStatus.value
     if (!session.value || (status !== 'pending' && status !== 'preparing')) return
 
@@ -248,6 +293,15 @@ export function useSessionManager(options: UseSessionManagerOptions) {
       // 检查开始会话的响应
       if (!session.value) {
         throw new Error('开始会话失败：服务器返回的数据格式不正确')
+      }
+
+      // 讲授型模式：无学生时自动切换为 fullscreen 幻灯片模式
+      if (activeStudentsCount === 0) {
+        try {
+          session.value = await classroomSessionService.updateDisplayMode(session.value.id, 'fullscreen')
+        } catch (displayErr: any) {
+          console.warn('讲授型模式自动切换全屏失败，可手动切换:', displayErr)
+        }
       }
 
       onSessionStarted?.(session.value)

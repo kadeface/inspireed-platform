@@ -8,6 +8,7 @@ import type {
   ClassSession,
   ClassSessionCreate,
   ClassSessionUpdate,
+  ClassSessionStatus,
   StudentParticipation,
   NavigateToCellRequest,
   StartActivityRequest,
@@ -15,6 +16,14 @@ import type {
   StudentPendingSession,
   GuestSessionInfo,
 } from '../types/classroomSession'
+
+/** 后端可能返回 TEACHING / teaching 等，统一为小写与前端 ClassSessionStatus 一致 */
+export function normalizeClassSessionStatus(raw: unknown): ClassSessionStatus {
+  const v = String(raw ?? '').toLowerCase()
+  if (v === 'teaching') return 'teaching'
+  if (v === 'ended') return 'ended'
+  return 'preparing'
+}
 
 export const classroomSessionService = {
   /**
@@ -499,7 +508,7 @@ export const classroomSessionService = {
       lessonTitle: r.lesson_title,
       teacherName: r.teacher_name,
       classroomName: r.classroom_name,
-      status: r.status,
+      status: normalizeClassSessionStatus(r.status),
       currentCellId: r.current_cell_id,
       displayCellOrders: r.display_cell_orders || [],
       guestCount: r.guest_count || 0,
@@ -509,7 +518,12 @@ export const classroomSessionService = {
   async guestGetCells(sessionId: number, accessCode: string): Promise<any> {
     const response = await api.get(
       `/classroom-sessions/guest/session/${sessionId}/cells`,
-      { params: { access_code: accessCode } },
+      {
+        params: {
+          access_code: accessCode,
+          _t: Date.now(),
+        },
+      },
     )
     return response
   },

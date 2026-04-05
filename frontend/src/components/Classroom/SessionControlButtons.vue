@@ -12,18 +12,18 @@
       </button>
     </template>
 
-    <!-- PREPARING 状态：等待学生登录 -->
+    <!-- PREPARING 状态：讲授型（无学生）或互动型（有学生）均可开始上课 -->
     <template v-else-if="sessionStatus === 'PREPARING' || sessionStatus === 'preparing'">
       <button
         data-testid="start-teaching-button"
         @click="$emit('start')"
-        :disabled="loading || activeStudentsCount === 0"
+        :disabled="loading"
         class="btn btn-primary"
-        :class="{ 'btn-disabled-hint': activeStudentsCount === 0 }"
-        :title="activeStudentsCount === 0 ? '请等待学生加入课堂（至少需要1名学生）' : '开始上课'"
+        :title="activeStudentsCount === 0 ? '开始上课（讲授型/幻灯片模式）' : '开始上课（互动型模式）'"
       >
         ▶️ 开始上课
-        <span v-if="activeStudentsCount === 0" class="ml-2 text-xs opacity-75">(等待学生加入)</span>
+        <span v-if="activeStudentsCount === 0" class="ml-2 text-xs opacity-75">(讲授型)</span>
+        <span v-else class="ml-2 text-xs opacity-75">(互动型)</span>
       </button>
       <button
         data-testid="end-session-button"

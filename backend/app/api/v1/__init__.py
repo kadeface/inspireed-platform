@@ -7,6 +7,7 @@ from typing import cast
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    monitoring_reports,
     activities,
     admin_dashboard,
     admin_organization,
@@ -164,6 +165,11 @@ api_router.include_router(
 )
 api_router.include_router(
     evaluations.router, prefix="/evaluations", tags=["评价-增值评价"]
+)
+api_router.include_router(
+    monitoring_reports.router,
+    prefix="/monitoring-reports",
+    tags=["评价-质量监测报告"],
 )
 api_router.include_router(
     data_center.router, tags=["评价-数据中心"]

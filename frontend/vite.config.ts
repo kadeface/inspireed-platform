@@ -1,11 +1,23 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import path from 'path'
 
+function useDevHttps(env: Record<string, string>): boolean {
+  const fromShell = process.env.VITE_DEV_HTTPS
+  if (fromShell === 'true') return true
+  if (fromShell === 'false') return false
+  return env.VITE_DEV_HTTPS === 'true'
+}
+
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [vue()],
+export default defineConfig(({ mode }) => {
+  const fileEnv = loadEnv(mode, process.cwd(), '')
+  const devHttps = useDevHttps(fileEnv)
+
+  return {
+  plugins: [vue(), ...(devHttps ? [basicSsl()] : [])],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
@@ -75,5 +87,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['vue', 'vue-router', 'pinia', 'axios']
+  }
   }
 })
