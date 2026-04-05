@@ -2,6 +2,7 @@
 Cell单元API路由
 """
 
+import logging
 from typing import Any, List, Optional, Union, cast
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,6 +32,7 @@ from app.api.deps import get_current_active_user
 from app.services.ai_qa import ai_qa_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ==================== 辅助函数 ====================
@@ -191,7 +193,7 @@ async def get_lesson_cells(
             cell_responses.append(cell_response)
         except Exception as e:
             # 如果序列化失败，手动构建响应字典
-            print(f"⚠️ Cell 序列化失败 (ID={cell.id}): {e}")
+            logger.warning("Cell serialization fallback (ID=%s): %s", cell.id, e)
             cell_dict = {
                 "id": cell.id,
                 "lesson_id": cell.lesson_id,
@@ -425,7 +427,8 @@ async def ask_question(
 
     except Exception as e:
         response_time = (time.time() - start_time) * 1000
-        raise HTTPException(status_code=500, detail=f"问答处理失败: {str(e)}")
+        logger.exception("Q&A processing failed for cell %s", cell_id)
+        raise HTTPException(status_code=500, detail="问答处理失败")
 
 
 @router.put("/{cell_id}/qa", response_model=CellResponse)
@@ -553,23 +556,16 @@ async def check_cell_unlock_status(
     # 在实际实现中，需要查询 student_cell_progress 表
     completed_cell_ids = []  # 应该从数据库查询
 
-    # 检查所有前置依赖是否都已完成
     missing_prereqs: List[dict[str, Any]] = []
     completed_ids = {str(cid) for cid in completed_cell_ids}
 
-    for prereq_id in prereqs_list:
-        prereq_id_str = str(prereq_id)
-        if prereq_id_str in completed_ids:
-            continue
-
-        # 获取前置Cell的信息
-        prereq_id_value = cast(Union[int, str], prereq_id)
-        prereq_id_int = int(prereq_id_value)
-        prereq_query = select(Cell).where(Cell.id == prereq_id_int)
-        prereq_result = await db.execute(prereq_query)
-        prereq_cell = prereq_result.scalar_one_or_none()
-
-        if prereq_cell:
+    missing_ids = [int(pid) for pid in prereqs_list if str(pid) not in completed_ids]
+    if missing_ids:
+        prereq_result = await db.execute(
+            select(Cell).where(Cell.id.in_(missing_ids))
+        )
+        prereq_cells = prereq_result.scalars().all()
+        for prereq_cell in prereq_cells:
             missing_prereqs.append(
                 {
                     "id": prereq_cell.id,

@@ -2,6 +2,7 @@
 课程体系管理 API 路由
 """
 
+import logging
 from typing import Any, List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
@@ -34,6 +35,7 @@ from app.schemas.curriculum import (
 from app.api.v1.auth import get_current_active_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -684,7 +686,8 @@ async def merge_courses(
         return result
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"合并课程失败: {str(e)}")
+        logger.exception("merge_courses failed")
+        raise HTTPException(status_code=500, detail="合并课程失败")
 
 
 # ==================== Curriculum Tree Endpoint ====================

@@ -71,7 +71,7 @@
                 <el-dropdown-item command="profile" v-if="showProfileButton">
                   <el-icon><User /></el-icon> 个人中心
                 </el-dropdown-item>
-                <el-dropdown-item command="settings">
+                <el-dropdown-item command="settings" disabled>
                   <el-icon><Setting /></el-icon> 系统设置
                 </el-dropdown-item>
 

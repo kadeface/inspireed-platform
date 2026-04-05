@@ -895,7 +895,7 @@ async def update_lesson(
                     if not cell_id:
                         import uuid
                         cell['id'] = str(uuid.uuid4())
-                        logger.info(f"  已为 Cell[{idx}] 生成临时ID: {cell['id']}")
+                        logger.debug("Cell[%d] assigned temp ID: %s", idx, cell['id'])
                 
                 if not cell_type:
                     logger.warning(
@@ -904,7 +904,7 @@ async def update_lesson(
                     # 如果没有 type，使用默认值
                     if not cell_type:
                         cell['type'] = 'text'
-                        logger.info(f"  已为 Cell[{idx}] 设置默认type: text")
+                        logger.debug("Cell[%d] defaulted to type=text", idx)
                 
                 logger.debug(
                     f"  保存Cell[{idx}]: id={cell.get('id')}, type={cell.get('type')}, "
@@ -927,11 +927,9 @@ async def update_lesson(
                 # 从后往前删除，避免索引变化
                 for idx in reversed(invalid_cells):
                     new_content.pop(idx)
-                logger.info(f"  已移除无效 cell，剩余 {len(new_content)} 个 cells")
+                logger.debug("Removed invalid cells, remaining: %d", len(new_content))
             
-            logger.info(
-                f"教案 {lesson_id} 准备保存 {len(new_content)} 个 cells, IDs={cell_ids[:10]}{'...' if len(cell_ids) > 10 else ''}"
-            )
+            logger.debug("Lesson %s saving %d cells", lesson_id, len(new_content))
             # 更新 update_data 中的 content
             update_data["content"] = new_content
 
@@ -959,9 +957,7 @@ async def update_lesson(
                 for idx in reversed(invalid_cells):
                     cells.pop(idx)
                 sec["cells"] = cells
-            logger.info(
-                f"教案 {lesson_id} 准备保存 sections 格式, 共 {_content_cell_count(new_content)} 个 cells"
-            )
+            logger.debug("Lesson %s saving sections format, %d cells", lesson_id, _content_cell_count(new_content))
 
         # 比较内容是否真正发生变化（兼容 list 与 {sections}）
         # cast: 避免类型检查器将 lesson.content 的 != 推断为 ColumnElement[bool]
@@ -998,24 +994,18 @@ async def update_lesson(
                     value = []
             if value is None:
                 value = []
-            logger.info(
-                f"教案 {lesson_id} 设置 content 字段: 类型={type(value)}, "
-                f"cell 数={_content_cell_count(value)}"
-            )
+            logger.debug("Lesson %s content set: type=%s cells=%d", lesson_id, type(value).__name__, _content_cell_count(value))
         setattr(lesson, field, value)
 
         if field == "content":
             set_value = getattr(lesson, field, None)
-            logger.info(
-                f"教案 {lesson_id} 设置后验证: content类型={type(set_value)}, "
-                f"cell 数={_content_cell_count(set_value)}"
-            )
+            logger.debug("Lesson %s content verified: type=%s cells=%d", lesson_id, type(set_value).__name__, _content_cell_count(set_value))
 
     # 如果更新了内容，自动更新 cell_count（兼容 list 与 {sections}）
     if content_updated:
         cell_count = _content_cell_count(lesson.content)
         setattr(lesson, "cell_count", cell_count)
-        logger.info(f"教案 {lesson_id} 更新 cell_count: {cell_count}")
+        logger.debug("Lesson %s cell_count updated: %d", lesson_id, cell_count)
     
     # 如果更新了已发布教案的内容，自动更新版本号
     # 这样学生端可以通过版本号判断是否有新内容
@@ -1244,7 +1234,7 @@ async def publish_lesson(
         raise
     except Exception as e:
         logger.exception("publish_lesson failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"发布失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="发布失败")
 
 
 @router.post("/{lesson_id}/unpublish", response_model=LessonResponse)
