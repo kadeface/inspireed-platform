@@ -6,7 +6,7 @@ from typing import List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload
 
 from app.core.database import get_db
 from app.models import (
@@ -155,22 +155,22 @@ async def list_subject_groups(
 ) -> SubjectGroupListResponse:
     """获取教研组列表"""
 
-    # 构建查询
-    query = select(SubjectGroup).where(SubjectGroup.is_active.is_(True))
+    # 构建基础查询
+    base_query = select(SubjectGroup).where(SubjectGroup.is_active.is_(True))
 
     # 应用过滤条件
     if subject_id:
-        query = query.where(SubjectGroup.subject_id == subject_id)
+        base_query = base_query.where(SubjectGroup.subject_id == subject_id)
     if grade_id:
-        query = query.where(SubjectGroup.grade_id == grade_id)
+        base_query = base_query.where(SubjectGroup.grade_id == grade_id)
     if scope:
-        query = query.where(SubjectGroup.scope == scope)
+        base_query = base_query.where(SubjectGroup.scope == scope)
     if school_id:
-        query = query.where(SubjectGroup.school_id == school_id)
+        base_query = base_query.where(SubjectGroup.school_id == school_id)
     if region_id:
-        query = query.where(SubjectGroup.region_id == region_id)
+        base_query = base_query.where(SubjectGroup.region_id == region_id)
     if is_public is not None:
-        query = query.where(SubjectGroup.is_public == is_public)
+        base_query = base_query.where(SubjectGroup.is_public == is_public)
 
     if my_groups:
         # 查询用户是成员的教研组
@@ -179,15 +179,22 @@ async def list_subject_groups(
             .where(GroupMembership.user_id == current_user.id)
             .where(GroupMembership.is_active == True)
         )
-        query = query.where(SubjectGroup.id.in_(membership_subquery))
+        base_query = base_query.where(SubjectGroup.id.in_(membership_subquery))
 
     # 计算总数
-    count_query = select(func.count()).select_from(query.subquery())
+    count_query = select(func.count()).select_from(base_query.subquery())
     total = await db.scalar(count_query)
 
-    # 分页
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    query = query.order_by(SubjectGroup.created_at.desc())
+    # 分页查询时预加载学科/年级，避免构建响应时额外查询
+    query = (
+        base_query.options(
+            joinedload(SubjectGroup.subject),
+            joinedload(SubjectGroup.grade),
+        )
+        .order_by(SubjectGroup.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     # 执行查询
     result = await db.execute(query)
@@ -208,38 +215,14 @@ async def list_subject_groups(
         for membership in memberships.scalars():
             user_roles[membership.group_id] = membership.role
 
-    # 获取关联信息
-    subject_ids = list({cast(int, g.subject_id) for g in groups})
-    subjects = {}
-    if subject_ids:
-        subject_result = await db.execute(
-            select(Subject).where(Subject.id.in_(subject_ids))
-        )
-        subjects = {s.id: s for s in subject_result.scalars()}
-
-    grade_ids = list(
-        {cast(int, g.grade_id) for g in groups if cast(Optional[int], g.grade_id) is not None}
-    )
-    grades = {}
-    if grade_ids:
-        grade_result = await db.execute(select(Grade).where(Grade.id.in_(grade_ids)))
-        grades = {g.id: g for g in grade_result.scalars()}
-
     # 构建响应
     items = []
     for group in groups:
         response = SubjectGroupResponse.model_validate(group)
         response.subject_name = (
-            cast(str, subjects[group.subject_id].name)
-            if group.subject_id in subjects
-            else None
+            cast(str, group.subject.name) if group.subject else None
         )
-        response.grade_name = (
-            cast(str, grades[cast(int, group.grade_id)].name)
-            if cast(Optional[int], group.grade_id) is not None
-            and cast(int, group.grade_id) in grades
-            else None
-        )
+        response.grade_name = cast(str, group.grade.name) if group.grade else None
         response.user_role = user_roles.get(group.id)
         items.append(response)
 
@@ -256,63 +239,47 @@ async def get_subject_group(
 ) -> SubjectGroupResponse:
     """获取教研组详情"""
 
-    group = await db.get(SubjectGroup, group_id)
+    group_result = await db.execute(
+        select(SubjectGroup)
+        .options(
+            joinedload(SubjectGroup.subject),
+            joinedload(SubjectGroup.creator),
+            joinedload(SubjectGroup.grade),
+            joinedload(SubjectGroup.school),
+            joinedload(SubjectGroup.region),
+        )
+        .where(SubjectGroup.id == group_id)
+    )
+    group = group_result.scalar_one_or_none()
     if not group or not cast(bool, group.is_active):
         raise HTTPException(status_code=404, detail="教研组不存在")
 
-    # 检查用户是否是成员（如果不是公开组）
-    if not cast(bool, group.is_public):
-        membership = await db.scalar(
-            select(GroupMembership).where(
-                and_(
-                    GroupMembership.group_id == group_id,
-                    GroupMembership.user_id == cast(int, current_user.id),
-                    GroupMembership.is_active == True,
-                )
-            )
-        )
-        if not membership:
-            raise HTTPException(status_code=403, detail="无权访问此教研组")
-
-    # 获取用户角色
-    user_role = None
+    # 一次查询获取当前用户在该组中的成员关系（用于权限校验 + 角色返回）
     membership = await db.scalar(
         select(GroupMembership).where(
             and_(
                 GroupMembership.group_id == group_id,
                 GroupMembership.user_id == cast(int, current_user.id),
-                GroupMembership.is_active == True,
+                GroupMembership.is_active.is_(True),
             )
         )
     )
-    if membership:
-        user_role = membership.role
-
-    # 获取关联信息
-    subject = await db.get(Subject, group.subject_id)
-    creator = await db.get(User, group.creator_id)
-    grade = (
-        await db.get(Grade, group.grade_id)
-        if cast(Optional[int], group.grade_id)
-        else None
-    )
+    if not cast(bool, group.is_public) and not membership:
+        raise HTTPException(status_code=403, detail="无权访问此教研组")
 
     response = SubjectGroupResponse.model_validate(group)
-    response.subject_name = cast(str, subject.name) if subject else None
-    response.grade_name = cast(str, grade.name) if grade else None
+    response.subject_name = cast(str, group.subject.name) if group.subject else None
+    response.grade_name = cast(str, group.grade.name) if group.grade else None
     response.creator_name = (
-        (cast(str, creator.full_name) or cast(str, creator.username))
-        if creator
+        (cast(str, group.creator.full_name) or cast(str, group.creator.username))
+        if group.creator
         else None
     )
-    response.user_role = cast(Optional[MemberRole], user_role)
-
-    if cast(Optional[int], group.school_id):
-        school = await db.get(School, group.school_id)
-        response.school_name = cast(str, school.name) if school else None
-    if cast(Optional[int], group.region_id):
-        region = await db.get(Region, group.region_id)
-        response.region_name = cast(str, region.name) if region else None
+    response.user_role = (
+        cast(Optional[MemberRole], membership.role) if membership else None
+    )
+    response.school_name = cast(str, group.school.name) if group.school else None
+    response.region_name = cast(str, group.region.name) if group.region else None
 
     return response
 
@@ -428,34 +395,31 @@ async def list_group_members(
         raise HTTPException(status_code=403, detail="无权访问此教研组成员列表")
 
     # 查询成员
-    query = select(GroupMembership).where(
+    base_query = select(GroupMembership).where(
         and_(GroupMembership.group_id == group_id, GroupMembership.is_active == True)
     )
 
     # 计算总数
-    count_query = select(func.count()).select_from(query.subquery())
+    count_query = select(func.count()).select_from(base_query.subquery())
     total = await db.scalar(count_query)
 
-    # 分页
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    query = query.order_by(GroupMembership.joined_at.asc())
+    # 分页并预加载用户信息，避免额外 IN 查询
+    query = (
+        base_query.options(joinedload(GroupMembership.user))
+        .order_by(GroupMembership.joined_at.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     # 执行查询
     result = await db.execute(query)
     memberships = result.scalars().all()
 
-    # 获取用户信息
-    user_ids = [m.user_id for m in memberships]
-    users = {}
-    if user_ids:
-        user_result = await db.execute(select(User).where(User.id.in_(user_ids)))
-        users = {u.id: u for u in user_result.scalars()}
-
     # 构建响应
     items = []
     for membership in memberships:
         response = GroupMembershipResponse.model_validate(membership)
-        user = users.get(membership.user_id)
+        user = membership.user
         if user:
             response.user_name = (
                 (cast(str, user.full_name) or cast(str, user.username))
@@ -729,43 +693,35 @@ async def list_shared_lessons(
         raise HTTPException(status_code=403, detail="无权访问此教研组的共享教学设计")
 
     # 查询共享教学设计
-    query = select(SharedLesson).where(
+    base_query = select(SharedLesson).where(
         and_(SharedLesson.group_id == group_id, SharedLesson.is_active == True)
     )
 
     # 计算总数
-    count_query = select(func.count()).select_from(query.subquery())
+    count_query = select(func.count()).select_from(base_query.subquery())
     total = cast(int, await db.scalar(count_query))
 
-    # 分页
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    query = query.order_by(SharedLesson.shared_at.desc())
+    # 分页并预加载教案与分享者，避免额外批量查询
+    query = (
+        base_query.options(
+            joinedload(SharedLesson.lesson),
+            joinedload(SharedLesson.sharer),
+        )
+        .order_by(SharedLesson.shared_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     # 执行查询
     result = await db.execute(query)
     shared_lessons = result.scalars().all()
-
-    # 获取关联信息
-    lesson_ids = [sl.lesson_id for sl in shared_lessons]
-    lessons = {}
-    if lesson_ids:
-        lesson_result = await db.execute(
-            select(Lesson).where(Lesson.id.in_(lesson_ids))
-        )
-        lessons = {lesson.id: lesson for lesson in lesson_result.scalars()}
-
-    sharer_ids = [sl.sharer_id for sl in shared_lessons]
-    sharers = {}
-    if sharer_ids:
-        sharer_result = await db.execute(select(User).where(User.id.in_(sharer_ids)))
-        sharers = {u.id: u for u in sharer_result.scalars()}
 
     # 构建响应
     items = []
     for shared_lesson in shared_lessons:
         response = SharedLessonResponse.model_validate(shared_lesson)
 
-        lesson = lessons.get(shared_lesson.lesson_id)
+        lesson = shared_lesson.lesson
         if lesson:
             lesson_title = cast(Optional[str], lesson.title)
             lesson_description = cast(Optional[str], lesson.description)
@@ -796,7 +752,7 @@ async def list_shared_lessons(
             response.lesson_cell_count = 0
             response.lesson_estimated_duration = None
 
-        sharer = sharers.get(shared_lesson.sharer_id)
+        sharer = shared_lesson.sharer
         if sharer:
             response.sharer_name = (
                 (cast(str, sharer.full_name) or cast(str, sharer.username))
