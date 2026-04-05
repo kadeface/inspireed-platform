@@ -146,16 +146,21 @@ class StudentSessionParticipation(Base):
         return f"<StudentSessionParticipation(session_id={self.session_id}, student_id={self.student_id})>"
 
 
-# 创建索引以优化查询性能
 Index("idx_session_status_teacher", ClassSession.teacher_id, ClassSession.status)
-Index(
-    "idx_session_classroom_status",
-    ClassSession.classroom_id,
-    ClassSession.status,
-)
+Index("idx_session_classroom_status", ClassSession.classroom_id, ClassSession.status)
 Index(
     "idx_participation_session_active",
     StudentSessionParticipation.session_id,
     StudentSessionParticipation.is_active,
+)
+
+# Partial unique index: prevent multiple active sessions for the same lesson+classroom.
+# Only rows where status != 'ENDED' are constrained.
+Index(
+    "uq_active_session_lesson_classroom",
+    ClassSession.lesson_id,
+    ClassSession.classroom_id,
+    unique=True,
+    postgresql_where=(ClassSession.status != ClassSessionStatus.ENDED),
 )
 

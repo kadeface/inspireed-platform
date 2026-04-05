@@ -532,7 +532,10 @@ async def start_session(
 ) -> Any:
     """开始课堂会话"""
 
-    session = await db.get(ClassSession, session_id)
+    result = await db.execute(
+        select(ClassSession).where(ClassSession.id == session_id).with_for_update()
+    )
+    session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
 
@@ -645,7 +648,10 @@ async def end_session(
 ) -> Any:
     """结束课堂会话"""
 
-    session = await db.get(ClassSession, session_id)
+    result = await db.execute(
+        select(ClassSession).where(ClassSession.id == session_id).with_for_update()
+    )
+    session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
 

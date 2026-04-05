@@ -204,8 +204,9 @@ async def fetch_teachers_by_lesson(
             .distinct()
         )
         teacher_ids = [row[0] for row in result.all() if row[0] is not None]
-    except Exception:
-        pass  # 如果 ClassSession 表结构不匹配，忽略错误
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to fetch teachers by session: %s", e)
     
     # 方案2: 从 Lesson 的创建者获取
     if not teacher_ids:
@@ -299,6 +300,8 @@ async def get_submission_statistics(
                                 sql_select(Cell)
                                 .where(Cell.lesson_id == lesson_id)
                                 .where(Cell.order == cell_order)
+                                .order_by(Cell.id.desc())
+                                .limit(1)
                             )
                             matched_cell = cell_result.scalar_one_or_none()
                             if matched_cell:

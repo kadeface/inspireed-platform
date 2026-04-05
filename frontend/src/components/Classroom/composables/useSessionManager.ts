@@ -48,7 +48,6 @@ export function useSessionManager(options: UseSessionManagerOptions) {
       preparing: '准备中',
       active: '上课中',
       teaching: '上课中',
-      paused: '已暂停',
       ended: '已结束',
     }
     return statusMap[status || ''] || '未知状态'
@@ -299,36 +298,6 @@ export function useSessionManager(options: UseSessionManagerOptions) {
     }
   }
 
-  // 暂停会话
-  async function handlePause() {
-    if (!session.value) return
-    loading.value = true
-    try {
-      session.value = await classroomSessionService.pauseSession(session.value.id)
-    } catch (error: any) {
-      console.error('Failed to pause session:', error)
-      alert('暂停失败')
-      onError?.(error)
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 继续会话
-  async function handleResume() {
-    if (!session.value) return
-    loading.value = true
-    try {
-      session.value = await classroomSessionService.resumeSession(session.value.id)
-    } catch (error: any) {
-      console.error('Failed to resume session:', error)
-      alert('继续失败')
-      onError?.(error)
-    } finally {
-      loading.value = false
-    }
-  }
-
   // 结束会话
   async function handleEnd() {
     if (!session.value) return
@@ -368,24 +337,6 @@ export function useSessionManager(options: UseSessionManagerOptions) {
         session.value = null
         onSessionEnded?.()
       }
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // 切换显示模式
-  async function handleToggleDisplayMode() {
-    if (!session.value) return
-
-    const newMode = currentDisplayMode.value === 'fullscreen' ? 'window' : 'fullscreen'
-
-    loading.value = true
-    try {
-      session.value = await classroomSessionService.updateDisplayMode(session.value.id, newMode)
-    } catch (error: any) {
-      console.error('切换显示模式失败:', error)
-      alert('切换显示模式失败')
-      onError?.(error)
     } finally {
       loading.value = false
     }
@@ -449,10 +400,7 @@ export function useSessionManager(options: UseSessionManagerOptions) {
     handleClassroomSelectCancel,
     handleBeginClass,
     handleCancelSession,
-    handlePause,
-    handleResume,
     handleEnd,
-    handleToggleDisplayMode,
     handleStartActivity,
     handleEndActivity,
   }
