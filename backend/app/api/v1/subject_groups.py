@@ -2,13 +2,9 @@
 学科教研组API接口
 """
 
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.schema import Column
 from typing import List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -160,7 +156,7 @@ async def list_subject_groups(
     """获取教研组列表"""
 
     # 构建查询
-    query = select(SubjectGroup).where(SubjectGroup.is_active == True)
+    query = select(SubjectGroup).where(SubjectGroup.is_active.is_(True))
 
     # 应用过滤条件
     if subject_id:
@@ -205,7 +201,7 @@ async def list_subject_groups(
             and_(
                 GroupMembership.group_id.in_(group_ids),
                 GroupMembership.user_id == current_user.id,
-                GroupMembership.is_active == True,
+                GroupMembership.is_active.is_(True),
             )
         )
         memberships = await db.execute(membership_query)
@@ -213,7 +209,7 @@ async def list_subject_groups(
             user_roles[membership.group_id] = membership.role
 
     # 获取关联信息
-    subject_ids = list[Column[int]](set[Column[int]](g.subject_id for g in groups))
+    subject_ids = list({cast(int, g.subject_id) for g in groups})
     subjects = {}
     if subject_ids:
         subject_result = await db.execute(
@@ -221,8 +217,8 @@ async def list_subject_groups(
         )
         subjects = {s.id: s for s in subject_result.scalars()}
 
-    grade_ids = list[Column[int]](
-        set[Column[int]](g.grade_id for g in groups if cast(Optional[int], g.grade_id))
+    grade_ids = list(
+        {cast(int, g.grade_id) for g in groups if cast(Optional[int], g.grade_id) is not None}
     )
     grades = {}
     if grade_ids:
@@ -239,9 +235,9 @@ async def list_subject_groups(
             else None
         )
         response.grade_name = (
-            cast(str, grades[group.grade_id].name)
-            if cast(Optional[int], group.grade_id)
-            and cast(Optional[int], group.grade_id) in cast(dict, grades)
+            cast(str, grades[cast(int, group.grade_id)].name)
+            if cast(Optional[int], group.grade_id) is not None
+            and cast(int, group.grade_id) in grades
             else None
         )
         response.user_role = user_roles.get(group.id)
@@ -1100,43 +1096,59 @@ async def get_statistics(
 
     # 总教研组数
     total_groups = await db.scalar(
-        select(func.count(SubjectGroup.id)).where(SubjectGroup.is_active == True)
+        select(func.count(SubjectGroup.id)).where(SubjectGroup.is_active.is_(True))
     )
 
-    # 总成员数
-    total_members = await db.scalar(
-        select(func.count(GroupMembership.id)).where(GroupMembership.is_active == True)
+    membership_stats_query = select(
+        func.coalesce(
+            func.sum(case((GroupMembership.is_active.is_(True), 1), else_=0)),
+            0,
+        ).label("total_members"),
+        func.coalesce(
+            func.sum(
+                case(
+                    (
+                        and_(
+                            GroupMembership.user_id == cast(int, current_user.id),
+                            GroupMembership.is_active.is_(True),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ),
+            0,
+        ).label("my_groups"),
     )
+    membership_stats = (await db.execute(membership_stats_query)).mappings().one()
 
-    # 总共享教案数
-    total_shared_lessons = await db.scalar(
-        select(func.count(SharedLesson.id)).where(SharedLesson.is_active == True)
+    shared_lesson_stats_query = select(
+        func.coalesce(
+            func.sum(case((SharedLesson.is_active.is_(True), 1), else_=0)),
+            0,
+        ).label("total_shared_lessons"),
+        func.coalesce(
+            func.sum(
+                case(
+                    (
+                        and_(
+                            SharedLesson.sharer_id == cast(int, current_user.id),
+                            SharedLesson.is_active.is_(True),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ),
+            0,
+        ).label("my_shared_lessons"),
     )
-
-    # 我的教研组数
-    my_groups = await db.scalar(
-        select(func.count(GroupMembership.id)).where(
-            and_(
-                GroupMembership.user_id == cast(int, current_user.id),
-                GroupMembership.is_active == True,
-            )
-        )
-    )
-
-    # 我的共享教案数
-    my_shared_lessons = await db.scalar(
-        select(func.count(SharedLesson.id)).where(
-            and_(
-                SharedLesson.sharer_id == cast(int, current_user.id),
-                SharedLesson.is_active == True,
-            )
-        )
-    )
+    shared_lesson_stats = (await db.execute(shared_lesson_stats_query)).mappings().one()
 
     return SubjectGroupStatistics(
         total_groups=total_groups or 0,
-        total_members=total_members or 0,
-        total_shared_lessons=total_shared_lessons or 0,
-        my_groups=my_groups or 0,
-        my_shared_lessons=my_shared_lessons or 0,
+        total_members=int(membership_stats["total_members"] or 0),
+        total_shared_lessons=int(shared_lesson_stats["total_shared_lessons"] or 0),
+        my_groups=int(membership_stats["my_groups"] or 0),
+        my_shared_lessons=int(shared_lesson_stats["my_shared_lessons"] or 0),
     )
