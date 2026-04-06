@@ -8,7 +8,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import defer, selectinload
 
 from app.core.database import get_db
 from app.models import (
@@ -28,6 +28,7 @@ from app.schemas.lesson import (
     LessonUpdate,
     LessonResponse,
     LessonListResponse,
+    LessonCreatorStatusCounts,
     LessonClassroomInfo,
     LessonPublishRequest,
     LessonRelatedMaterial,
@@ -176,8 +177,8 @@ def _lesson_to_response(lesson: Lesson, request: Optional[Request] = None, skip_
         return 0
 
     db_cell_count = cast(int, lesson.cell_count) if lesson.cell_count is not None else 0
-    if db_cell_count == 0:
-        # 如果数据库中的 cell_count 为 0，从 content 动态计算
+    # 列表 API 使用 defer(content) 时不应访问 lesson.content，否则会按行懒加载，抵消优化
+    if db_cell_count == 0 and include_content:
         calculated_count = _calculate_cell_count(lesson.content)
         if calculated_count > 0:
             lesson_data["cell_count"] = calculated_count
@@ -341,6 +342,7 @@ async def list_lessons(
         raise HTTPException(status_code=403, detail="当前用户角色无效")
 
     base_query = select(Lesson).options(
+        defer(Lesson.content),
         selectinload(Lesson.course).selectinload(Course.subject),
         selectinload(Lesson.course).selectinload(Course.grade),
         selectinload(Lesson.creator),
@@ -463,6 +465,37 @@ async def list_lessons(
     )
 
 
+@router.get("/creator-status-counts", response_model=LessonCreatorStatusCounts)
+async def get_creator_lesson_status_counts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """当前用户创建的教案按状态计数。供教师工作台 PDCA 首屏使用，替代 3 次分页列表请求。"""
+    stmt = (
+        select(Lesson.status, func.count(Lesson.id))
+        .where(Lesson.creator_id == current_user.id)
+        .group_by(Lesson.status)
+    )
+    result = await db.execute(stmt)
+    counts = {LessonStatus.DRAFT: 0, LessonStatus.PUBLISHED: 0, LessonStatus.ARCHIVED: 0}
+    for row in result.all():
+        status_val, cnt = row[0], int(row[1] or 0)
+        if isinstance(status_val, LessonStatus):
+            key = status_val
+        else:
+            try:
+                key = LessonStatus(str(status_val).lower())
+            except ValueError:
+                continue
+        if key in counts:
+            counts[key] = cnt
+    return LessonCreatorStatusCounts(
+        draft=counts[LessonStatus.DRAFT],
+        published=counts[LessonStatus.PUBLISHED],
+        archived=counts[LessonStatus.ARCHIVED],
+    )
+
+
 @router.get("/recommended", response_model=LessonListResponse)
 async def get_recommended_lessons(
     request: Request,
@@ -479,6 +512,7 @@ async def get_recommended_lessons(
     query = (
         select(Lesson)
         .options(
+            defer(Lesson.content),
             selectinload(Lesson.course).selectinload(Course.subject),
             selectinload(Lesson.course).selectinload(Course.grade),
             selectinload(Lesson.creator),
@@ -590,6 +624,7 @@ async def get_course_related_materials(
     if resource_ids:
         lessons_result = await db.execute(
             select(Lesson)
+                .options(defer(Lesson.content))
                 .where(Lesson.reference_resource_id.in_(resource_ids))
                 .order_by(Lesson.updated_at.desc())
         )
@@ -1473,6 +1508,7 @@ async def get_chapter_lessons(
     query = (
         select(Lesson)
         .options(
+            defer(Lesson.content),
             selectinload(Lesson.course).selectinload(Course.subject),
             selectinload(Lesson.course).selectinload(Course.grade),
             selectinload(Lesson.chapter),

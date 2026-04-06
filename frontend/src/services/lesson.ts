@@ -11,7 +11,11 @@ import type {
   LessonClassroom,
   LessonRelatedMaterialListResponse
 } from '../types/lesson'
-import type { LessonListParams, LessonListResponse } from '../types/api'
+import type {
+  LessonListParams,
+  LessonListResponse,
+  LessonCreatorStatusCounts,
+} from '../types/api'
 import type { 
   Resource, 
   CreateFromResourceRequest, 
@@ -31,6 +35,20 @@ class LessonService {
    * @param params 查询参数（分页、搜索、状态过滤）
    * @returns 教案列表响应
    */
+  /**
+   * 当前用户创建的教案按状态计数（单次请求，替代多次 fetchLessons 取 total）
+   */
+  async fetchCreatorStatusCounts(): Promise<LessonCreatorStatusCounts> {
+    try {
+      return await api.get<LessonCreatorStatusCounts>(
+        `${this.basePath}/creator-status-counts`
+      )
+    } catch (error: any) {
+      console.error('Failed to fetch creator lesson status counts:', error)
+      throw new Error(error.response?.data?.detail || '获取教案状态统计失败')
+    }
+  }
+
   async fetchLessons(params?: LessonListParams): Promise<LessonListResponse> {
     try {
       const response = await api.get<LessonListResponse>(this.collectionPath, {

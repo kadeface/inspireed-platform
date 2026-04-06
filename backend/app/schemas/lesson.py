@@ -191,6 +191,14 @@ class LessonListResponse(BaseModel):
     page_size: int
 
 
+class LessonCreatorStatusCounts(BaseModel):
+    """当前用户创建的教案按状态计数（工作台首屏专用，避免多次列表请求）"""
+
+    draft: int = Field(0, description="草稿数量")
+    published: int = Field(0, description="已发布数量")
+    archived: int = Field(0, description="已归档数量")
+
+
 class LessonPublishRequest(BaseModel):
     """教案发布请求。班级在上课时选择，发布时可不传班级。"""
 

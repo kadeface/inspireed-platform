@@ -1121,16 +1121,11 @@ async function loadSubjectGroupStats() {
 // 加载教案状态统计
 async function loadLessonStatusStats() {
   try {
-    const [draftResponse, publishedResponse, archivedResponse] = await Promise.all([
-      lessonService.fetchLessons({ status: LessonStatus.DRAFT, page_size: 1, creator_only: true }),
-      lessonService.fetchLessons({ status: LessonStatus.PUBLISHED, page_size: 1, creator_only: true }),
-      lessonService.fetchLessons({ status: LessonStatus.ARCHIVED, page_size: 1, creator_only: true }),
-    ])
-
+    const counts = await lessonService.fetchCreatorStatusCounts()
     lessonStatusSummary.value = {
-      draft: draftResponse.total ?? 0,
-      published: publishedResponse.total ?? 0,
-      archived: archivedResponse.total ?? 0,
+      draft: counts.draft ?? 0,
+      published: counts.published ?? 0,
+      archived: counts.archived ?? 0,
     }
   } catch (error: any) {
     console.error('Failed to load lesson status summary:', error)

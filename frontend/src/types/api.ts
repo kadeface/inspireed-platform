@@ -42,6 +42,13 @@ export interface LessonListParams {
  */
 export type LessonListResponse = PaginatedResponse<Lesson>
 
+/** 当前用户创建的教案按状态计数（工作台 PDCA） */
+export interface LessonCreatorStatusCounts {
+  draft: number
+  published: number
+  archived: number
+}
+
 /**
  * API 错误响应
  */
