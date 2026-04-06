@@ -30,7 +30,7 @@ from app.models.exam_room import ExamProctor
 from app.models.classroom_session import ClassSession
 from app.models.lesson import Lesson, LessonClassroom
 from app.models.cell import Cell
-from app.api.deps import get_current_admin
+from app.api.deps import get_current_admin, get_current_admin_or_staff
 from app.core.security import get_password_hash
 from app.core.config import settings
 import secrets
@@ -214,6 +214,32 @@ async def _fetch_user_with_relations(db: AsyncSession, user_id: int) -> Optional
     return result.scalar_one_or_none()
 
 
+def _scope_users_query_for_org_staff(query, current_user: User):
+    """按区县/学校管理员的数据范围限制用户列表查询；平台管理员不加限制。"""
+    if current_user.role == UserRole.ADMIN:
+        return query
+    if current_user.role == UserRole.DISTRICT_ADMIN:
+        if current_user.region_id is None:
+            return None
+        schools_in_region = select(School.id).where(
+            School.region_id == current_user.region_id
+        )
+        return query.where(
+            or_(
+                User.region_id == current_user.region_id,
+                User.school_id.in_(schools_in_region),
+            )
+        )
+    if current_user.role == UserRole.SCHOOL_ADMIN:
+        if current_user.school_id is None:
+            return None
+        return query.where(User.school_id == current_user.school_id)
+    raise HTTPException(
+        status_code=403,
+        detail="需要管理员、区县管理员或学校管理员权限",
+    )
+
+
 def _serialize_user(user: User) -> UserResponse:
     """Serialize user with related organization names."""
     return UserResponse(
@@ -300,6 +326,7 @@ async def _validate_scope_ids(
 # ==================== Endpoints ====================
 
 
+@router.get("", response_model=UserListResponse)
 @router.get("/", response_model=UserListResponse)
 async def get_users(
     page: int = Query(1, ge=1, description="页码"),
@@ -307,9 +334,9 @@ async def get_users(
     role: Optional[UserRole] = Query(None, description="角色筛选"),
     search: Optional[str] = Query(None, description="搜索关键词"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_admin_or_staff),
 ) -> Any:
-    """获取用户列表"""
+    """获取用户列表（平台管理员全量；区县/学校管理员仅本区县或本校范围）"""
 
     # 构建查询
     query = _user_with_relations_query()
@@ -324,6 +351,12 @@ async def get_users(
             User.username.ilike(f"%{search}%"), User.email.ilike(f"%{search}%")
         )
         query = query.where(search_filter)
+
+    query = _scope_users_query_for_org_staff(query, current_user)
+    if query is None:
+        return UserListResponse(
+            users=[], total=0, page=page, size=size, total_pages=0
+        )
 
     # 获取总数
     count_query = select(func.count()).select_from(query.subquery())
@@ -364,6 +397,7 @@ async def get_user(
     return _serialize_user(user)
 
 
+@router.post("", response_model=UserResponse)
 @router.post("/", response_model=UserResponse)
 async def create_user(
     user_data: UserCreate,

@@ -1,10 +1,16 @@
 <template>
   <div class="space-y-6">
-    <!-- 功能说明 -->
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-      <p class="text-sm text-blue-800">
-        💡 <strong>功能说明：</strong>管理学生档案信息，包括基本信息、所属班级、学籍号等。支持批量导入学生。
-      </p>
+    <!-- 功能说明：两类典型用法 -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+      <p class="text-sm text-blue-900 font-medium">学生分班与档案：两种常用方式</p>
+      <ul class="text-sm text-blue-800 list-disc list-inside space-y-1">
+        <li>
+          <strong>批量导入</strong>：开学建档、整批名单从 Excel 导入，在模板中填写学校、年级、班级编号，适合大批量一次性入库。
+        </li>
+        <li>
+          <strong>个别微调</strong>：使用「添加学生」或行内「编辑」按学校 → 年级 → 班级指定；转班、补录、改错时用。若需对<strong>多名学生</strong>调整到同一班级，可勾选后使用「批量调班」。
+        </li>
+      </ul>
     </div>
 
     <!-- 筛选和操作栏 -->
@@ -97,7 +103,13 @@
       <div class="text-sm text-blue-800">
         已选择 <span class="font-bold">{{ selectedStudents.length }}</span> 位学生
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
+        <button
+          @click="openBatchMoveDialog"
+          class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+        >
+          批量调班
+        </button>
         <button
           @click="openBatchDeleteWithSelected"
           class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
@@ -299,6 +311,73 @@
       <template #footer>
         <el-button @click="showStudentModal = false">取消</el-button>
         <el-button type="primary" @click="saveStudent" :loading="saving">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量调班（个别微调的批量场景） -->
+    <el-dialog
+      v-model="showBatchMoveDialog"
+      title="批量调班"
+      width="560px"
+      @close="resetBatchMoveForm"
+    >
+      <p class="text-sm text-gray-600 mb-4">
+        将已选的 <strong>{{ selectedStudents.length }}</strong> 位学生调整到同一目标班级（学校、年级、班级需与「班级管理」中已建班级一致）。
+      </p>
+      <el-form :model="batchMoveForm" label-width="100px">
+        <el-form-item label="所属学校">
+          <el-select
+            v-model="batchMoveForm.school_id"
+            @change="handleBatchMoveSchoolChange"
+            placeholder="选择学校"
+            class="w-full"
+            filterable
+          >
+            <el-option
+              v-for="school in filteredSchools"
+              :key="school.id"
+              :label="school.name"
+              :value="school.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="年级">
+          <el-select
+            v-model="batchMoveForm.grade_id"
+            @change="handleBatchMoveGradeChange"
+            placeholder="请选择年级"
+            class="w-full"
+            :disabled="!batchMoveForm.school_id"
+          >
+            <el-option
+              v-for="grade in grades"
+              :key="grade.id"
+              :label="grade.name"
+              :value="grade.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="目标班级">
+          <el-select
+            v-model="batchMoveForm.classroom_id"
+            placeholder="请选择班级"
+            class="w-full"
+            :disabled="!batchMoveForm.school_id || !batchMoveForm.grade_id"
+          >
+            <el-option
+              v-for="classroom in batchMoveClassrooms"
+              :key="classroom.id"
+              :label="classroom.name"
+              :value="classroom.id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showBatchMoveDialog = false">取消</el-button>
+        <el-button type="primary" :loading="batchMoving" @click="confirmBatchMove">
+          确认调班
+        </el-button>
       </template>
     </el-dialog>
 
@@ -605,6 +684,26 @@ const formClassrooms = computed(() => {
   return result
 })
 
+const batchMoveForm = ref({
+  school_id: undefined as number | undefined,
+  grade_id: undefined as number | undefined,
+  classroom_id: undefined as number | undefined
+})
+
+const batchMoveClassrooms = computed(() => {
+  let result = allClassrooms.value
+  if (batchMoveForm.value.school_id) {
+    result = result.filter(c => c.school_id === batchMoveForm.value.school_id)
+  }
+  if (batchMoveForm.value.grade_id) {
+    result = result.filter(c => c.grade_id === batchMoveForm.value.grade_id)
+  }
+  return result
+})
+
+const showBatchMoveDialog = ref(false)
+const batchMoving = ref(false)
+
 // 批量选择相关
 const isAllSelected = computed(() => {
   return students.value.length > 0 && selectedStudents.value.length === students.value.length
@@ -750,8 +849,12 @@ const loadStudents = async (page?: number) => {
     }
     students.value = filteredUsers
     total.value = filteredUsers.length
-  } catch (error) {
-    toast.error('加载学生列表失败')
+  } catch (error: unknown) {
+    const d = (error as { response?: { data?: { detail?: unknown } } })?.response?.data
+      ?.detail
+    const detail =
+      typeof d === 'string' ? d : Array.isArray(d) ? JSON.stringify(d) : ''
+    toast.error(detail ? `加载学生列表失败：${detail}` : '加载学生列表失败')
     console.error(error)
   } finally {
     loading.value = false
@@ -814,6 +917,88 @@ const handleFormSchoolChange = () => {
 
 const handleFormGradeChange = () => {
   studentForm.value.classroom_id = undefined
+}
+
+const handleBatchMoveSchoolChange = () => {
+  batchMoveForm.value.grade_id = undefined
+  batchMoveForm.value.classroom_id = undefined
+}
+
+const handleBatchMoveGradeChange = () => {
+  batchMoveForm.value.classroom_id = undefined
+}
+
+const resetBatchMoveForm = () => {
+  batchMoveForm.value = {
+    school_id: undefined,
+    grade_id: undefined,
+    classroom_id: undefined
+  }
+}
+
+const openBatchMoveDialog = () => {
+  if (selectedStudents.value.length === 0) {
+    toast.warning('请先选择要调班的学生')
+    return
+  }
+  const first = students.value.find(s => s.id === selectedStudents.value[0])
+  batchMoveForm.value = {
+    school_id: first?.school_id ?? undefined,
+    grade_id: first?.grade_id ?? undefined,
+    classroom_id: first?.classroom_id ?? undefined
+  }
+  showBatchMoveDialog.value = true
+}
+
+const confirmBatchMove = async () => {
+  if (
+    !batchMoveForm.value.school_id ||
+    !batchMoveForm.value.grade_id ||
+    !batchMoveForm.value.classroom_id
+  ) {
+    ElMessage.warning('请选择学校、年级和目标班级')
+    return
+  }
+  batchMoving.value = true
+  const ids = [...selectedStudents.value]
+  try {
+    const results = await Promise.allSettled(
+      ids.map(async (id) => {
+        const student = students.value.find(s => s.id === id)
+        if (!student) {
+          throw new Error(`未找到学生 ID ${id}`)
+        }
+        return adminService.updateUser(id, {
+          username: student.username,
+          email: student.email,
+          full_name: student.full_name ?? undefined,
+          student_id_number: student.student_id_number ?? undefined,
+          school_id: batchMoveForm.value.school_id,
+          grade_id: batchMoveForm.value.grade_id,
+          classroom_id: batchMoveForm.value.classroom_id,
+          is_active: student.is_active
+        })
+      })
+    )
+    const succeeded = results.filter(r => r.status === 'fulfilled').length
+    const failed = results.filter(r => r.status === 'rejected').length
+    if (failed === 0) {
+      ElMessage.success(`已成功将 ${succeeded} 位学生调整到目标班级`)
+    } else {
+      ElMessage.warning(`完成 ${succeeded} 位，失败 ${failed} 位，请查看控制台或重试失败学生`)
+      console.error(
+        '批量调班部分失败',
+        results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      )
+    }
+    showBatchMoveDialog.value = false
+    clearSelection()
+    loadStudents()
+  } catch (error: any) {
+    ElMessage.error(error?.message || '批量调班失败')
+  } finally {
+    batchMoving.value = false
+  }
 }
 
 // 学生操作

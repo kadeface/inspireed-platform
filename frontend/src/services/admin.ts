@@ -532,7 +532,8 @@ export const adminService = {
       search?: string
     } = {}
   ): Promise<UserListResponse> {
-    return await api.get('/admin/users', { params })
+    // 集合根路径须带尾部 /，否则 FastAPI 可能 307 到 /admin/users/，重定向后浏览器不携带 Authorization → 401 Not authenticated
+    return await api.get('/admin/users/', { params })
   },
 
   /**
@@ -546,7 +547,7 @@ export const adminService = {
    * 创建用户
    */
   async createUser(userData: UserCreate): Promise<User> {
-    return await api.post('/admin/users', userData)
+    return await api.post('/admin/users/', userData)
   },
 
   /**

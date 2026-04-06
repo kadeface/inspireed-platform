@@ -520,8 +520,12 @@ const loadTeachers = async (page?: number) => {
       return true
     })
     total.value = teachers.value.length
-  } catch (error) {
-    toast.error('加载教师列表失败')
+  } catch (error: unknown) {
+    const d = (error as { response?: { data?: { detail?: unknown } } })?.response?.data
+      ?.detail
+    const detail =
+      typeof d === 'string' ? d : Array.isArray(d) ? JSON.stringify(d) : ''
+    toast.error(detail ? `加载教师列表失败：${detail}` : '加载教师列表失败')
     console.error(error)
   } finally {
     loading.value = false

@@ -222,8 +222,11 @@ class ApiService {
     // 请求拦截器
     this.axiosInstance.interceptors.request.use(
       (config) => {
-        // 优先 localStorage，若无则从 store 取（避免登录后首请求时未同步导致 Not authenticated）
+        // 优先 localStorage，其次 sessionStorage，再从 store 取（避免登录后首请求时未同步导致 Not authenticated）
         let token = localStorage.getItem('access_token')
+        if (!token) {
+          token = sessionStorage.getItem('access_token')
+        }
         if (!token) {
           try {
             token = useUserStore().token ?? null

@@ -357,9 +357,18 @@ router.beforeEach(async (to, from, next) => {
         const user = JSON.parse(userStr)
         const requiredRole = to.meta.role as string
         const userRole = user.role?.toLowerCase()
-        
+
+        // 组织架构页：区县/学校管理员也需要管理师生档案，与组织 API 的 admin_or_staff 一致
+        const organizationAllowed =
+          to.path === '/admin/organization' &&
+          (userRole === 'district_admin' || userRole === 'school_admin')
+
         // 检查角色是否匹配（管理员可以访问所有页面）
-        if (userRole !== requiredRole && userRole !== 'admin') {
+        if (
+          !organizationAllowed &&
+          userRole !== requiredRole &&
+          userRole !== 'admin'
+        ) {
           // 角色不匹配，根据用户角色重定向到相应首页
           if (userRole === 'student') {
             next('/student')
