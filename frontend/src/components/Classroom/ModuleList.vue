@@ -17,6 +17,21 @@
         <span>上一模块</span>
       </button>
 
+      <!-- 当前模块：序号 + 标题（与下方预览联动时便于确认播出位置） -->
+      <div
+        class="module-nav-current"
+        data-testid="module-navigation-current"
+        :title="navCenterTitleFull"
+      >
+        <template v-if="currentModuleIndex < 0">
+          <span class="module-nav-current-muted">未播出 / 已隐藏</span>
+        </template>
+        <template v-else>
+          <span class="module-nav-current-index">{{ currentModuleIndex + 1 }} / {{ cells.length }}</span>
+          <span class="module-nav-current-title">{{ navCenterTitleShort }}</span>
+        </template>
+      </div>
+
       <!-- 下一模块按钮 -->
       <button
         class="module-nav-btn module-nav-btn-next"
@@ -160,6 +175,21 @@ const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map())
 const canGoPrev = computed(() => props.currentModuleIndex > 0)
 const canGoNext = computed(() => props.cells.length > 0 && props.currentModuleIndex >= 0 && props.currentModuleIndex < props.cells.length - 1)
 
+const navCenterTitleShort = computed(() => {
+  if (props.currentModuleIndex < 0 || !props.cells.length) return ''
+  const cell = props.cells[props.currentModuleIndex]
+  if (!cell) return ''
+  const raw = (cell.title && String(cell.title).trim()) || getCellTypeLabel(cell.type) || `模块 ${props.currentModuleIndex + 1}`
+  return raw.length > 36 ? `${raw.slice(0, 34)}…` : raw
+})
+
+const navCenterTitleFull = computed(() => {
+  if (props.currentModuleIndex < 0 || !props.cells.length) return '当前未向学生播出内容'
+  const cell = props.cells[props.currentModuleIndex]
+  if (!cell) return ''
+  return (cell.title && String(cell.title).trim()) || getCellTypeLabel(cell.type) || `模块 ${props.currentModuleIndex + 1}`
+})
+
 // 方法
 function setModuleItemRef(el: any, index: number) {
   if (el) {
@@ -255,11 +285,50 @@ function handleNextModule() {
 /* 导航控制栏 */
 .module-navigation-bar {
   display: flex;
+  align-items: stretch;
   gap: 8px;
   margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
+}
+
+.module-nav-current {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.module-nav-current-index {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #4b5563;
+  line-height: 1.2;
+}
+
+.module-nav-current-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.25;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-nav-current-muted {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  text-align: center;
 }
 
 .module-nav-btn {
@@ -276,8 +345,8 @@ function handleNextModule() {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: 7rem;
 }
 
 .module-nav-btn:hover:not(:disabled) {

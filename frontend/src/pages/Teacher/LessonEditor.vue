@@ -315,6 +315,10 @@ import courseExportService from '../../services/courseExport'
 import { useToast } from '@/composables/useToast'
 import { getServerBaseUrl } from '@/utils/url'
 import { createLogger } from '../../utils/logger'
+import {
+  scrollToTeachingPreviewCell,
+  getTeachingPreviewScrollTarget,
+} from '@/utils/scrollToTeachingCell'
 
 const logger = createLogger('LESSON_EDITOR')
 
@@ -495,6 +499,37 @@ watch(isPreviewMode, (newValue) => {
     })
   }
 })
+
+// 授课预览：随课堂会话的播出目标变化滚动主内容区（不依赖子组件 expose 的响应式追踪）
+watch(
+  () => {
+    if (!isPreviewMode.value || !showClassroomPanel.value) return ''
+    const s = providedSessionRef.value as Record<string, unknown> | null | undefined
+    if (!s) return ''
+    const settings = (s.settings || {}) as Record<string, unknown>
+    const orders = settings.display_cell_orders as number[] | undefined
+    const ordersKey = Array.isArray(orders) ? orders.join(',') : ''
+    const cid = s.current_cell_id ?? s.currentCellId
+    return `${cid ?? 'na'}|${ordersKey}`
+  },
+  (key) => {
+    if (!key) return
+    const s = providedSessionRef.value as Record<string, unknown> | null | undefined
+    if (!s) return
+    const cid = s.current_cell_id ?? s.currentCellId
+    if (cid === 0 || cid === '0') return
+    const lesson = currentLesson.value
+    const { flatIndex, cellId } = getTeachingPreviewScrollTarget(s, lesson)
+    if (flatIndex < 0 && (cellId == null || cellId === '')) return
+    nextTick(() => {
+      scrollToTeachingPreviewCell({
+        cellId: cellId != null && cellId !== '' ? cellId : null,
+        flatIndex: flatIndex >= 0 ? flatIndex : null,
+      })
+    })
+  },
+  { flush: 'post' }
+)
 
 // 监听 cells 变化，重新初始化拖拽（当 cells 数量变化时）
 watch(

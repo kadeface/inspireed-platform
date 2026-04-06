@@ -1,7 +1,67 @@
 <template>
-  <div ref="containerRef" class="teacher-control-panel" :class="{ 'panel-fullscreen': isPanelFullscreen }" data-testid="teacher-control-panel">
-    <!-- 🎯 优化后的顶部控制栏（固定，始终可见） -->
-    <div class="top-control-bar">
+  <div
+    ref="containerRef"
+    class="teacher-control-panel"
+    :class="{ 'panel-fullscreen': isPanelFullscreen, 'minimal-teaching': isMinimalTeachingUi }"
+    data-testid="teacher-control-panel"
+  >
+    <!-- 极简授课：单行顶栏 + 下方全课预览（由教案页自动滚到当前模块） -->
+    <div v-if="isMinimalTeachingUi" class="minimal-teaching-top">
+      <div class="minimal-teaching-nav">
+        <button
+          type="button"
+          class="minimal-teaching-nav-btn"
+          :disabled="loading || !canGoPrev"
+          data-testid="minimal-prev-module"
+          @click="handlePrevModule"
+        >
+          上一模块
+        </button>
+        <div class="minimal-teaching-current" :title="minimalCurrentTitleFull">
+          <span class="minimal-teaching-index">{{ minimalCurrentIndexLabel }}</span>
+          <span class="minimal-teaching-title">{{ minimalCurrentTitleShort }}</span>
+        </div>
+        <button
+          type="button"
+          class="minimal-teaching-nav-btn"
+          :disabled="loading || !canGoNext"
+          data-testid="minimal-next-module"
+          @click="handleNextModule"
+        >
+          下一模块
+        </button>
+      </div>
+      <div class="minimal-teaching-actions">
+        <SessionControlButtons
+          :has-session="!!session"
+          :session-status="normalizedSessionStatus ?? session?.status"
+          :loading="loading"
+          :active-students-count="activeStudents.length"
+          @create="handleCreateSession"
+          @start="() => handleBeginClass(activeStudents.length)"
+          @end="handleEnd"
+        />
+        <button
+          type="button"
+          class="btn-minimal-more"
+          data-testid="minimal-more-drawer"
+          @click="minimalMoreDrawerOpen = true"
+        >
+          更多
+        </button>
+        <button
+          type="button"
+          class="btn-minimal-exit"
+          data-testid="minimal-exit"
+          @click="minimalTeachingFocus = false"
+        >
+          退出极简
+        </button>
+      </div>
+    </div>
+
+    <!-- 🎯 标准顶部控制栏（固定，始终可见） -->
+    <div v-else class="top-control-bar">
       <!-- 第一行：标题和操作按钮 -->
       <div class="top-control-row">
         <div class="top-control-left">
@@ -60,6 +120,16 @@
             @start="() => handleBeginClass(activeStudents.length)"
             @end="handleEnd"
           />
+          <button
+            v-if="showEnterMinimalTeachingButton"
+            type="button"
+            class="btn-minimal-enter"
+            data-testid="enter-minimal-teaching"
+            title="隐藏模块列表与次要信息，专注当前模块与下方全课预览"
+            @click="minimalTeachingFocus = true"
+          >
+            极简授课
+          </button>
         
         <!-- 上课中：仅增加窗口/全屏切换（结束由 SessionControlButtons 统一显示） -->
         <template v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')">
@@ -88,14 +158,14 @@
     
     <!-- PENDING 状态：等待学生加入提示区域 -->
     <WaitingForStudentsBanner
-      v-if="session"
+      v-if="session && !isMinimalTeachingUi"
       :session-status="session.status"
       :active-count="activeStudents.length"
     />
 
     <!-- 访客观摩开关 -->
     <GuestAccessToggle
-      v-if="session"
+      v-if="session && !isMinimalTeachingUi"
       :session-id="session.id"
       :guest-access-enabled="session.guest_access_enabled || session.guestAccessEnabled || false"
       :guest-access-code="session.guest_access_code || session.guestAccessCode || null"
@@ -106,13 +176,17 @@
 
     <!-- 已加入学生列表 -->
     <JoinedStudentsList
-      v-if="session && session.status === 'PREPARING'"
+      v-if="session && session.status === 'PREPARING' && !isMinimalTeachingUi"
       :students="activeStudents"
       :max-display="12"
     />
 
-    <!-- 主布局：左侧模块列表，右侧预览和监控 -->
-    <div class="main-layout" :class="{ 'module-fullscreen-mode': modulePanelFullscreen }">
+    <p v-if="isMinimalTeachingUi" class="minimal-teaching-hint">
+      下方为全课预览，切换模块时将自动滚动到当前播出内容。
+    </p>
+
+    <!-- 主布局：模块列表与活动统计（极简模式下收入「更多」） -->
+    <div v-if="!isMinimalTeachingUi" class="main-layout" :class="{ 'module-fullscreen-mode': modulePanelFullscreen }">
       <!-- 左侧：教学模块 -->
       <div class="panel teaching-modules teaching-modules-fullwidth" :class="{ 'module-panel-fullscreen': modulePanelFullscreen }">
         <ModuleList
@@ -139,6 +213,112 @@
       </div>
     </div>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="minimalMoreDrawerOpen && session"
+      class="minimal-more-backdrop"
+      @click.self="minimalMoreDrawerOpen = false"
+    >
+      <div class="minimal-more-panel" role="dialog" aria-modal="true" aria-labelledby="minimal-more-heading">
+        <div class="minimal-more-panel-header">
+          <h3 id="minimal-more-heading" class="minimal-more-panel-title">课堂详情</h3>
+          <button
+            type="button"
+            class="minimal-more-close"
+            aria-label="关闭"
+            @click="minimalMoreDrawerOpen = false"
+          >
+            ×
+          </button>
+        </div>
+        <div class="minimal-more-panel-body">
+          <div v-if="session && normalizedSessionStatus !== 'pending'" class="minimal-more-metrics">
+            <SessionDurationDisplay
+              :status="session.status"
+              :duration="displayDuration"
+              :remaining="remainingTime"
+            />
+            <StudentCountDisplay
+              :active-count="activeStudents.length"
+              :total-count="totalStudents"
+              label="人已进入"
+            />
+            <ModuleCountDisplay
+              v-if="lessonContentCells.length > 0"
+              :count="lessonContentCells.length"
+              label="个模块"
+            />
+          </div>
+
+          <div v-if="lessonContentCells.length > 0" class="minimal-more-row">
+            <span class="minimal-more-label">播出模式</span>
+            <button
+              type="button"
+              class="minimal-drawer-mode-toggle"
+              :disabled="loading"
+              @click="toggleSelectionMode"
+            >
+              {{ isMultiSelectMode ? '多选' : '单选' }}
+            </button>
+          </div>
+
+          <div
+            v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')"
+            class="minimal-more-row"
+          >
+            <span class="minimal-more-label">学生端展示</span>
+            <button
+              type="button"
+              :disabled="loading"
+              class="btn btn-display-mode"
+              :class="{ active: currentDisplayMode === 'fullscreen' }"
+              @click="handleToggleDisplayMode"
+            >
+              {{ currentDisplayMode === 'fullscreen' ? '全屏' : '窗口' }}
+            </button>
+          </div>
+
+          <WaitingForStudentsBanner
+            :session-status="session.status"
+            :active-count="activeStudents.length"
+          />
+          <GuestAccessToggle
+            :session-id="session.id"
+            :guest-access-enabled="session.guest_access_enabled || session.guestAccessEnabled || false"
+            :guest-access-code="session.guest_access_code || session.guestAccessCode || null"
+            :guest-count="session.guest_count || session.guestCount || 0"
+            class="px-0 py-2"
+            @updated="handleGuestAccessUpdated"
+          />
+          <JoinedStudentsList
+            v-if="session.status === 'PREPARING'"
+            :students="activeStudents"
+            :max-display="12"
+          />
+          <ModuleList
+            :cells="lessonContentCells"
+            :current-module-index="currentModuleIndex"
+            :loading="loading"
+            :is-multi-select-mode="isMultiSelectMode"
+            :display-cell-orders="displayCellOrders"
+            :session-current-activity-id="session?.current_activity_id"
+            @item-click="handleModuleItemClick"
+            @checkbox-click="handleModuleCheckboxClick"
+            @checkbox-change="handleModuleCheckboxChange"
+            @prev-module="handlePrevModule"
+            @next-module="handleNextModule"
+          />
+          <ActivityStatisticsPanel
+            v-if="currentCell"
+            :current-cell="currentCell"
+            :activity-statistics="activityStatistics"
+            :loading="loadingActivityStats"
+          />
+        </div>
+      </div>
+    </div>
+  </Teleport>
 
   <!-- 班级选择弹窗（用于创建会话时选择班级） -->
   <ClassroomSelectModal
@@ -331,6 +511,9 @@ async function handleToggleDisplayMode() {
 const containerRef = ref<HTMLElement | null>(null)
 const moduleListRef = ref<HTMLElement | null>(null)
 const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map())
+/** 极简授课：隐藏模块格与次要信息，仅保留切换与结束课堂；详情进「更多」抽屉 */
+const minimalTeachingFocus = ref(false)
+const minimalMoreDrawerOpen = ref(false)
 const selectedCellIndex = ref(-1)
 const dbCells = ref<Array<{ id: number | string; order: number; cell_type: string }>>([])
 
@@ -609,6 +792,59 @@ const {
   handleModuleCheckboxChange,
   handleHideAll,
 } = navigationManager
+
+const isMinimalTeachingUi = computed(() => {
+  if (!minimalTeachingFocus.value || !session.value) return false
+  const st = normalizedSessionStatus.value
+  return st !== 'ended' && st != null
+})
+
+const showEnterMinimalTeachingButton = computed(() => {
+  if (!session.value || minimalTeachingFocus.value) return false
+  const st = normalizedSessionStatus.value
+  return st !== 'ended' && st != null
+})
+
+const minimalCurrentTitleFull = computed(() => {
+  const idx = currentModuleIndex.value
+  if (idx < 0 || !lessonContentCells.value.length) return '未播出 / 已隐藏'
+  const c = lessonContentCells.value[idx]
+  if (!c) return '未播出 / 已隐藏'
+  return (
+    (c.title && String(c.title).trim()) ||
+    getCellTypeLabel(c.type) ||
+    `模块 ${idx + 1}`
+  )
+})
+
+const minimalCurrentTitleShort = computed(() => {
+  const t = minimalCurrentTitleFull.value
+  if (t.length <= 40) return t
+  return `${t.slice(0, 38)}…`
+})
+
+const minimalCurrentIndexLabel = computed(() => {
+  const idx = currentModuleIndex.value
+  const n = lessonContentCells.value.length
+  if (!n) return ''
+  if (idx < 0) return '未播出'
+  return `${idx + 1} / ${n}`
+})
+
+watch(normalizedSessionStatus, (st) => {
+  if (st === 'ended') {
+    minimalTeachingFocus.value = false
+    minimalMoreDrawerOpen.value = false
+  }
+})
+
+watch(session, (s) => {
+  if (!s) {
+    minimalTeachingFocus.value = false
+    minimalMoreDrawerOpen.value = false
+  }
+})
+
 // v2.0: 以下状态已移至 useDataLoader composable
 // const activeStudents, const loadingStudents, const sessionStatistics
 // const activityStatistics, const studentSubmissionStatus, const loadingActivityStats
@@ -896,6 +1132,10 @@ onUnmounted(() => {
 defineExpose({
   session,
   sessionId: computed(() => session.value?.id),
+  /** 与导播台一致的当前播出 Cell，供授课预览区滚动联动 */
+  currentCell,
+  /** 当前模块在 lesson 扁平列表中的索引，供后备滚动 */
+  currentModuleIndex,
   activeStudents,
   totalStudents,
   displayDuration,
@@ -3385,6 +3625,222 @@ input[type="checkbox"].checkbox-input {
   .joined-students-grid {
     grid-template-columns: repeat(4, 1fr);
   }
+}
+
+/* ---------- 极简授课（含 Teleport 抽屉，使用 :deep 子组件与面板类名） ---------- */
+.minimal-teaching-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.minimal-teaching.panel-fullscreen .minimal-teaching-top {
+  position: sticky;
+  top: 0;
+}
+
+.minimal-teaching-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.minimal-teaching-nav-btn {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.minimal-teaching-nav-btn:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.minimal-teaching-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.minimal-teaching-current {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  padding: 6px 10px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.minimal-teaching-index {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  line-height: 1.2;
+}
+
+.minimal-teaching-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.minimal-teaching-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-minimal-more,
+.btn-minimal-exit,
+.btn-minimal-enter {
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  transition: background 0.15s ease;
+}
+
+.btn-minimal-more:hover,
+.btn-minimal-exit:hover {
+  background: #f9fafb;
+}
+
+.btn-minimal-enter {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.btn-minimal-enter:hover {
+  background: #dbeafe;
+}
+
+.minimal-teaching-hint {
+  margin: 0;
+  padding: 8px 16px 4px;
+  font-size: 13px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.minimal-more-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 10050;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+}
+
+.minimal-more-panel {
+  width: min(420px, 100vw);
+  background: #fff;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+.minimal-more-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.minimal-more-panel-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.minimal-more-close {
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.minimal-more-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.minimal-more-panel-body {
+  overflow-y: auto;
+  padding: 12px 16px 24px;
+  flex: 1;
+}
+
+.minimal-more-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.minimal-more-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.minimal-more-label {
+  font-size: 13px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.minimal-drawer-mode-toggle {
+  @apply px-2.5 py-1 text-xs font-medium rounded-md border shadow-sm;
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  cursor: pointer;
+}
+
+.minimal-drawer-mode-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 </style>

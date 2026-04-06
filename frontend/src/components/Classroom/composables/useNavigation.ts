@@ -205,11 +205,17 @@ export function useNavigation(options: UseNavigationOptions) {
 
       // 确保更新后的会话状态正确（不要丢失状态）
       if (updatedSession) {
+        const upd = updatedSession as Record<string, unknown>
         session.value = {
           ...session.value,
           ...updatedSession,
           status: session.value.status, // 保持原有状态，导航不应该改变会话状态
           id: session.value.id,
+          // navigate API 映射为 currentCellId；导播台与授课滚动监听仍读 current_cell_id
+          current_cell_id:
+            (upd.current_cell_id as number | undefined) ??
+            (upd.currentCellId as number | undefined) ??
+            (session.value as any).current_cell_id,
         }
       }
 
