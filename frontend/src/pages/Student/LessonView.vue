@@ -421,12 +421,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { lessonService } from '@/services/lesson'
 import { api } from '@/services/api'
 import type { Lesson } from '@/types/lesson'
-import type { CellType } from '@/types/cell'
+import { CellType } from '@/types/cell'
 
 // 导入所有 Cell 组件
 import TextCell from '@/components/Cell/TextCell.vue'
@@ -439,6 +439,7 @@ import VideoCell from '@/components/Cell/VideoCell.vue'
 import ActivityCell from '@/components/Cell/ActivityCell.vue'
 import BrowserCell from '@/components/Cell/BrowserCell.vue'
 import InteractiveCell from '@/components/Cell/InteractiveCell.vue'
+import ReferenceMaterialCell from '@/components/Cell/ReferenceMaterialCell.vue'
 import ReviewSection from '@/components/Resource/ReviewSection.vue'
 import QuestionForm from '@/components/Question/QuestionForm.vue'
 import QuestionList from '@/components/Question/QuestionList.vue'
@@ -920,8 +921,21 @@ const classroomDisplayKey = computed(() => {
 // ========== 旧代码全部结束 ==========
 
 // 方法
-const getCellComponent = (type: CellType) => {
-  const components = {
+const getCellComponent = (type: CellType | string): Component => {
+  // 与 CellContainer / 后端 CellType 一致（大写）；保留小写键以兼容旧数据
+  const components: Record<string, Component> = {
+    [CellType.TEXT]: TextCell,
+    [CellType.CODE]: CodeCell,
+    [CellType.SIM]: SimCell,
+    [CellType.CHART]: ChartCell,
+    [CellType.CONTEST]: ContestCell,
+    [CellType.VIDEO]: VideoCell,
+    [CellType.ACTIVITY]: ActivityCell,
+    [CellType.FLOWCHART]: FlowchartStudentCell,
+    [CellType.BROWSER]: BrowserCell,
+    [CellType.INTERACTIVE]: InteractiveCell,
+    [CellType.REFERENCE_MATERIAL]: ReferenceMaterialCell,
+    PARAM: ParamCell,
     text: TextCell,
     code: CodeCell,
     param: ParamCell,
@@ -933,8 +947,9 @@ const getCellComponent = (type: CellType) => {
     flowchart: FlowchartStudentCell,
     browser: BrowserCell,
     interactive: InteractiveCell,
+    reference_material: ReferenceMaterialCell,
   }
-  return components[type] || TextCell
+  return components[type as string] ?? TextCell
 }
 
 const loadLesson = async () => {
@@ -1158,6 +1173,8 @@ const stripHtmlTags = (html: string) =>
 
 const summarizeCell = (cell: any, index: number): string | null => {
   const orderLabel = `第${index + 1}单元`
+  // 与后端 CellType 枚举一致：API 多为大写（如 BROWSER），统一成小写再查表
+  const typeNorm = String(cell?.type ?? '').toLowerCase()
   const typeMap: Record<string, string> = {
     text: '文本',
     code: '代码',
@@ -1172,18 +1189,18 @@ const summarizeCell = (cell: any, index: number): string | null => {
     interactive: '交互式课件',
     reference_material: '参考素材',
   }
-  const typeLabel = typeMap[cell.type] || '单元'
+  const typeLabel = typeMap[typeNorm] || '单元'
   let detail = ''
 
-  if (cell.type === 'text' && cell.content?.html) {
+  if (typeNorm === 'text' && cell.content?.html) {
     const plain = stripHtmlTags(cell.content.html)
     if (plain) {
       detail = plain.slice(0, 28)
       if (plain.length > 28) detail += '…'
     }
-  } else if (cell.type === 'activity' && cell.content?.title) {
+  } else if (typeNorm === 'activity' && cell.content?.title) {
     detail = cell.content.title
-  } else if (cell.type === 'video' && cell.content?.title) {
+  } else if (typeNorm === 'video' && cell.content?.title) {
     detail = cell.content.title
   }
 

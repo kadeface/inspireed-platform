@@ -91,7 +91,22 @@
         <p v-if="displayContent.description" class="browser-description">{{ displayContent.description }}</p>
       </div>
 
-      <!-- 链接卡片 -->
+      <!-- 只读：内嵌网页（与访客观摩 GuestJoin 一致；部分站点会因 X-Frame-Options 显示空白） -->
+      <div v-if="!editable" class="browser-embed-section">
+        <div class="browser-embed-wrap">
+          <iframe
+            :src="displayUrl"
+            class="browser-embed-iframe"
+            title="浏览器单元预览"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+          />
+        </div>
+        <p class="browser-embed-hint">
+          若上方为空白，多为目标网站禁止被嵌入，请使用下方二维码或「在新窗口打开」。
+        </p>
+      </div>
+
+      <!-- 链接与二维码（辅助打开方式） -->
       <div class="link-mode-card" :class="{ 'fullscreen-preview': isFullscreenPreview }">
         <div class="link-card-content">
           <!-- 链接信息 -->
@@ -540,6 +555,26 @@ onBeforeUnmount(() => {
   @apply text-sm text-gray-600;
 }
 
+.browser-embed-section {
+  @apply mb-4 w-full;
+}
+
+.browser-embed-wrap {
+  @apply w-full overflow-hidden rounded-lg border border-gray-200 bg-white;
+  min-height: 480px;
+}
+
+.browser-embed-iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+  min-height: 480px;
+  height: 70vh;
+}
+
+.browser-embed-hint {
+  @apply mt-2 text-xs text-gray-500;
+}
 
 .empty-state {
   @apply flex flex-col items-center justify-center p-12 text-center;
