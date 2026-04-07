@@ -181,11 +181,72 @@
       :max-display="12"
     />
 
+    <!-- 浮动导播台（授课模式下始终显示） -->
+    <div v-if="isMinimalTeachingUi" class="panel teaching-modules teaching-modules-floating" :class="{ 'module-panel-fullscreen': modulePanelFullscreen, 'panel-collapsed': floatingPanelCollapsed }">
+      <div class="floating-panel-header">
+        <span class="floating-panel-title">📺 切换</span>
+        <button 
+          type="button" 
+          class="floating-panel-toggle"
+          :title="floatingPanelCollapsed ? '展开' : '折叠'"
+          @click="floatingPanelCollapsed = !floatingPanelCollapsed"
+        >
+          {{ floatingPanelCollapsed ? '◀' : '▶' }}
+        </button>
+      </div>
+      
+      <!-- 折叠状态：显示当前模块 + 快速切换 -->
+      <div v-if="floatingPanelCollapsed" class="floating-panel-collapsed">
+        <div class="collapsed-current-info">
+          <span class="collapsed-module-index">{{ currentModuleIndex + 1 }}/{{ lessonContentCells.length }}</span>
+          <span class="collapsed-module-title">{{ minimalCurrentTitleShort }}</span>
+        </div>
+        <div class="collapsed-nav-buttons">
+          <button
+            type="button"
+            class="collapsed-nav-btn"
+            :disabled="loading || !canGoPrev"
+            @click="handlePrevModule"
+            title="上一模块"
+          >
+            ◀
+          </button>
+          <button
+            type="button"
+            class="collapsed-nav-btn"
+            :disabled="loading || !canGoNext"
+            @click="handleNextModule"
+            title="下一模块"
+          >
+            ▶
+          </button>
+        </div>
+      </div>
+      
+      <!-- 展开状态：显示完整模块列表（紧凑版） -->
+      <div v-else class="floating-panel-content">
+        <ModuleList
+          :cells="lessonContentCells"
+          :current-module-index="currentModuleIndex"
+          :loading="loading"
+          :is-multi-select-mode="isMultiSelectMode"
+          :display-cell-orders="displayCellOrders"
+          :session-current-activity-id="session?.current_activity_id"
+          @item-click="handleModuleItemClick"
+          @checkbox-click="handleModuleCheckboxClick"
+          @checkbox-change="handleModuleCheckboxChange"
+          @prev-module="handlePrevModule"
+          @next-module="handleNextModule"
+        />
+      </div>
+    </div>
+
     <p v-if="isMinimalTeachingUi" class="minimal-teaching-hint">
       下方为全课预览，切换模块时将自动滚动到当前播出内容。
     </p>
 
     <!-- 主布局：模块列表与活动统计（极简模式下收入「更多」） -->
+    <!-- 主布局区（非授课模式） -->
     <div v-if="!isMinimalTeachingUi" class="main-layout" :class="{ 'module-fullscreen-mode': modulePanelFullscreen }">
       <!-- 左侧：教学模块 -->
       <div class="panel teaching-modules teaching-modules-fullwidth" :class="{ 'module-panel-fullscreen': modulePanelFullscreen }">
@@ -513,6 +574,8 @@ const moduleListRef = ref<HTMLElement | null>(null)
 const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map())
 /** 极简授课：隐藏模块格与次要信息，仅保留切换与结束课堂；详情进「更多」抽屉 */
 const minimalTeachingFocus = ref(false)
+const floatingPanelCollapsed = ref(true)  // 浮动面板折叠状态
+
 const minimalMoreDrawerOpen = ref(false)
 const selectedCellIndex = ref(-1)
 const dbCells = ref<Array<{ id: number | string; order: number; cell_type: string }>>([])
@@ -1023,6 +1086,11 @@ watch(
 // 监听 selectedCellIndex 变化，自动滚动到对应模块
 watch(selectedCellIndex, (newIndex, oldIndex) => {
   if (newIndex >= 0 && newIndex !== oldIndex) {
+    // 授课模式下不自动滚动，避免干扰老师操作节奏
+    // 老师需要在导播台和内容区之间频繁切换，自动滚动会打断这个过程
+    if (isMinimalTeachingUi.value) {
+      return
+    }
     // 延迟滚动，确保 DOM 已更新
     nextTick(() => {
       setTimeout(() => {
@@ -2066,6 +2134,268 @@ defineExpose({
   padding-right: 12px !important;
   padding-top: 12px !important;
   padding-bottom: 12px !important;
+}
+
+/* 浮动导播台 - 授课模式下模块列表始终可见（紧凑版） */
+.teaching-modules-floating {
+  position: fixed;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  z-index: 50;
+  max-width: 280px !important;
+  width: 280px !important;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  padding: 0 !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.teaching-modules-floating:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* 折叠状态：更紧凑 */
+.teaching-modules-floating.panel-collapsed {
+  max-width: 200px !important;
+  width: 200px !important;
+}
+
+.teaching-modules-floating .module-list {
+  max-height: none !important;
+  overflow-y: auto !important;
+}
+
+/* 浮动面板头部 - 更紧凑 */
+.floating-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
+  border-radius: 12px 12px 0 0;
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.floating-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.floating-panel-toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.floating-panel-toggle:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #1f2937;
+}
+
+/* 折叠状态内容 - 紧凑显示 */
+.floating-panel-collapsed {
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.collapsed-current-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.collapsed-module-index {
+  font-weight: 600;
+  color: #3b82f6;
+  background: #dbeafe;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.collapsed-module-title {
+  color: #4b5563;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collapsed-nav-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.collapsed-nav-btn {
+  flex: 1;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #4b5563;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.collapsed-nav-btn:hover:not(:disabled) {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.collapsed-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 浮动面板内容 - 紧凑版 */
+.floating-panel-content {
+  padding: 10px 12px;
+  max-height: 50vh;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.floating-panel-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.floating-panel-content::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 2px;
+}
+
+.floating-panel-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+.floating-panel-content::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* 紧凑模式下模块列表样式优化 */
+.teaching-modules-floating .module-item {
+  padding: 8px !important;
+  min-height: 48px !important;
+}
+
+.teaching-modules-floating .module-item-title {
+  font-size: 12px !important;
+}
+
+.teaching-modules-floating .module-item-type {
+  font-size: 10px !important;
+}
+
+/* 移动端适配 - 浮动导播台在底部 */
+@media (max-width: 1024px) {
+  .teaching-modules-floating {
+    top: auto;
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    transform: none;
+    max-width: none !important;
+    width: auto !important;
+    max-height: 40vh;
+    border-radius: 12px;
+  }
+  
+  .teaching-modules-floating.panel-collapsed {
+    max-width: 180px !important;
+    width: 180px !important;
+    left: auto !important;
+  }
+}
+
+/* 小屏幕适配 */
+@media (max-width: 768px) {
+  .teaching-modules-floating {
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+    max-height: 35vh;
+    border-radius: 10px;
+  }
+  
+  .teaching-modules-floating.panel-collapsed {
+    max-width: 160px !important;
+    width: 160px !important;
+  }
+  
+  .floating-panel-header {
+    padding: 6px 10px;
+    min-height: 32px;
+  }
+  
+  .floating-panel-title {
+    font-size: 12px;
+  }
+  
+  .floating-panel-toggle {
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+  }
+  
+  .collapsed-current-info {
+    font-size: 11px;
+  }
+  
+  .collapsed-nav-btn {
+    height: 26px;
+    font-size: 13px;
+  }
+  
+  .floating-panel-content {
+    padding: 8px 10px;
+  }
+}
+
+/* 超小屏幕适配 */
+@media (max-width: 480px) {
+  .teaching-modules-floating {
+    bottom: 8px;
+    right: 8px;
+    left: 8px;
+    max-height: 30vh;
+  }
+  
+  .teaching-modules-floating.panel-collapsed {
+    max-width: 140px !important;
+    width: 140px !important;
+  }
 }
 
 .module-panel-fullscreen {
@@ -3841,6 +4171,117 @@ input[type="checkbox"].checkbox-input {
 .minimal-drawer-mode-toggle:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ---------- Professional polish overrides ---------- */
+.teacher-control-panel {
+  border-radius: 14px;
+  border-color: #dbe3ef;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.top-control-bar {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-bottom: 1px solid #dbe3ef;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.top-control-row {
+  padding: 14px 20px;
+  gap: 12px;
+}
+
+.top-control-left {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.panel-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #0f172a;
+}
+
+.header-controls {
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mode-toggle-btn-compact {
+  min-height: 30px;
+  border-radius: 999px;
+}
+
+.btn-display-mode {
+  border-radius: 10px;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.btn-display-mode.active {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.main-layout {
+  padding: 14px;
+}
+
+.panel {
+  border-radius: 12px;
+  border-color: #dbe3ef;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.teaching-modules-fullwidth {
+  padding: 14px !important;
+}
+
+.minimal-teaching-top {
+  border-bottom-color: #dbe3ef;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  padding: 12px 14px;
+}
+
+.minimal-teaching-nav-btn,
+.btn-minimal-more,
+.btn-minimal-exit,
+.btn-minimal-enter {
+  border-radius: 10px;
+  min-height: 36px;
+  font-weight: 600;
+}
+
+.minimal-teaching-current {
+  border-color: #dbe3ef;
+  background: #f8fafc;
+}
+
+.minimal-more-panel {
+  border-left: 1px solid #dbe3ef;
+  box-shadow: -8px 0 30px rgba(15, 23, 42, 0.16);
+}
+
+.minimal-more-panel-header {
+  border-bottom-color: #dbe3ef;
+  background: #f8fafc;
+}
+
+@media (max-width: 768px) {
+  .top-control-row {
+    padding: 12px;
+    align-items: flex-start;
+  }
+
+  .header-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 </style>

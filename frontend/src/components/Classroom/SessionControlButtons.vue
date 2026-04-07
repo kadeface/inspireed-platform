@@ -8,7 +8,7 @@
         :disabled="loading"
         class="btn btn-primary"
       >
-        📚 创建课堂
+        创建课堂
       </button>
     </template>
 
@@ -21,7 +21,7 @@
         class="btn btn-primary"
         :title="activeStudentsCount === 0 ? '开始上课（讲授型/幻灯片模式）' : '开始上课（互动型模式）'"
       >
-        ▶️ 开始上课
+        开始授课
         <span v-if="activeStudentsCount === 0" class="ml-2 text-xs opacity-75">(讲授型)</span>
         <span v-else class="ml-2 text-xs opacity-75">(互动型)</span>
       </button>
@@ -32,7 +32,7 @@
         class="btn btn-danger"
         title="结束当前会话，以便创建新会话"
       >
-        ⏹️ 结束
+        结束课堂
       </button>
     </template>
 
@@ -45,7 +45,7 @@
         class="btn btn-danger"
         title="结束当前课程"
       >
-        ⏹️ 结束授课
+        结束授课
       </button>
     </template>
 
@@ -57,7 +57,7 @@
         :disabled="loading"
         class="btn btn-primary"
       >
-        📚 创建新课堂
+        创建新课堂
       </button>
     </template>
   </div>
@@ -88,21 +88,25 @@ defineEmits<{
 <style scoped>
 .session-control-buttons {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.625rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .btn {
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  padding: 0.55rem 1rem;
+  border-radius: 0.625rem;
   font-size: 0.875rem;
-  font-weight: 500;
-  border: none;
+  font-weight: 600;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 36px;
+  letter-spacing: 0.01em;
 }
 
 .btn:disabled {
@@ -111,21 +115,34 @@ defineEmits<{
 }
 
 .btn-primary {
-  background: #3b82f6;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  border-color: #1d4ed8;
   color: white;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.22);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #2563eb;
+  background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 16px rgba(37, 99, 235, 0.3);
 }
 
 .btn-danger {
-  background: #ef4444;
-  color: white;
+  background: #ffffff;
+  border-color: #fecaca;
+  color: #b91c1c;
+  box-shadow: 0 2px 8px rgba(185, 28, 28, 0.08);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #dc2626;
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.btn-danger:active:not(:disabled),
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btn-disabled-hint {

@@ -1,6 +1,6 @@
 <template>
   <div v-if="showDisplay" class="student-count-info" data-testid="student-count">
-    <span class="student-count-icon">👥</span>
+    <span class="student-count-icon" aria-hidden="true"></span>
     <span class="student-count-text">
       <span class="student-count-value" data-testid="student-count-value">{{ activeCount }}</span>
       <span v-if="totalCount > 0" class="student-count-total">/{{ totalCount }}</span>
@@ -31,16 +31,21 @@ const props = withDefaults(defineProps<Props>(), {
 .student-count-info {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.375rem 0.75rem;
-  background: #f0fdf4;
-  border-radius: 0.375rem;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  background: linear-gradient(180deg, #f7fdf9 0%, #eefcf3 100%);
+  border-radius: 0.625rem;
   font-size: 0.875rem;
-  border: 1px solid #bbf7d0;
+  border: 1px solid #b6eec8;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.08);
 }
 
 .student-count-icon {
-  font-size: 1rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.16);
 }
 
 .student-count-text {
