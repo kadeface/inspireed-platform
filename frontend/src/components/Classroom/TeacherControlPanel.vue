@@ -41,6 +41,35 @@
           @start="() => handleBeginClass(activeStudents.length)"
           @end="handleEnd"
         />
+
+        <!-- 临时解决方案：直接显示按钮，确保在授课模式下能看到 -->
+        <button
+          v-if="!session"
+          @click="handleCreateSession"
+          :disabled="loading"
+          class="btn btn-primary btn-compact"
+          style="min-width: 100px;"
+        >
+          创建课堂
+        </button>
+        <button
+          v-else-if="session?.status === 'PREPARING' || session?.status === 'preparing'"
+          @click="() => handleBeginClass(activeStudents.length)"
+          :disabled="loading"
+          class="btn btn-primary btn-compact"
+          style="min-width: 100px;"
+        >
+          开始授课
+        </button>
+        <button
+          v-else-if="session?.status === 'TEACHING' || session?.status === 'teaching'"
+          @click="handleEnd"
+          :disabled="loading"
+          class="btn btn-danger btn-compact"
+          style="min-width: 100px;"
+        >
+          结束授课
+        </button>
         <button
           type="button"
           class="btn-minimal-more"
