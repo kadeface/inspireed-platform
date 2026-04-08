@@ -41,6 +41,24 @@
           @start="() => handleBeginClass(activeStudents.length)"
           @end="handleEnd"
         />
+        <!-- DEBUG: 总是显示的调试按钮 -->
+        <div style="background: red; color: white; padding: 5px 10px; margin-bottom: 5px; font-weight: bold;">
+          🔴 DEBUG - Session: {{ session ? 'YES' : 'NO' }}, Status: {{ session?.status || 'NONE' }}
+        </div>
+        <button
+          @click="handleCreateSession"
+          :disabled="loading"
+          style="background: red; color: white; border: 2px solid white; padding: 8px 16px; font-weight: bold; cursor: pointer;"
+        >
+          🔴 创建课堂 (DEBUG)
+        </button>
+        <button
+          @click="() => handleBeginClass(activeStudents.length)"
+          :disabled="loading"
+          style="background: orange; color: white; border: 2px solid white; padding: 8px 16px; font-weight: bold; cursor: pointer;"
+        >
+          🟠 开始授课 (DEBUG)
+        </button>
 
         <!-- 临时解决方案：直接显示按钮，确保在授课模式下能看到 -->
         <button
