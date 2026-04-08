@@ -11,6 +11,24 @@
       @toggle-collapsed="emit('toggle-toolbar-collapsed')"
     />
 
+    <!-- 全屏预览时整块 <main> 不渲染（见下方 v-if="!isFullscreenPreview"），导播台若仍放在 main 内会一起消失。
+         因此在全屏下用 Teleport 挂到 body，并置于全屏层（z-50）之上。 -->
+    <Teleport to="body">
+      <div
+        v-if="isFullscreenPreview && isPreviewMode && showClassroomPanel && currentLesson"
+        class="fixed left-0 right-0 z-[60] max-h-[min(45vh,440px)] overflow-y-auto px-2 sm:px-4 pointer-events-auto"
+        style="top: 5.5rem"
+        data-testid="teacher-control-panel-fullscreen-teleport"
+      >
+        <TeacherClassroomControlPanel
+          key="teacher-control-panel-fullscreen"
+          :lesson-id="currentLesson.id"
+          :lesson="currentLesson"
+          @session-changed="emit('session-changed', $event)"
+        />
+      </div>
+    </Teleport>
+
     <!-- 中间：编辑区 -->
     <main v-if="!isFullscreenPreview" class="flex-1 overflow-y-auto bg-gray-50">
       <div :class="[isPreviewMode ? 'w-full py-4 px-2' : 'w-full py-6 px-4 sm:px-6 lg:px-8']">
@@ -115,12 +133,13 @@
             </div>
           </div>
 
-          <!-- 课堂控制面板（预览模式下） -->
+          <!-- 课堂控制面板（预览模式下；非全屏 — 全屏时见上方 Teleport） -->
           <div
-            v-if="isPreviewMode && showClassroomPanel && currentLesson"
+            v-if="!isFullscreenPreview && isPreviewMode && showClassroomPanel && currentLesson"
             :class="isPreviewMode ? 'mb-2' : 'mb-6'"
           >
             <TeacherClassroomControlPanel
+              key="teacher-control-panel-inline"
               :lesson-id="currentLesson.id"
               :lesson="currentLesson"
               @session-changed="emit('session-changed', $event)"

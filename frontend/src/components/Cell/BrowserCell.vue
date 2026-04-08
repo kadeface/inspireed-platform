@@ -91,23 +91,29 @@
         <p v-if="displayContent.description" class="browser-description">{{ displayContent.description }}</p>
       </div>
 
-      <!-- 只读：内嵌网页（与访客观摩 GuestJoin 一致；部分站点会因 X-Frame-Options 显示空白） -->
-      <div v-if="!editable" class="browser-embed-section">
+      <!-- 只读：二选一展示（优先尝试内嵌，失败后自动降级为链接模式） -->
+      <div v-if="!editable && shouldShowEmbed" class="browser-embed-section">
         <div class="browser-embed-wrap">
           <iframe
             :src="displayUrl"
             class="browser-embed-iframe"
             title="浏览器单元预览"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+            @load="handleIframeLoad"
+            @error="handleIframeError"
           />
         </div>
-        <p class="browser-embed-hint">
-          若上方为空白，多为目标网站禁止被嵌入，请使用下方二维码或「在新窗口打开」。
+        <p v-if="embedState === 'checking'" class="browser-embed-hint">
+          正在尝试内嵌加载，若目标网站禁止嵌入将自动切换为链接模式...
         </p>
       </div>
 
-      <!-- 链接与二维码（辅助打开方式） -->
-      <div class="link-mode-card" :class="{ 'fullscreen-preview': isFullscreenPreview }">
+      <!-- 链接与二维码（仅在编辑模式或内嵌失败时显示） -->
+      <div
+        v-if="shouldShowLinkMode"
+        class="link-mode-card"
+        :class="{ 'fullscreen-preview': isFullscreenPreview }"
+      >
         <div class="link-card-content">
           <!-- 链接信息 -->
           <div class="link-header">
@@ -228,6 +234,8 @@ const localConfig = ref<BrowserCell['config']>({
 })
 
 const urlError = ref<string | null>(null)
+const embedState = ref<'checking' | 'embedded' | 'fallback'>('checking')
+const iframeFallbackTimer = ref<number | null>(null)
 
 // 二维码相关
 const qrCodeDataUrl = ref<string | null>(null)
@@ -248,6 +256,49 @@ const displayContent = computed(() => {
 const displayConfig = computed(() => {
   return props.editable ? localConfig.value : (props.cell.config || {} as BrowserCell['config'])
 })
+
+const shouldShowEmbed = computed(() => {
+  if (props.editable || !displayUrl.value) return false
+  return embedState.value !== 'fallback'
+})
+
+const shouldShowLinkMode = computed(() => {
+  if (!displayUrl.value) return false
+  if (props.editable) return true
+  return embedState.value === 'fallback'
+})
+
+function clearIframeFallbackTimer() {
+  if (iframeFallbackTimer.value !== null) {
+    window.clearTimeout(iframeFallbackTimer.value)
+    iframeFallbackTimer.value = null
+  }
+}
+
+function startEmbedAttempt() {
+  if (props.editable || !displayUrl.value) return
+  clearIframeFallbackTimer()
+  embedState.value = 'checking'
+  iframeFallbackTimer.value = window.setTimeout(() => {
+    if (embedState.value === 'checking') {
+      embedState.value = 'fallback'
+    }
+  }, 5000)
+}
+
+function handleIframeLoad() {
+  if (props.editable) return
+  clearIframeFallbackTimer()
+  if (embedState.value !== 'fallback') {
+    embedState.value = 'embedded'
+  }
+}
+
+function handleIframeError() {
+  if (props.editable) return
+  clearIframeFallbackTimer()
+  embedState.value = 'fallback'
+}
 
 // URL 验证
 function isValidUrl(url: string): boolean {
@@ -371,6 +422,7 @@ watch(() => props.cell, (newCell) => {
       // 重置并重新生成二维码
       qrCodeDataUrl.value = null
       qrCodeLargeDataUrl.value = null
+      startEmbedAttempt()
       if (displayUrl.value) {
         nextTick(() => {
           generateNormalQR()
@@ -383,6 +435,7 @@ watch(() => props.cell, (newCell) => {
 // 当 URL 变化时，生成二维码
 watch(() => displayUrl.value, (newUrl, oldUrl) => {
   if (newUrl && newUrl !== oldUrl && !props.editable) {
+    startEmbedAttempt()
     // 重置二维码
     qrCodeDataUrl.value = null
     qrCodeLargeDataUrl.value = null
@@ -392,6 +445,16 @@ watch(() => displayUrl.value, (newUrl, oldUrl) => {
     })
   }
 }, { immediate: true })
+
+watch(() => props.editable, (isEditable) => {
+  if (isEditable) {
+    clearIframeFallbackTimer()
+    return
+  }
+  if (displayUrl.value) {
+    startEmbedAttempt()
+  }
+})
 
 // 当显示放大模态框时，生成大尺寸二维码
 watch(() => showLargeQR.value, (show) => {
@@ -423,6 +486,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearIframeFallbackTimer()
   if (escKeyHandler) {
     window.removeEventListener('keydown', escKeyHandler)
     escKeyHandler = null

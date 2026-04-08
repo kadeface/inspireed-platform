@@ -52,7 +52,6 @@
       <!-- 课程模块列表 -->
       <ModuleCard
         v-for="(cell, index) in cells"
-        v-memo="[isModuleActive(cell, index), loading, cell.id]" 
         :key="cell.id || index"
         :ref="el => setModuleItemRef(el, index)"
         :data-module-index="index"
@@ -63,6 +62,7 @@
         :loading="loading"
         :is-multi-select-mode="isMultiSelectMode"
         :is-activity-active="isModuleActivityActive(cell, index)"
+        :show-learning-meta="showLearningMeta"
         @click="handleModuleItemClick"
         @checkbox-click="handleModuleCheckboxClick"
         @checkbox-change="handleModuleCheckboxChange"
@@ -124,6 +124,7 @@ interface Props {
   isMultiSelectMode?: boolean
   displayCellOrders?: number[]
   sessionCurrentActivityId?: number | null
+  showLearningMeta?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -131,6 +132,8 @@ const props = withDefaults(defineProps<Props>(), {
   isMultiSelectMode: false,
   displayCellOrders: () => [],
   sessionCurrentActivityId: null,
+  // 授课导播台默认隐藏「难度/时长/进度状态」信息
+  showLearningMeta: false,
 })
 
 const emit = defineEmits<{
@@ -245,6 +248,14 @@ function handleNextModule() {
 
 function handleModuleItemClick(cell: Cell, index: number) {
   handleItemClick(cell, index)
+}
+
+function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
+  handleCheckboxClick(cell, index, event)
+}
+
+function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
+  handleCheckboxChange(cell, index, event)
 }
 
 function handleModulePreview(cell: Cell, index: number) {
@@ -379,7 +390,7 @@ function handleModuleEdit(cell: Cell, index: number) {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  max-height: calc(110px * 2 + 12px);
+  max-height: calc(76px * 2 + 12px);
   overflow-y: auto;
   overflow-x: hidden;
 }

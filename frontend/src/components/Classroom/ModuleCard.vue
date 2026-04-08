@@ -24,7 +24,7 @@
     <div class="module-card-number">{{ index + 1 }}</div>
 
     <!-- Top metadata bar -->
-    <div class="card-metadata">
+    <div v-if="showLearningMeta" class="card-metadata">
       <DifficultyBadge :level="cell.difficulty" />
       <DurationBadge :minutes="cell.duration" />
     </div>
@@ -41,7 +41,7 @@
     </div>
 
     <!-- Bottom status bar -->
-    <div class="card-status">
+    <div v-if="showLearningMeta" class="card-status">
       <ProgressRing
         :percentage="cell.progress || 0"
         :size="40"
@@ -90,12 +90,14 @@ interface Props {
   loading?: boolean
   isMultiSelectMode?: boolean
   isActivityActive?: boolean
+  showLearningMeta?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   isMultiSelectMode: false,
-  isActivityActive: false
+  isActivityActive: false,
+  showLearningMeta: true,
 })
 
 const emit = defineEmits<{
@@ -112,6 +114,7 @@ const cardClasses = computed(() => ({
   'module-card-active': props.isActive,
   'module-card-loading': props.loading,
   'module-card-disabled': props.loading,
+  'module-card-compact': !props.showLearningMeta,
   [`module-card-type-${props.cell.type}`]: true
 }))
 
@@ -214,6 +217,13 @@ function handleEdit() {
   overflow: hidden;
 }
 
+/* 授课导播台紧凑模式（隐藏元信息时） */
+.module-card-compact {
+  min-height: 72px;
+  padding: 8px 10px;
+  gap: 6px;
+}
+
 .module-card:hover:not(.module-card-disabled) {
   transform: translateY(-4px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
@@ -308,6 +318,11 @@ function handleEdit() {
   align-items: center;
   justify-content: center;
   pointer-events: auto;
+}
+
+.module-card-compact .module-card-checkbox {
+  bottom: 6px;
+  right: 6px;
 }
 
 .module-card-checkbox:hover {
@@ -414,6 +429,11 @@ input[type="checkbox"].checkbox-input {
   min-height: 0;
 }
 
+.module-card-compact .card-content {
+  align-items: center;
+  gap: 6px;
+}
+
 .card-icon {
   display: flex;
   align-items: center;
@@ -426,6 +446,11 @@ input[type="checkbox"].checkbox-input {
   flex-shrink: 0;
   transition: all 0.3s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.module-card-compact .card-icon {
+  width: 26px;
+  height: 26px;
 }
 
 .card-icon.icon-TEXT {
@@ -497,6 +522,12 @@ input[type="checkbox"].checkbox-input {
   transition: color 0.3s ease;
 }
 
+.module-card-compact .card-title {
+  font-size: 12px;
+  margin: 0;
+  line-height: 1.25;
+}
+
 .card-description {
   font-size: 11px;
   font-weight: 500;
@@ -507,6 +538,10 @@ input[type="checkbox"].checkbox-input {
   white-space: nowrap;
   line-height: 1.4;
   transition: color 0.3s ease;
+}
+
+.module-card-compact .card-description {
+  display: none;
 }
 
 .module-card-active .card-title,

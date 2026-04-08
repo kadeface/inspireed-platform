@@ -183,8 +183,18 @@ export function useWebSocket(options: UseWebSocketOptions) {
    */
   function handleMessage(event: MessageEvent) {
     try {
-      const message: WebSocketMessage = JSON.parse(event.data)
-      const { type, data } = message
+      const raw = JSON.parse(event.data)
+      if (!raw || typeof raw !== 'object') {
+        log.warn('收到无效 WebSocket 消息（非对象）', raw)
+        return
+      }
+      const message = raw as Partial<WebSocketMessage>
+      const type = message.type
+      const data = message.data
+      if (!type || typeof type !== 'string') {
+        log.warn('收到无效 WebSocket 消息（缺少 type）', message)
+        return
+      }
 
       // 心跳等不刷屏，其他消息用 debug 级别
       if (type !== 'pong') {

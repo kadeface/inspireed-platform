@@ -955,7 +955,7 @@ interface Props {
     // 只在开发环境输出初始状态
     if (isDev) {
       if (!sessionId.value) {
-        console.warn('⚠️ UnifiedSubmissionPanel: sessionId 为空', {
+        console.debug('UnifiedSubmissionPanel: sessionId 为空（未创建课堂时正常）', {
           cellId: props.cellId,
           lessonId: props.lessonId,
           hasInjectedSessionId: !!injectedSessionId,
