@@ -2166,6 +2166,9 @@ defineExpose({
 }
 
 .teaching-modules-floating .module-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
   max-height: none !important;
   overflow-y: auto !important;
 }
@@ -2305,6 +2308,27 @@ defineExpose({
 }
 
 /* 紧凑模式下模块列表样式优化 */
+
+.teaching-modules-floating .module-card {
+  min-height: 90px;
+  padding: 10px;
+}
+
+.teaching-modules-floating .card-title {
+  font-size: 12px;
+}
+
+.teaching-modules-floating .card-description {
+  font-size: 10px;
+}
+
+.teaching-modules-floating .card-metadata {
+  display: none;
+}
+
+.teaching-modules-floating .card-status {
+  padding: 4px 6px;
+}
 .teaching-modules-floating .module-item {
   padding: 8px !important;
   min-height: 48px !important;
@@ -2404,6 +2428,14 @@ defineExpose({
   max-height: calc(100vh - 48px) !important;
 }
 
+
+.module-panel-fullscreen .module-list {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.module-panel-fullscreen .module-card {
+  min-height: 120px;
+}
 .module-panel-header {
   display: flex;
   justify-content: space-between;
