@@ -50,52 +50,24 @@
 
     <div class="module-list" ref="moduleListRef" v-if="cells.length > 0" data-testid="module-list">
       <!-- 课程模块列表 -->
-      <div
+      <ModuleCard
         v-for="(cell, index) in cells"
         :key="cell.id || index"
         :ref="el => setModuleItemRef(el, index)"
         :data-module-index="index"
         :data-testid="`cell-item-${index}`"
-        class="module-item"
-        :class="{
-          'module-item-active': isModuleActive(cell, index),
-          [`module-item-type-${cell.type}`]: true,
-          'module-item-disabled': loading,
-        }"
-        :title="loading ? '切换中，请稍候...' : getModuleTooltip(cell, index)"
-      >
-        <!-- 单选框/复选框 -->
-        <div class="module-item-checkbox" @click.stop="!loading && handleCheckboxClick(cell, index, $event)">
-          <input
-            :type="isMultiSelectMode ? 'checkbox' : 'radio'"
-            :name="isMultiSelectMode ? `module-display-checkbox-${index}` : 'module-display-radio'"
-            :checked="isModuleActive(cell, index)"
-            :disabled="loading"
-            @change.stop="!loading && handleCheckboxChange(cell, index, $event)"
-            @click.stop
-            class="checkbox-input"
-          />
-        </div>
-
-        <!-- 模块序号 -->
-        <div class="module-item-number">{{ index + 1 }}</div>
-
-        <!-- 模块图标 -->
-        <div class="module-item-icon" :class="`icon-${cell.type}`" @click="!loading && handleItemClick(cell, index)">
-          <CellTypeIcon :type="cell.type" />
-        </div>
-
-        <!-- 模块信息 -->
-        <div class="module-item-content" @click="!loading && handleItemClick(cell, index)">
-          <div class="module-item-title">{{ cell.title || getCellTypeLabel(cell.type) || `模块 ${index + 1}` }}</div>
-          <div class="module-item-subtitle">{{ getCellTypeLabel(cell.type) }}</div>
-        </div>
-
-        <!-- 活动状态标记 -->
-        <div v-if="cell.type === 'activity' && isModuleActivityActive(cell, index)" class="module-item-activity-badge">
-          🎯
-        </div>
-      </div>
+        :cell="cell"
+        :index="index"
+        :is-active="isModuleActive(cell, index)"
+        :loading="loading"
+        :is-multi-select-mode="isMultiSelectMode"
+        :is-activity-active="isModuleActivityActive(cell, index)"
+        @click="handleModuleItemClick"
+        @checkbox-click="handleModuleCheckboxClick"
+        @checkbox-change="handleModuleCheckboxChange"
+        @preview="handleModulePreview"
+        @edit="handleModuleEdit"
+      />
     </div>
     <div v-else class="module-empty">
       <p>暂无课程模块</p>
@@ -106,6 +78,7 @@
 <script setup lang="ts">
 import { ref, computed, h } from 'vue'
 import type { Cell } from '../../types/cell'
+import ModuleCard from './ModuleCard.vue'
 
 // Cell类型图标组件
 const CellTypeIcon = (props: { type: string }) => {
@@ -265,6 +238,20 @@ function handlePrevModule() {
 function handleNextModule() {
   emit('next-module')
 }
+
+function handleModuleItemClick(cell: Cell, index: number) {
+  handleItemClick(cell, index)
+}
+
+function handleModulePreview(cell: Cell, index: number) {
+  // TODO: Implement preview functionality
+  console.log('Preview module:', cell, index)
+}
+
+function handleModuleEdit(cell: Cell, index: number) {
+  // TODO: Implement edit functionality
+  console.log('Edit module:', cell, index)
+}
 </script>
 
 <style scoped>
@@ -286,7 +273,7 @@ function handleNextModule() {
 .module-navigation-bar {
   display: flex;
   align-items: stretch;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #e5e7eb;
@@ -382,13 +369,13 @@ function handleNextModule() {
 /* 模块列表 */
 .module-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 8px;
-  padding-bottom: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding-bottom: 12px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  max-height: calc(52px * 2 + 8px);
+  max-height: calc(110px * 2 + 12px);
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -903,7 +890,7 @@ input[type="checkbox"].checkbox-input {
 /* 响应式布局 */
 @media (max-width: 768px) {
   .module-navigation-bar {
-    gap: 6px;
+    gap: 10px;
     margin-bottom: 10px;
     padding-bottom: 10px;
   }
@@ -920,9 +907,9 @@ input[type="checkbox"].checkbox-input {
   }
 
   .module-list {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 6px;
-    max-height: calc(48px * 2 + 6px);
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+    max-height: calc(100px * 2 + 10px);
   }
 
   .module-item {
