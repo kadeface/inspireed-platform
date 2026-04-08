@@ -2168,7 +2168,42 @@ defineExpose({
 .teaching-modules-floating .module-list {
   grid-template-columns: 1fr;
   gap: 8px;
+  max-height: none !important;
+  overflow-y: auto !important;
 }
+.teaching-modules-floating .module-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-height: none !important;
+  overflow-y: auto !important;
+}
+.teaching-modules-floating .module-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-height: none !important;
+  overflow-y: auto !important;
+}
+.teaching-modules-floating .module-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-height: none !important;
+  overflow-y: auto !important;
+}
+.teaching-modules-floating .module-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-height: none !important;
+  overflow-y: auto !important;
+}
+.teaching-modules-floating .module-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-height: none !important;
+  overflow-y: auto !important;
+}
+.teaching-modules-floating .module-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
   max-height: none !important;
   overflow-y: auto !important;
 }
