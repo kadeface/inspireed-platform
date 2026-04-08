@@ -52,6 +52,7 @@
       <!-- 课程模块列表 -->
       <ModuleCard
         v-for="(cell, index) in cells"
+        v-memo="[isModuleActive(cell, index), loading, cell.id]" 
         :key="cell.id || index"
         :ref="el => setModuleItemRef(el, index)"
         :data-module-index="index"
@@ -148,6 +149,9 @@ const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map())
 const canGoPrev = computed(() => props.currentModuleIndex > 0)
 const canGoNext = computed(() => props.cells.length > 0 && props.currentModuleIndex >= 0 && props.currentModuleIndex < props.cells.length - 1)
 
+
+// Performance: Check if virtualization is needed for large lists
+const shouldVirtualize = computed(() => props.cells.length > 20)
 const navCenterTitleShort = computed(() => {
   if (props.currentModuleIndex < 0 || !props.cells.length) return ''
   const cell = props.cells[props.currentModuleIndex]
