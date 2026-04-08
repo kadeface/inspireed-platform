@@ -904,7 +904,7 @@ const {
 } = navigationManager
 
 const isMinimalTeachingUi = computed(() => {
-  if (!minimalTeachingFocus.value || !session.value) return false
+  if (!minimalTeachingFocus.value ) return false
   const st = normalizedSessionStatus.value
   return st !== 'ended' && st != null
 })
