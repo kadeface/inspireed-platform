@@ -25,7 +25,7 @@ export interface CellBase {
   title?: string
   stage_label?: string
   editable: boolean
-  
+
   // 🎓 学习科学字段
   cognitive_level?: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create'
   prerequisite_cells?: (string | number)[]  // 前置单元ID列表
@@ -34,6 +34,12 @@ export interface CellBase {
     min_accuracy?: number
     max_time_seconds?: number
   }
+
+  // 🎨 Module Card Enhancement - 新增可选字段
+  preview?: string  // 简短描述（1行，约60字符）
+  difficulty?: 'beginner' | 'intermediate' | 'advanced'  // 难度等级
+  duration?: number  // 预计时长（分钟）
+  progress?: number  // 完成百分比（0-100）
 }
 
 export interface TextCellContent {
