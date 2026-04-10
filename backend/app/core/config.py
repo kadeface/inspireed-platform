@@ -175,5 +175,10 @@ class Settings(BaseSettings):
     # 如果为空，则从 Request.base_url 自动获取
     RESOURCE_BASE_URL: Optional[str] = None
 
+    # 作品评审前端入口基础地址（可选）
+    # 例如：https://inspireed.example.com
+    # 未配置时，回退为相对地址（前端自行拼接）
+    REVIEW_CHANNEL_FRONTEND_BASE_URL: Optional[str] = None
+
 
 settings = Settings()

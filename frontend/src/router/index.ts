@@ -22,6 +22,31 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '访客观摩 - InspireEd' },
   },
   {
+    path: '/review-channel/judge',
+    name: 'ReviewChannelJudge',
+    component: () => import('../pages/ReviewChannel/Judge.vue'),
+    meta: { title: '评委评审通道 - InspireEd' },
+  },
+  {
+    path: '/review-channel/coordinator',
+    name: 'ReviewChannelCoordinator',
+    component: () => import('../pages/ReviewChannel/Coordinator.vue'),
+    meta: { title: '教研员评审看板 - InspireEd' },
+  },
+  // 管理端 - 作品评审通道
+  {
+    path: '/admin/review-channel',
+    name: 'ReviewChannelAdmin',
+    component: () => import('../pages/ReviewChannel/AdminActivityList.vue'),
+    meta: { title: '评审通道管理 - InspireEd' },
+  },
+  {
+    path: '/admin/review-channel/:activityId',
+    name: 'ReviewChannelAdminDetail',
+    component: () => import('../pages/ReviewChannel/AdminActivityDetail.vue'),
+    meta: { title: '活动详情 - InspireEd' },
+  },
+  {
     path: '/subjects/:subjectCode/courses',
     name: 'SubjectCourses',
     component: () => import('../pages/InfoTechCourses.vue'),

@@ -37,6 +37,7 @@ from app.api.v1 import (
     public_curriculum,
     questions,
     researcher_curriculum,
+    review_channel,
     resources,
     reviews,
     scores,
@@ -185,4 +186,7 @@ api_router.include_router(
 )
 api_router.include_router(
     analytics.router, prefix="/admin", tags=["评价-增值分析"]
+)
+api_router.include_router(
+    review_channel.router, tags=["作品评审通道"]
 )

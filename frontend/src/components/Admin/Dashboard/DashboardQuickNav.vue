@@ -1,5 +1,5 @@
 <template>
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
     <AdminFunctionCard
       title="组织架构"
       description="管理区域、学校、班级和人员"
@@ -34,6 +34,17 @@
       @click="router.push('/district-admin/value-added')"
     />
     <AdminFunctionCard
+      title="评审通道"
+      description="作品评审活动与评委入口管理"
+      :icon="Medal"
+      icon-color="#4F46E5"
+      icon-bg-color="#EEF2FF"
+      text-color="#1E293B"
+      description-color="#64748B"
+      custom-class="bg-white border border-slate-200 nav-card"
+      @click="router.push({ name: 'ReviewChannelAdmin' })"
+    />
+    <AdminFunctionCard
       title="系统设置"
       description="管理员和权限配置"
       :icon="Setting"
@@ -49,7 +60,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { OfficeBuilding, DataLine, TrendCharts, Setting } from '@element-plus/icons-vue'
+import { OfficeBuilding, DataLine, TrendCharts, Medal, Setting } from '@element-plus/icons-vue'
 import AdminFunctionCard from '../AdminFunctionCard.vue'
 
 const router = useRouter()
