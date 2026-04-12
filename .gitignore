@@ -158,3 +158,8 @@ GIT_*.md
 # Git Worktrees
 .worktrees/
 .env.prod
+
+# Planning-with-files (local session working memory, repo root only)
+/task_plan.md
+/findings.md
+/progress.md

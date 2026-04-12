@@ -151,9 +151,25 @@
                 <p v-else>视频内容</p>
               </div>
 
-              <!-- CODE cell -->
-              <div v-else-if="cell.cell_type === 'CODE'" class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                <pre>{{ cell.content?.code || cell.content?.source || '' }}</pre>
+              <!-- CODE cell：与学生端 CodeCell 一致，HTML 用 iframe srcdoc 预览 -->
+              <div v-else-if="cell.cell_type === 'CODE'" class="space-y-2">
+                <div
+                  v-if="guestCodeIsHtml(cell) && guestCodeSource(cell).trim()"
+                  class="w-full overflow-hidden rounded-lg border border-gray-200 bg-white"
+                >
+                  <iframe
+                    :srcdoc="guestCodeSource(cell)"
+                    class="h-[min(70vh,800px)] min-h-[320px] w-full border-0"
+                    title="HTML 预览"
+                    sandbox="allow-scripts allow-same-origin"
+                  />
+                </div>
+                <div
+                  v-else
+                  class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto"
+                >
+                  <pre>{{ guestCodeSource(cell) }}</pre>
+                </div>
               </div>
 
               <!-- BROWSER cell（正文常仅来自教案 JSON） -->
@@ -586,6 +602,19 @@ function guestCellKey(cell: Record<string, any>) {
 
 function isGuestTextCellType(cell: Record<string, any>) {
   return String(cell?.cell_type ?? '').toUpperCase() === 'TEXT'
+}
+
+/** 与 CodeCell 使用同一字段：code 为主，兼容 source */
+function guestCodeSource(cell: Record<string, any>): string {
+  const c = cell?.content
+  if (!c || typeof c !== 'object') return ''
+  const raw = (c as Record<string, unknown>).code ?? (c as Record<string, unknown>).source
+  return raw != null ? String(raw) : ''
+}
+
+function guestCodeIsHtml(cell: Record<string, any>): boolean {
+  const lang = cell?.content?.language
+  return String(lang ?? '').toLowerCase() === 'html'
 }
 
 function tiptapJsonToPlainText(node: unknown): string {
