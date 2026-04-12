@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+  <div :class="guestRootLayoutClass">
     <!-- 输入接入码 -->
     <div v-if="!sessionInfo" class="w-full max-w-md">
       <div class="bg-white rounded-2xl shadow-xl p-8">
@@ -45,19 +45,59 @@
       </div>
     </div>
 
-    <!-- 课堂观摩界面 -->
-    <div v-else class="w-full max-w-4xl">
-      <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+    <!-- 课堂观摩界面：浏览器全屏时铺满视口（去掉 max-w 与居中留白） -->
+    <div v-else :class="guestShellClass">
+      <Transition name="guest-fade">
+        <div
+          v-if="showFullscreenPrompt"
+          class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4"
+          @click.self="showFullscreenPrompt = false"
+        >
+          <div class="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+            <div class="flex items-start gap-4 mb-4">
+              <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">教师已切换为全屏展示</h3>
+                <p class="text-sm text-gray-600 mt-1">
+                  建议进入浏览器全屏以获得与学生端相近的观摩体验（需您点击授权）。
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-3">
+              <button
+                type="button"
+                @click="toggleGuestDocumentFullscreen('fullscreen')"
+                class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+              >
+                进入全屏
+              </button>
+              <button
+                type="button"
+                @click="showFullscreenPrompt = false"
+                class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+              >
+                稍后
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
+      <div :class="guestCardClass">
         <!-- 顶部信息栏 -->
-        <div class="bg-blue-600 text-white px-6 py-4">
-          <div class="flex items-center justify-between">
+        <div class="shrink-0 bg-blue-600 text-white px-6 py-4">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h1 class="text-lg font-bold">{{ sessionInfo.lessonTitle || '课堂观摩' }}</h1>
               <div class="text-blue-100 text-sm mt-1">
                 {{ sessionInfo.teacherName }} · {{ sessionInfo.classroomName }}
               </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-wrap justify-end">
               <span
                 class="px-2 py-1 text-xs rounded-full"
                 :class="
@@ -77,6 +117,18 @@
                 }}
               </span>
               <button
+                type="button"
+                @click="
+                  isDocumentFullscreen
+                    ? toggleGuestDocumentFullscreen('window')
+                    : toggleGuestDocumentFullscreen('fullscreen')
+                "
+                class="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25 transition-colors"
+              >
+                {{ isDocumentFullscreen ? '退出全屏' : '全屏观摩' }}
+              </button>
+              <button
+                type="button"
                 @click="exitGuest"
                 class="text-blue-100 hover:text-white text-sm underline"
               >
@@ -87,7 +139,7 @@
         </div>
 
         <!-- 访客提示 -->
-        <div class="bg-yellow-50 border-b border-yellow-100 px-6 py-2 text-sm text-yellow-700 space-y-1">
+        <div class="shrink-0 bg-yellow-50 border-b border-yellow-100 px-6 py-2 text-sm text-yellow-700 space-y-1">
           <p>访客观摩模式 — 您正在只读观摩此课堂，无法提交活动或参与互动。</p>
           <p class="text-yellow-800/90 text-xs leading-relaxed">
             下方正文与学生端一致：仅展示教师在导播台当前勾选/投屏的模块；未勾选的模块不会显示内容（并非系统遗漏）。
@@ -95,7 +147,7 @@
         </div>
 
         <!-- Cell 内容区域 -->
-        <div class="p-6">
+        <div :class="guestContentAreaClass">
           <div v-if="cellsLoading" class="text-center py-12 text-gray-400">
             加载课堂内容中...
           </div>
@@ -161,7 +213,7 @@
                     :srcdoc="guestCodeSource(cell)"
                     class="h-[min(70vh,800px)] min-h-[320px] w-full border-0"
                     title="HTML 预览"
-                    sandbox="allow-scripts allow-same-origin"
+                    sandbox="allow-scripts allow-same-origin allow-fullscreen"
                   />
                 </div>
                 <div
@@ -184,7 +236,7 @@
                     :src="cell.content.url"
                     class="h-[70vh] min-h-[480px] w-full border-0"
                     title="浏览器单元"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-fullscreen"
                   />
                 </div>
                 <p v-else class="text-gray-500">未配置网址</p>
@@ -202,7 +254,7 @@
                     :src="cell.content.url"
                     class="h-[70vh] min-h-[480px] w-full border-0"
                     title="交互式课件"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-fullscreen"
                   />
                 </div>
                 <div
@@ -393,6 +445,53 @@ const undisplayedLessonModules = computed(() => {
   return lessonOutline.value.filter((m) => m.order != null && !shown.has(m.order))
 })
 
+/** 浏览器原生全屏（含 webkit/moz/ms 前缀）— 用于观摩页铺满视口 */
+const isDocumentFullscreen = ref(false)
+
+function updateDocumentFullscreenFlag() {
+  isDocumentFullscreen.value = !!(
+    document.fullscreenElement ||
+    (document as any).webkitFullscreenElement ||
+    (document as any).mozFullScreenElement ||
+    (document as any).msFullscreenElement
+  )
+}
+
+const guestRootLayoutClass = computed(() => {
+  if (!sessionInfo.value) {
+    return 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4'
+  }
+  if (isDocumentFullscreen.value) {
+    return 'fixed inset-0 z-[1] flex flex-col overflow-hidden bg-slate-100'
+  }
+  return 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4'
+})
+
+const guestShellClass = computed(() => {
+  if (isDocumentFullscreen.value) {
+    return 'relative flex min-h-0 w-full max-w-none flex-1 flex-col'
+  }
+  return 'relative w-full max-w-4xl'
+})
+
+const guestCardClass = computed(() => {
+  if (isDocumentFullscreen.value) {
+    return 'flex min-h-0 flex-1 flex-col overflow-hidden bg-white shadow-none'
+  }
+  return 'overflow-hidden rounded-2xl bg-white shadow-xl'
+})
+
+const guestContentAreaClass = computed(() => {
+  if (isDocumentFullscreen.value) {
+    return 'min-h-0 flex-1 overflow-y-auto p-6'
+  }
+  return 'p-6'
+})
+
+function onDocumentFullscreenChange() {
+  updateDocumentFullscreenFlag()
+}
+
 let ws: WebSocket | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let wsPingTimer: ReturnType<typeof setInterval> | null = null
@@ -401,9 +500,83 @@ let reloadCellsDebounce: ReturnType<typeof setTimeout> | null = null
 /** 仅第一次拉 cells 时全屏「加载中」，避免轮询/推送把正文整块换掉 */
 const isInitialCellFetch = ref(true)
 
+/** 与学生端一致：教师将导播台切为「全屏」时提示进入浏览器全屏 */
+const showFullscreenPrompt = ref(false)
+const lastKnownDisplayMode = ref<'fullscreen' | 'window' | null>(null)
+
 const GUEST_POLL_MS = 25000
 
+function normalizeGuestDisplayMode(raw: unknown): 'fullscreen' | 'window' {
+  return String(raw ?? '').toLowerCase() === 'fullscreen' ? 'fullscreen' : 'window'
+}
+
+async function exitGuestDocumentFullscreen() {
+  try {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      await document.exitFullscreen()
+    } else if ((document as any).webkitFullscreenElement && (document as any).webkitExitFullscreen) {
+      await (document as any).webkitExitFullscreen()
+    } else if ((document as any).mozFullScreenElement && (document as any).mozCancelFullScreen) {
+      await (document as any).mozCancelFullScreen()
+    } else if ((document as any).msFullscreenElement && (document as any).msExitFullscreen) {
+      await (document as any).msExitFullscreen()
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+async function toggleGuestDocumentFullscreen(mode: 'fullscreen' | 'window') {
+  try {
+    if (mode === 'fullscreen') {
+      const element = document.documentElement
+      if (element.requestFullscreen) {
+        await element.requestFullscreen()
+      } else if ((element as any).webkitRequestFullscreen) {
+        await (element as any).webkitRequestFullscreen()
+      } else if ((element as any).mozRequestFullScreen) {
+        await (element as any).mozRequestFullScreen()
+      } else if ((element as any).msRequestFullscreen) {
+        await (element as any).msRequestFullscreen()
+      }
+      showFullscreenPrompt.value = false
+    } else {
+      await exitGuestDocumentFullscreen()
+      showFullscreenPrompt.value = false
+    }
+  } catch (err: unknown) {
+    const e = err as { name?: string }
+    if (e?.name !== 'NotAllowedError') {
+      console.warn('观摩全屏切换:', err)
+    }
+    showFullscreenPrompt.value = false
+  } finally {
+    updateDocumentFullscreenFlag()
+  }
+}
+
+function applyServerDisplayMode(raw: unknown) {
+  if (!sessionInfo.value) return
+  const m = normalizeGuestDisplayMode(raw)
+  sessionInfo.value.displayMode = m
+  const prev = lastKnownDisplayMode.value
+  lastKnownDisplayMode.value = m
+  if (m === 'fullscreen' && prev !== 'fullscreen') {
+    showFullscreenPrompt.value = true
+  }
+  if (m === 'window' && prev === 'fullscreen') {
+    showFullscreenPrompt.value = false
+    void exitGuestDocumentFullscreen()
+  }
+}
+
 onMounted(() => {
+  document.addEventListener('fullscreenchange', onDocumentFullscreenChange)
+  document.addEventListener('webkitfullscreenchange', onDocumentFullscreenChange)
+  document.addEventListener('mozfullscreenchange', onDocumentFullscreenChange)
+  document.addEventListener('MSFullscreenChange', onDocumentFullscreenChange)
+  updateDocumentFullscreenFlag()
+
   const code = route.query.code as string
   if (code) {
     accessCode.value = code.toUpperCase()
@@ -412,10 +585,16 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', onDocumentFullscreenChange)
+  document.removeEventListener('webkitfullscreenchange', onDocumentFullscreenChange)
+  document.removeEventListener('mozfullscreenchange', onDocumentFullscreenChange)
+  document.removeEventListener('MSFullscreenChange', onDocumentFullscreenChange)
   cleanup()
 })
 
 function cleanup() {
+  void exitGuestDocumentFullscreen()
+  showFullscreenPrompt.value = false
   if (reloadCellsDebounce) {
     clearTimeout(reloadCellsDebounce)
     reloadCellsDebounce = null
@@ -442,7 +621,9 @@ async function lookupSession() {
   try {
     isInitialCellFetch.value = true
     const info = await classroomSessionService.guestLookupSession(accessCode.value)
+    lastKnownDisplayMode.value = null
     sessionInfo.value = info
+    applyServerDisplayMode(info.displayMode ?? 'window')
     await loadCells()
     connectWS()
     startPolling()
@@ -477,6 +658,9 @@ async function loadCells() {
     }
     if (data.current_cell_id !== undefined) {
       sessionInfo.value!.currentCellId = data.current_cell_id ?? undefined
+    }
+    if (data.display_mode !== undefined) {
+      applyServerDisplayMode(data.display_mode)
     }
   } catch {
     // silently fail, will retry via polling
@@ -561,8 +745,16 @@ function handleWsMessage(msg: any) {
       if (data.current_state.status !== undefined && sessionInfo.value) {
         sessionInfo.value.status = normalizeClassSessionStatus(data.current_state.status)
       }
+      if (data.current_state.display_mode !== undefined) {
+        applyServerDisplayMode(data.current_state.display_mode)
+      }
     }
     scheduleLoadCells()
+  } else if (type === 'display_mode_changed') {
+    const d = msg.data || {}
+    if (d.display_mode !== undefined) {
+      applyServerDisplayMode(d.display_mode)
+    }
   } else if (type === 'session_ended') {
     if (sessionInfo.value) {
       sessionInfo.value.status = 'ended'
@@ -585,7 +777,8 @@ function startPolling() {
   }, GUEST_POLL_MS)
 }
 
-function exitGuest() {
+async function exitGuest() {
+  lastKnownDisplayMode.value = null
   cleanup()
   sessionInfo.value = null
   cells.value = []
@@ -716,6 +909,15 @@ function guestIsSubjectiveItem(type: string | undefined) {
 </script>
 
 <style scoped>
+.guest-fade-enter-active,
+.guest-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.guest-fade-enter-from,
+.guest-fade-leave-to {
+  opacity: 0;
+}
+
 .guest-lesson-outline > summary .guest-outline-toggle::after {
   content: '展开目录';
 }

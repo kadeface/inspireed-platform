@@ -163,3 +163,6 @@ GIT_*.md
 /task_plan.md
 /findings.md
 /progress.md
+
+# tradingview-mcp — install dependencies inside that directory only
+tradingview-mcp/node_modules/

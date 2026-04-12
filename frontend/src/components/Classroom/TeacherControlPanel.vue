@@ -556,15 +556,24 @@ const {
   handleEndActivity,
 } = sessionManager
 
-/** 切换窗口/全屏展示（仅存于 session.settings，与导播台 UI 一致） */
+/** 切换窗口/全屏展示：写入会话 settings 并广播给学生端 / 观摩端 */
 async function handleToggleDisplayMode() {
-  if (!session.value) return
+  if (!session.value?.id) return
   const prev = (session.value.settings || {}) as Record<string, unknown>
   const cur = (prev.display_mode as string) || 'window'
   const next = cur === 'fullscreen' ? 'window' : 'fullscreen'
+  const nextMode = next as 'fullscreen' | 'window'
+  const snapshot = { ...session.value, settings: { ...prev } }
   session.value = {
     ...session.value,
     settings: { ...prev, display_mode: next },
+  }
+  try {
+    const updated = await classroomSessionService.updateDisplayMode(session.value.id, nextMode)
+    session.value = { ...session.value, ...updated, settings: updated.settings || session.value.settings }
+  } catch (e) {
+    console.error('同步展示模式失败:', e)
+    session.value = snapshot
   }
 }
 

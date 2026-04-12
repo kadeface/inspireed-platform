@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
 from pydantic import BaseModel, Field
 
 from app.models.classroom_session import ClassSessionStatus
@@ -25,6 +25,7 @@ __all__ = [
     "StudentPendingSessionResponse",
     "GuestAccessToggleRequest",
     "GuestSessionInfoResponse",
+    "DisplayModeUpdateRequest",
 ]
 
 
@@ -226,5 +227,11 @@ class GuestSessionInfoResponse(BaseModel):
     current_cell_id: Optional[int] = None
     display_cell_orders: List[int] = Field(default_factory=list)
     guest_count: int = 0
+    display_mode: str = "window"
+
+
+class DisplayModeUpdateRequest(BaseModel):
+    """教师切换学生/观摩端展示模式（窗口 / 全屏提示）"""
+    display_mode: Literal["fullscreen", "window"]
 
 

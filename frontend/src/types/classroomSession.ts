@@ -48,6 +48,8 @@ export interface GuestSessionInfo {
   currentCellId?: number
   displayCellOrders: number[]
   guestCount: number
+  /** 与教师导播台一致：fullscreen 时提示观摩端进入浏览器全屏 */
+  displayMode?: 'fullscreen' | 'window'
 }
 
 export interface ClassSessionCreate {

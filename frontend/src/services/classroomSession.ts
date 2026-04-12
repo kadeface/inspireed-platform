@@ -367,6 +367,38 @@ export const classroomSessionService = {
   },
 
   /**
+   * 更新展示模式（窗口/全屏），同步学生端与观摩端 WebSocket
+   */
+  async updateDisplayMode(
+    sessionId: number,
+    displayMode: 'fullscreen' | 'window',
+  ): Promise<ClassSession> {
+    const response = await api.post(`/classroom-sessions/sessions/${sessionId}/display-mode`, {
+      display_mode: displayMode,
+    })
+    const settings = (response as any).settings || {}
+    return {
+      ...(response as object),
+      id: (response as any).id,
+      lessonId: (response as any).lesson_id || (response as any).lessonId,
+      classroomId: (response as any).classroom_id || (response as any).classroomId,
+      teacherId: (response as any).teacher_id || (response as any).teacherId,
+      status: (response as any).status,
+      scheduledStart: (response as any).scheduled_start || (response as any).scheduledStart,
+      actualStart: (response as any).actual_start || (response as any).actualStart,
+      endedAt: (response as any).ended_at || (response as any).endedAt,
+      durationMinutes: (response as any).duration_minutes || (response as any).durationMinutes,
+      currentCellId: (response as any).current_cell_id ?? (response as any).currentCellId ?? null,
+      currentActivityId: (response as any).current_activity_id ?? (response as any).currentActivityId ?? null,
+      settings,
+      totalStudents: (response as any).total_students || (response as any).totalStudents || 0,
+      activeStudents: (response as any).active_students || (response as any).activeStudents || 0,
+      createdAt: (response as any).created_at || (response as any).createdAt,
+      updatedAt: (response as any).updated_at || (response as any).updatedAt,
+    } as ClassSession
+  },
+
+  /**
    * 开始活动
    */
   async startActivity(sessionId: number, data: StartActivityRequest): Promise<ClassSession> {
@@ -502,6 +534,7 @@ export const classroomSessionService = {
   async guestLookupSession(accessCode: string): Promise<GuestSessionInfo> {
     const response = await api.get(`/classroom-sessions/guest/join/${accessCode}`)
     const r = response as any
+    const dm = r.display_mode === 'fullscreen' ? 'fullscreen' : 'window'
     return {
       sessionId: r.session_id,
       lessonId: r.lesson_id,
@@ -512,6 +545,7 @@ export const classroomSessionService = {
       currentCellId: r.current_cell_id,
       displayCellOrders: r.display_cell_orders || [],
       guestCount: r.guest_count || 0,
+      displayMode: dm,
     }
   },
 

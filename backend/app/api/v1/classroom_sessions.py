@@ -43,6 +43,7 @@ from app.schemas.classroom_session import (
     StudentPendingSessionResponse,
     GuestAccessToggleRequest,
     GuestSessionInfoResponse,
+    DisplayModeUpdateRequest,
 )
 from app.services.session_state_machine import (
     SessionStateMachine,
@@ -272,6 +273,7 @@ async def send_initial_state(websocket: WebSocket, session: ClassSession, db: As
                 "display_cell_orders": (session.settings or {}).get("display_cell_orders", []),
                 "current_cell_id": session.current_cell_id,
                 "current_activity_id": session.current_activity_id,
+                "display_mode": (session.settings or {}).get("display_mode") or "window",
                 # 添加教师和课程信息
                 "teacher_name": session_teacher.full_name or session_teacher.username if session_teacher else None,
                 "lesson_title": session_lesson.title if session_lesson else None,
@@ -381,6 +383,7 @@ async def create_class_session(
         "allow_advance": False,  # 不允许学生提前查看
         "auto_save": True,  # 自动保存学生答案
         "show_leaderboard": False,  # 默认不显示排行榜
+        "display_mode": "window",  # 学生端 / 观摩端全屏提示同步
     }
     # 合并用户自定义设置
     session_settings = {**default_settings, **(data.settings or {})}
@@ -871,6 +874,52 @@ async def navigate_to_cell(
         )
 
 
+@router.post("/sessions/{session_id}/display-mode", response_model=ClassSessionResponse)
+async def update_session_display_mode(
+    session_id: int,
+    data: DisplayModeUpdateRequest,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """更新课堂展示模式（窗口/全屏），并广播给学生与访客 WebSocket。"""
+
+    result = await db.execute(
+        select(ClassSession).where(ClassSession.id == session_id).with_for_update()
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    session_teacher_id = cast(int, session.teacher_id)
+    current_user_id = cast(int, current_user.id)
+    if session_teacher_id != current_user_id:
+        raise HTTPException(status_code=403, detail="无权操作")
+
+    if session.status == ClassSessionStatus.ENDED:  # type: ignore[comparison-overlap]
+        raise HTTPException(status_code=400, detail="课堂已结束")
+
+    new_settings = dict(session.settings) if session.settings else {}
+    new_settings["display_mode"] = data.display_mode
+    setattr(session, "settings", new_settings)
+
+    await db.commit()
+    await db.refresh(session)
+
+    from app.services.websocket_manager import manager as ws_manager
+
+    await ws_manager.broadcast_to_session(
+        message={
+            "type": "display_mode_changed",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "session_id": session_id,
+                "display_mode": data.display_mode,
+            },
+        },
+        session_id=session_id,
+    )
+
+    return session
 
 
 # ========== 旧代码（已废弃，保留用于参考）==========
@@ -1468,6 +1517,8 @@ async def guest_lookup_session(
 
     display_cell_orders = (session.settings or {}).get("display_cell_orders", [])
 
+    display_mode = str((session.settings or {}).get("display_mode") or "window")
+
     return GuestSessionInfoResponse(
         session_id=cast(int, session.id),
         lesson_id=cast(int, session.lesson_id),
@@ -1481,6 +1532,7 @@ async def guest_lookup_session(
         current_cell_id=session.current_cell_id,
         display_cell_orders=display_cell_orders,
         guest_count=session.guest_count or 0,
+        display_mode=display_mode,
     )
 
 
@@ -1645,12 +1697,15 @@ async def guest_get_session_cells(
         else str(session.status)
     )
 
+    display_mode = str((session.settings or {}).get("display_mode") or "window")
+
     return {
         "cells": cells_data,
         "current_cell_id": session.current_cell_id,
         "display_cell_orders": display_orders,
         "status": status_val,
         "lesson_outline": lesson_outline,
+        "display_mode": display_mode,
     }
 
 
