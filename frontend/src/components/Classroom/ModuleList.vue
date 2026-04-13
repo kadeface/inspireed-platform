@@ -66,8 +66,6 @@
         @click="handleModuleItemClick"
         @checkbox-click="handleModuleCheckboxClick"
         @checkbox-change="handleModuleCheckboxChange"
-        @preview="handleModulePreview"
-        @edit="handleModuleEdit"
       />
     </div>
     <div v-else class="module-empty">
@@ -256,16 +254,6 @@ function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
 
 function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
   handleCheckboxChange(cell, index, event)
-}
-
-function handleModulePreview(cell: Cell, index: number) {
-  // TODO: Implement preview functionality
-  console.log('Preview module:', cell, index)
-}
-
-function handleModuleEdit(cell: Cell, index: number) {
-  // TODO: Implement edit functionality
-  console.log('Edit module:', cell, index)
 }
 </script>
 

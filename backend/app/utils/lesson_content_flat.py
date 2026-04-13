@@ -114,6 +114,33 @@ def flatten_lesson_content_cells(content: Optional[Any]) -> List[Dict[str, Any]]
     return sections_to_flat_cells(sections)
 
 
+def guest_flat_order_sequence(content: Optional[Any]) -> List[int]:
+    """
+    按教案扁平遍历顺序去重后的 order 列表，与导播台模块顺序一致，用于访客「全课」cells。
+    """
+    flat = flatten_lesson_content_cells(content)
+    json_by_order = build_json_cells_by_effective_order(content)
+    seen: set[int] = set()
+    orders: List[int] = []
+    for idx, c in enumerate(flat):
+        if not isinstance(c, dict):
+            continue
+        ord_raw = c.get("order")
+        if ord_raw is None:
+            order_val = idx
+        else:
+            try:
+                order_val = int(ord_raw)
+            except (TypeError, ValueError):
+                order_val = idx
+        if order_val not in seen:
+            seen.add(order_val)
+            orders.append(order_val)
+    if not orders and json_by_order:
+        return sorted(int(k) for k in json_by_order.keys())
+    return orders
+
+
 def build_json_cells_by_effective_order(content: Optional[Any]) -> Dict[int, Dict[str, Any]]:
     """
     教案 JSON 中每个 cell 的有效 order → 原始 dict（与导播台 cellOrder 一致）。

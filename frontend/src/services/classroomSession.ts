@@ -549,12 +549,18 @@ export const classroomSessionService = {
     }
   },
 
-  async guestGetCells(sessionId: number, accessCode: string): Promise<any> {
+  async guestGetCells(
+    sessionId: number,
+    accessCode: string,
+    options?: { guestView?: 'live' | 'all' },
+  ): Promise<any> {
+    const guest_view = options?.guestView === 'all' ? 'all' : 'live'
     const response = await api.get(
       `/classroom-sessions/guest/session/${sessionId}/cells`,
       {
         params: {
           access_code: accessCode,
+          guest_view,
           _t: Date.now(),
         },
       },

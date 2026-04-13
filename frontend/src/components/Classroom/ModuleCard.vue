@@ -4,8 +4,6 @@
     :class="cardClasses"
     :title="tooltip"
     @click="handleClick"
-    @mouseenter="handleMouseEnter"
-    @mouseleave="handleMouseLeave"
   >
     <!-- Checkbox for multi-select mode -->
     <div class="module-card-checkbox" @click.stop="handleCheckboxClick">
@@ -50,24 +48,6 @@
       <span class="status-text">{{ statusText }}</span>
     </div>
 
-    <!-- Hover action buttons -->
-    <div class="card-actions" v-show="showActions">
-      <button
-        class="action-btn action-btn-preview"
-        @click.stop="handlePreview"
-        :title="`预览 ${cell.title}`"
-      >
-        👁️
-      </button>
-      <button
-        class="action-btn action-btn-edit"
-        @click.stop="handleEdit"
-        :title="`编辑 ${cell.title}`"
-      >
-        ✏️
-      </button>
-    </div>
-
     <!-- Activity badge for active modules -->
     <div v-if="cell.type === 'ACTIVITY' && isActivityActive" class="activity-badge">
       🎯
@@ -76,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import type { Cell } from '../../types/cell'
 import CellTypeIcon from './CellTypeIcon.vue'
 import DifficultyBadge from './DifficultyBadge.vue'
@@ -104,11 +84,7 @@ const emit = defineEmits<{
   'click': [cell: Cell, index: number]
   'checkbox-click': [cell: Cell, index: number, event: Event]
   'checkbox-change': [cell: Cell, index: number, event: Event]
-  'preview': [cell: Cell, index: number]
-  'edit': [cell: Cell, index: number]
 }>()
-
-const showActions = ref(false)
 
 const cardClasses = computed(() => ({
   'module-card-active': props.isActive,
@@ -179,24 +155,6 @@ function handleCheckboxChange(event: Event) {
   if (!props.loading) {
     emit('checkbox-change', props.cell, props.index, event)
   }
-}
-
-function handleMouseEnter() {
-  if (!props.loading) {
-    showActions.value = true
-  }
-}
-
-function handleMouseLeave() {
-  showActions.value = false
-}
-
-function handlePreview() {
-  emit('preview', props.cell, props.index)
-}
-
-function handleEdit() {
-  emit('edit', props.cell, props.index)
 }
 </script>
 
@@ -574,55 +532,6 @@ input[type="checkbox"].checkbox-input {
   color: white;
 }
 
-.card-actions {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  display: flex;
-  gap: 4px;
-  z-index: 10;
-  opacity: 0;
-  transition: opacity 0.3s ease 0.1s;
-}
-
-.module-card:hover .card-actions {
-  opacity: 1;
-}
-
-.action-btn {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.action-btn-preview {
-  background: white;
-  border: 1px solid #D1D5DB;
-}
-
-.action-btn-preview:hover {
-  background: #F3F4F6;
-  transform: scale(1.1);
-}
-
-.action-btn-edit {
-  background: #3B82F6;
-  color: white;
-}
-
-.action-btn-edit:hover {
-  background: #2563EB;
-  transform: scale(1.1);
-}
-
 .activity-badge {
   position: absolute;
   top: 8px;
@@ -662,12 +571,6 @@ input[type="checkbox"].checkbox-input {
 
   .card-description {
     font-size: 10px;
-  }
-
-  .card-actions {
-    opacity: 1;
-    right: 6px;
-    bottom: 6px;
   }
 
   .module-card-number {

@@ -117,6 +117,14 @@
                 }}
               </span>
               <button
+                v-if="sessionInfo.status === 'teaching'"
+                type="button"
+                @click="toggleGuestLessonScope"
+                class="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25 transition-colors"
+              >
+                {{ guestViewAll ? '仅看播出' : '查看全课' }}
+              </button>
+              <button
                 type="button"
                 @click="
                   isDocumentFullscreen
@@ -138,12 +146,87 @@
           </div>
         </div>
 
-        <!-- 访客提示 -->
-        <div class="shrink-0 bg-yellow-50 border-b border-yellow-100 px-6 py-2 text-sm text-yellow-700 space-y-1">
-          <p>访客观摩模式 — 您正在只读观摩此课堂，无法提交活动或参与互动。</p>
-          <p class="text-yellow-800/90 text-xs leading-relaxed">
-            下方正文与学生端一致：仅展示教师在导播台当前勾选/投屏的模块；未勾选的模块不会显示内容（并非系统遗漏）。
-          </p>
+        <!-- 访客提示：默认一行 + 可展开说明，避免长文抢占阅读区 -->
+        <div
+          class="shrink-0 border-b border-slate-200/90 bg-slate-50/95 px-6 py-2"
+        >
+          <div class="flex items-start gap-2.5">
+            <span
+              class="mt-0.5 shrink-0 rounded-md bg-blue-100/90 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-blue-900"
+            >
+              只读
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm leading-snug text-slate-800">
+                <template v-if="sessionInfo.status === 'preparing'">
+                  课前预览：下方为全课正文。开始上课后默认只显示教师播出内容，可随时点顶部「查看全课」。无法提交活动或参与互动。
+                </template>
+                <template v-else-if="guestViewAll">
+                  正在查看全课正文；教师当前播出模块以浅蓝边框标示。无法提交活动或参与互动。
+                </template>
+                <template v-else>
+                  访客观摩：无法提交活动或参与互动。
+                </template>
+              </p>
+              <details
+                v-if="sessionInfo.status === 'teaching' && !guestViewAll"
+                class="group mt-1"
+              >
+                <summary
+                  class="inline-flex cursor-pointer list-none items-center gap-1 text-xs text-slate-500 hover:text-slate-700 [&::-webkit-details-marker]:hidden"
+                >
+                  <span
+                    class="inline-block text-slate-400 transition-transform duration-150 group-open:rotate-90"
+                    aria-hidden="true"
+                  >▸</span>
+                  为何有些模块没有内容？
+                </summary>
+                <p
+                  class="mt-1.5 border-l-2 border-slate-200 pl-2.5 text-xs leading-relaxed text-slate-600"
+                >
+                  与学生端一致，仅显示教师在导播台当前勾选或投屏的模块；教师未播出的模块不展示正文，并非遗漏。需要浏览全课时可点「查看全课」。
+                </p>
+              </details>
+              <details
+                v-else-if="sessionInfo.status === 'preparing'"
+                class="group mt-1"
+              >
+                <summary
+                  class="inline-flex cursor-pointer list-none items-center gap-1 text-xs text-slate-500 hover:text-slate-700 [&::-webkit-details-marker]:hidden"
+                >
+                  <span
+                    class="inline-block text-slate-400 transition-transform duration-150 group-open:rotate-90"
+                    aria-hidden="true"
+                  >▸</span>
+                  开始上课后会怎样？
+                </summary>
+                <p
+                  class="mt-1.5 border-l-2 border-slate-200 pl-2.5 text-xs leading-relaxed text-slate-600"
+                >
+                  上课后默认只显示教师播出模块；需要预习或回顾全课结构时，使用顶部「查看全课」即可。
+                </p>
+              </details>
+              <details
+                v-else-if="sessionInfo.status === 'teaching' && guestViewAll"
+                class="group mt-1"
+              >
+                <summary
+                  class="inline-flex cursor-pointer list-none items-center gap-1 text-xs text-slate-500 hover:text-slate-700 [&::-webkit-details-marker]:hidden"
+                >
+                  <span
+                    class="inline-block text-slate-400 transition-transform duration-150 group-open:rotate-90"
+                    aria-hidden="true"
+                  >▸</span>
+                  浅蓝边框是什么？
+                </summary>
+                <p
+                  class="mt-1.5 border-l-2 border-slate-200 pl-2.5 text-xs leading-relaxed text-slate-600"
+                >
+                  表示教师导播台当前勾选或投屏的模块，便于在「全课」视图中对齐教师节奏。
+                </p>
+              </details>
+            </div>
+          </div>
         </div>
 
         <!-- Cell 内容区域 -->
@@ -383,7 +466,10 @@
               >
                 <span>
                   全课 <strong class="text-slate-900">{{ lessonOutline.length }}</strong> 个模块（与导播台一致）
-                  <template v-if="undisplayedLessonModules.length > 0">
+                  <template v-if="guestShowFullLesson">
+                    · 正文区已展示全课内容
+                  </template>
+                  <template v-else-if="undisplayedLessonModules.length > 0">
                     · 另有 <strong class="text-slate-900">{{ undisplayedLessonModules.length }}</strong> 个未投屏
                   </template>
                   <template v-else> · 当前均已投屏</template>
@@ -391,7 +477,16 @@
                 <span class="guest-outline-toggle shrink-0 text-[11px] text-slate-400" aria-hidden="true" />
               </summary>
               <div class="border-t border-slate-200/80 px-4 pb-3 pt-2">
-                <p v-if="undisplayedLessonModules.length > 0" class="mb-2 text-[11px] leading-relaxed text-slate-500">
+                <p
+                  v-if="guestShowFullLesson"
+                  class="mb-2 text-[11px] leading-relaxed text-slate-500"
+                >
+                  上方卡片已含各模块正文；浅蓝边框标示教师当前播出模块。
+                </p>
+                <p
+                  v-else-if="undisplayedLessonModules.length > 0"
+                  class="mb-2 text-[11px] leading-relaxed text-slate-500"
+                >
                   下列为未投屏模块标题（无正文）；投屏内容见上方。
                 </p>
                 <p v-else class="text-[11px] text-slate-500">
@@ -416,7 +511,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import classroomSessionService, {
   normalizeClassSessionStatus,
@@ -439,11 +534,37 @@ const lessonOutline = ref<
   { id: number; order: number | null; title: string; cell_type: string }[]
 >([])
 
+/** 上课中：访客主动选择「查看全课」；准备中后端固定返回全课，视为全课视图 */
+const guestViewAll = ref(false)
+
+const guestShowFullLesson = computed(() => {
+  if (!sessionInfo.value) return false
+  return (
+    sessionInfo.value.status === 'preparing' ||
+    (sessionInfo.value.status === 'teaching' && guestViewAll.value)
+  )
+})
+
+function guestCellsRequestView(): 'live' | 'all' {
+  if (sessionInfo.value?.status === 'preparing') return 'all'
+  return guestViewAll.value ? 'all' : 'live'
+}
+
 const undisplayedLessonModules = computed(() => {
   if (!sessionInfo.value) return []
+  if (guestShowFullLesson.value) return []
   const shown = new Set(sessionInfo.value.displayCellOrders ?? [])
   return lessonOutline.value.filter((m) => m.order != null && !shown.has(m.order))
 })
+
+watch(
+  () => sessionInfo.value?.status,
+  (next, prev) => {
+    if (prev === 'preparing' && next === 'teaching') {
+      guestViewAll.value = false
+    }
+  },
+)
 
 /** 浏览器原生全屏（含 webkit/moz/ms 前缀）— 用于观摩页铺满视口 */
 const isDocumentFullscreen = ref(false)
@@ -620,6 +741,7 @@ async function lookupSession() {
 
   try {
     isInitialCellFetch.value = true
+    guestViewAll.value = false
     const info = await classroomSessionService.guestLookupSession(accessCode.value)
     lastKnownDisplayMode.value = null
     sessionInfo.value = info
@@ -645,6 +767,7 @@ async function loadCells() {
     const data = await classroomSessionService.guestGetCells(
       sessionInfo.value.sessionId,
       accessCode.value,
+      { guestView: guestCellsRequestView() },
     )
     cells.value = data.cells || []
     if (Array.isArray(data.lesson_outline)) {
@@ -670,6 +793,11 @@ async function loadCells() {
       cellsLoading.value = false
     }
   }
+}
+
+async function toggleGuestLessonScope() {
+  guestViewAll.value = !guestViewAll.value
+  await loadCells()
 }
 
 function scheduleLoadCells() {
