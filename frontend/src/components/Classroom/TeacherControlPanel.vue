@@ -903,6 +903,30 @@ const minimalCurrentIndexLabel = computed(() => {
   return `${idx + 1} / ${n}`
 })
 
+const isAutoSelectingFirstModule = ref(false)
+
+async function ensureDefaultModuleSelectedAfterClassStart() {
+  if (isAutoSelectingFirstModule.value || loading.value) return
+  if (!session.value || !lessonContentCells.value.length) return
+
+  const status = normalizedSessionStatus.value
+  if (status !== 'teaching' && status !== 'active') return
+  if (currentModuleIndex.value >= 0 || selectedCellIndex.value >= 0) return
+
+  const firstCell = lessonContentCells.value[0]
+  if (!firstCell) return
+
+  const firstCellId = getCellId(firstCell)
+  const firstCellOrder = firstCell.order !== undefined ? firstCell.order : 0
+
+  isAutoSelectingFirstModule.value = true
+  try {
+    await handleControlBoardNavigate(firstCellId, firstCellOrder, 'toggle', false)
+  } finally {
+    isAutoSelectingFirstModule.value = false
+  }
+}
+
 watch(normalizedSessionStatus, (st) => {
   if (st === 'ended') {
     minimalTeachingFocus.value = false
@@ -1088,6 +1112,14 @@ watch(
     if (session.value && (sessionManager.normalizedSessionStatus.value === 'preparing' || sessionManager.normalizedSessionStatus.value === 'teaching')) {
       polling.startPollingIfNeeded()
     }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => [session.value?.id, normalizedSessionStatus.value, lessonContentCells.value.length, currentModuleIndex.value] as const,
+  async () => {
+    await ensureDefaultModuleSelectedAfterClassStart()
   },
   { immediate: true }
 )
