@@ -76,7 +76,7 @@
 
 <script setup lang="ts">
 import { ref, computed, h } from 'vue'
-import type { Cell } from '../../types/cell'
+import { CellType, type Cell } from '../../types/cell'
 import ModuleCard from './ModuleCard.vue'
 
 // Cell类型图标组件
@@ -192,7 +192,8 @@ function isModuleActive(cell: Cell, index: number): boolean {
 }
 
 function isModuleActivityActive(cell: Cell, index: number): boolean {
-  if (cell.type !== 'activity') return false
+  const t = cell.type as string
+  if (t !== CellType.ACTIVITY && t.toLowerCase() !== 'activity') return false
   if (!props.sessionCurrentActivityId) return false
 
   const cellId = cell.id

@@ -8,12 +8,12 @@
     <div class="flex">
       <aside
         :class="[
-          'flex w-28 flex-shrink-0 flex-col items-center justify-center gap-2 border-r border-gray-200 px-3 py-6 text-white',
+          'flex w-16 sm:w-20 md:w-28 flex-shrink-0 flex-col items-center justify-center gap-1.5 md:gap-2 border-r border-gray-200 px-1.5 sm:px-2 md:px-3 py-3 sm:py-4 md:py-6 text-white',
           stageStyles.bg
         ]"
       >
-        <span :class="['text-xs tracking-[0.3em]', stageStyles.label]">环节</span>
-        <span class="text-3xl font-semibold leading-none">{{ cell.order + 1 }}</span>
+        <span :class="['text-[10px] sm:text-xs tracking-[0.2em] md:tracking-[0.3em]', stageStyles.label]">环节</span>
+        <span class="text-xl sm:text-2xl md:text-3xl font-semibold leading-none">{{ cell.order + 1 }}</span>
         <div class="w-full">
           <textarea
             v-if="editable"
@@ -21,12 +21,12 @@
             @blur="handleStageLabelSave"
             @keyup.enter.prevent="handleStageLabelSave"
             rows="2"
-            class="w-full resize-none rounded-md bg-white/15 px-2 py-1 text-center text-xs font-medium leading-snug text-white outline-none ring-0 placeholder:text-white/60 focus:bg-white/20 focus:text-white focus:ring-2 focus:ring-white/70"
+            class="w-full resize-none rounded-md bg-white/15 px-1.5 sm:px-2 py-1 text-center text-[10px] sm:text-xs font-medium leading-snug text-white outline-none ring-0 placeholder:text-white/60 focus:bg-white/20 focus:text-white focus:ring-2 focus:ring-white/70"
             placeholder="输入环节名称"
           />
           <p
             v-else
-            :class="['text-center text-xs font-medium leading-snug', stageStyles.label]"
+            :class="['text-center text-[10px] sm:text-xs font-medium leading-snug', stageStyles.label]"
           >
             {{ displayStageLabel }}
           </p>

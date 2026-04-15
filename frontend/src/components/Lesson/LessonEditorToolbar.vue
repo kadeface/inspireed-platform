@@ -1,12 +1,12 @@
 <template>
   <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
-    <div class="mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+    <div class="mx-auto px-3 sm:px-6 lg:px-8">
+      <div class="flex flex-col gap-2 py-2 md:h-16 md:flex-row md:items-center md:justify-between md:py-0">
         <!-- 左侧：返回按钮 + 标题 -->
-        <div class="flex items-center gap-4 flex-1">
+        <div class="flex w-full items-center gap-2 md:flex-1 md:gap-4">
           <button
             @click="$emit('back')"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl hover:bg-white hover:shadow-md transition-all"
+            class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-white/80 px-3 py-2 text-sm font-medium text-gray-700 backdrop-blur-sm transition-all hover:bg-white hover:shadow-md md:px-4"
             title="返回教案列表"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -25,12 +25,12 @@
             @input="$emit('update:lessonTitle', ($event.target as HTMLInputElement).value)"
             type="text"
             placeholder="教案标题"
-            class="text-lg font-semibold text-gray-900 border-none outline-none bg-transparent flex-1 max-w-md focus:ring-2 focus:ring-blue-500 rounded px-2"
+            class="min-w-0 flex-1 rounded border-none bg-transparent px-2 text-base font-semibold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 md:max-w-md md:text-lg"
           />
         </div>
 
         <!-- 右侧：操作按钮 -->
-        <div class="flex items-center gap-3">
+        <div class="no-scrollbar flex w-full items-center gap-2 overflow-x-auto pb-1 md:w-auto md:gap-3 md:overflow-visible md:pb-0">
           <!-- 上课模式：仅显示导播台只读信息（结束/窗口等操作仅在下方导播台内，避免重复） -->
           <template
             v-if="
@@ -41,7 +41,7 @@
                 classroomPanelData.session.status === 'TEACHING')
             "
           >
-            <div class="flex items-center gap-2.5 text-xs border-r border-gray-200 pr-3 mr-3">
+            <div class="hidden items-center gap-2.5 border-r border-gray-200 pr-3 text-xs md:mr-3 md:flex">
               <!-- 课程标题 -->
               <div class="text-gray-800 font-semibold max-w-xs truncate">
                 {{ currentLesson?.title }}
@@ -85,9 +85,9 @@
           </template>
 
           <!-- 第一组：核心操作 -->
-          <div class="flex items-center gap-2 border-r border-gray-200 pr-3">
+          <div class="flex shrink-0 items-center gap-2 border-r border-gray-200 pr-2 md:pr-3">
             <!-- 保存状态指示器 -->
-            <div class="flex items-center gap-2 text-sm">
+            <div class="hidden items-center gap-2 text-sm sm:flex">
               <span v-if="saveStatus === 'saving'" class="text-gray-500 flex items-center gap-1">
                 <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                   <circle
@@ -144,7 +144,7 @@
               @click="$emit('manual-save')"
               :disabled="saveStatus === 'saving'"
               :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md disabled:opacity-50',
+                'rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap disabled:opacity-50',
                 isPreviewMode
                   ? 'text-amber-700 bg-amber-50 border border-amber-300 hover:bg-amber-100'
                   : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50',
@@ -159,7 +159,7 @@
               v-if="currentLesson?.status === 'draft'"
               @click="$emit('publish')"
               :disabled="isSaving"
-              class="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+              class="whitespace-nowrap rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
             >
               发布
             </button>
@@ -167,7 +167,7 @@
             <!-- 教案状态提示 -->
             <div
               v-if="isRecentlyUnpublished"
-              class="flex items-center gap-2 px-3 py-1.5 text-sm text-amber-600 bg-amber-50 rounded-md"
+              class="hidden items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm text-amber-600 lg:flex"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -182,12 +182,12 @@
           </div>
 
           <!-- 第二组：辅助工具 -->
-          <div class="flex items-center gap-2 border-r border-gray-200 pr-3">
+          <div class="flex shrink-0 items-center gap-2 border-r border-gray-200 pr-2 md:pr-3">
             <!-- AI 助手 -->
             <button
               type="button"
               @click="$emit('show-ai-assistant')"
-              class="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-[#4C6EF5] to-[#6C8DFF] px-3 py-1.5 text-sm font-medium text-white shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#BFD0FF]"
+              class="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-[#4C6EF5] to-[#6C8DFF] px-3 py-1.5 text-sm font-medium text-white shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#BFD0FF] whitespace-nowrap"
             >
               <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path
@@ -199,13 +199,13 @@
           </div>
 
           <!-- 第三组：视图控制 -->
-          <div class="flex items-center gap-2 border-r border-gray-200 pr-3">
+          <div class="flex shrink-0 items-center gap-2 border-r border-gray-200 pr-2 md:pr-3">
             <!-- 紧凑模式切换 -->
             <button
               v-if="!isPreviewMode"
               @click="$emit('toggle-compact')"
               :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
                 compactMode
                   ? 'bg-purple-600 text-white hover:bg-purple-700'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
@@ -233,7 +233,7 @@
               @click="$emit('toggle-preview')"
               :disabled="!canEnterPreviewMode && !isPreviewMode"
               :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
                 isPreviewMode
                   ? 'bg-blue-600 text-white'
                   : canEnterPreviewMode
@@ -253,7 +253,7 @@
               type="button"
               @click="$emit('toggle-classroom-panel')"
               :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
                 showClassroomPanel
                   ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
@@ -267,7 +267,7 @@
             <button
               @click="$emit('fullscreen-preview')"
               :disabled="false"
-              class="px-3 py-1.5 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="flex items-center gap-2 rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white whitespace-nowrap hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
               :title="isPreviewMode ? '全屏预览（授课模式下可用）' : '全屏预览'"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,14 +289,14 @@
           </div>
 
           <!-- 第四组：导出操作 -->
-          <div class="flex items-center gap-2">
+          <div class="flex shrink-0 items-center gap-2">
             <!-- 导出教案按钮 -->
             <button
               v-if="currentLesson"
               type="button"
               @click="$emit('export-lesson')"
               :disabled="exporting"
-              class="inline-flex items-center gap-2 rounded-md bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white whitespace-nowrap shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               title="导出教案为ZIP文件"
             >
               <svg v-if="exporting" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -379,3 +379,14 @@ defineEmits<{
   'export-lesson': []
 }>()
 </script>
+
+<style scoped>
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+</style>

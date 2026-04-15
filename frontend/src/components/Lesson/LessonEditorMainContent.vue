@@ -3,6 +3,7 @@
     <!-- 左侧：Cell 工具箱 -->
     <CellToolbar
       v-if="!isPreviewMode && !isFullscreenPreview"
+      class="hidden shrink-0 lg:block"
       :collapsed="toolbarCollapsed"
       @add-cell="(cellType) => {
         console.log('LessonEditorMainContent: 收到 add-cell 事件', { cellType })
@@ -30,8 +31,14 @@
     </Teleport>
 
     <!-- 中间：编辑区 -->
-    <main v-if="!isFullscreenPreview" class="flex-1 overflow-y-auto bg-gray-50">
-      <div :class="[isPreviewMode ? 'w-full py-4 px-2' : 'w-full py-6 px-4 sm:px-6 lg:px-8']">
+    <main v-if="!isFullscreenPreview" class="flex-1 overflow-y-auto bg-gray-50 pb-24 lg:pb-0">
+      <div
+        :class="[
+          isPreviewMode
+            ? 'w-full px-2 py-3 sm:px-3 sm:py-4'
+            : 'w-full px-3 py-4 sm:px-6 sm:py-6 lg:px-8',
+        ]"
+      >
         <!-- 加载状态 -->
         <div v-if="isLoading" class="text-center py-12">
           <div
@@ -318,16 +325,75 @@
       </div>
     </main>
   </div>
+
+  <!-- 移动端新增单元入口 -->
+  <div
+    v-if="!isPreviewMode && !isFullscreenPreview"
+    class="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-2 lg:hidden pointer-events-none"
+  >
+    <div class="mx-auto max-w-md pointer-events-auto">
+      <div class="rounded-2xl border border-gray-200 bg-white/95 backdrop-blur shadow-lg p-2">
+        <button
+          type="button"
+          @click="showMobileAddMenu = true"
+          class="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+        >
+          <span class="text-base leading-none">＋</span>
+          添加单元
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <Teleport to="body">
+    <div
+      v-if="showMobileAddMenu && !isPreviewMode && !isFullscreenPreview"
+      class="fixed inset-0 z-50 flex items-end bg-black/40 lg:hidden"
+      @click="showMobileAddMenu = false"
+    >
+      <div
+        class="w-full rounded-t-2xl bg-white p-4 shadow-2xl"
+        @click.stop
+      >
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="text-base font-semibold text-gray-900">添加单元</h3>
+          <button
+            type="button"
+            class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+            @click="showMobileAddMenu = false"
+            title="关闭"
+          >
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <button
+            v-for="cellType in mobileCellTypes"
+            :key="cellType.type"
+            type="button"
+            class="flex flex-col items-center justify-center gap-1 rounded-xl border border-gray-200 bg-gray-50 px-2 py-3 text-gray-700 transition-colors hover:border-blue-200 hover:bg-blue-50"
+            @click="handleMobileAddCell(cellType.type)"
+          >
+            <span class="text-lg leading-none">{{ cellType.icon }}</span>
+            <span class="text-xs font-medium">{{ cellType.name }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { nextTick } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import type { Lesson } from '@/types/lesson'
 import type { SectionInContent } from '@/types/section'
 import CellToolbar from '@/components/Lesson/CellToolbar.vue'
 import SectionContainer from '@/components/Lesson/SectionContainer.vue'
 import TeacherClassroomControlPanel from '@/components/Classroom/TeacherControlPanel.vue'
 import ReferenceResourcePanel from '@/components/Resource/ReferenceResourcePanel.vue'
+import { CellType } from '@/types/cell'
 
 interface Props {
   isLoading: boolean
@@ -374,6 +440,24 @@ const emit = defineEmits<{
   'cell-move-up': [cellId: string]
   'cell-move-down': [cellId: string]
 }>()
+
+const showMobileAddMenu = ref(false)
+const mobileCellTypes = computed(
+  () =>
+    [
+      { type: CellType.TEXT, name: '文本', icon: '📝' },
+      { type: CellType.VIDEO, name: '视频', icon: '🎥' },
+      { type: CellType.INTERACTIVE, name: '交互', icon: '🎮' },
+      { type: CellType.CODE, name: '代码', icon: '💻' },
+      { type: CellType.ACTIVITY, name: '活动', icon: '✅' },
+      { type: CellType.FLOWCHART, name: '流程图', icon: '📊' },
+    ] as const
+)
+
+function handleMobileAddCell(cellType: CellType) {
+  emit('add-cell-to-end', cellType)
+  showMobileAddMenu.value = false
+}
 
 // 授课模式下点击大环节标签：更新选中状态并滚动到对应区域
 function handlePreviewModeSectionClick(index: number) {

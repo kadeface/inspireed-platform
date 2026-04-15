@@ -5,9 +5,14 @@
  */
 
 import { ref, type Ref, computed, nextTick } from 'vue'
-import type { Cell } from '@/types/cell'
+import { CellType, type Cell } from '@/types/cell'
 import classroomSessionService from '@/services/classroomSession'
 import { getCellId as getCellIdUtil, toNumericId, isUUID } from '@/utils/cellId'
+
+function isActivityCell(cell: Cell): boolean {
+  const t = cell.type as string
+  return t === CellType.ACTIVITY || t.toLowerCase() === 'activity'
+}
 
 export interface UseNavigationOptions {
   /**
@@ -181,8 +186,13 @@ export function useNavigation(options: UseNavigationOptions) {
       } else if (cellOrder !== null) {
         // 根据 action 更新 displayOrders
         if (action === 'add') {
-          if (!displayOrders.includes(cellOrder)) {
-            displayOrders.push(cellOrder)
+          if (multiSelect) {
+            if (!displayOrders.includes(cellOrder)) {
+              displayOrders.push(cellOrder)
+            }
+          } else {
+            // 单选模式：活动模块等走 add 时也应只播当前格，避免与 displayOrders 叠加多条
+            displayOrders = [cellOrder]
           }
         } else if (action === 'remove') {
           displayOrders = displayOrders.filter(o => o !== cellOrder)
@@ -229,7 +239,7 @@ export function useNavigation(options: UseNavigationOptions) {
           return cellOrderValue === cellOrder
         })
 
-        if (clickedCell && clickedCell.type === 'activity') {
+        if (clickedCell && isActivityCell(clickedCell)) {
           const createdCellId = await ensureActivityCellExists(clickedCell, cellOrder)
           // 重新加载 dbCells 以获取最新数据
           await loadDbCells()
@@ -317,17 +327,9 @@ export function useNavigation(options: UseNavigationOptions) {
     const cellId = getCellId(cell)
     const cellOrder = cell.order !== undefined ? cell.order : index
 
-    // 根据模式选择 action
-    let actionItem: 'toggle' | 'add' | 'remove' = 'toggle'
-    if (isMultiSelectMode.value) {
-      // 多选模式：对于活动模块，使用 'add'；其他模块使用 'toggle'
-      actionItem = cell.type === 'activity' ? 'add' : 'toggle'
-    } else {
-      // 单选模式：对于活动模块，使用 'add'；其他模块使用 'toggle'
-      actionItem = cell.type === 'activity' ? 'add' : 'toggle'
-    }
+    // 活动用 add：多选时叠加且不重复；单选时在 navigate 内归一为仅 [cellOrder]（再次点击同一活动仍为单格，不触发 toggle 取消）
+    const actionItem: 'toggle' | 'add' | 'remove' = isActivityCell(cell) ? 'add' : 'toggle'
 
-    // 使用 handleControlBoardNavigate 处理导航
     handleControlBoardNavigate(cellId, cellOrder, actionItem, isMultiSelectMode.value)
   }
 
@@ -382,10 +384,11 @@ export function useNavigation(options: UseNavigationOptions) {
       // 单选模式：单选框逻辑
       if (isCurrentlyActive) {
         // 如果点击已选中的单选框，取消选中（隐藏所有内容）
-        event.preventDefault()
         const target = event.target as HTMLElement
-        const radioInput = target.closest('.module-item-checkbox')?.querySelector('input[type="radio"]') as HTMLInputElement
+        const checkboxWrapper = target.closest('.module-item-checkbox, .module-card-checkbox')
+        const radioInput = checkboxWrapper?.querySelector('input[type="radio"]') as HTMLInputElement | undefined
         if (radioInput) {
+          event.preventDefault()
           radioInput.checked = false
           // 隐藏所有内容
           handleControlBoardNavigate(null, null, 'toggle', false)

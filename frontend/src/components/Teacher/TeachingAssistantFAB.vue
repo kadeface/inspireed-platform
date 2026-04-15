@@ -271,6 +271,31 @@ const handleClassAssistant = () => {
   gap: 12px;
 }
 
+@media (max-width: 768px) {
+  .teaching-assistant-fab-container {
+    right: auto;
+    left: 12px;
+    /* 避开底部导航条与极简翻页控件 */
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+    z-index: 960;
+  }
+
+  .fab-button {
+    width: 52px;
+    height: 52px;
+  }
+
+  .fab-menu {
+    min-width: min(320px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    max-height: 60vh;
+  }
+
+  .fab-menu-content {
+    max-height: calc(60vh - 60px);
+  }
+}
+
 .fab-button {
   width: 56px;
   height: 56px;

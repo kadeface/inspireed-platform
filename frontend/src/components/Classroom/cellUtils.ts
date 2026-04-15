@@ -4,7 +4,7 @@
  * 用于处理Cell相关的操作和显示逻辑
  */
 
-import type { Cell } from '@/types/cell'
+import { CellType, type Cell } from '@/types/cell'
 import { getCellId as getCellIdUtil } from '@/utils/cellId'
 
 /**
@@ -97,7 +97,8 @@ export function isModuleActive(
  * @returns 是否激活
  */
 export function isModuleActivityActive(cell: Cell, index: number, session: any): boolean {
-  if (cell.type !== 'activity') return false
+  const t = cell.type as string
+  if (t !== CellType.ACTIVITY && t.toLowerCase() !== 'activity') return false
   if (!session?.current_activity_id) return false
 
   const cellId = getCellIdUtil(cell)
