@@ -1402,13 +1402,15 @@ const startImport = async () => {
     formData.append('file', importFile.value)
 
     // 构建URL（strategy_type 作为查询参数）
-    const url = new URL(`${apiBaseUrl}/import`)
-    url.searchParams.append('strategy_type', 'student_account')
-    url.searchParams.append('update_existing', 'false')
+    // 手动构建查询字符串，避免 new URL() 在相对路径时出错
+    const queryParams = new URLSearchParams()
+    queryParams.append('strategy_type', 'student_account')
+    queryParams.append('update_existing', 'false')
+    const url = `${apiBaseUrl}/import?${queryParams.toString()}`
 
-    console.log('📤 [学生导入] 请求URL:', url.toString())
+    console.log('📤 [学生导入] 请求URL:', url)
 
-    const response = await fetch(url.toString(), {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`
