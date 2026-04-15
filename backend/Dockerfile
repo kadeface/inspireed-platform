@@ -26,9 +26,9 @@ RUN apt-get update --fix-missing && \
 # 复制依赖文件
 COPY requirements.txt .
 
-# pip 源：默认官方 PyPI；国内可加速：--build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+# pip 源：默认清华大学镜像（国内加速）；需官方源可：--build-arg PIP_INDEX_URL=https://pypi.org/simple
 # 慢速网络可加大超时：--build-arg PIP_TIMEOUT=600
-ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
 ARG PIP_TIMEOUT=300
 RUN pip install --no-cache-dir --index-url "$PIP_INDEX_URL" --timeout "$PIP_TIMEOUT" --retries 5 -r requirements.txt
 
