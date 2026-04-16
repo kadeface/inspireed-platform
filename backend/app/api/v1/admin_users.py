@@ -1489,8 +1489,9 @@ async def reset_user_password(
 
     return {
         "message": "密码重置成功",
+        "new_password": new_password,
         "password_length": len(new_password),
-        "note": "新密码已生成，请通过安全渠道告知用户。密码不会在响应中返回。",
+        "note": "新密码已生成，请通过安全渠道告知用户。",
     }
 
 

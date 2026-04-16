@@ -438,13 +438,21 @@ const resetPassword = async (researcher: User) => {
       { type: 'warning' }
     )
     const result = await adminService.resetUserPassword(researcher.id)
-    ElMessageBox.alert(`新密码：${result.new_password}`, '密码重置成功', {
-      type: 'success',
-      confirmButtonText: '复制',
-      callback: () => {
-        navigator.clipboard.writeText(result.new_password)
-      }
-    })
+    if (result.new_password) {
+      ElMessageBox.alert(`新密码：${result.new_password}`, '密码重置成功', {
+        type: 'success',
+        confirmButtonText: '复制',
+        callback: () => {
+          navigator.clipboard.writeText(result.new_password!)
+        }
+      })
+    } else {
+      ElMessageBox.alert(
+        result.note || '新密码已生成，请通过安全渠道告知用户（接口不返回明文密码）。',
+        '密码重置成功',
+        { type: 'success', confirmButtonText: '知道了' }
+      )
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('重置密码失败')

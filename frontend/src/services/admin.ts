@@ -633,7 +633,9 @@ export const adminService = {
   /**
    * 重置用户密码
    */
-  async resetUserPassword(userId: number): Promise<{ message: string; new_password: string }> {
+  async resetUserPassword(
+    userId: number
+  ): Promise<{ message: string; new_password?: string; note?: string; password_length?: number }> {
     return await api.post(`/admin/users/${userId}/reset-password`)
   },
 

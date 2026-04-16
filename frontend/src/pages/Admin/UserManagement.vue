@@ -758,7 +758,11 @@ async function resetPassword(user: User) {
   
   try {
     const result = await adminService.resetUserPassword(user.id)
-    toast.success(`${result.message}，新密码：${result.new_password}`)
+    if (result.new_password) {
+      toast.success(`${result.message}，新密码：${result.new_password}`)
+    } else {
+      toast.success(result.note || result.message)
+    }
   } catch (error: any) {
     console.error('Failed to reset password:', error)
     toast.error(error.response?.data?.detail || '重置密码失败')

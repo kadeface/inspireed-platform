@@ -60,6 +60,9 @@ class StudentAccountImportStrategy(BaseImportStrategy):
         "联系电话": "phone",
         # Gender (optional)
         "性别": "gender",
+        # Password (optional, fallback to default)
+        "密码": "password",
+        "初始密码": "password",
     }
 
     # School admin column mapping (no school columns)
@@ -95,6 +98,9 @@ class StudentAccountImportStrategy(BaseImportStrategy):
         "联系电话": "phone",
         # Gender
         "性别": "gender",
+        # Password (optional, fallback to default)
+        "密码": "password",
+        "初始密码": "password",
     }
 
     DISTRICT_REQUIRED_COLUMNS = [
@@ -234,6 +240,7 @@ class StudentAccountImportStrategy(BaseImportStrategy):
                 "email": record.get("email"),
                 "phone": record.get("phone"),
                 "gender": record.get("gender"),
+                "password": record.get("password"),
                 "row_number": record.get("row_number"),
             },
         )
@@ -345,6 +352,10 @@ class StudentAccountImportStrategy(BaseImportStrategy):
             email = validated_data.get("email")
             if not email:
                 email = f"{username}@inspireed.com"
+            raw_password = validated_data.get("password")
+            initial_password = (
+                str(raw_password).strip() if raw_password is not None and str(raw_password).strip() else self.DEFAULT_PASSWORD
+            )
 
             # Create student user
             from app.core.security import get_password_hash
@@ -353,7 +364,7 @@ class StudentAccountImportStrategy(BaseImportStrategy):
                 username=username,
                 full_name=full_name,
                 email=email,
-                hashed_password=get_password_hash(self.DEFAULT_PASSWORD),
+                hashed_password=get_password_hash(initial_password),
                 role=UserRole.STUDENT,
                 school_id=school_id,
                 grade_id=int(grade.id),
@@ -371,7 +382,7 @@ class StudentAccountImportStrategy(BaseImportStrategy):
                 "id": int(new_student.id),
                 "type": "student_account",
                 "username": username,
-                "password": self.DEFAULT_PASSWORD,  # Return default password for notification
+                "password": initial_password,
             }
 
     async def find_grade_by_level(self, db: AsyncSession, grade_level: int):

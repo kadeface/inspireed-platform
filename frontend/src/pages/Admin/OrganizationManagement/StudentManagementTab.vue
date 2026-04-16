@@ -394,7 +394,7 @@
           :closable="false"
           show-icon
         >
-          <p>请按照模板格式填写学生信息。支持导入的字段：学号、姓名、学籍号、邮箱、学校名称、学校代码、年级级别、班级编号。</p>
+          <p>请按照模板格式填写学生信息。支持导入的字段：学号、姓名、学籍号、邮箱、学校名称、学校代码、年级级别、班级编号、密码。</p>
           <p class="mt-2 text-sm text-gray-600">
             <strong>注意：</strong>
             <br>- 学校名称*：学生所属学校（必填）
@@ -402,6 +402,7 @@
             <br>- 年级级别使用数字（1-12），如：7表示七年级，10表示高一
             <br>- 班级编号格式：年级+班级序号，如：701表示七年级1班，1001表示高一1班
             <br>- 学生必须指定学籍号，作为唯一标识
+            <br>- 密码列可选：留空时系统默认初始密码为 123456
           </p>
         </el-alert>
 
@@ -1095,13 +1096,21 @@ const resetPassword = async (student: User) => {
       { type: 'warning' }
     )
     const result = await adminService.resetUserPassword(student.id)
-    ElMessageBox.alert(`新密码：${result.new_password}`, '密码重置成功', {
-      type: 'success',
-      confirmButtonText: '复制',
-      callback: () => {
-        navigator.clipboard.writeText(result.new_password)
-      }
-    })
+    if (result.new_password) {
+      ElMessageBox.alert(`新密码：${result.new_password}`, '密码重置成功', {
+        type: 'success',
+        confirmButtonText: '复制',
+        callback: () => {
+          navigator.clipboard.writeText(result.new_password!)
+        }
+      })
+    } else {
+      ElMessageBox.alert(
+        result.note || '新密码已生成，请通过安全渠道告知用户（接口不返回明文密码）。',
+        '密码重置成功',
+        { type: 'success', confirmButtonText: '知道了' }
+      )
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('重置密码失败')
@@ -1300,17 +1309,17 @@ const openImportDialog = () => {
 
 const downloadTemplate = () => {
   const template = [
-    ['学号*', '姓名*', '学籍号*', '邮箱', '学校名称*', '学校代码', '年级级别*', '班级编号*'],
-    ['2024100001', '张三', '123456789012345678', 'zhang@example.com', '示例学校', '10001', 7, '701'],
-    ['2024100002', '李四', '987654321098765432', 'li@example.com', '示例学校', '10001', 7, '702'],
-    ['2024100003', '王五', '111111111111111111', 'wang@example.com', '示例学校', '10001', 10, '1001']
+    ['学号*', '姓名*', '学籍号*', '邮箱', '学校名称*', '学校代码', '年级级别*', '班级编号*', '密码'],
+    ['2024100001', '张三', '123456789012345678', 'zhang@example.com', '示例学校', '10001', 7, '701', '123456'],
+    ['2024100002', '李四', '987654321098765432', 'li@example.com', '示例学校', '10001', 7, '702', ''],
+    ['2024100003', '王五', '111111111111111111', 'wang@example.com', '示例学校', '10001', 10, '1001', 'abc123456']
   ]
 
   const ws = XLSX.utils.aoa_to_sheet(template)
   // 设置列宽
   const colWidths = [
     { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
-    { wch: 12 }, { wch: 12 }, { wch: 12 }
+    { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }
   ]
   ws['!cols'] = colWidths
 
