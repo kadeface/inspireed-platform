@@ -41,7 +41,7 @@
 
         <select
           v-model="filters.grade_id"
-          @change="() => loadStudents()"
+          @change="applyFilters"
           class="px-3 py-2 border rounded-lg"
         >
           <option :value="undefined">所有年级</option>
@@ -52,7 +52,7 @@
 
         <select
           v-model="filters.classroom_id"
-          @change="() => loadStudents()"
+          @change="applyFilters"
           class="px-3 py-2 border rounded-lg"
         >
           <option :value="undefined">所有班级</option>
@@ -823,7 +823,11 @@ const toast = useToast()
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 const debouncedLoadStudents = () => {
   if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => loadStudents(), 500)
+  debounceTimer = setTimeout(() => applyFilters(), 500)
+}
+
+const applyFilters = () => {
+  loadStudents(1)
 }
 
 // 加载数据
@@ -836,20 +840,13 @@ const loadStudents = async (page?: number) => {
       size: pageSize.value,
       role: 'student',
       search: filters.value.search,
+      region_id: filters.value.region_id,
+      school_id: filters.value.school_id,
+      grade_id: filters.value.grade_id,
+      classroom_id: filters.value.classroom_id,
     })
-    // 在前端过滤（因为后端可能不支持所有筛选条件）
-    let filteredUsers = response.users
-    if (filters.value.school_id) {
-      filteredUsers = filteredUsers.filter(u => u.school_id === filters.value.school_id)
-    }
-    if (filters.value.grade_id) {
-      filteredUsers = filteredUsers.filter(u => u.grade_id === filters.value.grade_id)
-    }
-    if (filters.value.classroom_id) {
-      filteredUsers = filteredUsers.filter(u => u.classroom_id === filters.value.classroom_id)
-    }
-    students.value = filteredUsers
-    total.value = filteredUsers.length
+    students.value = response.users
+    total.value = response.total
   } catch (error: unknown) {
     const d = (error as { response?: { data?: { detail?: unknown } } })?.response?.data
       ?.detail
@@ -902,13 +899,13 @@ const handleRegionChange = () => {
   filters.value.school_id = undefined
   filters.value.grade_id = undefined
   filters.value.classroom_id = undefined
-  loadStudents()
+  applyFilters()
 }
 
 const handleSchoolChange = () => {
   filters.value.grade_id = undefined
   filters.value.classroom_id = undefined
-  loadStudents()
+  applyFilters()
 }
 
 const handleFormSchoolChange = () => {

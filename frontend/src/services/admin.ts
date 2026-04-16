@@ -530,6 +530,10 @@ export const adminService = {
       size?: number
       role?: string
       search?: string
+      region_id?: number
+      school_id?: number
+      grade_id?: number
+      classroom_id?: number
     } = {}
   ): Promise<UserListResponse> {
     // 集合根路径须带尾部 /，否则 FastAPI 可能 307 到 /admin/users/，重定向后浏览器不携带 Authorization → 401 Not authenticated

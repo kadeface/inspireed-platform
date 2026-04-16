@@ -333,6 +333,10 @@ async def get_users(
     size: int = Query(10, ge=1, le=1000, description="每页数量"),
     role: Optional[UserRole] = Query(None, description="角色筛选"),
     search: Optional[str] = Query(None, description="搜索关键词"),
+    region_id: Optional[int] = Query(None, description="区域筛选"),
+    school_id: Optional[int] = Query(None, description="学校筛选"),
+    grade_id: Optional[int] = Query(None, description="年级筛选"),
+    classroom_id: Optional[int] = Query(None, description="班级筛选"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_or_staff),
 ) -> Any:
@@ -351,6 +355,16 @@ async def get_users(
             User.username.ilike(f"%{search}%"), User.email.ilike(f"%{search}%")
         )
         query = query.where(search_filter)
+
+    # 组织范围筛选
+    if region_id is not None:
+        query = query.where(User.region_id == region_id)
+    if school_id is not None:
+        query = query.where(User.school_id == school_id)
+    if grade_id is not None:
+        query = query.where(User.grade_id == grade_id)
+    if classroom_id is not None:
+        query = query.where(User.classroom_id == classroom_id)
 
     query = _scope_users_query_for_org_staff(query, current_user)
     if query is None:

@@ -55,7 +55,7 @@
     </nav>
 
     <!-- 主要内容区域 -->
-    <main class="flex-1 flex overflow-hidden">
+    <main class="flex-1 flex overflow-hidden min-w-0">
       <!-- 左侧：5E阶段导航 -->
       <aside class="w-64 bg-white border-r border-gray-200 overflow-y-auto">
         <ProjectStageNavigator
@@ -66,8 +66,8 @@
       </aside>
 
       <!-- 中间：Cell编辑区 -->
-      <div class="flex-1 overflow-y-auto">
-        <div class="max-w-4xl mx-auto px-6 py-8">
+      <div class="flex-1 min-w-0 overflow-y-auto">
+        <div class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <!-- 项目描述 -->
           <div class="mb-6">
             <textarea

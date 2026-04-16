@@ -231,10 +231,7 @@
           ref="interactiveIframeRef"
           :src="displayUrl"
           class="interactive-iframe"
-          :style="{
-            width: displayConfig?.width || '100%',
-            height: displayConfig?.height || '800px'
-          }"
+          :style="iframeStyle"
           frameborder="0"
           allowfullscreen
           :sandbox="displayConfig?.sandbox?.join(' ') || 'allow-scripts allow-forms allow-popups'"
@@ -479,6 +476,17 @@ const displayContent = computed(() => {
 
 const displayConfig = computed(() => {
   return props.editable ? localConfig.value : (props.cell.config || {} as InteractiveCell['config'])
+})
+
+const iframeStyle = computed(() => {
+  const configuredWidth = displayConfig.value?.width?.trim()
+  const configuredHeight = displayConfig.value?.height?.trim() || '800px'
+
+  return {
+    width: '100%',
+    maxWidth: configuredWidth && configuredWidth !== '100%' ? configuredWidth : '100%',
+    height: configuredHeight,
+  }
 })
 
 // URL 验证
@@ -1038,11 +1046,11 @@ onBeforeUnmount(() => {
 }
 
 .iframe-container {
-  @apply w-full rounded-lg overflow-hidden border border-gray-200;
+  @apply w-full rounded-lg overflow-x-auto overflow-y-hidden border border-gray-200;
 }
 
 .interactive-iframe {
-  @apply w-full border-0;
+  @apply block w-full max-w-full border-0;
 }
 
 .empty-state {

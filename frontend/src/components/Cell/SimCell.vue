@@ -392,11 +392,10 @@
       <div class="sim-preview">
         <iframe
           :src="editorSimulationUrl"
-          :width="localConfig.width || 800"
-          :height="localConfig.height || 600"
+          :style="getIframeStyle(localConfig.width || 800, localConfig.height || 600)"
           frameborder="0"
           allowfullscreen
-          class="rounded-lg shadow-lg"
+          class="sim-iframe rounded-lg shadow-lg"
         ></iframe>
       </div>
     </div>
@@ -432,11 +431,10 @@
       <div v-if="cell.content.type === 'phet' && simulationUrl" class="sim-display">
         <iframe
           :src="simulationUrl"
-          :width="cell.content.config.width || 800"
-          :height="cell.content.config.height || 600"
+          :style="getIframeStyle(cell.content.config.width || 800, cell.content.config.height || 600)"
           frameborder="0"
           allowfullscreen
-          class="rounded-lg shadow-lg w-full"
+          class="sim-iframe rounded-lg shadow-lg"
         ></iframe>
       </div>
 
@@ -444,11 +442,10 @@
       <div v-else-if="cell.content.type === 'hardware' && hardwareSimulationUrl" class="sim-display">
         <iframe
           :src="hardwareSimulationUrl"
-          :width="cell.content.config.width || 1000"
-          :height="cell.content.config.height || 700"
+          :style="getIframeStyle(cell.content.config.width || 1000, cell.content.config.height || 700)"
           frameborder="0"
           allowfullscreen
-          class="rounded-lg shadow-lg w-full"
+          class="sim-iframe rounded-lg shadow-lg"
         ></iframe>
       </div>
 
@@ -456,11 +453,10 @@
       <div v-else-if="cell.content.url" class="sim-display">
         <iframe
           :src="cell.content.url"
-          :width="cell.content.config.width || 800"
-          :height="cell.content.config.height || 600"
+          :style="getIframeStyle(cell.content.config.width || 800, cell.content.config.height || 600)"
           frameborder="0"
           allowfullscreen
-          class="rounded-lg shadow-lg w-full"
+          class="sim-iframe rounded-lg shadow-lg"
         ></iframe>
       </div>
 
@@ -647,6 +643,14 @@ const editorSimulationUrl = computed(() => {
   // Otherwise use the PhET simulation URL
   return simulationUrl.value
 })
+
+function getIframeStyle(width: number, height: number) {
+  return {
+    width: '100%',
+    maxWidth: `${width}px`,
+    height: `${height}px`,
+  }
+}
 
 function selectSimulation(sim: PhETSimulation) {
   const updatedCell: SimCellType = {
@@ -847,11 +851,15 @@ function useCustomUrl() {
 }
 
 .sim-preview {
-  @apply flex justify-center;
+  @apply flex justify-center overflow-x-auto;
 }
 
 .sim-display {
-  @apply flex justify-center;
+  @apply flex justify-center overflow-x-auto;
+}
+
+.sim-iframe {
+  @apply block w-full max-w-full;
 }
 
 .sim-placeholder {
