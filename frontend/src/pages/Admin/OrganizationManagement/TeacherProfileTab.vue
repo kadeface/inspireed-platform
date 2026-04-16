@@ -513,13 +513,10 @@ const loadTeachers = async (page?: number) => {
       size: pageSize.value,
       role: 'teacher',
       search: filters.value.search,
-      // 需要后端支持按学校筛选，暂时在前端过滤
+      school_id: filters.value.school_id  // 使用后端筛选而不是前端过滤
     })
-    teachers.value = response.users.filter(u => {
-      if (filters.value.school_id) return u.school_id === filters.value.school_id
-      return true
-    })
-    total.value = teachers.value.length
+    teachers.value = response.users
+    total.value = response.total  // 使用后端返回的总数
   } catch (error: unknown) {
     const d = (error as { response?: { data?: { detail?: unknown } } })?.response?.data
       ?.detail
@@ -597,8 +594,8 @@ const saveTeacher = async () => {
       await adminService.updateUser(editingTeacher.value.id, {
         username: teacherForm.value.username,
         email: teacherForm.value.email,
-        full_name: teacherForm.value.full_name,
-        school_id: teacherForm.value.school_id,
+        full_name: teacherForm.value.full_name || null,
+        school_id: teacherForm.value.school_id || null,
         is_active: teacherForm.value.is_active
       })
       ElMessage.success('更新成功')
@@ -606,10 +603,10 @@ const saveTeacher = async () => {
       await adminService.createUser({
         username: teacherForm.value.username,
         email: teacherForm.value.email,
-        full_name: teacherForm.value.full_name,
+        full_name: teacherForm.value.full_name || null,
         password: teacherForm.value.password,
         role: 'teacher',
-        school_id: teacherForm.value.school_id,
+        school_id: teacherForm.value.school_id || null,
         is_active: teacherForm.value.is_active
       })
       ElMessage.success('创建成功')
@@ -617,7 +614,9 @@ const saveTeacher = async () => {
     showTeacherModal.value = false
     loadTeachers()
   } catch (error: any) {
-    ElMessage.error(error.message || '操作失败')
+    console.error('保存教师失败:', error)
+    const errorMessage = error?.response?.data?.detail || error?.message || '操作失败'
+    ElMessage.error(errorMessage)
   } finally {
     saving.value = false
   }
