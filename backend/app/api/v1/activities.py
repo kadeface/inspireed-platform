@@ -2,6 +2,7 @@
 教学活动 API
 """
 
+import json
 from datetime import datetime
 from statistics import mean
 from typing import Any, Dict, List, Optional, Union, cast
@@ -559,8 +560,8 @@ async def create_and_submit(
         if started_at_value and hasattr(started_at_value, 'tzinfo') and started_at_value.tzinfo is not None:
             started_at_value = started_at_value.replace(tzinfo=None)
         
-        # 获取 Cell 内容以进行自动评分
-        cell_content = cast(Dict[str, Any], cell.content)
+        # 获取 Cell 内容以进行自动评分（兼容 content 为 JSON 字符串）
+        cell_content = _coerce_activity_cell_content(cell.content)
         auto_graded, total_score, max_score, graded_responses = _auto_grade_submission(
             cast(dict[str, Any], data.responses),
             cell_content
@@ -788,8 +789,8 @@ async def submit_activity(
     if not cell:
         raise HTTPException(status_code=404, detail="Cell 不存在")
     
-    # 实现自动评分逻辑
-    cell_content = cast(Dict[str, Any], cell.content)
+    # 实现自动评分逻辑（兼容 content 为 JSON 字符串）
+    cell_content = _coerce_activity_cell_content(cell.content)
     auto_graded, total_score, max_score, graded_responses = _auto_grade_submission(
         cast(dict[str, Any], data.responses),
         cell_content
@@ -1814,6 +1815,43 @@ async def sync_offline_submissions(
 # ========== 辅助函数 ==========
 
 
+def _coerce_activity_cell_content(raw: Any) -> Dict[str, Any]:
+    """将 Cell.content 规范为 dict（兼容 JSON 字符串、非 dict 脏数据）。"""
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _normalize_activity_items(raw_items: Any) -> List[Dict[str, Any]]:
+    """
+    返回题目列表。兼容：
+    - list[dict]（标准）
+    - dict[id, dict]（以题目 id 为键的 map）
+    - JSON 字符串
+    """
+    if raw_items is None:
+        return []
+    if isinstance(raw_items, str):
+        try:
+            raw_items = json.loads(raw_items)
+        except json.JSONDecodeError:
+            return []
+    if isinstance(raw_items, dict):
+        values = list(raw_items.values())
+        if values and all(isinstance(v, dict) for v in values):
+            return cast(List[Dict[str, Any]], values)
+        return []
+    if isinstance(raw_items, list):
+        return [v for v in raw_items if isinstance(v, dict)]
+    return []
+
+
 def _auto_grade_submission(
     responses: Dict[str, Any],
     cell_content: Dict[str, Any]
@@ -1832,7 +1870,8 @@ def _auto_grade_submission(
         - max_score: 满分
         - graded_responses: 包含正确性判断的答案字典
     """
-    items = cell_content.get("items", [])
+    cell_content = _coerce_activity_cell_content(cell_content)
+    items = _normalize_activity_items(cell_content.get("items", []))
     graded_responses: Dict[str, Any] = {}
     total_score = 0.0
     max_score = 0.0
@@ -1842,6 +1881,13 @@ def _auto_grade_submission(
         item_id = str(item.get("id", ""))
         item_type = item.get("type", "")
         item_config = item.get("config", {})
+        if isinstance(item_config, str):
+            try:
+                item_config = json.loads(item_config)
+            except json.JSONDecodeError:
+                item_config = {}
+        if not isinstance(item_config, dict):
+            item_config = {}
         item_points = item.get("points", 0)
         max_score += float(item_points) if item_points else 0.0
         
@@ -1893,8 +1939,12 @@ def _auto_grade_submission(
                 is_correct = str(student_answer_id) == str(correct_answer_id)
                 # 找到正确答案的文本和ID（都保存以便前端使用）
                 options = item_config.get("options", [])
+                if not isinstance(options, list):
+                    options = []
                 correct_answer_text = None
                 for opt in options:
+                    if not isinstance(opt, dict):
+                        continue
                     if str(opt.get("id", "")) == str(correct_answer_id):
                         correct_answer_text = opt.get("text", correct_answer_id)
                         break
@@ -1930,8 +1980,12 @@ def _auto_grade_submission(
                 
                 # 找到正确答案的文本
                 options = item_config.get("options", [])
+                if not isinstance(options, list):
+                    options = []
                 correct_texts = []
                 for opt in options:
+                    if not isinstance(opt, dict):
+                        continue
                     if str(opt.get("id", "")) in correct_set:
                         correct_texts.append(opt.get("text", opt.get("id", "")))
                 correct_answer = ", ".join(correct_texts) if correct_texts else ", ".join(correct_answer_ids)
