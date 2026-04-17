@@ -238,7 +238,31 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         const oldCurrentCellId = (session.value as any)?.current_cell_id ?? session.value?.currentCellId ?? null
         const newCurrentCellId = (updatedSession as any)?.current_cell_id ?? updatedSession.currentCellId ?? null
         const hasCurrentCellIdChanged = oldCurrentCellId !== newCurrentCellId
-        
+
+        const oldOrders = JSON.stringify((session.value.settings as any)?.display_cell_orders ?? null)
+        const newOrders = JSON.stringify((updatedSession.settings as any)?.display_cell_orders ?? null)
+        const hasDisplayOrdersChanged = oldOrders !== newOrders
+
+        const oldStatusNorm = normalizeSessionStatus(session.value.status)
+        const newStatusNorm = normalizeSessionStatus(updatedSession.status)
+        const hasSessionStatusChanged = oldStatusNorm !== newStatusNorm
+
+        const oldSyncMode = (session.value.settings as any)?.sync_mode
+        const newSyncMode = (updatedSession.settings as any)?.sync_mode
+        const hasSyncModeChanged = oldSyncMode !== newSyncMode
+
+        const oldDisplayMode = (session.value.settings as any)?.display_mode
+        const newDisplayMode = (updatedSession.settings as any)?.display_mode
+        const hasDisplayModeChanged = oldDisplayMode !== newDisplayMode
+
+        const shouldBumpDisplayVersion =
+          hasDisplayCellIdsChanged ||
+          hasCurrentCellIdChanged ||
+          hasDisplayOrdersChanged ||
+          hasSessionStatusChanged ||
+          hasSyncModeChanged ||
+          hasDisplayModeChanged
+
         // 提取 display_cell_ids，确保它是数组
         const rawSettings = updatedSession.settings || {}
         const displayCellIdsFromSettings = rawSettings.display_cell_ids || rawSettings.displayCellIds || []
@@ -258,7 +282,10 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         // 更新 currentCellId
         const cellId = (updatedSession as any)?.current_cell_id ?? updatedSession.currentCellId ?? null
         currentCellId.value = cellId
-        displayVersion.value += 1
+        // 仅在实际影响学生端展示同步内容时递增，避免轮询/可见性刷新每秒触发整块 :key 重挂载影响阅读
+        if (shouldBumpDisplayVersion) {
+          displayVersion.value += 1
+        }
 
         // 会话状态已更新
       }
