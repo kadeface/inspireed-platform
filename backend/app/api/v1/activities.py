@@ -133,12 +133,26 @@ def _content_cells_flat(content: Any) -> List[Dict[str, Any]]:
     """从 lesson.content 提取扁平 cell 列表，支持 List[dict] 或 {sections:[{cells:[]}]}"""
     if not content:
         return []
+    if isinstance(content, str):
+        try:
+            content = json.loads(content)
+        except json.JSONDecodeError:
+            return []
     if isinstance(content, list):
-        return content
+        return [c for c in content if isinstance(c, dict)]
     if isinstance(content, dict) and "sections" in content:
         cells: List[Dict[str, Any]] = []
         for sec in content.get("sections") or []:
-            cells.extend(sec.get("cells") or [])
+            if not isinstance(sec, dict):
+                continue
+            section_cells = sec.get("cells") or []
+            if isinstance(section_cells, str):
+                try:
+                    section_cells = json.loads(section_cells)
+                except json.JSONDecodeError:
+                    section_cells = []
+            if isinstance(section_cells, list):
+                cells.extend(c for c in section_cells if isinstance(c, dict))
         return cells
     return []
 
@@ -231,8 +245,15 @@ async def resolve_cell_id(
     cell: Optional[Cell] = None
     
     if isinstance(cell_id_value, str):
-        # UUID 格式，需要从 lesson.content 中查找并创建
-        lesson_content = cast(Optional[List[Dict[str, Any]]], getattr(lesson, "content", None))
+        # UUID 格式，先尝试从 lesson.content 映射到数据库 cell_id
+        mapped_cell_id = await get_db_id_from_cell_uuid(db, cell_id_value, lesson_id)
+        if mapped_cell_id is not None:
+            cell = await db.get(Cell, mapped_cell_id)
+            if cell:
+                return cell, cast(int, cell.id)
+
+        # 兼容：若数据库中尚未有对应 Cell，尝试从 lesson.content 查找并创建
+        lesson_content = _content_cells_flat(getattr(lesson, "content", None))
         if lesson_content:
             # 在 lesson.content 中查找匹配的 cell（通过 UUID）
             matched_cell_data = None
