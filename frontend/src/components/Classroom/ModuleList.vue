@@ -1,7 +1,10 @@
 <template>
   <div
     class="module-list-container"
-    :class="{ 'module-list-embed--minimal-drawer': embedContext === 'minimalDrawer' }"
+    :class="{
+      'module-list-embed--minimal-drawer': embedContext === 'minimalDrawer',
+      'module-list-embed--minimal-floating': embedContext === 'minimalFloating',
+    }"
     data-testid="module-list-container"
   >
     <!-- 导航控制栏（固定在顶部，始终可见） -->
@@ -11,7 +14,7 @@
         class="module-nav-btn module-nav-btn-prev"
         :class="{
           'module-nav-btn-disabled': !canGoPrev,
-          'module-nav-btn--icon-only': embedContext === 'minimalDrawer',
+          'module-nav-btn--icon-only': navUseIconOnlyNavButtons,
         }"
         :disabled="!canGoPrev || loading"
         @click="handlePrevModule"
@@ -21,12 +24,12 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
-        <span v-if="embedContext !== 'minimalDrawer'">上一模块</span>
+        <span v-if="!navUseIconOnlyNavButtons">上一模块</span>
       </button>
 
-      <!-- 当前模块：抽屉内用下拉快速跳转；主界面仍为序号 + 标题 -->
+      <!-- 当前模块：课堂详情侧栏 / 极简浮动面板用下拉快速跳转；主界面仍为序号 + 标题 -->
       <select
-        v-if="embedContext === 'minimalDrawer'"
+        v-if="navUseCompactModuleSelect"
         class="module-nav-select"
         data-testid="module-navigation-current"
         :value="minimalDrawerSelectValue"
@@ -66,14 +69,14 @@
         class="module-nav-btn module-nav-btn-next"
         :class="{
           'module-nav-btn-disabled': !canGoNext,
-          'module-nav-btn--icon-only': embedContext === 'minimalDrawer',
+          'module-nav-btn--icon-only': navUseIconOnlyNavButtons,
         }"
         :disabled="!canGoNext || loading"
         @click="handleNextModule"
         data-testid="next-module-button"
         :title="canGoNext ? '下一模块' : '已经是最后一个模块'"
       >
-        <span v-if="embedContext !== 'minimalDrawer'">下一模块</span>
+        <span v-if="!navUseIconOnlyNavButtons">下一模块</span>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
         </svg>
@@ -155,8 +158,12 @@ interface Props {
   displayCellOrders?: number[]
   sessionCurrentActivityId?: number | null
   showLearningMeta?: boolean
-  /** 极简授课「课堂详情」侧栏：放宽列表可视高度、单列，便于一次浏览更多模块 */
-  embedContext?: 'default' | 'minimalDrawer'
+  /**
+   * default：主布局模块区
+   * minimalDrawer：「更多」课堂详情侧栏（下拉选模块 + 高列表）
+   * minimalFloating：极简授课浮动「切换」面板（导航仅箭头 + 中间模块下拉）
+   */
+  embedContext?: 'default' | 'minimalDrawer' | 'minimalFloating'
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -184,6 +191,16 @@ const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map())
 // 计算属性
 const canGoPrev = computed(() => props.currentModuleIndex > 0)
 const canGoNext = computed(() => props.cells.length > 0 && props.currentModuleIndex >= 0 && props.currentModuleIndex < props.cells.length - 1)
+
+/** 抽屉与极简浮动面板：上一页/下一页仅显示箭头 */
+const navUseIconOnlyNavButtons = computed(
+  () => props.embedContext === 'minimalDrawer' || props.embedContext === 'minimalFloating',
+)
+
+/** 抽屉与极简浮动面板：中间为模块下拉 */
+const navUseCompactModuleSelect = computed(
+  () => props.embedContext === 'minimalDrawer' || props.embedContext === 'minimalFloating',
+)
 
 
 // Performance: Check if virtualization is needed for large lists
@@ -468,15 +485,17 @@ function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
   background: #6b7280;
 }
 
-/* 极简授课「课堂详情」抽屉：尽量多显示模块（紧凑卡片 + 高列表区） */
-.module-list-embed--minimal-drawer .module-navigation-bar {
+/* 极简抽屉 / 极简浮动：导航条紧凑、仅图标按钮 */
+.module-list-embed--minimal-drawer .module-navigation-bar,
+.module-list-embed--minimal-floating .module-navigation-bar {
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
   padding-bottom: 8px;
 }
 
-.module-list-embed--minimal-drawer .module-nav-select {
+.module-list-embed--minimal-drawer .module-nav-select,
+.module-list-embed--minimal-floating .module-nav-select {
   flex: 1 1 0;
   min-width: 0;
   height: 32px;
@@ -491,18 +510,21 @@ function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
   box-sizing: border-box;
 }
 
-.module-list-embed--minimal-drawer .module-nav-select:disabled {
+.module-list-embed--minimal-drawer .module-nav-select:disabled,
+.module-list-embed--minimal-floating .module-nav-select:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.module-list-embed--minimal-drawer .module-nav-select:focus {
+.module-list-embed--minimal-drawer .module-nav-select:focus,
+.module-list-embed--minimal-floating .module-nav-select:focus {
   outline: none;
   border-color: #93c5fd;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-.module-list-embed--minimal-drawer .module-nav-btn.module-nav-btn--icon-only {
+.module-list-embed--minimal-drawer .module-nav-btn.module-nav-btn--icon-only,
+.module-list-embed--minimal-floating .module-nav-btn.module-nav-btn--icon-only {
   min-width: unset;
   width: 30px;
   height: 30px;
@@ -512,7 +534,8 @@ function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
   border-radius: 0.375rem;
 }
 
-.module-list-embed--minimal-drawer .module-nav-btn.module-nav-btn--icon-only svg {
+.module-list-embed--minimal-drawer .module-nav-btn.module-nav-btn--icon-only svg,
+.module-list-embed--minimal-floating .module-nav-btn.module-nav-btn--icon-only svg {
   width: 16px;
   height: 16px;
 }

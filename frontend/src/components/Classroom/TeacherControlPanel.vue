@@ -195,11 +195,31 @@
         </button>
       </div>
       
-      <!-- 折叠状态：显示当前模块 + 快速切换 -->
+      <!-- 折叠状态：模块下拉 + 快速切换 -->
       <div v-if="floatingPanelCollapsed" class="floating-panel-collapsed">
-        <div class="collapsed-current-info">
-          <span class="collapsed-module-index">{{ currentModuleIndex + 1 }}/{{ lessonContentCells.length }}</span>
-          <span class="collapsed-module-title">{{ minimalCurrentTitleShort }}</span>
+        <div v-if="lessonContentCells.length > 0" class="collapsed-current-info">
+          <select
+            class="collapsed-module-select"
+            :value="collapsedFloatingSelectValue"
+            :disabled="loading"
+            aria-label="选择模块"
+            :title="collapsedFloatingSelectTitle"
+            @change="onCollapsedFloatingModuleSelect"
+          >
+            <option v-if="currentModuleIndex < 0" disabled value="">
+              未播出 / 已隐藏
+            </option>
+            <option
+              v-for="(cell, index) in lessonContentCells"
+              :key="cell.id ?? index"
+              :value="String(index)"
+            >
+              {{ formatCollapsedFloatingModuleOptionLabel(cell, index) }}
+            </option>
+          </select>
+        </div>
+        <div v-else class="collapsed-current-info collapsed-current-info--empty">
+          <span class="collapsed-empty-hint">暂无模块</span>
         </div>
         <div class="collapsed-nav-buttons">
           <button
@@ -232,6 +252,7 @@
           :is-multi-select-mode="isMultiSelectMode"
           :display-cell-orders="displayCellOrders"
           :session-current-activity-id="session?.current_activity_id"
+          embed-context="minimalFloating"
           @item-click="handleModuleItemClick"
           @checkbox-click="handleModuleCheckboxClick"
           @checkbox-change="handleModuleCheckboxChange"
@@ -294,92 +315,192 @@
           </button>
         </div>
         <div class="minimal-more-panel-body">
-          <div v-if="session && normalizedSessionStatus !== 'pending'" class="minimal-more-metrics">
-            <SessionDurationDisplay
-              :status="session.status"
-              :duration="displayDuration"
-              :remaining="remainingTime"
-              :show-remaining-line="false"
-            />
-            <StudentCountDisplay
-              :active-count="activeStudents.length"
-              :total-count="totalStudents"
-              label="人已进入"
-            />
-          </div>
+          <!-- 课堂概况：固定展开 -->
+          <section
+            v-if="session && normalizedSessionStatus !== 'pending'"
+            class="minimal-more-group minimal-more-group--always-open"
+            aria-label="课堂概况"
+          >
+            <h4 class="minimal-more-group-heading">课堂概况</h4>
+            <div class="minimal-more-metrics">
+              <SessionDurationDisplay
+                :status="session.status"
+                :duration="displayDuration"
+                :remaining="remainingTime"
+                :show-remaining-line="false"
+              />
+              <StudentCountDisplay
+                :active-count="activeStudents.length"
+                :total-count="totalStudents"
+                label="人已进入"
+              />
+            </div>
+          </section>
 
-          <div
+          <!-- 播出设置：可折叠 -->
+          <section
             v-if="
               lessonContentCells.length > 0 ||
               (session && (session.status === 'teaching' || session.status === 'TEACHING'))
             "
-            class="minimal-more-settings-row"
+            class="minimal-more-group"
+            aria-label="播出设置"
           >
-            <div v-if="lessonContentCells.length > 0" class="minimal-more-inline-group">
-              <span class="minimal-more-label">播出模式</span>
-              <button
-                type="button"
-                class="minimal-drawer-mode-toggle"
-                :disabled="loading"
-                @click="toggleSelectionMode"
-              >
-                {{ isMultiSelectMode ? '多选' : '单选' }}
-              </button>
-            </div>
-            <div
-              v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')"
-              class="minimal-more-inline-group"
+            <button
+              type="button"
+              class="minimal-more-group-toggle"
+              :aria-expanded="minimalDrawerSectionSettingsOpen"
+              @click="minimalDrawerSectionSettingsOpen = !minimalDrawerSectionSettingsOpen"
             >
-              <span class="minimal-more-label">学生端展示</span>
-              <button
-                type="button"
-                :disabled="loading"
-                class="btn btn-display-mode"
-                :class="{ active: currentDisplayMode === 'fullscreen' }"
-                @click="handleToggleDisplayMode"
+              <span class="minimal-more-group-toggle-label">播出设置</span>
+              <svg
+                class="minimal-more-chevron"
+                :class="{ 'minimal-more-chevron--open': minimalDrawerSectionSettingsOpen }"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
               >
-                {{ currentDisplayMode === 'fullscreen' ? '全屏' : '窗口' }}
-              </button>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div
+              v-show="minimalDrawerSectionSettingsOpen"
+              class="minimal-more-group-body"
+            >
+              <div class="minimal-more-settings-row">
+                <div v-if="lessonContentCells.length > 0" class="minimal-more-inline-group">
+                  <span class="minimal-more-label">播出模式</span>
+                  <select
+                    class="minimal-drawer-mode-select"
+                    :value="isMultiSelectMode ? 'multi' : 'single'"
+                    :disabled="loading"
+                    aria-label="播出模式"
+                    title="单选：一次播出一个模块；多选：可同时播出多个模块"
+                    @change="onMinimalDrawerBroadcastModeSelect"
+                  >
+                    <option value="single">单选</option>
+                    <option value="multi">多选</option>
+                  </select>
+                </div>
+                <div
+                  v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')"
+                  class="minimal-more-inline-group"
+                >
+                  <span class="minimal-more-label">学生端展示</span>
+                  <button
+                    type="button"
+                    :disabled="loading"
+                    class="btn btn-display-mode"
+                    :class="{ active: currentDisplayMode === 'fullscreen' }"
+                    @click="handleToggleDisplayMode"
+                  >
+                    {{ currentDisplayMode === 'fullscreen' ? '全屏' : '窗口' }}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          </section>
 
-          <WaitingForStudentsBanner
-            :session-status="session.status"
-            :active-count="activeStudents.length"
-          />
-          <GuestAccessToggle
-            :session-id="session.id"
-            :guest-access-enabled="session.guest_access_enabled || session.guestAccessEnabled || false"
-            :guest-access-code="session.guest_access_code || session.guestAccessCode || null"
-            :guest-count="session.guest_count || session.guestCount || 0"
-            class="px-0 py-2"
-            @updated="handleGuestAccessUpdated"
-          />
-          <JoinedStudentsList
-            v-if="session.status === 'PREPARING'"
-            :students="activeStudents"
-            :max-display="12"
-          />
-          <ModuleList
-            :cells="lessonContentCells"
-            :current-module-index="currentModuleIndex"
-            :loading="loading"
-            :is-multi-select-mode="isMultiSelectMode"
-            :display-cell-orders="displayCellOrders"
-            :session-current-activity-id="session?.current_activity_id"
-            embed-context="minimalDrawer"
-            @item-click="handleModuleItemClick"
-            @checkbox-click="handleModuleCheckboxClick"
-            @checkbox-change="handleModuleCheckboxChange"
-            @prev-module="handlePrevModule"
-            @next-module="handleNextModule"
-          />
-          <ActivityStatisticsPanel
-            v-if="currentCell"
-            :current-cell="currentCell"
-            :activity-statistics="activityStatistics"
-            :loading="loadingActivityStats"
-          />
+          <!-- 学生与访客：可折叠 -->
+          <section class="minimal-more-group" aria-label="学生与访客">
+            <button
+              type="button"
+              class="minimal-more-group-toggle"
+              :aria-expanded="minimalDrawerSectionStudentsOpen"
+              @click="minimalDrawerSectionStudentsOpen = !minimalDrawerSectionStudentsOpen"
+            >
+              <span class="minimal-more-group-toggle-label">学生与访客</span>
+              <svg
+                class="minimal-more-chevron"
+                :class="{ 'minimal-more-chevron--open': minimalDrawerSectionStudentsOpen }"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div
+              v-show="minimalDrawerSectionStudentsOpen"
+              class="minimal-more-group-body minimal-more-group-body--tight"
+            >
+              <WaitingForStudentsBanner
+                :session-status="session.status"
+                :active-count="activeStudents.length"
+              />
+              <GuestAccessToggle
+                :session-id="session.id"
+                :guest-access-enabled="session.guest_access_enabled || session.guestAccessEnabled || false"
+                :guest-access-code="session.guest_access_code || session.guestAccessCode || null"
+                :guest-count="session.guest_count || session.guestCount || 0"
+                class="px-0 py-2"
+                @updated="handleGuestAccessUpdated"
+              />
+              <JoinedStudentsList
+                v-if="session.status === 'PREPARING'"
+                :students="activeStudents"
+                :max-display="12"
+              />
+            </div>
+          </section>
+
+          <!-- 模块与活动：可折叠 -->
+          <section class="minimal-more-group" aria-label="模块与活动">
+            <button
+              type="button"
+              class="minimal-more-group-toggle"
+              :aria-expanded="minimalDrawerSectionModulesOpen"
+              @click="minimalDrawerSectionModulesOpen = !minimalDrawerSectionModulesOpen"
+            >
+              <span class="minimal-more-group-toggle-label">模块与活动</span>
+              <svg
+                class="minimal-more-chevron"
+                :class="{ 'minimal-more-chevron--open': minimalDrawerSectionModulesOpen }"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div
+              v-show="minimalDrawerSectionModulesOpen"
+              class="minimal-more-group-body"
+            >
+              <ModuleList
+                :cells="lessonContentCells"
+                :current-module-index="currentModuleIndex"
+                :loading="loading"
+                :is-multi-select-mode="isMultiSelectMode"
+                :display-cell-orders="displayCellOrders"
+                :session-current-activity-id="session?.current_activity_id"
+                embed-context="minimalDrawer"
+                @item-click="handleModuleItemClick"
+                @checkbox-click="handleModuleCheckboxClick"
+                @checkbox-change="handleModuleCheckboxChange"
+                @prev-module="handlePrevModule"
+                @next-module="handleNextModule"
+              />
+              <ActivityStatisticsPanel
+                v-if="currentCell"
+                :current-cell="currentCell"
+                :activity-statistics="activityStatistics"
+                :loading="loadingActivityStats"
+              />
+            </div>
+          </section>
         </div>
       </div>
     </div>
@@ -590,6 +711,30 @@ const minimalTeachingFocus = ref(false)
 const floatingPanelCollapsed = ref(true)  // 浮动面板折叠状态
 
 const minimalMoreDrawerOpen = ref(false)
+/** 课堂详情抽屉分组折叠（路线 A）；打开抽屉时按会话状态重置默认展开 */
+const minimalDrawerSectionSettingsOpen = ref(true)
+const minimalDrawerSectionStudentsOpen = ref(true)
+const minimalDrawerSectionModulesOpen = ref(true)
+
+function applyMinimalDrawerSectionDefaults() {
+  if (!session.value) return
+  const s = String(session.value.status ?? '').toLowerCase()
+  minimalDrawerSectionSettingsOpen.value = true
+  if (s === 'preparing') {
+    minimalDrawerSectionStudentsOpen.value = true
+    minimalDrawerSectionModulesOpen.value = false
+  } else if (s === 'teaching' || s === 'active') {
+    minimalDrawerSectionStudentsOpen.value = false
+    minimalDrawerSectionModulesOpen.value = true
+  } else {
+    minimalDrawerSectionStudentsOpen.value = true
+    minimalDrawerSectionModulesOpen.value = true
+  }
+}
+
+watch(minimalMoreDrawerOpen, (open) => {
+  if (open) applyMinimalDrawerSectionDefaults()
+})
 const selectedCellIndex = ref(-1)
 const dbCells = ref<Array<{ id: number | string; order: number; cell_type: string }>>([])
 
@@ -869,6 +1014,34 @@ const {
   handleHideAll,
 } = navigationManager
 
+async function onMinimalDrawerBroadcastModeSelect(ev: Event) {
+  const el = ev.target as HTMLSelectElement
+  const wantMulti = el.value === 'multi'
+  if (wantMulti === isMultiSelectMode.value) return
+  await toggleSelectionMode()
+}
+
+function formatCollapsedFloatingModuleOptionLabel(cell: Cell, index: number): string {
+  const raw =
+    (cell.title && String(cell.title).trim()) ||
+    getCellTypeLabel(cell.type) ||
+    `模块 ${index + 1}`
+  const prefix = `${index + 1}. `
+  const maxBody = 40
+  const body = raw.length > maxBody ? `${raw.slice(0, maxBody - 1)}…` : raw
+  return `${prefix}${body}`
+}
+
+async function onCollapsedFloatingModuleSelect(ev: Event) {
+  const el = ev.target as HTMLSelectElement
+  const v = el.value
+  if (v === '') return
+  const index = parseInt(v, 10)
+  if (Number.isNaN(index) || index < 0 || index >= lessonContentCells.value.length) return
+  const cell = lessonContentCells.value[index]
+  if (cell) await handleModuleItemClick(cell, index)
+}
+
 const isMinimalTeachingUi = computed(() => {
   if (!minimalTeachingFocus.value ) return false
   const st = normalizedSessionStatus.value
@@ -905,6 +1078,16 @@ const minimalCurrentIndexLabel = computed(() => {
   if (!n) return ''
   if (idx < 0) return '未播出'
   return `${idx + 1} / ${n}`
+})
+
+const collapsedFloatingSelectValue = computed(() => {
+  if (currentModuleIndex.value < 0 || !lessonContentCells.value.length) return ''
+  return String(currentModuleIndex.value)
+})
+
+const collapsedFloatingSelectTitle = computed(() => {
+  if (currentModuleIndex.value < 0) return '请选择要播出的模块'
+  return minimalCurrentTitleFull.value
 })
 
 const isAutoSelectingFirstModule = ref(false)
@@ -2305,29 +2488,44 @@ defineExpose({
 }
 
 .collapsed-current-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  width: 100%;
   margin-bottom: 8px;
-  font-size: 12px;
 }
 
-.collapsed-module-index {
-  font-weight: 600;
-  color: #3b82f6;
-  background: #dbeafe;
-  padding: 2px 6px;
-  border-radius: 4px;
+.collapsed-current-info--empty {
+  padding: 6px 0;
+}
+
+.collapsed-empty-hint {
   font-size: 11px;
+  color: #9ca3af;
 }
 
-.collapsed-module-title {
-  color: #4b5563;
-  font-weight: 500;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.collapsed-module-select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.collapsed-module-select:focus {
+  outline: none;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.collapsed-module-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .collapsed-nav-buttons {
@@ -4252,6 +4450,72 @@ input[type="checkbox"].checkbox-input {
   flex: 1;
 }
 
+/* 课堂详情：分组（路线 A） */
+.minimal-more-group {
+  margin-bottom: 14px;
+}
+
+.minimal-more-group:last-child {
+  margin-bottom: 0;
+}
+
+.minimal-more-group-heading {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.03em;
+}
+
+.minimal-more-group-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.minimal-more-group-toggle:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.minimal-more-group-toggle-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.minimal-more-chevron {
+  flex-shrink: 0;
+  color: #64748b;
+  transition: transform 0.2s ease;
+}
+
+.minimal-more-chevron--open {
+  transform: rotate(180deg);
+}
+
+.minimal-more-group-body {
+  padding-top: 10px;
+}
+
+.minimal-more-group-body--tight {
+  padding-top: 8px;
+}
+
+.minimal-more-group-body .minimal-more-settings-row {
+  margin-bottom: 0;
+}
+
 .minimal-more-metrics {
   display: flex;
   flex-direction: row;
@@ -4264,6 +4528,10 @@ input[type="checkbox"].checkbox-input {
   overflow-y: hidden;
   padding-bottom: 4px;
   -webkit-overflow-scrolling: touch;
+}
+
+.minimal-more-group--always-open .minimal-more-metrics {
+  margin-bottom: 0;
 }
 
 .minimal-more-settings-row {
@@ -4325,6 +4593,31 @@ input[type="checkbox"].checkbox-input {
 }
 
 .minimal-drawer-mode-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.minimal-drawer-mode-select {
+  min-width: 4.25rem;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.minimal-drawer-mode-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.minimal-drawer-mode-select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
