@@ -1,11 +1,11 @@
 <template>
-  <!-- 浮动助手按钮 -->
-  <Teleport to="body">
-    <Transition name="fab-fade">
-      <div v-if="visible" class="teaching-assistant-fab-container">
-        <!-- 快捷菜单 -->
-        <Transition name="menu-slide">
-          <div v-if="showMenu" class="fab-menu">
+  <!-- 嵌入极简浮动导播台：与「模块切换」面板同层，菜单在按钮上方展开 -->
+  <div
+    v-if="layout === 'embedded' && visible"
+    class="teaching-assistant-fab-container teaching-assistant-fab-container--embedded"
+  >
+    <Transition name="menu-slide">
+      <div v-if="showMenu" class="fab-menu fab-menu--embedded">
             <div class="fab-menu-header">
               <h3 class="fab-menu-title">教学助手</h3>
               <button
@@ -134,20 +134,183 @@
               </button>
             </div>
           </div>
+    </Transition>
+    <button
+      type="button"
+      @click="toggleMenu"
+      class="fab-button fab-button--embedded"
+      :class="{ 'fab-button-active': showMenu }"
+      :title="embeddedFabTitle"
+      :aria-label="embeddedFabAriaLabel"
+    >
+      <Transition name="icon-rotate" mode="out-in">
+        <svg
+          v-if="!showMenu"
+          key="menu"
+          class="fab-button-icon"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <svg
+          v-else
+          key="close"
+          class="fab-button-icon"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </Transition>
+    </button>
+  </div>
+
+  <!-- 默认：视口角落浮动按钮 -->
+  <Teleport v-if="layout !== 'embedded'" to="body">
+    <Transition name="fab-fade">
+      <div v-if="visible" class="teaching-assistant-fab-container">
+        <Transition name="menu-slide">
+          <div v-if="showMenu" class="fab-menu">
+            <div class="fab-menu-header">
+              <h3 class="fab-menu-title">教学助手</h3>
+              <button
+                @click="showMenu = false"
+                class="fab-menu-close"
+                title="关闭菜单"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="fab-menu-content">
+              <div v-if="!classroomId" class="fab-menu-tip">
+                <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="fab-menu-tip-text">请先发布教案，上课时选择班级</span>
+              </div>
+
+              <button
+                @click="handleAttendance"
+                class="fab-menu-item"
+                :disabled="!classroomId"
+                :title="!classroomId ? '上课时选择班级后可用' : '快速点名'"
+              >
+                <div class="fab-menu-item-icon bg-blue-500">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div class="fab-menu-item-content">
+                  <div class="fab-menu-item-title">点名考勤</div>
+                  <div class="fab-menu-item-desc">快速记录学生出勤</div>
+                </div>
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              <button
+                @click="handlePositiveBehavior"
+                class="fab-menu-item"
+                :disabled="!classroomId"
+                :title="!classroomId ? '上课时选择班级后可用' : '记录课堂表现'"
+              >
+                <div class="fab-menu-item-icon bg-green-500">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                </div>
+                <div class="fab-menu-item-content">
+                  <div class="fab-menu-item-title">课堂表现</div>
+                  <div class="fab-menu-item-desc">记录积极表现</div>
+                </div>
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              <button
+                @click="handleDiscipline"
+                class="fab-menu-item"
+                :disabled="!classroomId"
+                :title="!classroomId ? '上课时选择班级后可用' : '记录纪律'"
+              >
+                <div class="fab-menu-item-icon bg-amber-500">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div class="fab-menu-item-content">
+                  <div class="fab-menu-item-title">纪律记录</div>
+                  <div class="fab-menu-item-desc">记录课堂纪律</div>
+                </div>
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              <button
+                @click="handleDuty"
+                class="fab-menu-item"
+                :disabled="!classroomId"
+                :title="!classroomId ? '上课时选择班级后可用' : '查看值日安排'"
+              >
+                <div class="fab-menu-item-icon bg-purple-500">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div class="fab-menu-item-content">
+                  <div class="fab-menu-item-title">值日管理</div>
+                  <div class="fab-menu-item-desc">查看值日安排</div>
+                </div>
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              <button
+                @click="handleClassAssistant"
+                class="fab-menu-item"
+                :disabled="!classroomId"
+                :title="!classroomId ? '上课时选择班级后可用' : '进入班级助手'"
+              >
+                <div class="fab-menu-item-icon bg-indigo-500">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+                <div class="fab-menu-item-content">
+                  <div class="fab-menu-item-title">班级助手</div>
+                  <div class="fab-menu-item-desc">进入完整功能</div>
+                </div>
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </Transition>
 
-        <!-- 主按钮 -->
         <button
+          type="button"
           @click="toggleMenu"
           class="fab-button"
           :class="{ 'fab-button-active': showMenu }"
-          :title="showMenu ? '关闭菜单' : '打开教学助手'"
+          :title="cornerFabTitle"
+          :aria-label="cornerFabAriaLabel"
         >
           <Transition name="icon-rotate" mode="out-in">
             <svg
               v-if="!showMenu"
               key="menu"
-              class="w-6 h-6 text-white"
+              class="fab-button-icon text-white"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -157,7 +320,7 @@
             <svg
               v-else
               key="close"
-              class="w-6 h-6 text-white"
+              class="fab-button-icon text-white"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -172,16 +335,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, withDefaults } from 'vue'
 import { useRouter } from 'vue-router'
 
-const props = defineProps<{
-  visible: boolean
-  classroomId?: number | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    visible: boolean
+    classroomId?: number | null
+    /** floating：Teleport 到视口角落；embedded：由父级（如极简浮动导播台标题栏）布局 */
+    layout?: 'floating' | 'embedded'
+  }>(),
+  { layout: 'floating' }
+)
 
 const router = useRouter()
 const showMenu = ref(false)
+
+/** 嵌入导播台：悬停说明与人像/叉号图标对应关系 */
+const embeddedFabTitle = computed(() =>
+  showMenu.value
+    ? '关闭教学助手菜单（当前图标为叉号）'
+    : '教学助手（当前图标为人像剪影）：打开菜单，可使用点名考勤、课堂表现、纪律记录、值日管理、班级助手等'
+)
+const embeddedFabAriaLabel = computed(() =>
+  showMenu.value ? '关闭教学助手菜单' : '打开教学助手功能菜单'
+)
+
+/** 视口角落 FAB：同上，并说明为浮动按钮 */
+const cornerFabTitle = computed(() =>
+  showMenu.value
+    ? '关闭教学助手菜单（当前图标为叉号）'
+    : '教学助手（人像图标浮动按钮）：打开菜单，点名、课堂表现、纪律、值日、班级助手等'
+)
+const cornerFabAriaLabel = computed(() =>
+  showMenu.value ? '关闭教学助手菜单' : '打开教学助手功能菜单'
+)
 
 const toggleMenu = () => {
   showMenu.value = !showMenu.value
@@ -202,6 +390,10 @@ watch(showMenu, (isOpen) => {
   } else {
     document.removeEventListener('click', handleClickOutside)
   }
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 
 const emit = defineEmits<{
@@ -261,18 +453,88 @@ const handleClassAssistant = () => {
 
 <style scoped>
 .teaching-assistant-fab-container {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 1000;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
 }
 
+.teaching-assistant-fab-container:not(.teaching-assistant-fab-container--embedded) {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+}
+
+.teaching-assistant-fab-container--embedded {
+  position: relative;
+  z-index: 6;
+  flex-shrink: 0;
+  gap: 0;
+  align-items: flex-end;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu--embedded {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  min-width: 260px;
+  max-width: min(320px, calc(100vw - 20px));
+  max-height: min(72vh, 440px);
+  z-index: 20;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.14),
+    0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-content {
+  max-height: min(52vh, 360px);
+}
+
+/* 与 TeacherControlPanel 浮动导播台「课堂详情 / 展开」图标按钮同一套工具按钮语言 */
+.teaching-assistant-fab-container--embedded .fab-button--embedded {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  color: #475569;
+  box-shadow: none;
+  transform: none;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.teaching-assistant-fab-container--embedded .fab-button--embedded:hover {
+  background: #f8fafc;
+  border-color: rgba(15, 23, 42, 0.16);
+  color: #0f172a;
+  transform: none;
+  box-shadow: none;
+}
+
+.teaching-assistant-fab-container--embedded .fab-button--embedded:active {
+  transform: none;
+}
+
+.teaching-assistant-fab-container--embedded .fab-button--embedded.fab-button-active {
+  background: rgba(79, 70, 229, 0.12);
+  border-color: rgba(79, 70, 229, 0.35);
+  color: #3730a3;
+  box-shadow: none;
+}
+
+.fab-button-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.teaching-assistant-fab-container--embedded .fab-button--embedded .fab-button-icon {
+  width: 16px;
+  height: 16px;
+}
+
 @media (max-width: 768px) {
-  .teaching-assistant-fab-container {
+  .teaching-assistant-fab-container:not(.teaching-assistant-fab-container--embedded) {
     right: auto;
     left: 12px;
     /* 避开底部导航条与极简翻页控件 */
@@ -280,19 +542,29 @@ const handleClassAssistant = () => {
     z-index: 960;
   }
 
-  .fab-button {
+  .teaching-assistant-fab-container:not(.teaching-assistant-fab-container--embedded) .fab-button {
     width: 52px;
     height: 52px;
   }
 
-  .fab-menu {
+  .fab-menu:not(.fab-menu--embedded) {
     min-width: min(320px, calc(100vw - 24px));
     max-width: calc(100vw - 24px);
     max-height: 60vh;
   }
 
-  .fab-menu-content {
+  .teaching-assistant-fab-container:not(.teaching-assistant-fab-container--embedded) .fab-menu-content {
     max-height: calc(60vh - 60px);
+  }
+
+  .teaching-assistant-fab-container--embedded .fab-button--embedded {
+    width: 28px;
+    height: 28px;
+  }
+
+  .teaching-assistant-fab-container--embedded .fab-button--embedded .fab-button-icon {
+    width: 14px;
+    height: 14px;
   }
 }
 

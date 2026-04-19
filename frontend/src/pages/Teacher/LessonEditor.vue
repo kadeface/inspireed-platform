@@ -45,6 +45,7 @@
       :editing-tab-id="editingTabId"
       :cell-list-ref="cellListRef"
       :tabs-container-ref="tabsContainerRef"
+      :assistant-classroom-id="currentClassroomId"
       @toggle-toolbar-collapsed="toolbarCollapsed = !toolbarCollapsed"
       @add-cell-to-end="(cellType) => {
         console.log('LessonEditor: 收到 add-cell-to-end 事件', { cellType })
@@ -76,6 +77,8 @@
       @cell-delete="handleDeleteCell"
       @cell-move-up="handleMoveUp"
       @cell-move-down="handleMoveDown"
+      @open-assistant-drawer="handleOpenAssistantDrawer"
+      @minimal-teaching-assistant-docked="minimalTeachingAssistantDocked = $event"
     />
 
     <!-- Toast 提示 -->
@@ -93,7 +96,7 @@
 
     <!-- 浮动教学助手按钮（仅在授课模式显示） -->
     <TeachingAssistantFAB
-      :visible="isPreviewMode"
+      :visible="isPreviewMode && !(minimalTeachingAssistantDocked && showClassroomPanel)"
       :classroom-id="currentClassroomId"
       @open-drawer="handleOpenAssistantDrawer"
     />
@@ -346,6 +349,8 @@ const showPDFViewer = ref(false)
 const showLessonAssistant = ref(false)
 const showClassroomPanel = ref(false)
 const showAssistantDrawer = ref(false)
+/** 极简授课时教学助手已嵌入浮动导播台，避免与左下角 FAB 重复 */
+const minimalTeachingAssistantDocked = ref(false)
 // Toast
 const toast = ref<ToastData>({ show: false, type: 'success', message: '' })
 function showToast(type: 'success' | 'error' | 'warning', message: string) {

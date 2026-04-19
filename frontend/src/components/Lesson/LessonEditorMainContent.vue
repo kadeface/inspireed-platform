@@ -25,7 +25,10 @@
           key="teacher-control-panel-fullscreen"
           :lesson-id="currentLesson.id"
           :lesson="currentLesson"
+          :assistant-classroom-id="assistantClassroomId ?? null"
           @session-changed="emit('session-changed', $event)"
+          @open-assistant-drawer="emit('open-assistant-drawer', $event)"
+          @minimal-teaching-assistant-docked="emit('minimal-teaching-assistant-docked', $event)"
         />
       </div>
     </Teleport>
@@ -149,7 +152,10 @@
               key="teacher-control-panel-inline"
               :lesson-id="currentLesson.id"
               :lesson="currentLesson"
+              :assistant-classroom-id="assistantClassroomId ?? null"
               @session-changed="emit('session-changed', $event)"
+              @open-assistant-drawer="emit('open-assistant-drawer', $event)"
+              @minimal-teaching-assistant-docked="emit('minimal-teaching-assistant-docked', $event)"
             />
           </div>
 
@@ -413,6 +419,7 @@ interface Props {
   editingTabId: string | null
   cellListRef: any
   tabsContainerRef: any
+  assistantClassroomId?: number | null
 }
 
 defineProps<Props>()
@@ -425,6 +432,8 @@ const emit = defineEmits<{
   'cover-image-load': []
   'upload-cover-image': []
   'session-changed': [event: any]
+  'open-assistant-drawer': [type: 'attendance' | 'behavior' | 'discipline' | 'duty']
+  'minimal-teaching-assistant-docked': [docked: boolean]
   'close-reference-panel': []
   'show-pdf-viewer': []
   'update-notes': [notes: string]
