@@ -7,7 +7,6 @@
       :save-status="saveStatus"
       :last-saved-at="lastSavedAt"
       :is-preview-mode="isPreviewMode"
-      :show-classroom-panel="showClassroomPanel"
       :compact-mode="compactMode"
       :can-enter-preview-mode="canEnterPreviewMode"
       :current-lesson="currentLesson"
@@ -22,7 +21,6 @@
       @publish="handlePublish"
       @toggle-compact="compactMode = !compactMode"
       @toggle-preview="handleTogglePreviewMode"
-      @toggle-classroom-panel="handleClassroomButtonClick"
       @fullscreen-preview="toggleFullscreenPreview"
       @show-ai-assistant="showLessonAssistant = true"
       @export-lesson="handleExportLesson"
@@ -464,18 +462,6 @@ const lessonOutline = computed(() => {
 // 标记是否最近从未发布状态切换的
 const isRecentlyUnpublished = ref(false)
 
-
-// 处理课堂控制按钮点击
-function handleClassroomButtonClick() {
-  if (!isPreviewMode.value) {
-    // 如果不在预览模式，自动切换到预览模式并打开课堂控制面板
-    isPreviewMode.value = true
-    showClassroomPanel.value = true
-    showToast('success', '已进入预览模式，课堂控制面板已打开')
-    return
-  }
-  showClassroomPanel.value = !showClassroomPanel.value
-}
 
 // 切换幻灯片全屏（使用浏览器原生全屏API）
 async function handleSlideFullscreenToggle() {

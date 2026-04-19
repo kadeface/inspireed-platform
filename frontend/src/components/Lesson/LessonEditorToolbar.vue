@@ -247,22 +247,6 @@
               {{ isPreviewMode ? '编辑模式' : '授课模式' }}
             </button>
 
-            <!-- 授课模式：导播台开关（否则看不到「创建课堂」等按钮） -->
-            <button
-              v-if="isPreviewMode"
-              type="button"
-              @click="$emit('toggle-classroom-panel')"
-              :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
-                showClassroomPanel
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
-              ]"
-              :title="showClassroomPanel ? '隐藏导播台' : '显示导播台（创建课堂/开始授课）'"
-            >
-              {{ showClassroomPanel ? '隐藏导播台' : '显示导播台' }}
-            </button>
-
             <!-- 全屏预览按钮 -->
             <button
               @click="$emit('fullscreen-preview')"
@@ -352,7 +336,6 @@ interface Props {
   saveStatus: 'saving' | 'saved' | 'error' | 'idle' | null
   lastSavedAt: Date | null
   isPreviewMode: boolean
-  showClassroomPanel: boolean
   compactMode: boolean
   canEnterPreviewMode: boolean
   currentLesson: Lesson | null
@@ -373,7 +356,6 @@ defineEmits<{
   'publish': []
   'toggle-compact': []
   'toggle-preview': []
-  'toggle-classroom-panel': []
   'fullscreen-preview': []
   'show-ai-assistant': []
   'export-lesson': []
