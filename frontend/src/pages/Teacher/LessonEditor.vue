@@ -96,7 +96,7 @@
 
     <!-- 浮动教学助手按钮（仅在授课模式显示） -->
     <TeachingAssistantFAB
-      :visible="isPreviewMode && !(minimalTeachingAssistantDocked && showClassroomPanel)"
+      :visible="teachingAssistantCornerFabVisible"
       :classroom-id="currentClassroomId"
       @open-drawer="handleOpenAssistantDrawer"
     />
@@ -364,6 +364,15 @@ function initSortable() { /* 大环节模式下由 SectionContainer 负责，cel
 const { createReferenceMaterialCell, scrollToNewCell, handleAddCellToEnd, handleAddCellInSection, handleAddCellAt, insertReferenceMaterial, handleCellUpdate, handleDeleteCell, handleMoveUp, handleMoveDown } = useLessonEditorCells(sections, activeSectionIndex, cellListRef, showToast)
 const { saveStatus, lastSavedAt, hasUnsavedChanges, isSavingOnUnmount, handleManualSave, handleBack, formatSaveTime, saveOnUnmount } = useLessonEditorSave(sections, lessonTitle, isPreviewMode, showToast)
 const { currentSessionId, providedSessionRef, providedSessionId, handleSessionChanged } = useLessonEditorSession(teacherControlPanelRef, isPreviewMode, showClassroomPanel)
+
+/** 视口角落教学助手 FAB：极简内嵌时隐藏；无会话且已展示导播台时隐藏（与「创建课堂」同屏，避免重复占位） */
+const teachingAssistantCornerFabVisible = computed(() => {
+  if (!isPreviewMode.value) return false
+  if (minimalTeachingAssistantDocked.value && showClassroomPanel.value) return false
+  if (showClassroomPanel.value && !providedSessionRef.value) return false
+  return true
+})
+
 const { isFullscreenPreview, toggleFullscreenPreview, handleTogglePreviewMode, handleExportLesson, exporting } = useLessonEditorNav(isPreviewMode, showToast)
 
 // 从 TeacherControlPanel 获取导播台数据
