@@ -170,7 +170,20 @@
     <!-- 浮动导播台（授课模式下始终显示） -->
     <div v-if="isMinimalTeachingUi" class="panel teaching-modules teaching-modules-floating" :class="{ 'module-panel-fullscreen': modulePanelFullscreen, 'panel-collapsed': floatingPanelCollapsed }">
       <div class="floating-panel-header">
-        <span class="floating-panel-title">📺 切换</span>
+        <div class="floating-panel-title-group" title="当前课节模块快速切换">
+          <span class="floating-panel-title-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
+          </span>
+          <div class="floating-panel-title-text">
+            <span class="floating-panel-title-main">模块切换</span>
+            <span class="floating-panel-title-kicker">播出导控</span>
+          </div>
+        </div>
         <div class="floating-panel-header-right">
           <button
             type="button"
@@ -179,23 +192,31 @@
             title="打开课堂详情抽屉（暂退出极简顶栏）；关闭抽屉后将自动回到极简"
             @click="openMinimalDetailDrawerFromMinimalBar"
           >
-            课堂详情
+            详情
           </button>
           <button
             type="button"
             class="floating-panel-toggle"
-            :title="floatingPanelCollapsed ? '展开' : '折叠'"
+            :title="floatingPanelCollapsed ? '展开完整列表' : '收起到紧凑视图'"
+            :aria-expanded="!floatingPanelCollapsed"
             @click="floatingPanelCollapsed = !floatingPanelCollapsed"
           >
-            {{ floatingPanelCollapsed ? '◀' : '▶' }}
+            <svg v-if="floatingPanelCollapsed" class="floating-panel-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            <svg v-else class="floating-panel-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
         </div>
       </div>
       
       <!-- 折叠状态：模块下拉 + 快速切换 -->
       <div v-if="floatingPanelCollapsed" class="floating-panel-collapsed">
-        <div v-if="lessonContentCells.length > 0" class="collapsed-current-info">
+        <div v-if="lessonContentCells.length > 0" class="collapsed-field">
+          <label class="floating-panel-field-label" for="floating-module-select">当前播出</label>
           <select
+            id="floating-module-select"
             class="collapsed-module-select"
             :value="collapsedFloatingSelectValue"
             :disabled="loading"
@@ -223,19 +244,25 @@
             type="button"
             class="collapsed-nav-btn"
             :disabled="loading || !canGoPrev"
-            @click="handlePrevModule"
+            aria-label="上一模块"
             title="上一模块"
+            @click="handlePrevModule"
           >
-            ◀
+            <svg class="collapsed-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
           </button>
           <button
             type="button"
             class="collapsed-nav-btn"
             :disabled="loading || !canGoNext"
-            @click="handleNextModule"
+            aria-label="下一模块"
             title="下一模块"
+            @click="handleNextModule"
           >
-            ▶
+            <svg class="collapsed-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
         </div>
       </div>
@@ -329,6 +356,24 @@
                 :total-count="totalStudents"
                 label="人已进入"
               />
+            </div>
+            <div
+              v-if="
+                session &&
+                (normalizedSessionStatus === 'teaching' || normalizedSessionStatus === 'active')
+              "
+              class="minimal-more-overview-actions"
+            >
+              <button
+                type="button"
+                class="btn btn-danger minimal-more-end-class-btn"
+                data-testid="minimal-drawer-end-teaching"
+                title="结束当前课程"
+                :disabled="loading"
+                @click="handleEnd"
+              >
+                结束授课
+              </button>
             </div>
           </section>
 
@@ -2382,8 +2427,10 @@ defineExpose({
   padding-bottom: 12px !important;
 }
 
-/* 浮动导播台 - 授课模式下模块列表始终可见（紧凑版） */
+/* 浮动导播台 — 极简侧栏：控制台质感 slate + indigo */
 .teaching-modules-floating {
+  --fp-accent: #4f46e5;
+  --fp-accent-soft: rgba(79, 70, 229, 0.12);
   position: fixed;
   top: 50%;
   right: 20px;
@@ -2391,24 +2438,30 @@ defineExpose({
   z-index: 50;
   max-width: 280px !important;
   width: 280px !important;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(229, 231, 235, 0.8);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
+  backdrop-filter: blur(14px) saturate(1.15);
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 14px 36px rgba(15, 23, 42, 0.1),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
   padding: 0 !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: box-shadow 0.25s ease, border-color 0.2s ease;
   overflow: hidden;
 }
 
 .teaching-modules-floating:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 18px 44px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(79, 70, 229, 0.12);
+  border-color: rgba(79, 70, 229, 0.18);
 }
 
-/* 折叠状态：更紧凑（标题栏含「课堂详情」需略宽） */
 .teaching-modules-floating.panel-collapsed {
-  max-width: 218px !important;
-  width: 218px !important;
+  max-width: 232px !important;
+  width: 232px !important;
 }
 
 .teaching-modules-floating .module-list {
@@ -2417,129 +2470,136 @@ defineExpose({
   max-height: none !important;
   overflow-y: auto !important;
 }
-.teaching-modules-floating .module-list {
-  grid-template-columns: 1fr;
-  gap: 8px;
-  max-height: none !important;
-  overflow-y: auto !important;
-}
-.teaching-modules-floating .module-list {
-  grid-template-columns: 1fr;
-  gap: 8px;
-  max-height: none !important;
-  overflow-y: auto !important;
-}
-.teaching-modules-floating .module-list {
-  grid-template-columns: 1fr;
-  gap: 8px;
-  max-height: none !important;
-  overflow-y: auto !important;
-}
-.teaching-modules-floating .module-list {
-  grid-template-columns: 1fr;
-  gap: 8px;
-  max-height: none !important;
-  overflow-y: auto !important;
-}
-.teaching-modules-floating .module-list {
-  grid-template-columns: 1fr;
-  gap: 8px;
-  max-height: none !important;
-  overflow-y: auto !important;
-}
-.teaching-modules-floating .module-list {
-  grid-template-columns: 1fr;
-  gap: 8px;
-  max-height: none !important;
-  overflow-y: auto !important;
-}
 
-/* 浮动面板头部 - 更紧凑 */
 .floating-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #e5e7eb;
-  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
-  border-radius: 12px 12px 0 0;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 14px 14px 0 0;
   flex-shrink: 0;
-  min-height: 36px;
+  min-height: 44px;
 }
 
-.floating-panel-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1f2937;
+.floating-panel-title-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
   min-width: 0;
   flex: 1;
+}
+
+.floating-panel-title-icon {
+  display: flex;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.floating-panel-title-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.floating-panel-title-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.floating-panel-title-main {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  line-height: 1.2;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.floating-panel-title-kicker {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  line-height: 1.2;
 }
 
 .floating-panel-header-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
 .floating-panel-detail-btn {
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
   font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
-  border: 1px solid #93c5fd;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  color: #334155;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   white-space: nowrap;
 }
 
 .floating-panel-detail-btn:hover {
-  background: #dbeafe;
-  border-color: #60a5fa;
+  background: var(--fp-accent-soft);
+  border-color: rgba(79, 70, 229, 0.35);
+  color: #3730a3;
 }
 
 .floating-panel-toggle {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
   background: #fff;
-  color: #6b7280;
+  color: #475569;
   cursor: pointer;
-  font-size: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   flex-shrink: 0;
   padding: 0;
 }
 
 .floating-panel-toggle:hover {
-  background: #f3f4f6;
-  border-color: #9ca3af;
-  color: #1f2937;
+  background: #f8fafc;
+  border-color: rgba(15, 23, 42, 0.16);
+  color: #0f172a;
 }
 
-/* 折叠状态内容 - 紧凑显示 */
+.floating-panel-toggle-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .floating-panel-collapsed {
-  padding: 10px 12px;
-  background: #fff;
+  padding: 12px 12px 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
-.collapsed-current-info {
+.collapsed-field {
   width: 100%;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.floating-panel-field-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 6px;
 }
 
 .collapsed-current-info--empty {
@@ -2548,51 +2608,56 @@ defineExpose({
 
 .collapsed-empty-hint {
   font-size: 11px;
-  color: #9ca3af;
+  color: #94a3b8;
 }
 
 .collapsed-module-select {
   display: block;
   width: 100%;
   min-width: 0;
-  height: 30px;
-  padding: 0 8px;
+  height: 36px;
+  padding: 0 30px 0 10px;
   font-size: 12px;
   font-weight: 600;
-  color: #111827;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  color: #0f172a;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 10px;
   cursor: pointer;
   box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .collapsed-module-select:focus {
   outline: none;
-  border-color: #93c5fd;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: rgba(79, 70, 229, 0.45);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
 }
 
 .collapsed-module-select:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .collapsed-nav-buttons {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .collapsed-nav-btn {
   flex: 1;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: #f9fafb;
-  color: #4b5563;
-  font-size: 14px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  color: #334155;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2600,21 +2665,28 @@ defineExpose({
 }
 
 .collapsed-nav-btn:hover:not(:disabled) {
-  background: #e5e7eb;
-  border-color: #9ca3af;
+  background: #f1f5f9;
+  border-color: rgba(15, 23, 42, 0.14);
+  color: #0f172a;
 }
 
 .collapsed-nav-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.38;
   cursor: not-allowed;
+}
+
+.collapsed-nav-icon {
+  width: 18px;
+  height: 18px;
 }
 
 /* 浮动面板内容 - 紧凑版 */
 .floating-panel-content {
-  padding: 10px 12px;
+  padding: 12px 12px 14px;
   max-height: 50vh;
   overflow-y: auto;
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+  border-top: 1px solid rgba(15, 23, 42, 0.04);
 }
 
 .floating-panel-content::-webkit-scrollbar {
@@ -2681,12 +2753,12 @@ defineExpose({
     max-width: none !important;
     width: auto !important;
     max-height: 40vh;
-    border-radius: 12px;
+    border-radius: 14px;
   }
   
   .teaching-modules-floating.panel-collapsed {
-    max-width: 196px !important;
-    width: 196px !important;
+    max-width: 210px !important;
+    width: 210px !important;
     left: auto !important;
   }
 }
@@ -2698,45 +2770,53 @@ defineExpose({
     right: 12px;
     left: 12px;
     max-height: 35vh;
-    border-radius: 10px;
+    border-radius: 12px;
   }
   
   .teaching-modules-floating.panel-collapsed {
-    max-width: 176px !important;
-    width: 176px !important;
+    max-width: 188px !important;
+    width: 188px !important;
   }
   
   .floating-panel-header {
-    padding: 6px 10px;
-    min-height: 32px;
+    padding: 8px 10px;
+    min-height: 40px;
   }
-  
-  .floating-panel-title {
+
+  .floating-panel-title-main {
     font-size: 12px;
   }
 
+  .floating-panel-title-kicker {
+    font-size: 9px;
+  }
+  
   .floating-panel-detail-btn {
-    padding: 3px 6px;
+    padding: 4px 8px;
     font-size: 10px;
   }
   
   .floating-panel-toggle {
-    width: 22px;
-    height: 22px;
-    font-size: 10px;
+    width: 28px;
+    height: 28px;
   }
-  
-  .collapsed-current-info {
-    font-size: 11px;
+
+  .floating-panel-toggle-icon {
+    width: 14px;
+    height: 14px;
   }
   
   .collapsed-nav-btn {
-    height: 26px;
-    font-size: 13px;
+    height: 32px;
+  }
+
+  .collapsed-nav-icon {
+    width: 16px;
+    height: 16px;
   }
   
   .floating-panel-content {
-    padding: 8px 10px;
+    padding: 10px 10px 12px;
   }
 }
 
@@ -2750,8 +2830,8 @@ defineExpose({
   }
   
   .teaching-modules-floating.panel-collapsed {
-    max-width: 156px !important;
-    width: 156px !important;
+    max-width: 168px !important;
+    width: 168px !important;
   }
 }
 
@@ -4579,6 +4659,17 @@ input[type="checkbox"].checkbox-input {
 
 .minimal-more-group--always-open .minimal-more-metrics {
   margin-bottom: 0;
+}
+
+.minimal-more-overview-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.minimal-more-end-class-btn {
+  width: 100%;
+  justify-content: center;
 }
 
 .minimal-more-settings-row {
