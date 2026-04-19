@@ -1,11 +1,18 @@
 <template>
-  <div class="module-list-container" data-testid="module-list-container">
+  <div
+    class="module-list-container"
+    :class="{ 'module-list-embed--minimal-drawer': embedContext === 'minimalDrawer' }"
+    data-testid="module-list-container"
+  >
     <!-- 导航控制栏（固定在顶部，始终可见） -->
     <div class="module-navigation-bar" v-if="cells.length > 0" data-testid="module-navigation-bar">
       <!-- 上一模块按钮 -->
       <button
         class="module-nav-btn module-nav-btn-prev"
-        :class="{ 'module-nav-btn-disabled': !canGoPrev }"
+        :class="{
+          'module-nav-btn-disabled': !canGoPrev,
+          'module-nav-btn--icon-only': embedContext === 'minimalDrawer',
+        }"
         :disabled="!canGoPrev || loading"
         @click="handlePrevModule"
         data-testid="prev-module-button"
@@ -14,11 +21,33 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
-        <span>上一模块</span>
+        <span v-if="embedContext !== 'minimalDrawer'">上一模块</span>
       </button>
 
-      <!-- 当前模块：序号 + 标题（与下方预览联动时便于确认播出位置） -->
+      <!-- 当前模块：抽屉内用下拉快速跳转；主界面仍为序号 + 标题 -->
+      <select
+        v-if="embedContext === 'minimalDrawer'"
+        class="module-nav-select"
+        data-testid="module-navigation-current"
+        :value="minimalDrawerSelectValue"
+        :disabled="loading"
+        aria-label="选择要播出的模块"
+        :title="minimalDrawerSelectTitle"
+        @change="onMinimalDrawerModuleSelect"
+      >
+        <option v-if="currentModuleIndex < 0" disabled value="">
+          未播出 / 已隐藏
+        </option>
+        <option
+          v-for="(cell, index) in cells"
+          :key="cell.id ?? index"
+          :value="String(index)"
+        >
+          {{ formatDrawerOptionLabel(cell, index) }}
+        </option>
+      </select>
       <div
+        v-else
         class="module-nav-current"
         data-testid="module-navigation-current"
         :title="navCenterTitleFull"
@@ -35,13 +64,16 @@
       <!-- 下一模块按钮 -->
       <button
         class="module-nav-btn module-nav-btn-next"
-        :class="{ 'module-nav-btn-disabled': !canGoNext }"
+        :class="{
+          'module-nav-btn-disabled': !canGoNext,
+          'module-nav-btn--icon-only': embedContext === 'minimalDrawer',
+        }"
         :disabled="!canGoNext || loading"
         @click="handleNextModule"
         data-testid="next-module-button"
         :title="canGoNext ? '下一模块' : '已经是最后一个模块'"
       >
-        <span>下一模块</span>
+        <span v-if="embedContext !== 'minimalDrawer'">下一模块</span>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
         </svg>
@@ -123,6 +155,8 @@ interface Props {
   displayCellOrders?: number[]
   sessionCurrentActivityId?: number | null
   showLearningMeta?: boolean
+  /** 极简授课「课堂详情」侧栏：放宽列表可视高度、单列，便于一次浏览更多模块 */
+  embedContext?: 'default' | 'minimalDrawer'
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -132,6 +166,7 @@ const props = withDefaults(defineProps<Props>(), {
   sessionCurrentActivityId: null,
   // 授课导播台默认隐藏「难度/时长/进度状态」信息
   showLearningMeta: false,
+  embedContext: 'default',
 })
 
 const emit = defineEmits<{
@@ -166,6 +201,16 @@ const navCenterTitleFull = computed(() => {
   const cell = props.cells[props.currentModuleIndex]
   if (!cell) return ''
   return (cell.title && String(cell.title).trim()) || getCellTypeLabel(cell.type) || `模块 ${props.currentModuleIndex + 1}`
+})
+
+const minimalDrawerSelectValue = computed(() => {
+  if (props.currentModuleIndex < 0 || !props.cells.length) return ''
+  return String(props.currentModuleIndex)
+})
+
+const minimalDrawerSelectTitle = computed(() => {
+  if (props.currentModuleIndex < 0) return '请选择要播出的模块'
+  return navCenterTitleFull.value
 })
 
 // 方法
@@ -247,6 +292,27 @@ function handleNextModule() {
 
 function handleModuleItemClick(cell: Cell, index: number) {
   handleItemClick(cell, index)
+}
+
+function formatDrawerOptionLabel(cell: Cell, index: number): string {
+  const raw =
+    (cell.title && String(cell.title).trim()) ||
+    getCellTypeLabel(cell.type) ||
+    `模块 ${index + 1}`
+  const prefix = `${index + 1}. `
+  const maxBody = 44
+  const body = raw.length > maxBody ? `${raw.slice(0, maxBody - 1)}…` : raw
+  return `${prefix}${body}`
+}
+
+function onMinimalDrawerModuleSelect(event: Event) {
+  const el = event.target as HTMLSelectElement
+  const v = el.value
+  if (v === '') return
+  const index = parseInt(v, 10)
+  if (Number.isNaN(index) || index < 0 || index >= props.cells.length) return
+  const cell = props.cells[index]
+  if (cell) handleModuleItemClick(cell, index)
 }
 
 function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
@@ -400,6 +466,61 @@ function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
 
 .module-list::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
+}
+
+/* 极简授课「课堂详情」抽屉：尽量多显示模块（紧凑卡片 + 高列表区） */
+.module-list-embed--minimal-drawer .module-navigation-bar {
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+}
+
+.module-list-embed--minimal-drawer .module-nav-select {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #111827;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.module-list-embed--minimal-drawer .module-nav-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.module-list-embed--minimal-drawer .module-nav-select:focus {
+  outline: none;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.module-list-embed--minimal-drawer .module-nav-btn.module-nav-btn--icon-only {
+  min-width: unset;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  gap: 0;
+  flex-shrink: 0;
+  border-radius: 0.375rem;
+}
+
+.module-list-embed--minimal-drawer .module-nav-btn.module-nav-btn--icon-only svg {
+  width: 16px;
+  height: 16px;
+}
+
+.module-list-embed--minimal-drawer .module-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-height: min(78vh, calc(100vh - 200px));
 }
 
 .module-item {

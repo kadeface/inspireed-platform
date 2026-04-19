@@ -36,17 +36,21 @@ interface Props {
   duration?: number  // 当前时长（秒）
   remaining?: number  // 剩余时长（秒）
   showDisplay?: boolean
+  /** 为 false 时不展示「剩余: xx」行（如极简课堂详情抽屉仅需已用时长） */
+  showRemainingLine?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   status: 'ended',
   duration: 0,
   remaining: 0,
-  showDisplay: true
+  showDisplay: true,
+  showRemainingLine: true,
 })
 
-// 计算是否显示剩余时间（只在active/teaching状态显示）
+// 计算是否显示剩余时间（只在 active/teaching 且未关闭 showRemainingLine 时显示）
 const showRemaining = computed(() => {
+  if (!props.showRemainingLine) return false
   const normalizedStatus = props.status.toLowerCase()
   return normalizedStatus === 'active' || normalizedStatus === 'teaching'
 })

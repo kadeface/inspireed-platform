@@ -299,45 +299,48 @@
               :status="session.status"
               :duration="displayDuration"
               :remaining="remainingTime"
+              :show-remaining-line="false"
             />
             <StudentCountDisplay
               :active-count="activeStudents.length"
               :total-count="totalStudents"
               label="人已进入"
             />
-            <ModuleCountDisplay
-              v-if="lessonContentCells.length > 0"
-              :count="lessonContentCells.length"
-              label="个模块"
-            />
-          </div>
-
-          <div v-if="lessonContentCells.length > 0" class="minimal-more-row">
-            <span class="minimal-more-label">播出模式</span>
-            <button
-              type="button"
-              class="minimal-drawer-mode-toggle"
-              :disabled="loading"
-              @click="toggleSelectionMode"
-            >
-              {{ isMultiSelectMode ? '多选' : '单选' }}
-            </button>
           </div>
 
           <div
-            v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')"
-            class="minimal-more-row"
+            v-if="
+              lessonContentCells.length > 0 ||
+              (session && (session.status === 'teaching' || session.status === 'TEACHING'))
+            "
+            class="minimal-more-settings-row"
           >
-            <span class="minimal-more-label">学生端展示</span>
-            <button
-              type="button"
-              :disabled="loading"
-              class="btn btn-display-mode"
-              :class="{ active: currentDisplayMode === 'fullscreen' }"
-              @click="handleToggleDisplayMode"
+            <div v-if="lessonContentCells.length > 0" class="minimal-more-inline-group">
+              <span class="minimal-more-label">播出模式</span>
+              <button
+                type="button"
+                class="minimal-drawer-mode-toggle"
+                :disabled="loading"
+                @click="toggleSelectionMode"
+              >
+                {{ isMultiSelectMode ? '多选' : '单选' }}
+              </button>
+            </div>
+            <div
+              v-if="session && (session.status === 'teaching' || session.status === 'TEACHING')"
+              class="minimal-more-inline-group"
             >
-              {{ currentDisplayMode === 'fullscreen' ? '全屏' : '窗口' }}
-            </button>
+              <span class="minimal-more-label">学生端展示</span>
+              <button
+                type="button"
+                :disabled="loading"
+                class="btn btn-display-mode"
+                :class="{ active: currentDisplayMode === 'fullscreen' }"
+                @click="handleToggleDisplayMode"
+              >
+                {{ currentDisplayMode === 'fullscreen' ? '全屏' : '窗口' }}
+              </button>
+            </div>
           </div>
 
           <WaitingForStudentsBanner
@@ -364,6 +367,7 @@
             :is-multi-select-mode="isMultiSelectMode"
             :display-cell-orders="displayCellOrders"
             :session-current-activity-id="session?.current_activity_id"
+            embed-context="minimalDrawer"
             @item-click="handleModuleItemClick"
             @checkbox-click="handleModuleCheckboxClick"
             @checkbox-change="handleModuleCheckboxChange"
@@ -4200,7 +4204,8 @@ input[type="checkbox"].checkbox-input {
 }
 
 .minimal-more-panel {
-  width: min(420px, 100vw);
+  /* 比原 420px 窄，减少遮挡右侧教案；单列模块列表仍可读 */
+  width: min(320px, 100vw);
   background: #fff;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
   display: flex;
@@ -4249,9 +4254,52 @@ input[type="checkbox"].checkbox-input {
 
 .minimal-more-metrics {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 16px;
+  /* 抽屉较窄时仍保持单行：可横向滑动查看 */
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.minimal-more-settings-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 12px;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.minimal-more-inline-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* 播出模式在左、学生端展示在右，同一行 */
+.minimal-more-inline-group + .minimal-more-inline-group {
+  margin-left: auto;
+}
+
+.minimal-more-inline-group .minimal-more-label {
+  margin-bottom: 0;
+}
+
+.minimal-more-settings-row .btn-display-mode {
+  flex-shrink: 0;
 }
 
 .minimal-more-row {
