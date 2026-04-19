@@ -37,26 +37,11 @@
           :session-status="normalizedSessionStatus ?? session?.status"
           :loading="loading"
           :active-students-count="activeStudents.length"
+          merge-start-with-minimal-ui
           @create="handleCreateSession"
           @start="() => handleBeginClass(activeStudents.length)"
           @end="handleEnd"
         />
-        <button
-          type="button"
-          class="btn-minimal-more"
-          data-testid="minimal-more-drawer"
-          @click="minimalMoreDrawerOpen = true"
-        >
-          更多
-        </button>
-        <button
-          type="button"
-          class="btn-minimal-exit"
-          data-testid="minimal-exit"
-          @click="minimalTeachingFocus = false"
-        >
-          退出极简
-        </button>
       </div>
     </div>
 
@@ -116,6 +101,7 @@
             :session-status="normalizedSessionStatus ?? session?.status"
             :loading="loading"
             :active-students-count="activeStudents.length"
+            merge-start-with-minimal-ui
             @create="handleCreateSession"
             @start="() => handleBeginClass(activeStudents.length)"
             @end="handleEnd"
@@ -126,7 +112,7 @@
             class="btn-minimal-enter"
             data-testid="enter-minimal-teaching"
             title="隐藏模块列表与次要信息，专注当前模块与下方全课预览"
-            @click="minimalTeachingFocus = true"
+            @click="minimalTeachingFocus = true; minimalMoreDrawerOpen = false"
           >
             极简授课
           </button>
@@ -185,14 +171,25 @@
     <div v-if="isMinimalTeachingUi" class="panel teaching-modules teaching-modules-floating" :class="{ 'module-panel-fullscreen': modulePanelFullscreen, 'panel-collapsed': floatingPanelCollapsed }">
       <div class="floating-panel-header">
         <span class="floating-panel-title">📺 切换</span>
-        <button 
-          type="button" 
-          class="floating-panel-toggle"
-          :title="floatingPanelCollapsed ? '展开' : '折叠'"
-          @click="floatingPanelCollapsed = !floatingPanelCollapsed"
-        >
-          {{ floatingPanelCollapsed ? '◀' : '▶' }}
-        </button>
+        <div class="floating-panel-header-right">
+          <button
+            type="button"
+            class="floating-panel-detail-btn"
+            data-testid="minimal-more-drawer"
+            title="打开课堂详情抽屉（暂退出极简顶栏）；关闭抽屉后将自动回到极简"
+            @click="openMinimalDetailDrawerFromMinimalBar"
+          >
+            课堂详情
+          </button>
+          <button
+            type="button"
+            class="floating-panel-toggle"
+            :title="floatingPanelCollapsed ? '展开' : '折叠'"
+            @click="floatingPanelCollapsed = !floatingPanelCollapsed"
+          >
+            {{ floatingPanelCollapsed ? '◀' : '▶' }}
+          </button>
+        </div>
       </div>
       
       <!-- 折叠状态：模块下拉 + 快速切换 -->
@@ -262,10 +259,6 @@
       </div>
     </div>
 
-    <p v-if="isMinimalTeachingUi" class="minimal-teaching-hint">
-      下方为全课预览，切换模块时将自动滚动到当前播出内容。
-    </p>
-
     <!-- 主布局：模块列表与活动统计（极简模式下收入「更多」） -->
     <!-- 主布局区（非授课模式） -->
     <div v-if="!isMinimalTeachingUi" class="main-layout" :class="{ 'module-fullscreen-mode': modulePanelFullscreen }">
@@ -300,7 +293,7 @@
     <div
       v-if="minimalMoreDrawerOpen && session"
       class="minimal-more-backdrop"
-      @click.self="minimalMoreDrawerOpen = false"
+      @click.self="closeMinimalMoreDrawer"
     >
       <div class="minimal-more-panel" role="dialog" aria-modal="true" aria-labelledby="minimal-more-heading">
         <div class="minimal-more-panel-header">
@@ -308,8 +301,10 @@
           <button
             type="button"
             class="minimal-more-close"
-            aria-label="关闭"
-            @click="minimalMoreDrawerOpen = false"
+            data-testid="minimal-more-drawer-close"
+            aria-label="关闭并返回极简导播"
+            title="关闭并返回极简导播"
+            @click="closeMinimalMoreDrawer"
           >
             ×
           </button>
@@ -650,6 +645,7 @@ const sessionManager = useSessionManager({
   onSessionStarted: (updatedSession) => {
     durationTimer.startDurationTimer()
     loadStatistics()
+    minimalTeachingFocus.value = true
   },
   onSessionEnded: () => {
     durationTimer.stopDurationTimer()
@@ -706,7 +702,7 @@ async function handleToggleDisplayMode() {
 const containerRef = ref<HTMLElement | null>(null)
 const moduleListRef = ref<HTMLElement | null>(null)
 const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map())
-/** 极简授课：隐藏模块格与次要信息，仅保留切换与结束课堂；详情进「更多」抽屉 */
+/** 极简授课：隐藏模块格与次要信息；「课堂详情」与抽屉关闭成对切换标准布局 */
 const minimalTeachingFocus = ref(false)
 const floatingPanelCollapsed = ref(true)  // 浮动面板折叠状态
 
@@ -735,6 +731,21 @@ function applyMinimalDrawerSectionDefaults() {
 watch(minimalMoreDrawerOpen, (open) => {
   if (open) applyMinimalDrawerSectionDefaults()
 })
+
+/** 极简顶栏：进入课堂详情 = 退出极简布局并打开抽屉（与 closeMinimalMoreDrawer 对称） */
+function openMinimalDetailDrawerFromMinimalBar() {
+  minimalTeachingFocus.value = false
+  minimalMoreDrawerOpen.value = true
+}
+
+/** 关闭课堂详情抽屉并回到极简导播（与 openMinimalDetailDrawerFromMinimalBar 对称） */
+function closeMinimalMoreDrawer() {
+  minimalMoreDrawerOpen.value = false
+  if (!session.value) return
+  const st = normalizedSessionStatus.value
+  if (st === 'ended') return
+  minimalTeachingFocus.value = true
+}
 const selectedCellIndex = ref(-1)
 const dbCells = ref<Array<{ id: number | string; order: number; cell_type: string }>>([])
 
@@ -1043,15 +1054,22 @@ async function onCollapsedFloatingModuleSelect(ev: Event) {
 }
 
 const isMinimalTeachingUi = computed(() => {
-  if (!minimalTeachingFocus.value ) return false
+  if (!minimalTeachingFocus.value || !session.value) return false
   const st = normalizedSessionStatus.value
-  return st !== 'ended' && st != null
+  if (st === 'ended') return false
+  const raw = session.value.status
+  if (raw !== undefined && raw !== null && String(raw).toLowerCase() === 'ended') return false
+  // 勿要求 st != null：讲授型开始上课后会立刻调 display-mode，若返回体短暂缺少 status，避免极简顶栏被关掉
+  return true
 })
 
+/** 仅上课中且已退出极简时显示，与准备态的「开始授课 · 极简」分工 */
 const showEnterMinimalTeachingButton = computed(() => {
   if (!session.value || minimalTeachingFocus.value) return false
   const st = normalizedSessionStatus.value
-  return st !== 'ended' && st != null
+  if (st === 'ended' || st == null) return false
+  if (st === 'preparing' || st === 'pending') return false
+  return st === 'teaching' || st === 'active'
 })
 
 const minimalCurrentTitleFull = computed(() => {
@@ -2387,10 +2405,10 @@ defineExpose({
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 
-/* 折叠状态：更紧凑 */
+/* 折叠状态：更紧凑（标题栏含「课堂详情」需略宽） */
 .teaching-modules-floating.panel-collapsed {
-  max-width: 200px !important;
-  width: 200px !important;
+  max-width: 218px !important;
+  width: 218px !important;
 }
 
 .teaching-modules-floating .module-list {
@@ -2441,6 +2459,7 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 8px 12px;
   border-bottom: 1px solid #e5e7eb;
   background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
@@ -2456,6 +2475,37 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.floating-panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.floating-panel-detail-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.floating-panel-detail-btn:hover {
+  background: #dbeafe;
+  border-color: #60a5fa;
 }
 
 .floating-panel-toggle {
@@ -2635,8 +2685,8 @@ defineExpose({
   }
   
   .teaching-modules-floating.panel-collapsed {
-    max-width: 180px !important;
-    width: 180px !important;
+    max-width: 196px !important;
+    width: 196px !important;
     left: auto !important;
   }
 }
@@ -2652,8 +2702,8 @@ defineExpose({
   }
   
   .teaching-modules-floating.panel-collapsed {
-    max-width: 160px !important;
-    width: 160px !important;
+    max-width: 176px !important;
+    width: 176px !important;
   }
   
   .floating-panel-header {
@@ -2663,6 +2713,11 @@ defineExpose({
   
   .floating-panel-title {
     font-size: 12px;
+  }
+
+  .floating-panel-detail-btn {
+    padding: 3px 6px;
+    font-size: 10px;
   }
   
   .floating-panel-toggle {
@@ -2695,8 +2750,8 @@ defineExpose({
   }
   
   .teaching-modules-floating.panel-collapsed {
-    max-width: 140px !important;
-    width: 140px !important;
+    max-width: 156px !important;
+    width: 156px !important;
   }
 }
 
@@ -4381,14 +4436,6 @@ input[type="checkbox"].checkbox-input {
 
 .btn-minimal-enter:hover {
   background: #dbeafe;
-}
-
-.minimal-teaching-hint {
-  margin: 0;
-  padding: 8px 16px 4px;
-  font-size: 13px;
-  color: #6b7280;
-  text-align: center;
 }
 
 .minimal-more-backdrop {

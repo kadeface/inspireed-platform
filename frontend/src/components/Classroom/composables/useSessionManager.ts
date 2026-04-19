@@ -298,7 +298,14 @@ export function useSessionManager(options: UseSessionManagerOptions) {
       // 讲授型模式：无学生时自动切换为 fullscreen 幻灯片模式
       if (activeStudentsCount === 0) {
         try {
-          session.value = await classroomSessionService.updateDisplayMode(session.value.id, 'fullscreen')
+          const prev = session.value
+          const updated = await classroomSessionService.updateDisplayMode(prev.id, 'fullscreen')
+          session.value = {
+            ...prev,
+            ...updated,
+            status: (updated as any).status ?? prev.status,
+            settings: (updated as any).settings ?? prev.settings,
+          }
         } catch (displayErr: any) {
           console.warn('讲授型模式自动切换全屏失败，可手动切换:', displayErr)
         }

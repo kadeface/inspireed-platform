@@ -12,17 +12,36 @@
       </button>
     </template>
 
-    <!-- PREPARING 状态：讲授型（无学生）或互动型（有学生）均可开始上课 -->
-    <template v-else-if="sessionStatus === 'PREPARING' || sessionStatus === 'preparing'">
+    <!-- PREPARING / PENDING：讲授型（无学生）或互动型（有学生）均可开始上课 -->
+    <template
+      v-else-if="
+        sessionStatus === 'PREPARING' ||
+        sessionStatus === 'preparing' ||
+        sessionStatus === 'PENDING' ||
+        sessionStatus === 'pending'
+      "
+    >
       <button
         data-testid="start-teaching-button"
         @click="$emit('start')"
         :disabled="loading"
         class="btn btn-primary"
-        :title="activeStudentsCount === 0 ? '开始上课（讲授型/幻灯片模式）' : '开始上课（互动型模式）'"
+        :title="
+          mergeStartWithMinimalUi
+            ? activeStudentsCount === 0
+              ? '开始上课并进入极简导播（讲授型 / 幻灯片）'
+              : '开始上课并进入极简导播（互动型）'
+            : activeStudentsCount === 0
+              ? '开始上课（讲授型/幻灯片模式）'
+              : '开始上课（互动型模式）'
+        "
       >
         开始授课
-        <span v-if="activeStudentsCount === 0" class="ml-2 text-xs opacity-75">(讲授型)</span>
+        <span v-if="mergeStartWithMinimalUi" class="ml-2 text-xs opacity-75">
+          <template v-if="activeStudentsCount === 0">(讲授型 · 极简)</template>
+          <template v-else>(互动型 · 极简)</template>
+        </span>
+        <span v-else-if="activeStudentsCount === 0" class="ml-2 text-xs opacity-75">(讲授型)</span>
         <span v-else class="ml-2 text-xs opacity-75">(互动型)</span>
       </button>
       <button
@@ -69,13 +88,16 @@ interface Props {
   sessionStatus?: string
   loading?: boolean
   activeStudentsCount?: number
+  /** 与导播台「极简授课」合并：准备中只保留本按钮，点击后开始上课并进入极简布局 */
+  mergeStartWithMinimalUi?: boolean
 }
 
 withDefaults(defineProps<Props>(), {
   hasSession: false,
   sessionStatus: 'ended',
   loading: false,
-  activeStudentsCount: 0
+  activeStudentsCount: 0,
+  mergeStartWithMinimalUi: false,
 })
 
 defineEmits<{
