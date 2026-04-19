@@ -611,7 +611,7 @@ import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, provide,
 // ============================================================================
 import type { Lesson } from '../../types/lesson'
 import type { LessonClassroom } from '../../types/lesson'
-import type { Cell, ActivityCell } from '../../types/cell'
+import { CellType, type Cell, type ActivityCell } from '../../types/cell'
 
 // ============================================================================
 // 3. Store
@@ -916,7 +916,7 @@ const currentCell = computed(() => {
 })
 
 const currentActivityDbCell = computed(() => {
-  if (!currentCell.value || currentCell.value.type !== 'activity') return null
+  if (!currentCell.value || currentCell.value.type !== CellType.ACTIVITY) return null
   if (!dbCells.value?.length) return null
   const order = currentCell.value.order
   if (order === undefined) return null
