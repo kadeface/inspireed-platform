@@ -80,9 +80,12 @@ class ActivitySubmission(Base):
 
     # 状态
     status = Column(
-        # Persist enum member names (DRAFT/SUBMITTED/...) for compatibility
-        # with existing PostgreSQL enum labels in production databases.
-        SQLEnum(ActivitySubmissionStatus),
+        # Persist enum values (draft/submitted/...) to match migration-defined
+        # PostgreSQL enum labels in active environments.
+        SQLEnum(
+            ActivitySubmissionStatus,
+            values_callable=_enum_values,
+        ),
         default=ActivitySubmissionStatus.DRAFT,
         nullable=False,
         index=True,
