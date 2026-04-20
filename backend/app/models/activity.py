@@ -23,6 +23,11 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
+def _enum_values(enum_cls: type[Enum]) -> list[str]:
+    """Persist enum member .value (e.g. submitted), not .name (SUBMITTED), for PostgreSQL ENUM."""
+    return [m.value for m in enum_cls]  # type: ignore[misc]
+
+
 class ActivitySubmissionStatus(str, Enum):
     """活动提交状态"""
 
@@ -75,7 +80,10 @@ class ActivitySubmission(Base):
 
     # 状态
     status = Column(
-        SQLEnum(ActivitySubmissionStatus),
+        SQLEnum(
+            ActivitySubmissionStatus,
+            values_callable=_enum_values,
+        ),
         default=ActivitySubmissionStatus.DRAFT,
         nullable=False,
         index=True,
@@ -163,7 +171,10 @@ class PeerReview(Base):
 
     # 状态
     status = Column(
-        SQLEnum(PeerReviewStatus),
+        SQLEnum(
+            PeerReviewStatus,
+            values_callable=_enum_values,
+        ),
         default=PeerReviewStatus.PENDING,
         nullable=False,
     )
