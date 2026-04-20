@@ -5,9 +5,9 @@
       :key="option.id"
       class="option-label"
       :class="{
-        'option-correct': isSubmitted && isCorrectOption(option.id),
+        'option-correct': isSubmitted && hasCorrectAnswer && isCorrectOption(option.id),
         'option-selected': modelValue === option.id,
-        'option-wrong': isSubmitted && modelValue === option.id && !isCorrect
+        'option-wrong': isSubmitted && hasCorrectAnswer && modelValue === option.id && !isCorrect
       }"
     >
       <input
@@ -19,7 +19,7 @@
         @change="handleChange(option.id)"
       />
       <span>{{ option.text }}</span>
-      <span v-if="isSubmitted && isCorrectOption(option.id)" class="correct-badge">
+      <span v-if="isSubmitted && hasCorrectAnswer && isCorrectOption(option.id)" class="correct-badge">
         ✓ 正确答案
       </span>
     </label>
@@ -58,6 +58,10 @@ const emit = defineEmits<{
 }>()
 
 const isCorrect = computed(() => props.answerData?.correct ?? false)
+const hasCorrectAnswer = computed(() => {
+  if (!props.answerData || typeof props.answerData !== 'object') return false
+  return Boolean(props.answerData.correctAnswerId || props.answerData.correctAnswer)
+})
 
 function isCorrectOption(optionId: string): boolean {
   if (!props.answerData || typeof props.answerData !== 'object') return false

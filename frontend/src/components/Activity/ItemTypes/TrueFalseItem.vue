@@ -3,9 +3,9 @@
     <label
       class="option-label"
       :class="{
-        'option-correct': isSubmitted && isCorrectAnswer(true),
+        'option-correct': isSubmitted && hasCorrectAnswer && isCorrectAnswer(true),
         'option-selected': modelValue === true,
-        'option-wrong': isSubmitted && modelValue === true && !isCorrectAnswer(true)
+        'option-wrong': isSubmitted && hasCorrectAnswer && modelValue === true && !isCorrectAnswer(true)
       }"
     >
       <input
@@ -22,9 +22,9 @@
     <label
       class="option-label"
       :class="{
-        'option-correct': isSubmitted && isCorrectAnswer(false),
+        'option-correct': isSubmitted && hasCorrectAnswer && isCorrectAnswer(false),
         'option-selected': modelValue === false,
-        'option-wrong': isSubmitted && modelValue === false && !isCorrectAnswer(false)
+        'option-wrong': isSubmitted && hasCorrectAnswer && modelValue === false && !isCorrectAnswer(false)
       }"
     >
       <input
@@ -69,6 +69,11 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   'change': [itemId: string]
 }>()
+
+const hasCorrectAnswer = computed(() => {
+  const correctAnswer = props.answerData?.correctAnswer
+  return correctAnswer !== undefined && correctAnswer !== null && correctAnswer !== ''
+})
 
 function isCorrectAnswer(value: boolean): boolean {
   if (!props.answerData || props.answerData.correctAnswer === undefined) return false

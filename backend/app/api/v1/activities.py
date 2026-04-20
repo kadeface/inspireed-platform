@@ -1892,6 +1892,7 @@ def _auto_grade_submission(
         - graded_responses: 包含正确性判断的答案字典
     """
     cell_content = _coerce_activity_cell_content(cell_content)
+    is_survey_activity = str(cell_content.get("activityType", "")).lower() == "survey"
     items = _normalize_activity_items(cell_content.get("items", []))
     graded_responses: Dict[str, Any] = {}
     total_score = 0.0
@@ -1947,6 +1948,15 @@ def _auto_grade_submission(
         else:
             graded_answer = student_answer.copy()
         
+        # 问卷活动不进行判对错，也不返回标准答案字段
+        if is_survey_activity:
+            graded_answer.pop("correct", None)
+            graded_answer.pop("correctAnswer", None)
+            graded_answer.pop("correctAnswerId", None)
+            graded_answer.pop("score", None)
+            graded_responses[item_id] = graded_answer
+            continue
+
         # 判断选择题的正确性
         is_correct = None
         correct_answer = None
@@ -1986,6 +1996,12 @@ def _auto_grade_submission(
                 
                 graded_answer["correct"] = is_correct
                 graded_answer["correctAnswer"] = correct_answer
+            else:
+                # 没有标准答案时，清理潜在的历史判题字段，避免误显示“回答错误”
+                graded_answer.pop("correct", None)
+                graded_answer.pop("correctAnswer", None)
+                graded_answer.pop("correctAnswerId", None)
+                graded_answer.pop("score", None)
         
         elif item_type == "multiple-choice":
             has_auto_gradable_items = True
@@ -2020,6 +2036,10 @@ def _auto_grade_submission(
                 
                 graded_answer["correct"] = is_correct
                 graded_answer["correctAnswer"] = correct_answer
+            else:
+                graded_answer.pop("correct", None)
+                graded_answer.pop("correctAnswer", None)
+                graded_answer.pop("score", None)
         
         elif item_type == "true-false":
             has_auto_gradable_items = True
@@ -2042,6 +2062,10 @@ def _auto_grade_submission(
                 
                 graded_answer["correct"] = is_correct
                 graded_answer["correctAnswer"] = correct_answer
+            else:
+                graded_answer.pop("correct", None)
+                graded_answer.pop("correctAnswer", None)
+                graded_answer.pop("score", None)
         
         # 保存评分后的答案
         graded_responses[item_id] = graded_answer
