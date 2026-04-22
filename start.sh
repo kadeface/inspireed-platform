@@ -16,6 +16,15 @@
 
 echo "🚀 启动 InspireEd 本地开发环境..."
 
+COMPOSE_FILE="docker/docker-compose.prod.yml"
+COMPOSE_ENV_FILE="docker/.env.prod"
+
+if [ ! -f "$COMPOSE_ENV_FILE" ]; then
+    echo "❌ 缺少环境文件: $COMPOSE_ENV_FILE"
+    echo "   请先创建该文件（可参考 docker/.env.example）"
+    exit 1
+fi
+
 # 等待 Docker 启动（最多等待 2 分钟）
 WAIT_DOCKER=${WAIT_DOCKER:-false}
 if [ "$WAIT_DOCKER" = "true" ]; then
@@ -99,9 +108,8 @@ fi
 
 # 启动基础服务（仅 postgres/redis/minio，后端和前端在本地运行，避免拉取 python/node 镜像）
 echo "📦 启动基础服务 (PostgreSQL, Redis, MinIO)..."
-cd docker
-docker compose up -d postgres redis minio 2>/dev/null || docker-compose up -d postgres redis minio
-cd ..
+docker compose -f "$COMPOSE_FILE" --env-file "$COMPOSE_ENV_FILE" up -d postgres redis minio 2>/dev/null || \
+docker-compose -f "$COMPOSE_FILE" --env-file "$COMPOSE_ENV_FILE" up -d postgres redis minio
 
 # 等待服务启动
 echo "⏳ 等待服务启动..."
@@ -114,7 +122,7 @@ POSTGRES_ATTEMPT=0
 until nc -z 127.0.0.1 5432 2>/dev/null; do
     POSTGRES_ATTEMPT=$((POSTGRES_ATTEMPT + 1))
     if [ $POSTGRES_ATTEMPT -ge $POSTGRES_MAX_ATTEMPTS ]; then
-        echo "❌ PostgreSQL 启动超时，请检查 Docker 容器: docker-compose -f docker/docker-compose.yml ps"
+        echo "❌ PostgreSQL 启动超时，请检查 Docker 容器: docker compose -f $COMPOSE_FILE --env-file $COMPOSE_ENV_FILE ps"
         exit 1
     fi
     echo "   等待中... ($POSTGRES_ATTEMPT/$POSTGRES_MAX_ATTEMPTS)"
@@ -126,7 +134,8 @@ mkdir -p logs
 
 # 检查服务状态
 echo "🔍 检查服务状态..."
-(docker compose -f docker/docker-compose.yml ps 2>/dev/null || docker-compose -f docker/docker-compose.yml ps) || true
+(docker compose -f "$COMPOSE_FILE" --env-file "$COMPOSE_ENV_FILE" ps 2>/dev/null || \
+docker-compose -f "$COMPOSE_FILE" --env-file "$COMPOSE_ENV_FILE" ps) || true
 
 # 启动后端服务
 echo "🔧 启动后端服务..."
@@ -215,8 +224,6 @@ PUBLIC_IP=$(get_public_ip)
 
 PROTOCOL="http"
 if [[ "$USE_HTTPS" == "true" ]]; then
-    PROTOCOL="https"
-elif [[ ! -z "$PUBLIC_IP" ]] && ! is_private_ip "$PUBLIC_IP"; then
     PROTOCOL="https"
 fi
 

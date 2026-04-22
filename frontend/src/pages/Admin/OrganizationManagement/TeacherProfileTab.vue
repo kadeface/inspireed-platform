@@ -78,6 +78,13 @@
       </div>
       <div class="flex gap-2">
         <button
+          @click="editSelectedTeacher"
+          :disabled="selectedTeachers.length !== 1"
+          class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          编辑资料
+        </button>
+        <button
           @click="batchDeleteTeachers"
           class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
         >
@@ -90,6 +97,35 @@
           取消选择
         </button>
       </div>
+    </div>
+
+    <!-- 悬浮快捷操作：避免长列表中来回滚动 -->
+    <div
+      v-if="selectedTeachers.length > 0"
+      class="fixed right-6 bottom-6 z-40 bg-white border border-gray-200 shadow-lg rounded-lg px-3 py-2 flex items-center gap-2"
+    >
+      <span class="text-sm text-gray-700 whitespace-nowrap">
+        已选 {{ selectedTeachers.length }} 位
+      </span>
+      <button
+        @click="editSelectedTeacher"
+        :disabled="selectedTeachers.length !== 1"
+        class="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        编辑资料
+      </button>
+      <button
+        @click="batchDeleteTeachers"
+        class="px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+      >
+        批量删除
+      </button>
+      <button
+        @click="clearSelection"
+        class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
+      >
+        取消
+      </button>
     </div>
 
     <!-- 教师列表 -->
@@ -224,8 +260,13 @@
         <el-form-item label="邮箱">
           <el-input v-model="teacherForm.email" type="email" placeholder="请输入邮箱" />
         </el-form-item>
-        <el-form-item v-if="!editingTeacher" label="密码">
-          <el-input v-model="teacherForm.password" type="password" placeholder="请输入初始密码" />
+        <el-form-item :label="editingTeacher ? '新密码' : '密码'">
+          <el-input
+            v-model="teacherForm.password"
+            type="password"
+            :placeholder="editingTeacher ? '留空则不修改密码' : '请输入初始密码'"
+            show-password
+          />
         </el-form-item>
         <el-form-item label="所属学校">
           <el-select v-model="teacherForm.school_id" placeholder="输入学校名称搜索或选择学校" class="w-full" filterable>
@@ -573,6 +614,19 @@ const editTeacher = (teacher: User) => {
   showTeacherModal.value = true
 }
 
+const editSelectedTeacher = () => {
+  if (selectedTeachers.value.length !== 1) {
+    ElMessage.warning('请只选择 1 位教师进行编辑')
+    return
+  }
+  const targetTeacher = teachers.value.find(t => t.id === selectedTeachers.value[0])
+  if (!targetTeacher) {
+    ElMessage.warning('未找到已选择的教师，请刷新后重试')
+    return
+  }
+  editTeacher(targetTeacher)
+}
+
 const saveTeacher = async () => {
   // 表单验证
   if (!teacherForm.value.username) {
@@ -587,6 +641,10 @@ const saveTeacher = async () => {
     ElMessage.warning('请输入密码')
     return
   }
+  if (teacherForm.value.password && teacherForm.value.password.length < 6) {
+    ElMessage.warning('密码长度至少 6 位')
+    return
+  }
 
   saving.value = true
   try {
@@ -596,7 +654,8 @@ const saveTeacher = async () => {
         email: teacherForm.value.email,
         full_name: teacherForm.value.full_name || null,
         school_id: teacherForm.value.school_id || null,
-        is_active: teacherForm.value.is_active
+        is_active: teacherForm.value.is_active,
+        ...(teacherForm.value.password ? { password: teacherForm.value.password } : {})
       })
       ElMessage.success('更新成功')
     } else {

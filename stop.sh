@@ -2,6 +2,9 @@
 
 echo "🛑 停止 InspireEd 教师教研系统..."
 
+COMPOSE_FILE="docker/docker-compose.prod.yml"
+COMPOSE_ENV_FILE="docker/.env.prod"
+
 # 停止前端服务
 if [ -f "logs/frontend.pid" ]; then
     FRONTEND_PID=$(cat logs/frontend.pid)
@@ -29,9 +32,8 @@ pkill -f "pnpm dev" 2>/dev/null
 
 # 停止 Docker 服务
 echo "📦 停止 Docker 服务..."
-cd docker
-docker-compose down
-cd ..
+docker compose -f "$COMPOSE_FILE" --env-file "$COMPOSE_ENV_FILE" down 2>/dev/null || \
+docker-compose -f "$COMPOSE_FILE" --env-file "$COMPOSE_ENV_FILE" down
 
 echo "✅ 所有服务已停止"
 echo ""

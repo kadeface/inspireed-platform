@@ -105,6 +105,13 @@
       </div>
       <div class="flex gap-2 flex-wrap">
         <button
+          @click="editSelectedStudent"
+          :disabled="selectedStudents.length !== 1"
+          class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          编辑资料
+        </button>
+        <button
           @click="openBatchMoveDialog"
           class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
         >
@@ -123,6 +130,41 @@
           取消选择
         </button>
       </div>
+    </div>
+
+    <!-- 悬浮快捷操作：避免长列表中来回滚动 -->
+    <div
+      v-if="selectedStudents.length > 0"
+      class="fixed right-6 bottom-6 z-40 bg-white border border-gray-200 shadow-lg rounded-lg px-3 py-2 flex items-center gap-2 flex-wrap"
+    >
+      <span class="text-sm text-gray-700 whitespace-nowrap">
+        已选 {{ selectedStudents.length }} 位
+      </span>
+      <button
+        @click="editSelectedStudent"
+        :disabled="selectedStudents.length !== 1"
+        class="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        编辑资料
+      </button>
+      <button
+        @click="openBatchMoveDialog"
+        class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+      >
+        批量调班
+      </button>
+      <button
+        @click="openBatchDeleteWithSelected"
+        class="px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+      >
+        批量删除
+      </button>
+      <button
+        @click="clearSelection"
+        class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
+      >
+        取消
+      </button>
     </div>
 
     <!-- 学生列表 -->
@@ -144,7 +186,7 @@
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">用户名</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学号</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">学籍号</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">邮箱</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">所属学校</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">所属班级</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">最后登录</th>
@@ -178,7 +220,7 @@
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.username }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.username }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.student_id_number || '-' }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.email }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.school_name || '-' }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               {{ student.classroom_name || '-' }}
             </td>
@@ -264,8 +306,13 @@
         <el-form-item label="邮箱">
           <el-input v-model="studentForm.email" type="email" placeholder="请输入邮箱" />
         </el-form-item>
-        <el-form-item v-if="!editingStudent" label="密码">
-          <el-input v-model="studentForm.password" type="password" placeholder="请输入初始密码" />
+        <el-form-item :label="editingStudent ? '新密码' : '密码'">
+          <el-input
+            v-model="studentForm.password"
+            type="password"
+            :placeholder="editingStudent ? '留空则不修改密码' : '请输入初始密码'"
+            show-password
+          />
         </el-form-item>
         <el-form-item label="所属学校">
           <el-select v-model="studentForm.school_id" @change="handleFormSchoolChange" placeholder="输入学校名称搜索或选择学校" class="w-full" filterable>
@@ -1023,6 +1070,19 @@ const editStudent = (student: User) => {
   showStudentModal.value = true
 }
 
+const editSelectedStudent = () => {
+  if (selectedStudents.value.length !== 1) {
+    ElMessage.warning('请只选择 1 位学生进行编辑')
+    return
+  }
+  const targetStudent = students.value.find(s => s.id === selectedStudents.value[0])
+  if (!targetStudent) {
+    ElMessage.warning('未找到已选择的学生，请刷新后重试')
+    return
+  }
+  editStudent(targetStudent)
+}
+
 const saveStudent = async () => {
   if (!studentForm.value.username) {
     ElMessage.warning('请输入学号')
@@ -1034,6 +1094,10 @@ const saveStudent = async () => {
   }
   if (!editingStudent.value && !studentForm.value.password) {
     ElMessage.warning('请输入密码')
+    return
+  }
+  if (studentForm.value.password && studentForm.value.password.length < 6) {
+    ElMessage.warning('密码长度至少 6 位')
     return
   }
 
@@ -1048,7 +1112,8 @@ const saveStudent = async () => {
         school_id: studentForm.value.school_id,
         grade_id: studentForm.value.grade_id,
         classroom_id: studentForm.value.classroom_id,
-        is_active: studentForm.value.is_active
+        is_active: studentForm.value.is_active,
+        ...(studentForm.value.password ? { password: studentForm.value.password } : {})
       })
       ElMessage.success('更新成功')
     } else {
