@@ -110,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h } from 'vue'
+import { ref, computed, h, watch, nextTick } from 'vue'
 import { CellType, type Cell } from '../../types/cell'
 import ModuleCard from './ModuleCard.vue'
 
@@ -329,8 +329,54 @@ function onMinimalDrawerModuleSelect(event: Event) {
   const index = parseInt(v, 10)
   if (Number.isNaN(index) || index < 0 || index >= props.cells.length) return
   const cell = props.cells[index]
-  if (cell) handleModuleItemClick(cell, index)
+  if (cell) {
+    handleModuleItemClick(cell, index)
+    // 选择后立即尝试滚动到对应模块，避免视觉上“下拉已切换但列表未跟随”。
+    scrollToModuleIndex(index, 'smooth')
+  }
 }
+
+function scrollToModuleIndex(index: number, behavior: ScrollBehavior = 'auto') {
+  if (index < 0) return
+  const listEl = moduleListRef.value
+  if (!listEl) return
+
+  let itemEl = moduleItemRefs.value.get(index)
+  if (!itemEl) {
+    itemEl = listEl.querySelector(`[data-module-index="${index}"]`) as HTMLElement | null
+  }
+  if (!itemEl) return
+
+  // 极简抽屉场景：让目标项尽量落在可视区域中间，阅读与连续切换体验更稳定。
+  if (props.embedContext === 'minimalDrawer' || props.embedContext === 'minimalFloating') {
+    const centerIntoView = (scrollBehavior: ScrollBehavior) => {
+      const listRect = listEl.getBoundingClientRect()
+      const itemRect = itemEl!.getBoundingClientRect()
+      const itemCenter = itemRect.top - listRect.top + listEl.scrollTop + itemRect.height / 2
+      const rawTop = itemCenter - listEl.clientHeight / 2
+      const maxScrollTop = Math.max(0, listEl.scrollHeight - listEl.clientHeight)
+      const nextScrollTop = Math.max(0, Math.min(rawTop, maxScrollTop))
+      listEl.scrollTo({ top: nextScrollTop, behavior: scrollBehavior })
+    }
+
+    centerIntoView(behavior)
+    // 平滑滚动在某些浏览器/布局下会有一次偏移，下一帧做一次无动画校正。
+    requestAnimationFrame(() => centerIntoView('auto'))
+    return
+  }
+
+  itemEl.scrollIntoView({ behavior, block: 'nearest' })
+}
+
+// 外部切换当前模块（例如下拉、上一条/下一条、其他入口）时，让列表始终跟随到可视区域。
+watch(
+  () => props.currentModuleIndex,
+  async (index) => {
+    if (index < 0) return
+    await nextTick()
+    scrollToModuleIndex(index, 'smooth')
+  },
+)
 
 function handleModuleCheckboxClick(cell: Cell, index: number, event: Event) {
   handleCheckboxClick(cell, index, event)

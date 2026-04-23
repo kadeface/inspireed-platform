@@ -482,13 +482,17 @@ const handleClassAssistant = () => {
   max-width: min(320px, calc(100vw - 20px));
   max-height: min(72vh, 440px);
   z-index: 20;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.14),
-    0 4px 16px rgba(0, 0, 0, 0.08);
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 14px 30px rgba(15, 23, 42, 0.12);
 }
 
 .teaching-assistant-fab-container--embedded .fab-menu-content {
   max-height: min(52vh, 360px);
+  padding: 8px;
 }
 
 /* 与 TeacherControlPanel 浮动导播台「课堂详情 / 展开」图标按钮同一套工具按钮语言 */
@@ -521,6 +525,104 @@ const handleClassAssistant = () => {
   border-color: rgba(79, 70, 229, 0.35);
   color: #3730a3;
   box-shadow: none;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-header {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  color: #475569;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-close:hover {
+  background: #f8fafc;
+  border-color: rgba(15, 23, 42, 0.16);
+  color: #0f172a;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-item {
+  position: relative;
+  border-radius: 10px;
+  padding: 10px 12px;
+  gap: 10px;
+  margin-bottom: 2px;
+  border: 1px solid transparent;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-item:hover:not(:disabled) {
+  background: rgba(79, 70, 229, 0.08);
+  border-color: rgba(79, 70, 229, 0.16);
+  transform: none;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-item:hover:not(:disabled)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 999px;
+  background: #4f46e5;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(79, 70, 229, 0.12) !important;
+  color: #4f46e5;
+  box-shadow: inset 0 0 0 1px rgba(79, 70, 229, 0.14);
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-item-icon svg {
+  color: #4f46e5 !important;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-item-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-item > svg {
+  color: #6366f1 !important;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-tip {
+  margin-bottom: 6px;
+  border-radius: 10px;
+  background: rgba(79, 70, 229, 0.08);
+  border: 1px solid rgba(79, 70, 229, 0.22);
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-tip svg {
+  color: #4f46e5 !important;
+}
+
+.teaching-assistant-fab-container--embedded .fab-menu-tip-text {
+  color: #3730a3;
 }
 
 .fab-button-icon {

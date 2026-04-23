@@ -9,25 +9,24 @@
 
       <!-- 抽屉内容 -->
       <aside
-        class="absolute right-0 top-0 flex h-full w-full max-w-2xl flex-col bg-white/95 backdrop-blur-sm shadow-2xl"
+        class="absolute right-0 top-0 flex h-full w-full max-w-2xl flex-col border-l border-slate-200/80 bg-white/96 backdrop-blur-sm shadow-[0_20px_48px_rgba(15,23,42,0.16)]"
       >
-        <header class="relative overflow-hidden border-b border-gray-200 bg-white/80 backdrop-blur-sm px-6 py-5">
-          <span class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 to-purple-600"></span>
+        <header class="relative overflow-hidden border-b border-slate-200 bg-gradient-to-b from-slate-50/95 to-slate-100/80 px-5 py-3 min-h-11">
           <div class="relative flex items-start justify-between gap-4">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">
+              <p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                 教学助手
               </p>
-              <h2 class="mt-1 text-xl font-bold text-gray-900">
+              <h2 class="mt-1 text-xl font-bold text-slate-900">
                 快速操作
               </h2>
-              <p class="mt-1 text-sm text-gray-600">
+              <p class="mt-1 text-sm text-slate-600">
                 在授课过程中快速进行点名、考勤等操作
               </p>
             </div>
             <button
               type="button"
-              class="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              class="h-[30px] w-[30px] rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
               @click="handleClose"
             >
               <span class="sr-only">关闭</span>
@@ -42,19 +41,19 @@
           </div>
         </header>
 
-        <main class="flex-1 overflow-y-auto px-6 py-5">
+        <main class="assistant-drawer-main">
           <!-- 功能标签页 -->
-          <div class="mb-6">
-            <div class="flex gap-2 border-b border-gray-200">
+          <div class="mb-3">
+            <div class="flex gap-1.5 border-b border-slate-200 pb-0.5">
               <button
                 v-for="tab in tabs"
                 :key="tab.key"
                 @click="activeTab = tab.key"
                 :class="[
-                  'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
+                  'relative -mb-px rounded-t-md px-3 h-9 inline-flex items-center text-sm font-medium transition-colors border-b-2',
                   activeTab === tab.key
-                    ? 'text-indigo-600 border-indigo-600'
-                    : 'text-gray-500 border-transparent hover:text-gray-700'
+                    ? 'text-slate-800 border-slate-500 bg-slate-100'
+                    : 'text-slate-500 border-transparent hover:text-slate-700 hover:bg-slate-100/70'
                 ]"
               >
                 {{ tab.label }}
@@ -65,16 +64,16 @@
           <!-- 点名考勤 -->
           <div v-if="activeTab === 'attendance'" class="space-y-4">
             <!-- 未开始点名 -->
-            <div v-if="!currentAttendanceSession" class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-200 p-6 text-center">
-              <svg class="mx-auto h-12 w-12 text-blue-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div v-if="!currentAttendanceSession" class="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+              <svg class="mx-auto mb-3 h-12 w-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">快速点名</h3>
-              <p class="text-sm text-gray-600 mb-4">一键开始点名，快速记录学生出勤情况</p>
+              <h3 class="mb-2 text-lg font-semibold text-slate-900">快速点名</h3>
+              <p class="mb-4 text-sm text-slate-600">一键开始点名，快速记录学生出勤情况</p>
               <button
                 @click="startAttendance"
                 :disabled="!classroomId || startingAttendance"
-                class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-800 bg-slate-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <svg v-if="!startingAttendance" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -90,11 +89,11 @@
             <!-- 点名进行中 -->
             <div v-else class="space-y-4">
               <!-- 会话信息 -->
-              <div class="bg-white rounded-xl border border-gray-200 p-4">
+              <div class="rounded-xl border border-slate-200 bg-white p-4">
                 <div class="flex items-center justify-between">
                   <div>
-                    <h3 class="text-lg font-semibold text-gray-900">点名进行中</h3>
-                    <p class="text-sm text-gray-500 mt-1">
+                    <h3 class="text-lg font-semibold text-slate-900">点名进行中</h3>
+                    <p class="mt-1 text-sm text-slate-500">
                       {{ formatTime(currentAttendanceSession.startedAt) }}
                     </p>
                   </div>
@@ -102,14 +101,14 @@
                     <button
                       @click="markAllPresent"
                       :disabled="savingAttendance"
-                      class="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-all disabled:opacity-50"
+                      class="inline-flex h-9 items-center rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
                     >
                       一键全到
                     </button>
                     <button
                       @click="completeAttendance"
                       :disabled="savingAttendance"
-                      class="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg shadow hover:shadow-md transition-all disabled:opacity-50"
+                      class="inline-flex h-9 items-center rounded-lg border border-slate-800 bg-slate-800 px-3 text-sm font-medium text-white transition hover:bg-slate-900 disabled:opacity-50"
                     >
                       完成点名
                     </button>
@@ -118,23 +117,23 @@
               </div>
 
               <!-- 学生列表（简化版） -->
-              <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div class="p-4 border-b border-gray-200 bg-gray-50">
-                  <h4 class="text-sm font-semibold text-gray-900">学生考勤状态</h4>
+              <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div class="border-b border-slate-200 bg-slate-50 p-4">
+                  <h4 class="text-sm font-semibold text-slate-900">学生考勤状态</h4>
                 </div>
                 <div class="p-4 max-h-[400px] overflow-y-auto">
-                  <div v-if="loadingStudents" class="text-center py-8 text-gray-500">
-                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+                  <div v-if="loadingStudents" class="py-8 text-center text-slate-500">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-600 mx-auto mb-2"></div>
                     <p class="text-sm">加载中...</p>
                   </div>
-                  <div v-else-if="attendanceEntries.length === 0" class="text-center py-8 text-gray-500">
+                  <div v-else-if="attendanceEntries.length === 0" class="py-8 text-center text-slate-500">
                     <p class="text-sm">暂无学生</p>
                   </div>
                   <div v-else class="grid grid-cols-2 gap-2">
                     <div
                       v-for="entry in attendanceEntries"
                       :key="entry.id"
-                      class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:shadow-sm transition-all"
+                      class="flex items-center justify-between rounded-lg border border-slate-200 p-3 transition-all hover:bg-slate-50"
                       :class="getStatusClass(entry.status)"
                     >
                       <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -145,14 +144,14 @@
                           {{ getStudentInitial(entry.studentId) }}
                         </div>
                         <div class="min-w-0 flex-1">
-                          <p class="text-sm font-medium text-gray-900 truncate">{{ getStudentName(entry.studentId) }}</p>
+                          <p class="truncate text-sm font-medium text-slate-900">{{ getStudentName(entry.studentId) }}</p>
                         </div>
                       </div>
                       <select
                         :value="entry.status"
                         @change="updateAttendanceStatus(entry.studentId, ($event.target as HTMLSelectElement).value)"
                         :disabled="savingAttendance"
-                        class="ml-2 px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 flex-shrink-0"
+                        class="ml-2 flex-shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:opacity-50"
                       >
                         <option value="present">出勤</option>
                         <option value="late">迟到</option>
@@ -168,15 +167,15 @@
 
           <!-- 课堂表现 -->
           <div v-if="activeTab === 'behavior'" class="space-y-4">
-            <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 p-6 text-center">
-              <svg class="mx-auto h-12 w-12 text-green-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+              <svg class="mx-auto mb-3 h-12 w-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
               </svg>
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">记录课堂表现</h3>
-              <p class="text-sm text-gray-600 mb-4">快速记录学生的积极表现</p>
+              <h3 class="mb-2 text-lg font-semibold text-slate-900">记录课堂表现</h3>
+              <p class="mb-4 text-sm text-slate-600">快速记录学生的积极表现</p>
               <button
                 @click="openFullPage('positive-behaviors')"
-                class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                class="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-800 bg-slate-800 px-4 text-sm font-semibold text-white transition hover:bg-slate-900"
               >
                 进入完整功能
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -188,15 +187,15 @@
 
           <!-- 纪律记录 -->
           <div v-if="activeTab === 'discipline'" class="space-y-4">
-            <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200 p-6 text-center">
-              <svg class="mx-auto h-12 w-12 text-amber-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+              <svg class="mx-auto mb-3 h-12 w-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">记录纪律</h3>
-              <p class="text-sm text-gray-600 mb-4">快速记录课堂纪律事件</p>
+              <h3 class="mb-2 text-lg font-semibold text-slate-900">记录纪律</h3>
+              <p class="mb-4 text-sm text-slate-600">快速记录课堂纪律事件</p>
               <button
                 @click="openFullPage('discipline')"
-                class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                class="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-800 bg-slate-800 px-4 text-sm font-semibold text-white transition hover:bg-slate-900"
               >
                 进入完整功能
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,15 +207,15 @@
 
           <!-- 值日管理 -->
           <div v-if="activeTab === 'duty'" class="space-y-4">
-            <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-200 p-6 text-center">
-              <svg class="mx-auto h-12 w-12 text-purple-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+              <svg class="mx-auto mb-3 h-12 w-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">值日管理</h3>
-              <p class="text-sm text-gray-600 mb-4">查看今日值日安排</p>
+              <h3 class="mb-2 text-lg font-semibold text-slate-900">值日管理</h3>
+              <p class="mb-4 text-sm text-slate-600">查看今日值日安排</p>
               <button
                 @click="openFullPage('duty')"
-                class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                class="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-800 bg-slate-800 px-4 text-sm font-semibold text-white transition hover:bg-slate-900"
               >
                 进入完整功能
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,23 +298,23 @@ const getStudentInitial = (studentId: number): string => {
 // 获取状态样式类
 const getStatusClass = (status: string) => {
   const classes: Record<string, string> = {
-    present: 'bg-green-50 border-green-200',
-    late: 'bg-yellow-50 border-yellow-200',
-    leave: 'bg-blue-50 border-blue-200',
-    absent: 'bg-red-50 border-red-200',
+    present: 'bg-white border-slate-200',
+    late: 'bg-white border-slate-200',
+    leave: 'bg-white border-slate-200',
+    absent: 'bg-white border-slate-200',
   }
-  return classes[status] || 'bg-gray-50 border-gray-200'
+  return classes[status] || 'bg-white border-slate-200'
 }
 
 // 获取状态背景类
 const getStatusBgClass = (status: string) => {
   const classes: Record<string, string> = {
-    present: 'bg-green-500',
-    late: 'bg-yellow-500',
-    leave: 'bg-blue-500',
-    absent: 'bg-red-500',
+    present: 'bg-slate-500',
+    late: 'bg-slate-500',
+    leave: 'bg-slate-500',
+    absent: 'bg-slate-500',
   }
-  return classes[status] || 'bg-gray-500'
+  return classes[status] || 'bg-slate-500'
 }
 
 // 加载学生列表
@@ -453,6 +452,13 @@ watch(() => props.classroomId, (newId) => {
 </script>
 
 <style scoped>
+.assistant-drawer-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px 18px;
+  background: linear-gradient(180deg, #ffffff 0%, rgba(248, 250, 252, 0.55) 100%);
+}
+
 .drawer-enter-active,
 .drawer-leave-active {
   transition: opacity 0.3s ease;

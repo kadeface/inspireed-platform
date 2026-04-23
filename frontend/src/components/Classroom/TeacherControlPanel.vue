@@ -4669,7 +4669,8 @@ input[type="checkbox"].checkbox-input {
 .minimal-more-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(2px);
   z-index: 10050;
   display: flex;
   justify-content: flex-end;
@@ -4679,8 +4680,9 @@ input[type="checkbox"].checkbox-input {
 .minimal-more-panel {
   /* 比原 420px 窄，减少遮挡右侧教案；单列模块列表仍可读 */
   width: min(320px, 100vw);
-  background: #fff;
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-left: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: -10px 0 36px rgba(15, 23, 42, 0.16);
   display: flex;
   flex-direction: column;
   max-height: 100vh;
@@ -4691,43 +4693,51 @@ input[type="checkbox"].checkbox-input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 10px 12px;
+  min-height: 44px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   flex-shrink: 0;
 }
 
 .minimal-more-panel-title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f172a;
 }
 
 .minimal-more-close {
-  border: none;
-  background: transparent;
-  font-size: 24px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  font-size: 20px;
   line-height: 1;
   cursor: pointer;
-  color: #6b7280;
-  padding: 4px 8px;
-  border-radius: 6px;
+  color: #475569;
+  padding: 0;
+  border-radius: 8px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .minimal-more-close:hover {
-  background: #f3f4f6;
-  color: #111827;
+  background: #f8fafc;
+  border-color: rgba(15, 23, 42, 0.16);
+  color: #0f172a;
 }
 
 .minimal-more-panel-body {
   overflow-y: auto;
-  padding: 12px 16px 24px;
+  padding: 10px 12px 18px;
   flex: 1;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
 /* 课堂详情：分组（路线 A） */
 .minimal-more-group {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .minimal-more-group:last-child {
@@ -4735,23 +4745,24 @@ input[type="checkbox"].checkbox-input {
 }
 
 .minimal-more-group-heading {
-  margin: 0 0 8px;
-  font-size: 12px;
+  margin: 0 0 6px;
+  font-size: 11px;
   font-weight: 600;
   color: #64748b;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
 }
 
 .minimal-more-group-toggle {
   display: flex;
   width: 100%;
+  min-height: 36px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
+  padding: 7px 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 10px;
-  background: #f8fafc;
+  background: #fff;
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -4759,8 +4770,8 @@ input[type="checkbox"].checkbox-input {
 }
 
 .minimal-more-group-toggle:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: #f8fafc;
+  border-color: rgba(15, 23, 42, 0.14);
 }
 
 .minimal-more-group-toggle-label {
@@ -4780,11 +4791,11 @@ input[type="checkbox"].checkbox-input {
 }
 
 .minimal-more-group-body {
-  padding-top: 10px;
+  padding-top: 8px;
 }
 
 .minimal-more-group-body--tight {
-  padding-top: 8px;
+  padding-top: 6px;
 }
 
 .minimal-more-group-body .minimal-more-settings-row {
@@ -4828,7 +4839,7 @@ input[type="checkbox"].checkbox-input {
   gap: 10px;
   width: 100%;
   min-width: 0;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   white-space: nowrap;
   overflow-x: auto;
   overflow-y: hidden;
@@ -4861,7 +4872,7 @@ input[type="checkbox"].checkbox-input {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .minimal-more-label {
@@ -4872,9 +4883,10 @@ input[type="checkbox"].checkbox-input {
 
 .minimal-drawer-mode-toggle {
   @apply px-2.5 py-1 text-xs font-medium rounded-md border shadow-sm;
-  border-color: #93c5fd;
-  background: #eff6ff;
-  color: #1d4ed8;
+  height: 30px;
+  border-color: rgba(79, 70, 229, 0.28);
+  background: rgba(79, 70, 229, 0.08);
+  color: #3730a3;
   cursor: pointer;
 }
 
@@ -4889,9 +4901,9 @@ input[type="checkbox"].checkbox-input {
   padding: 0 8px;
   font-size: 12px;
   font-weight: 600;
-  color: #1d4ed8;
-  background: #eff6ff;
-  border: 1px solid #93c5fd;
+  color: #3730a3;
+  background: rgba(79, 70, 229, 0.08);
+  border: 1px solid rgba(79, 70, 229, 0.28);
   border-radius: 0.375rem;
   cursor: pointer;
   flex-shrink: 0;
@@ -4899,8 +4911,8 @@ input[type="checkbox"].checkbox-input {
 
 .minimal-drawer-mode-select:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  border-color: rgba(79, 70, 229, 0.45);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.16);
 }
 
 .minimal-drawer-mode-select:disabled {
@@ -4998,13 +5010,13 @@ input[type="checkbox"].checkbox-input {
 }
 
 .minimal-more-panel {
-  border-left: 1px solid #dbe3ef;
-  box-shadow: -8px 0 30px rgba(15, 23, 42, 0.16);
+  border-left-color: rgba(15, 23, 42, 0.08);
+  box-shadow: -10px 0 36px rgba(15, 23, 42, 0.16);
 }
 
 .minimal-more-panel-header {
-  border-bottom-color: #dbe3ef;
-  background: #f8fafc;
+  border-bottom-color: rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 @media (max-width: 768px) {
