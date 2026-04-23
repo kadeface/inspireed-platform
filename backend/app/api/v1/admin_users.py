@@ -74,6 +74,7 @@ class UserUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
+    password: Optional[str] = Field(None, min_length=6, max_length=50)
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
     region_id: Optional[int] = None
@@ -352,7 +353,9 @@ async def get_users(
     # 搜索筛选
     if search:
         search_filter = or_(
-            User.username.ilike(f"%{search}%"), User.email.ilike(f"%{search}%")
+            User.username.ilike(f"%{search}%"),
+            User.email.ilike(f"%{search}%"),
+            User.full_name.ilike(f"%{search}%"),
         )
         query = query.where(search_filter)
 
@@ -497,6 +500,11 @@ async def update_user(
     # 更新用户信息
     update_data = user_data.model_dump(exclude_unset=True)
     scope_fields = {"region_id", "school_id", "grade_id", "classroom_id"}
+
+    # password 是输入字段，需要转换为数据库中的 hashed_password
+    raw_password = cast(Optional[str], update_data.pop("password", None))
+    if raw_password:
+        update_data["hashed_password"] = get_password_hash(raw_password)
 
     if any(field in update_data for field in scope_fields):
         scope_kwargs = {

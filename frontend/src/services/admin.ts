@@ -152,6 +152,7 @@ export interface UserUpdate {
   email?: string
   full_name?: string | null
   student_id_number?: string | null
+  password?: string
   role?: string
   is_active?: boolean
   region_id?: number | null

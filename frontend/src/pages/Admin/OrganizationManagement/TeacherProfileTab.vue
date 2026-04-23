@@ -24,7 +24,7 @@
 
         <select
           v-model="filters.school_id"
-          @change="() => loadTeachers()"
+          @change="handleSchoolChange"
           class="px-3 py-2 border rounded-lg"
         >
           <option :value="undefined">所有学校</option>
@@ -541,7 +541,10 @@ const toast = useToast()
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 const debouncedLoadTeachers = () => {
   if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => loadTeachers(), 500)
+  debounceTimer = setTimeout(() => {
+    currentPage.value = 1
+    loadTeachers()
+  }, 500)
 }
 
 // 加载数据
@@ -591,6 +594,12 @@ const loadSchools = async () => {
 // 事件处理
 const handleRegionChange = () => {
   filters.value.school_id = undefined
+  currentPage.value = 1
+  loadTeachers()
+}
+
+const handleSchoolChange = () => {
+  currentPage.value = 1
   loadTeachers()
 }
 
