@@ -86,7 +86,10 @@ export default defineConfig(({ mode }) => {
     chunkSizeWarningLimit: 1000,
   },
   optimizeDeps: {
-    include: ['vue', 'vue-router', 'pinia', 'axios']
-  }
+    // vue-router 由根目录 pnpm patchedDependencies 打补丁；预构建缓存可能仍为旧文件，导致
+    // Safari/Chrome 报 instance.__vrv_devtools 对 null 赋值。排除后开发态始终走 node_modules 源码。
+    include: ['vue', 'pinia', 'axios'],
+    exclude: ['vue-router'],
+  },
   }
 })

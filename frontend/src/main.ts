@@ -46,21 +46,35 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 
-try {
-  app.mount('#app')
-  const boot = document.getElementById('app-static-boot')
-  if (boot) boot.remove()
-  if (import.meta.env.DEV) {
-    console.info('[InspireEd] app.mount 完成')
-  }
-} catch (e) {
-  console.error('[InspireEd] app.mount 失败', e)
-  const root = document.getElementById('app')
-  if (root) {
-    root.innerHTML =
-      '<pre style="padding:16px;color:#b91c1c;font:14px/1.5 monospace;white-space:pre-wrap;">应用挂载失败（请截图发开发者）：\n\n' +
-      (e instanceof Error ? e.stack || e.message : String(e)) +
-      '</pre>'
-  }
-  throw e
-}
+void router
+  .isReady()
+  .then(() => {
+    try {
+      app.mount('#app')
+      const boot = document.getElementById('app-static-boot')
+      if (boot) boot.remove()
+      if (import.meta.env.DEV) {
+        console.info('[InspireEd] app.mount 完成')
+      }
+    } catch (e) {
+      console.error('[InspireEd] app.mount 失败', e)
+      const root = document.getElementById('app')
+      if (root) {
+        root.innerHTML =
+          '<pre style="padding:16px;color:#b91c1c;font:14px/1.5 monospace;white-space:pre-wrap;">应用挂载失败（请截图发开发者）：\n\n' +
+          (e instanceof Error ? e.stack || e.message : String(e)) +
+          '</pre>'
+      }
+      throw e
+    }
+  })
+  .catch((e) => {
+    console.error('[InspireEd] router.isReady 失败', e)
+    const root = document.getElementById('app')
+    if (root) {
+      root.innerHTML =
+        '<pre style="padding:16px;color:#b91c1c;font:14px/1.5 monospace;white-space:pre-wrap;">路由初始化失败（请截图发开发者）：\n\n' +
+        (e instanceof Error ? e.stack || e.message : String(e)) +
+        '</pre>'
+    }
+  })

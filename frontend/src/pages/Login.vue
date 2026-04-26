@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-screen bg-slate-50 font-sans selection:bg-emerald-100 selection:text-emerald-900 isolate"
+    class="min-h-screen bg-slate-50 font-sans selection:bg-emerald-100 selection:text-emerald-900"
     style="min-height: 100vh; background-color: #f8fafc"
   >
     <!-- 顶部导航栏 - 玻璃拟态设计 -->
@@ -82,13 +82,13 @@
           <!-- Hero Section -->
           <section class="relative overflow-hidden pb-16 lg:pb-24">
             <!-- Dynamic Background Gradients（避免 Safari 下 mix-blend-multiply + 大模糊层导致整页发白） -->
-            <div class="absolute inset-0 pointer-events-none z-0">
-              <div 
-                class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-gradient-to-b from-emerald-50/80 via-teal-50/50 to-transparent rounded-[100%] blur-3xl transition-colors duration-1000"
+            <div class="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+              <div
+                class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-gradient-to-b from-emerald-50/80 via-teal-50/50 to-transparent rounded-[100%] blur-2xl transition-colors duration-1000"
                 :class="currentSystem === 'evaluation' ? '!from-teal-50/80 !via-emerald-50/50' : ''"
               ></div>
-              <div class="absolute top-20 right-0 w-96 h-96 bg-cyan-100/40 rounded-full blur-3xl animate-blob"></div>
-              <div class="absolute top-40 left-0 w-96 h-96 bg-emerald-100/40 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
+              <div class="absolute top-20 right-0 w-96 h-96 bg-cyan-100/40 rounded-full blur-2xl animate-blob"></div>
+              <div class="absolute top-40 left-0 w-96 h-96 bg-emerald-100/40 rounded-full blur-2xl animate-blob animation-delay-2000"></div>
             </div>
 
             <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-10">

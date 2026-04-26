@@ -1,0 +1,13 @@
+diff --git a/dist/vue-router.mjs b/dist/vue-router.mjs
+index 51101d6dd1cac25eb9d15726a21e06fff56139e8..5213b02b76d64a43251d2abe2358051441054d68 100644
+--- a/dist/vue-router.mjs
++++ b/dist/vue-router.mjs
+@@ -1115,7 +1115,7 @@ const RouterViewImpl = /* @__PURE__ */ defineComponent({
+ 					meta: matchedRoute.meta
+ 				};
+ 				(isArray(component.ref) ? component.ref.map((r) => r.i) : [component.ref.i]).forEach((instance) => {
+-					instance.__vrv_devtools = info;
++					if (instance != null) instance.__vrv_devtools = info;
+ 				});
+ 			}
+ 			return normalizeSlot(slots.default, {

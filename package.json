@@ -25,11 +25,13 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "vue-demi"
-    ]
+    ],
+    "patchedDependencies": {
+      "vue-router@4.6.4": "patches/vue-router@4.6.4.patch"
+    }
   },
   "devDependencies": {
     "prettier": "^3.1.0",
     "typescript": "^5.3.3"
   }
 }
-
