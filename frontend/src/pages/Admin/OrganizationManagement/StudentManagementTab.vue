@@ -45,7 +45,7 @@
           class="px-3 py-2 border rounded-lg"
         >
           <option :value="undefined">所有年级</option>
-          <option v-for="grade in grades" :key="grade.id" :value="grade.id">
+          <option v-for="grade in filteredGrades" :key="grade.id" :value="grade.id">
             {{ grade.name }}
           </option>
         </select>
@@ -327,7 +327,7 @@
         <el-form-item label="年级">
           <el-select v-model="studentForm.grade_id" @change="handleFormGradeChange" placeholder="请选择年级" class="w-full" :disabled="!studentForm.school_id">
             <el-option
-              v-for="grade in grades"
+              v-for="grade in formGrades"
               :key="grade.id"
               :label="grade.name"
               :value="grade.id"
@@ -397,7 +397,7 @@
             :disabled="!batchMoveForm.school_id"
           >
             <el-option
-              v-for="grade in grades"
+              v-for="grade in batchMoveGrades"
               :key="grade.id"
               :label="grade.name"
               :value="grade.id"
@@ -721,6 +721,30 @@ const filteredClassrooms = computed(() => {
   return result
 })
 
+const filteredGrades = computed(() => {
+  if (!filters.value.school_id) {
+    return grades.value
+  }
+  const gradeIds = new Set(
+    allClassrooms.value
+      .filter(c => c.school_id === filters.value.school_id)
+      .map(c => c.grade_id)
+  )
+  return grades.value.filter(g => gradeIds.has(g.id))
+})
+
+const formGrades = computed(() => {
+  if (!studentForm.value.school_id) {
+    return grades.value
+  }
+  const gradeIds = new Set(
+    allClassrooms.value
+      .filter(c => c.school_id === studentForm.value.school_id)
+      .map(c => c.grade_id)
+  )
+  return grades.value.filter(g => gradeIds.has(g.id))
+})
+
 const formClassrooms = computed(() => {
   let result = allClassrooms.value
   if (studentForm.value.school_id) {
@@ -747,6 +771,18 @@ const batchMoveClassrooms = computed(() => {
     result = result.filter(c => c.grade_id === batchMoveForm.value.grade_id)
   }
   return result
+})
+
+const batchMoveGrades = computed(() => {
+  if (!batchMoveForm.value.school_id) {
+    return grades.value
+  }
+  const gradeIds = new Set(
+    allClassrooms.value
+      .filter(c => c.school_id === batchMoveForm.value.school_id)
+      .map(c => c.grade_id)
+  )
+  return grades.value.filter(g => gradeIds.has(g.id))
 })
 
 const showBatchMoveDialog = ref(false)
