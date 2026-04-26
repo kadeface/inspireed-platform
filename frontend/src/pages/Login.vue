@@ -1,5 +1,8 @@
 <template>
-  <div class="min-h-screen bg-slate-50 font-sans selection:bg-emerald-100 selection:text-emerald-900">
+  <div
+    class="min-h-screen bg-slate-50 font-sans selection:bg-emerald-100 selection:text-emerald-900 isolate"
+    style="min-height: 100vh; background-color: #f8fafc"
+  >
     <!-- 顶部导航栏 - 玻璃拟态设计 -->
     <header
       class="fixed w-full top-0 z-50 transition-all duration-300"
@@ -11,6 +14,7 @@
           <div class="flex items-center space-x-3 group cursor-pointer" @click="showLoginForm = false">
             <div
               class="w-10 h-10 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform duration-300 ring-2 ring-white/50"
+              style="background: linear-gradient(to bottom right, #10b981, #14b8a6, #06b6d4)"
             >
               <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -22,7 +26,7 @@
               </svg>
             </div>
             <span
-              class="text-2xl font-bold bg-gradient-to-r from-slate-800 via-slate-700 to-slate-900 bg-clip-text text-transparent tracking-tight group-hover:opacity-80 transition-opacity"
+              class="text-2xl font-bold tracking-tight text-slate-800 group-hover:opacity-80 transition-opacity"
             >
               InspireEd
             </span>
@@ -77,14 +81,14 @@
         <div v-if="!showLoginForm" class="flex-grow">
           <!-- Hero Section -->
           <section class="relative overflow-hidden pb-16 lg:pb-24">
-            <!-- Dynamic Background Gradients -->
-            <div class="absolute inset-0 pointer-events-none">
+            <!-- Dynamic Background Gradients（避免 Safari 下 mix-blend-multiply + 大模糊层导致整页发白） -->
+            <div class="absolute inset-0 pointer-events-none z-0">
               <div 
-                class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-gradient-to-b from-emerald-50/80 via-teal-50/50 to-transparent rounded-[100%] blur-3xl -z-10 transition-colors duration-1000"
+                class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-gradient-to-b from-emerald-50/80 via-teal-50/50 to-transparent rounded-[100%] blur-3xl transition-colors duration-1000"
                 :class="currentSystem === 'evaluation' ? '!from-teal-50/80 !via-emerald-50/50' : ''"
               ></div>
-              <div class="absolute top-20 right-0 w-96 h-96 bg-cyan-100/40 rounded-full blur-3xl -z-10 mix-blend-multiply animate-blob"></div>
-              <div class="absolute top-40 left-0 w-96 h-96 bg-emerald-100/40 rounded-full blur-3xl -z-10 mix-blend-multiply animate-blob animation-delay-2000"></div>
+              <div class="absolute top-20 right-0 w-96 h-96 bg-cyan-100/40 rounded-full blur-3xl animate-blob"></div>
+              <div class="absolute top-40 left-0 w-96 h-96 bg-emerald-100/40 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
             </div>
 
             <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-10">
@@ -123,7 +127,7 @@
                   </div>
                   
                   <h1 class="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight text-slate-900 leading-[1.1]">
-                    交互式<span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">学习活动</span>平台
+                    交互式<span class="text-emerald-600">学习活动</span>平台
                   </h1>
                   
                   <p class="text-xl md:text-2xl text-slate-600 mb-8 max-w-3xl mx-auto leading-relaxed font-light">
@@ -137,7 +141,7 @@
                       { num: lessonCount ? `${lessonCount}+` : '...', label: '实践案例', from: 'from-cyan-500', to: 'to-blue-500' }
                     ]" :key="idx" 
                     class="bg-white/60 backdrop-blur-md border border-white/60 px-8 py-4 rounded-2xl shadow-lg shadow-slate-200/50 hover:-translate-y-1 transition-transform duration-300">
-                      <div class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r" :class="[stat.from, stat.to]">
+                      <div class="text-3xl font-bold text-emerald-600">
                         {{ stat.num }}
                       </div>
                       <div class="text-xs text-slate-500 font-semibold uppercase tracking-wider mt-1">{{ stat.label }}</div>
@@ -159,7 +163,7 @@
                   </div>
 
                   <h1 class="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight text-slate-900 leading-[1.1]">
-                    教学<span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-500">增值评价</span>系统
+                    教学<span class="text-teal-600">增值评价</span>系统
                   </h1>
                   
                   <p class="text-xl md:text-2xl text-slate-600 mb-8 max-w-3xl mx-auto leading-relaxed font-light">
@@ -196,7 +200,7 @@
                   <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br opacity-10 rounded-full blur-2xl -mr-8 -mt-8 transition-opacity group-hover:opacity-20" :class="subject.color"></div>
                   <div class="relative z-10 flex flex-col items-center">
                     <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform duration-300 filter drop-shadow-sm">{{ subject.icon }}</div>
-                    <h3 class="font-bold text-slate-800 text-lg group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r" :class="subject.color">{{ subject.name }}</h3>
+                    <h3 class="font-bold text-slate-800 text-lg group-hover:text-emerald-700 transition-colors">{{ subject.name }}</h3>
                     <p class="text-xs text-slate-400 font-medium tracking-wide uppercase mt-1">{{ subject.en }}</p>
                   </div>
                 </RouterLink>
@@ -242,7 +246,7 @@
                             </span>
                             <span>循证教育评价</span>
                          </div>
-                         <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">更科学的<span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-500">增值评价体系</span></h2>
+                         <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">更科学的<span class="text-teal-600">增值评价体系</span></h2>
                          <p class="text-lg text-slate-600 leading-relaxed">
                            告别单一的绝对成绩排名。InspireEd 采用先进的增值评估模型，剥离生源基础等外部影响，还原最真实的“教学力”和“进步值”。
                          </p>
