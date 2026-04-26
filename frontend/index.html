@@ -7,7 +7,48 @@
     <title>InspireEd - 探究式STEM教学系统</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- 在 main.ts 执行并成功 mount 之前可见；若一直停留在此说明 JS 未跑完或未挂载 -->
+      <div
+        id="app-static-boot"
+        style="padding: 24px; font-family: system-ui, sans-serif; color: #334155; max-width: 36rem; line-height: 1.5"
+      >
+        <p style="font-weight: 600; margin: 0 0 8px">正在加载 InspireEd…</p>
+        <p style="margin: 0; font-size: 14px; color: #64748b">
+          若长时间只有本页文字：请按 F12 打开「控制台」和「网络」，看 <code>/src/main.ts</code> 是否失败（红色）、是否被拦截为空白。
+        </p>
+      </div>
+    </div>
+    <script>
+      ;(function () {
+        function show(msg) {
+          var el = document.createElement('pre')
+          el.setAttribute(
+            'style',
+            'position:fixed;z-index:2147483647;left:0;right:0;bottom:0;max-height:50vh;overflow:auto;margin:0;padding:12px;background:#fee;color:#900;font:12px/1.4 monospace;border-top:3px solid #c00;'
+          )
+          el.textContent = msg
+          document.body.appendChild(el)
+        }
+        window.addEventListener(
+          'error',
+          function (ev) {
+            show(
+              '[全局 error]\n' +
+                (ev && ev.message ? ev.message : '') +
+                '\n' +
+                (ev && ev.filename ? ev.filename : '') +
+                (ev && ev.lineno ? ':' + ev.lineno + ':' + ev.colno : '')
+            )
+          },
+          true
+        )
+        window.addEventListener('unhandledrejection', function (ev) {
+          var r = ev.reason
+          show('[全局 unhandledrejection]\n' + (r && r.stack ? r.stack : String(r)))
+        })
+      })()
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
