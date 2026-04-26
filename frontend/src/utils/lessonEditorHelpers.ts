@@ -42,6 +42,7 @@ const CELL_TYPE_NAMES: Record<string, string> = {
   [CellType.CHART]: '图表单元',
   [CellType.CONTEST]: '竞赛单元',
   [CellType.VIDEO]: '视频单元',
+  [CellType.IMAGE]: '图片单元',
   [CellType.ACTIVITY]: '活动单元',
   [CellType.FLOWCHART]: '流程图单元',
   [CellType.BROWSER]: '浏览器单元',
@@ -62,6 +63,7 @@ export function summarizeCell(cell: Cell, index: number): string | null {
     [CellType.CHART]: '图表',
     [CellType.CONTEST]: '竞赛',
     [CellType.VIDEO]: '视频',
+    [CellType.IMAGE]: '图片',
     [CellType.ACTIVITY]: '活动',
     [CellType.FLOWCHART]: '流程图',
     [CellType.INTERACTIVE]: '交互式课件',
@@ -81,6 +83,13 @@ export function summarizeCell(cell: Cell, index: number): string | null {
     detail = (cell as any).content.title
   } else if (cell.type === CellType.VIDEO && (cell as any).content?.title) {
     detail = (cell as any).content.title
+  } else if (cell.type === CellType.IMAGE) {
+    const cap = (cell as any).content?.caption
+    const src = (cell as any).content?.src
+    const raw = (cap && String(cap).trim()) || (src && String(src).trim()) || ''
+    if (raw) {
+      detail = raw.length > 28 ? `${raw.slice(0, 28)}…` : raw
+    }
   } else if (cell.type === CellType.FLOWCHART) {
     detail = '流程设计'
   } else if (cell.type === CellType.SIM) {

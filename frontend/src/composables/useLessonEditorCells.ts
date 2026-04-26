@@ -53,6 +53,13 @@ export function getDefaultCell(cellType: (typeof CellType)[keyof typeof CellType
         content: { videoUrl: '', title: '', description: '' },
         config: { autoplay: false, controls: true, loop: false, muted: false },
       } as Cell
+    case CellType.IMAGE:
+      return {
+        ...baseCell,
+        type: CellType.IMAGE,
+        content: { src: '', alt: '', caption: '' },
+        config: { align: 'center' as const, maxWidth: '100%' },
+      } as Cell
     case CellType.ACTIVITY:
       return {
         ...baseCell,

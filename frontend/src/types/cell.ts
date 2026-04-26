@@ -13,6 +13,7 @@ export const CellType = {
   FLOWCHART: 'FLOWCHART',  // 流程图
   BROWSER: 'BROWSER',  // 浏览器单元
   INTERACTIVE: 'INTERACTIVE',  // 交互式课件单元
+  IMAGE: 'IMAGE',  // 图片单元
   REFERENCE_MATERIAL: 'REFERENCE_MATERIAL',
 } as const
 
@@ -118,6 +119,22 @@ export interface ContestCellContent {
 export interface ContestCell extends CellBase {
   type: typeof CellType.CONTEST
   content: ContestCellContent
+}
+
+/** 独立图片单元：src 可为上传后的文件名、/uploads/... 相对路径或完整 URL */
+export interface ImageCellContent {
+  src: string
+  alt?: string
+  caption?: string
+}
+
+export interface ImageCell extends CellBase {
+  type: typeof CellType.IMAGE
+  content: ImageCellContent
+  config?: {
+    maxWidth?: string
+    align?: 'left' | 'center' | 'right'
+  }
 }
 
 export interface VideoCellContent {
@@ -260,6 +277,7 @@ export type Cell =
   | ChartCell
   | ContestCell
   | VideoCell
+  | ImageCell
   | ActivityCell
   | FlowchartCell
   | BrowserCell

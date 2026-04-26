@@ -204,6 +204,7 @@ const show_add_menu = ref(false)
 const available_cell_types = [
   { type: 'TEXT', name: '文本单元', icon: '📝', description: '富文本编辑器' },
   { type: 'VIDEO', name: '视频单元', icon: '🎥', description: '视频教学内容' },
+  { type: 'IMAGE', name: '图片单元', icon: '🖼️', description: '插图、示意图' },
   { type: 'INTERACTIVE', name: '交互式课件单元', icon: '🎨', description: 'HTML交互式课件' },
   { type: 'BROWSER', name: '浏览器单元', icon: '🌐', description: '嵌入网页内容' },
   { type: 'ACTIVITY', name: '活动单元', icon: '🎯', description: '互动任务、课堂练习' },
@@ -268,6 +269,18 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
           loop: false,
           muted: false,
         },
+      } as Cell
+
+    case 'image':
+      return {
+        ...base_cell,
+        type: CellType.IMAGE,
+        content: {
+          src: project_cell.content?.src || '',
+          alt: project_cell.content?.alt,
+          caption: project_cell.content?.caption,
+        },
+        config: project_cell.config || { align: 'center', maxWidth: '100%' },
       } as Cell
 
     case 'code':
@@ -452,6 +465,14 @@ function cell_to_project_cell(cell: Cell): ProjectCell {
         thumbnail: (cell.content as any).thumbnail,
         subtitles: (cell.content as any).subtitles,
         chapters: (cell.content as any).chapters,
+      }
+      break
+
+    case CellType.IMAGE:
+      project_cell.content = {
+        src: (cell.content as any).src || '',
+        alt: (cell.content as any).alt,
+        caption: (cell.content as any).caption,
       }
       break
 
@@ -716,6 +737,7 @@ function handle_add_cell(cell_type: string) {
   const cell_type_name_map: Record<string, string> = {
     'TEXT': '文本',
     'VIDEO': '视频',
+    'IMAGE': '图片',
     'CODE': '代码',
     'SIM': '仿真',
     'CHART': '图表',
@@ -733,6 +755,9 @@ function handle_add_cell(cell_type: string) {
       break
     case 'video':
       default_content = { videoUrl: '', title: '', description: '' }
+      break
+    case 'image':
+      default_content = { src: '', alt: '', caption: '' }
       break
     case 'code':
       default_content = { code: '# 在此编写代码\nprint("Hello, World!")', language: 'python' }

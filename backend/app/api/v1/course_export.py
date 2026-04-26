@@ -55,7 +55,7 @@ def extract_file_urls_from_content(content: Any) -> Set[str]:
         if not isinstance(cell, dict):
             continue
             
-        cell_type = cell.get("type", "")
+        cell_type = str(cell.get("type", "") or "").lower()
         cell_content = cell.get("content", {})
         
         # TextCell: 从HTML中提取图片和文件URL
@@ -102,6 +102,28 @@ def extract_file_urls_from_content(content: Any) -> Set[str]:
                         if url.startswith("/uploads/"):
                             file_urls.add(url)
         
+        # ImageCell: 图片资源路径或文件名
+        elif cell_type == "image" and isinstance(cell_content, dict):
+            src = cell_content.get("src") or ""
+            if not src or src.startswith(("data:", "blob:")):
+                continue
+            url = src
+            if url.startswith(("http://", "https://")):
+                try:
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(url)
+                    if parsed.path:
+                        url = parsed.path
+                    else:
+                        continue
+                except Exception:
+                    continue
+            if url.startswith("/uploads/"):
+                file_urls.add(url)
+            elif "/" not in url and "." in url:
+                file_urls.add(f"/uploads/resources/{url}")
+
         # VideoCell: 提取视频URL
         elif cell_type == "video" and isinstance(cell_content, dict):
             video_url = cell_content.get("videoUrl") or cell_content.get("video_url")

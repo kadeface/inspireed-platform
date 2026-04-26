@@ -98,6 +98,12 @@ const cellTypes = [
     description: '视频教学内容',
   },
   {
+    type: CellType.IMAGE,
+    name: '图片单元',
+    icon: '🖼️',
+    description: '插图、示意图、全宽展示',
+  },
+  {
     type: CellType.BROWSER,
     name: '浏览器单元',
     icon: '🌐',

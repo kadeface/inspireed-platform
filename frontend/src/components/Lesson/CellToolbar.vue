@@ -118,6 +118,12 @@ const cellTypes = [
     description: '视频教学内容',
   },
   {
+    type: CellType.IMAGE,
+    name: '图片单元',
+    icon: '🖼️',
+    description: '插图、示意图',
+  },
+  {
     type: CellType.INTERACTIVE,
     name: '交互式课件单元',
     icon: '🎮',

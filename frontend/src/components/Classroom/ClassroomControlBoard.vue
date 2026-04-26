@@ -322,10 +322,11 @@ function getCellTypeLabel(type: string): string {
     code: '代码',
     activity: '活动',
     video: '视频',
+    image: '图片',
     flowchart: '流程图',
     qa: '问答',
   }
-  return labels[type] || type
+  return labels[type.toLowerCase()] || type
 }
 
 function getCellTypeEmoji(type: string): string {
@@ -334,10 +335,11 @@ function getCellTypeEmoji(type: string): string {
     code: '💻',
     activity: '📝',
     video: '📹',
+    image: '🖼️',
     flowchart: '📊',
     qa: '❓',
   }
-  return emojis[type] || '📦'
+  return emojis[type.toLowerCase()] || '📦'
 }
 
 

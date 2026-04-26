@@ -18,13 +18,14 @@ export function getCellTypeLabel(type: string): string {
     code: '代码',
     activity: '活动',
     video: '视频',
+    image: '图片',
     flowchart: '流程图',
     qa: '问答',
     browser: '浏览器',
     interactive: '互动',
     reference_material: '参考资料',
   }
-  return labels[type] || type
+  return labels[type.toLowerCase()] || type
 }
 
 /**
@@ -38,13 +39,14 @@ export function getCellTypeEmoji(type: string): string {
     code: '💻',
     activity: '📝',
     video: '📹',
+    image: '🖼️',
     flowchart: '📊',
     qa: '❓',
     browser: '🌐',
     interactive: '🎮',
     reference_material: '📚',
   }
-  return emojis[type] || '📦'
+  return emojis[type.toLowerCase()] || '📦'
 }
 
 /**

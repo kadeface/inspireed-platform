@@ -35,6 +35,7 @@ class CellType(str, Enum):
     FLOWCHART = "FLOWCHART"  # 流程图单元
     BROWSER = "BROWSER"  # 浏览器单元
     INTERACTIVE = "INTERACTIVE"  # 交互式课件单元
+    IMAGE = "IMAGE"  # 图片单元
     REFERENCE_MATERIAL = "REFERENCE_MATERIAL"  # 参考素材单元
 
 

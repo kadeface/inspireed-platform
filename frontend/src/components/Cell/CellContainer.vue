@@ -147,6 +147,7 @@ import SimCell from './SimCell.vue'
 import ChartCell from './ChartCell.vue'
 import ContestCell from './ContestCell.vue'
 import VideoCell from './VideoCell.vue'
+import ImageCell from './ImageCell.vue'
 import ActivityCell from './ActivityCell.vue'
 import FlowchartCell from './FlowchartCell.vue'
 import FlowchartCellX6 from './FlowchartCellX6.vue'
@@ -306,6 +307,7 @@ const cellComponent = computed(() => {
     [CellType.CHART]: ChartCell,
     [CellType.CONTEST]: ContestCell,
     [CellType.VIDEO]: VideoCell,
+    [CellType.IMAGE]: ImageCell,
     [CellType.ACTIVITY]: ActivityCell,
     // 使用特性开关选择流程图编辑器
     [CellType.FLOWCHART]: useX6Editor ? FlowchartCellX6 : FlowchartCell,
@@ -325,6 +327,7 @@ const cellTypeLabel = computed(() => {
     [CellType.CHART]: '图表',
     [CellType.CONTEST]: '竞赛',
     [CellType.VIDEO]: '视频',
+    [CellType.IMAGE]: '图片',
     [CellType.ACTIVITY]: '活动',
     [CellType.FLOWCHART]: '流程图',
     [CellType.BROWSER]: '浏览器',
@@ -362,6 +365,7 @@ const stageStyles = computed(() => {
     [CellType.CHART]: { bg: 'bg-amber-500', label: 'text-amber-100' },
     [CellType.CONTEST]: { bg: 'bg-rose-500', label: 'text-rose-100' },
     [CellType.VIDEO]: { bg: 'bg-pink-500', label: 'text-pink-100' },
+    [CellType.IMAGE]: { bg: 'bg-sky-500', label: 'text-sky-100' },
     [CellType.ACTIVITY]: { bg: 'bg-orange-500', label: 'text-orange-100' },
     [CellType.FLOWCHART]: { bg: 'bg-indigo-500', label: 'text-indigo-100' },
     [CellType.BROWSER]: { bg: 'bg-cyan-500', label: 'text-cyan-100' },

@@ -105,6 +105,7 @@ const typeColor = computed(() => {
   const colors: Record<string, string> = {
     TEXT: '#F59E0B',
     VIDEO: '#3B82F6',
+    IMAGE: '#0EA5E9',
     CODE: '#10B981',
     ACTIVITY: '#A855F7',
     FLOWCHART: '#6366F1',
@@ -129,6 +130,7 @@ function getTypeLabel(type: string): string {
     CODE: '代码',
     ACTIVITY: '活动',
     VIDEO: '视频',
+    IMAGE: '图片',
     FLOWCHART: '流程图',
     CHART: '图表',
     QA: '问答',
@@ -192,6 +194,10 @@ function handleCheckboxChange(event: Event) {
   border-color: #93C5FD;
 }
 
+.module-card-type-IMAGE:hover:not(.module-card-disabled) {
+  border-color: #7DD3FC;
+}
+
 .module-card-type-TEXT:hover:not(.module-card-disabled) {
   border-color: #FBBF24;
 }
@@ -219,6 +225,11 @@ function handleCheckboxChange(event: Event) {
 .module-card-type-VIDEO.module-card-active {
   background: #3B82F6;
   border-color: #2563EB;
+}
+
+.module-card-type-IMAGE.module-card-active {
+  background: #0EA5E9;
+  border-color: #0284C7;
 }
 
 .module-card-type-ACTIVITY.module-card-active {
@@ -330,6 +341,11 @@ input[type="checkbox"].checkbox-input {
   color: #2563EB;
 }
 
+.module-card-type-IMAGE .module-card-number {
+  border-color: #38BDF8;
+  color: #0369A1;
+}
+
 .module-card-type-ACTIVITY .module-card-number {
   border-color: #C084FC;
   color: #9333EA;
@@ -429,6 +445,11 @@ input[type="checkbox"].checkbox-input {
 .card-icon.icon-VIDEO {
   border-color: #93C5FD;
   color: #1D4ED8;
+}
+
+.card-icon.icon-IMAGE {
+  border-color: #7DD3FC;
+  color: #0369A1;
 }
 
 .card-icon.icon-FLOWCHART {

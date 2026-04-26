@@ -436,6 +436,7 @@ import SimCell from '@/components/Cell/SimCell.vue'
 import ChartCell from '@/components/Cell/ChartCell.vue'
 import ContestCell from '@/components/Cell/ContestCell.vue'
 import VideoCell from '@/components/Cell/VideoCell.vue'
+import ImageCell from '@/components/Cell/ImageCell.vue'
 import ActivityCell from '@/components/Cell/ActivityCell.vue'
 import BrowserCell from '@/components/Cell/BrowserCell.vue'
 import InteractiveCell from '@/components/Cell/InteractiveCell.vue'
@@ -930,6 +931,7 @@ const getCellComponent = (type: CellType | string): Component => {
     [CellType.CHART]: ChartCell,
     [CellType.CONTEST]: ContestCell,
     [CellType.VIDEO]: VideoCell,
+    [CellType.IMAGE]: ImageCell,
     [CellType.ACTIVITY]: ActivityCell,
     [CellType.FLOWCHART]: FlowchartStudentCell,
     [CellType.BROWSER]: BrowserCell,
@@ -943,6 +945,7 @@ const getCellComponent = (type: CellType | string): Component => {
     chart: ChartCell,
     contest: ContestCell,
     video: VideoCell,
+    image: ImageCell,
     activity: ActivityCell,
     flowchart: FlowchartStudentCell,
     browser: BrowserCell,
