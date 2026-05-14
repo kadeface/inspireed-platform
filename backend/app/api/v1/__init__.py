@@ -15,10 +15,12 @@ from app.api.v1 import (
     cells,
     chapters,
     classroom_assistant,
+    forms,
     classroom_sessions,
     course_export,
     curriculum,
     favorites,
+    forms,
     learning_paths,
     lessons,
     library_assets,
@@ -56,6 +58,8 @@ api_router.include_router(resources.router, prefix="/resources", tags=["资源"]
 api_router.include_router(lessons.router, prefix="/lessons", tags=["教案"])
 api_router.include_router(cells.router, prefix="/cells", tags=["单元"])
 api_router.include_router(activities.router, prefix="/activities", tags=["教学活动"])
+api_router.include_router(forms.router, tags=["互动表单"])
+api_router.include_router(forms.router, tags=["互动表单"])
 api_router.include_router(classroom_sessions.router, prefix="/classroom-sessions", tags=["课堂会话"])
 api_router.include_router(classroom_assistant.router, prefix="/classroom-assistant", tags=["班级教学助手"])
 api_router.include_router(questions.router, prefix="/questions", tags=["问答系统"])
