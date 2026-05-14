@@ -30,5 +30,4 @@ export const CellType = {
   INTERACTIVE: 'INTERACTIVE',  // 交互式课件单元
   IMAGE: 'IMAGE',  // 图片单元
   FORM: 'FORM',  // 互动表单单元
-  FORM: 'FORM',  # 互动表单单元
   REFERENCE_MATERIAL: 'REFERENCE_MATERIAL',
