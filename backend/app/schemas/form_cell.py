@@ -21,6 +21,7 @@ class FormOptionCreate(BaseModel):
 class FormOptionResponse(BaseModel):
     """表单选项响应Schema"""
 
+    id: Optional[str] = Field(None, description="选项ID")
     text: str
     order: int
     image_url: Optional[str] = None
@@ -44,11 +45,6 @@ class FormCellCreate(BaseModel):
         description="时间限制（秒）"
     )
 
-    # 元数据字段
-    lesson_id: Optional[int] = Field(None, description="所属课程ID")
-    project_cell_id: Optional[int] = Field(None, description="所属项目单元格ID")
-    created_by: int = Field(..., description="创建者ID")
-
 
 class FormCellUpdate(BaseModel):
     """更新表单单元格请求Schema"""
@@ -64,9 +60,6 @@ class FormCellUpdate(BaseModel):
         le=600,
         description="时间限制（秒）"
     )
-    lesson_id: Optional[int] = Field(None, description="所属课程ID")
-    project_cell_id: Optional[int] = Field(None, description="所属项目单元格ID")
-    created_by: Optional[int] = Field(None, description="创建者ID")
 
 
 class FormCellResponse(BaseModel):
@@ -78,7 +71,7 @@ class FormCellResponse(BaseModel):
     cell_type: str
     title: Optional[str]
     description: Optional[str]
-    options: List[Dict[str, Any]]
+    options: List[FormOptionResponse]
     settings: Dict[str, Any]
     time_limit: Optional[int]
     created_by: int
@@ -121,6 +114,9 @@ class FormResults(BaseModel):
     """表单结果统计响应Schema"""
 
     form_cell_id: int
-    total_responses: int
-    option_stats: List[Dict[str, Any]]
-    response_rate: float
+    total_responses: int = Field(..., ge=0, description="总回答数")
+    option_stats: List[Dict[str, Any]] = Field(..., description="选项统计")
+    response_rate: float = Field(..., ge=0, le=100, description="响应率（百分比）")
+
+    class Config:
+        from_attributes = True
