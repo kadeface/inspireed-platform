@@ -5,14 +5,12 @@ Forms API - 互动表单接口
 from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case
-from sqlalchemy.sql import alias
+from sqlalchemy import select, func, text
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
 from app.models.user import User, UserRole
 from app.models.form_cell import FormCell, FormResponse
-from app.models.lesson import Lesson
 from app.schemas.form_cell import (
     FormCellCreate,
     FormCellUpdate,
@@ -518,7 +516,3 @@ async def get_form_results(
         option_stats=option_stats,
         response_rate=response_rate
     )
-
-
-# 导入text函数用于原生SQL
-from sqlalchemy import text
