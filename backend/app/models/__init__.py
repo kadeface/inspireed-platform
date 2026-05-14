@@ -63,10 +63,23 @@ from app.models.student_project import (
     ProjectStage,
 )
 from app.models.project_cell import ProjectCell
+from app.models.user import User, UserRole, StudentType
+from app.models.section import Section, SectionType
+from app.models.exam_subjects import GradeSubjectConfig
+from app.models.room import Room
+from app.models.project_cell import ProjectCell
+from app.models.form_cell import FormCell, FormResponse
+from app.models.evaluation import (
+from app.models.teacher import (
+from app.models.teacher_position import TeacherPositionType
+from app.models.exam_room import ExamRoom, ExamRoomStudent, ExamProctor
+from app.models.form_cell import FormCell, FormResponse
+from app.models.form_cell import FormCell, FormResponse
 
 __all__ = [
     "User",
     "UserRole",
+    "StudentType",
     "Lesson",
     "LessonStatus",
     "DifficultyLevel",
@@ -74,6 +87,8 @@ __all__ = [
     "Cell",
     "CellType",
     "CognitiveLevel",
+    "Section",
+    "SectionType",
     "ExecutionLog",
     "QARecord",
     "ExecutionStatus",
@@ -82,11 +97,13 @@ __all__ = [
     "Course",
     "Chapter",
     "Resource",
+    "GradeSubjectConfig",
     "LibraryAsset",
     "LibraryAssetVersion",
     "Region",
     "School",
     "Classroom",
+    "Room",
     "Favorite",
     "Review",
     "LearningPath",
@@ -130,4 +147,35 @@ __all__ = [
     "ProjectStatus",
     "ProjectStage",
     "ProjectCell",
+    "FormCell",
+    "FormResponse",
+    # 增值评价系统
+    "Semester",
+    "Exam",
+    "ExamType",
+    "ExamStatus",
+    "ExamSubject",
+    "ExamNumberMapping",
+    "Score",
+    "ExamTotalScore",
+    "DailyPerformanceScore",
+    "EvaluationMetric",
+    "MetricType",
+    "MetricCategory",
+    "ValueAddedEvaluation",
+    "EvaluationDetail",
+    "MonitoringReport",
+    "MonitoringReportSchool",
+    "ImportTask",
+    "ImportStatus",
+    # 教师教学任务
+    "TeacherTeachingAssignment",
+    "TeachingAssignmentType",
+    # 教师职务类型
+    "TeacherPositionType",
+    # 考场
+    "ExamRoom",
+    "ExamRoomStudent",
+    "ExamProctor",
 ]
+
