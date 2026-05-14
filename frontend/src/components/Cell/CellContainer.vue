@@ -147,6 +147,8 @@ import SimCell from './SimCell.vue'
 import ChartCell from './ChartCell.vue'
 import ContestCell from './ContestCell.vue'
 import VideoCell from './VideoCell.vue'
+import ImageCell from './ImageCell.vue'
+import FormCell from './FormCell.vue'
 import ActivityCell from './ActivityCell.vue'
 import FlowchartCell from './FlowchartCell.vue'
 import FlowchartCellX6 from './FlowchartCellX6.vue'
@@ -303,6 +305,8 @@ const cellComponent = computed(() => {
     [CellType.CHART]: ChartCell,
     [CellType.CONTEST]: ContestCell,
     [CellType.VIDEO]: VideoCell,
+    [CellType.IMAGE]: ImageCell,
+    [CellType.FORM]: FormCell,
     [CellType.ACTIVITY]: ActivityCell,
     // 使用特性开关选择流程图编辑器
     [CellType.FLOWCHART]: useX6Editor ? FlowchartCellX6 : FlowchartCell,
