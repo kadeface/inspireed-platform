@@ -3,7 +3,7 @@ Forms API - 互动表单接口
 """
 
 from typing import Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text
 
@@ -515,4 +515,36 @@ async def get_form_results(
         total_responses=total_responses,
         option_stats=option_stats,
         response_rate=response_rate
+    )
+
+
+# ==================== WebSocket Endpoint ====================
+
+
+@router.websocket("/{form_cell_id}/ws")
+async def websocket_form_endpoint(
+    websocket: WebSocket,
+    form_cell_id: int,
+    token: str = Query(..., description="JWT token for authentication"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    表单WebSocket端点
+
+    连接URL: ws://localhost:8000/api/v1/forms/{form_cell_id}/ws?token={jwt}
+
+    支持的消息类型:
+    - form_start: 教师开始投票
+    - form_stop: 教师停止投票
+    - form_submit: 学生提交答案
+    - new_response: 新答案通知
+    - results_update: 结果更新推送
+    """
+    from app.websockets.form_ws import form_ws_handler
+
+    await form_ws_handler.handle_connection(
+        websocket=websocket,
+        form_cell_id=form_cell_id,
+        token=token,
+        db=db
     )
