@@ -10,6 +10,41 @@ import './assets/main.css'
 
 if (import.meta.env.DEV) {
   console.info('[InspireEd] main.ts 模块已加载，开始创建应用')
+
+  function showDevGlobalError(msg: string) {
+    let el = document.getElementById('dev-global-error')
+    if (!el) {
+      el = document.createElement('pre')
+      el.id = 'dev-global-error'
+      el.setAttribute(
+        'style',
+        'position:fixed;z-index:2147483647;left:0;right:0;bottom:0;max-height:50vh;overflow:auto;margin:0;padding:12px;background:#fee;color:#900;font:12px/1.4 monospace;border-top:3px solid #c00;'
+      )
+      document.body.appendChild(el)
+    }
+    el.textContent = msg
+  }
+
+  window.addEventListener(
+    'error',
+    (ev: ErrorEvent) => {
+      showDevGlobalError(
+        '[全局 error]\n' +
+          (ev.message || '') +
+          '\n' +
+          (ev.filename || '') +
+          (ev.lineno ? `:${ev.lineno}:${ev.colno}` : '')
+      )
+    },
+    true
+  )
+  window.addEventListener('unhandledrejection', (ev: PromiseRejectionEvent) => {
+    const r = ev.reason
+    showDevGlobalError(
+      '[全局 unhandledrejection]\n' +
+        (r instanceof Error && r.stack ? r.stack : String(r))
+    )
+  })
 }
 
 const app = createApp(App)

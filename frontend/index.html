@@ -19,36 +19,6 @@
         </p>
       </div>
     </div>
-    <script>
-      ;(function () {
-        function show(msg) {
-          var el = document.createElement('pre')
-          el.setAttribute(
-            'style',
-            'position:fixed;z-index:2147483647;left:0;right:0;bottom:0;max-height:50vh;overflow:auto;margin:0;padding:12px;background:#fee;color:#900;font:12px/1.4 monospace;border-top:3px solid #c00;'
-          )
-          el.textContent = msg
-          document.body.appendChild(el)
-        }
-        window.addEventListener(
-          'error',
-          function (ev) {
-            show(
-              '[全局 error]\n' +
-                (ev && ev.message ? ev.message : '') +
-                '\n' +
-                (ev && ev.filename ? ev.filename : '') +
-                (ev && ev.lineno ? ':' + ev.lineno + ':' + ev.colno : '')
-            )
-          },
-          true
-        )
-        window.addEventListener('unhandledrejection', function (ev) {
-          var r = ev.reason
-          show('[全局 unhandledrejection]\n' + (r && r.stack ? r.stack : String(r)))
-        })
-      })()
-    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
