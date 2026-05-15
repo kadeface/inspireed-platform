@@ -133,30 +133,6 @@ const cellTypes = [
     icon: '🎮',
     description: '3D仿真',
   },
-  {
-    type: CellType.CHART,
-    name: '图表单元',
-    icon: '📊',
-    description: '数据可视化',
-  },
-  {
-    type: CellType.FLOWCHART,
-    name: '流程图单元',
-    icon: '🗺️',
-    description: '步骤梳理、思维导图',
-  },
-  {
-    type: CellType.PARAM,
-    name: '参数单元',
-    icon: '⚙️',
-    description: '参数配置',
-  },
-  {
-    type: CellType.CONTEST,
-    name: '竞赛单元',
-    icon: '🏆',
-    description: '积分竞赛、排行榜',
-  },
 ]
 
 function toggleMenu() {

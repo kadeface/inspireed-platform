@@ -291,7 +291,7 @@ import CellToolbar from '../../components/Lesson/CellToolbar.vue'
 import CellContainer from '../../components/Cell/CellContainer.vue'
 import AddCellMenu from '../../components/Lesson/AddCellMenu.vue'
 import SectionContainer from '../../components/Lesson/SectionContainer.vue'
-import { isContentWithSections } from '../../utils/lessonContent'
+import { isContentWithSections, renumberCellsGloballyInSections } from '../../utils/lessonContent'
 import ReferenceResourcePanel from '../../components/Resource/ReferenceResourcePanel.vue'
 import PDFViewerModal from '../../components/Resource/PDFViewerModal.vue'
 import LessonAiAssistantDrawer from '@/components/Teacher/LessonAiAssistantDrawer.vue'
@@ -721,12 +721,7 @@ onMounted(async () => {
           cell.order = idx
         })
       } else if (isContentWithSections(c)) {
-        let i = 0
-        for (const sec of c.sections || []) {
-          for (const cell of sec.cells || []) {
-            cell.order = i++
-          }
-        }
+        renumberCellsGloballyInSections(sections.value)
       }
 
       if (insertedIndices.length > 0) {

@@ -64,6 +64,7 @@ export function normalizeContentToSections(
       })
     }
     result.sort((a, b) => a.order - b.order)
+    renumberCellsGloballyInSections(result)
     return result
   }
 
@@ -74,6 +75,7 @@ export function normalizeContentToSections(
   if (teaching) {
     teaching.cells = cells.map((c, i) => ({ ...c, order: i }))
   }
+  renumberCellsGloballyInSections(sections)
   return sections
 }
 
@@ -111,4 +113,17 @@ export function sectionsToContent(sections: SectionInContent[]): LessonContentWi
  */
 export function sectionsToFlatCells(sections: SectionInContent[]): Cell[] {
   return sections.flatMap((s) => s.cells || [])
+}
+
+/**
+ * 将各 section 内 cell 的 order 重排为全课唯一的 0..n-1（与 sectionsToFlatCells 顺序一致）。
+ * 导播台、display_cell_orders、后端 Cell.order 均依赖全局 order，不能使用 section 内局部序号。
+ */
+export function renumberCellsGloballyInSections(sections: SectionInContent[]): void {
+  let i = 0
+  for (const sec of sections) {
+    for (const cell of sec.cells || []) {
+      cell.order = i++
+    }
+  }
 }

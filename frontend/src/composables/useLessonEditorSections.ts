@@ -5,7 +5,11 @@
 import { ref, watch, nextTick, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import Sortable from 'sortablejs'
-import { normalizeContentToSections, sectionsToContent } from '../utils/lessonContent'
+import {
+  normalizeContentToSections,
+  renumberCellsGloballyInSections,
+  sectionsToContent,
+} from '../utils/lessonContent'
 import type { SectionInContent } from '../types/section'
 import { useLessonStore } from '../store/lesson'
 
@@ -62,7 +66,7 @@ export function useLessonEditorSections(
     if (s.cells?.length && teaching) {
       teaching.cells = teaching.cells ?? []
       teaching.cells.push(...s.cells)
-      teaching.cells.forEach((c, i) => { c.order = i })
+      renumberCellsGloballyInSections(sections.value)
     }
     sections.value.splice(sectionIndex, 1)
     if (activeSectionIndex.value >= sections.value.length) {

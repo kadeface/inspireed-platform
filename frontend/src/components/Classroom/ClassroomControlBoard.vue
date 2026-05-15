@@ -78,7 +78,7 @@
           </div>
           
           <!-- 活动状态标记 -->
-          <div v-if="cell.type === 'activity' && isActivityActive(cell, index)" class="node-activity-badge">
+          <div v-if="cell.type === CellType.ACTIVITY && isActivityActive(cell, index)" class="node-activity-badge">
             🎯 进行中
           </div>
         </div>
@@ -97,7 +97,7 @@
       </div>
       <div class="detail-actions">
         <button 
-          v-if="currentCell.type === 'activity' && !isActivityActive(currentCell, currentCellIndex)"
+          v-if="currentCell.type === CellType.ACTIVITY && !isActivityActive(currentCell, currentCellIndex)"
           @click="handleStartActivity"
           :disabled="loading"
           class="btn btn-sm btn-primary"
@@ -105,7 +105,7 @@
           🎯 开始活动
         </button>
         <button 
-          v-else-if="currentCell.type === 'activity' && isActivityActive(currentCell, currentCellIndex)"
+          v-else-if="currentCell.type === CellType.ACTIVITY && isActivityActive(currentCell, currentCellIndex)"
           @click="handleEndActivity"
           :disabled="loading"
           class="btn btn-sm btn-secondary"
@@ -119,7 +119,7 @@
 
 <script setup lang="ts">
 import { computed, h } from 'vue'
-import type { Cell } from '@/types/cell'
+import { CellType, type Cell } from '@/types/cell'
 import { getCellId as getCellIdUtil, isUUID, toNumericId } from '../../utils/cellId'
 
 // Cell类型图标组件
@@ -304,7 +304,7 @@ function isCompleted(cell: Cell, index: number): boolean {
 }
 
 function isActivityActive(cell: Cell, index: number): boolean {
-  if (cell.type !== 'activity') return false
+  if (cell.type !== CellType.ACTIVITY) return false
   if (!props.currentActivityId) return false
   
   const cellId = getCellId(cell)
@@ -440,7 +440,7 @@ function handleNodeClick(cell: Cell, index: number) {
   // 如果未选中，使用 'add' 选中它
   // 对于其他模块，使用 'toggle' 切换状态
   let action: 'toggle' | 'add' = 'toggle'
-  if (cell.type === 'activity') {
+  if (cell.type === CellType.ACTIVITY) {
     // 活动模块：始终使用 'add'，确保选中状态，以便显示统计信息
     action = 'add'
   } else {

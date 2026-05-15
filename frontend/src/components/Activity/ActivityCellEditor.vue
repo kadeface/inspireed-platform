@@ -381,7 +381,7 @@ watch(() => props.cell.content, (newContent) => {
   const currentActivityType = localContent.activityType
   Object.assign(localContent, newContent)
   // 保留当前的 activityType（如果新内容没有或为空）
-  if (!newContent.activityType || newContent.activityType === '') {
+  if (!newContent.activityType) {
     localContent.activityType = currentActivityType || 'quiz'
   }
 }, { deep: true })

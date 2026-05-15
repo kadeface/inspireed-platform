@@ -1,7 +1,7 @@
 <template>
   <div
     class="mb-4 rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-    :class="{ 'overflow-hidden': cell.type !== 'flowchart' }"
+    :class="{ 'overflow-hidden': cell.type !== CellType.FLOWCHART }"
     :data-cell-id="cell.id"
     :data-cell-index="props.index"
   >
@@ -202,7 +202,7 @@ const finalSessionId = computed(() => {
 watch(() => finalSessionId.value, (newId, oldId) => {
   if (newId !== oldId) {
     const isDev = process.env.NODE_ENV === 'development'
-    const isActivity = props.cell.type === 'activity'
+    const isActivity = props.cell.type === CellType.ACTIVITY
     
     // 只在开发环境且是 activity 类型时输出详细日志，其他情况使用 debug
     if (isDev && isActivity) {
@@ -230,7 +230,7 @@ watch(() => finalSessionId.value, (newId, oldId) => {
 
 // 组件挂载时输出初始状态（仅在开发环境）
 onMounted(() => {
-  if (props.cell.type === 'activity') {
+  if (props.cell.type === CellType.ACTIVITY) {
     logger.debug('CellContainer (Activity) 已挂载:', {
       cellId: props.cell.id,
       finalSessionId: finalSessionId.value,
@@ -302,7 +302,7 @@ const cellComponent = computed(() => {
   const componentMap = {
     [CellType.TEXT]: TextCell,
     [CellType.CODE]: CodeCell,
-    [CellType.PARAM]: ParamCell,
+    PARAM: ParamCell, // legacy cell type (not in CellType enum)
     [CellType.SIM]: SimCell,
     [CellType.CHART]: ChartCell,
     [CellType.CONTEST]: ContestCell,
@@ -322,7 +322,7 @@ const cellTypeLabel = computed(() => {
   const labelMap = {
     [CellType.TEXT]: '文本',
     [CellType.CODE]: '代码',
-    [CellType.PARAM]: '参数',
+    PARAM: '参数', // legacy cell type (not in CellType enum)
     [CellType.SIM]: '仿真',
     [CellType.CHART]: '图表',
     [CellType.CONTEST]: '竞赛',
@@ -360,7 +360,7 @@ const stageStyles = computed(() => {
   const map = {
     [CellType.TEXT]: { bg: 'bg-violet-500', label: 'text-violet-100' },
     [CellType.CODE]: { bg: 'bg-blue-500', label: 'text-blue-100' },
-    [CellType.PARAM]: { bg: 'bg-teal-500', label: 'text-teal-100' },
+    PARAM: { bg: 'bg-teal-500', label: 'text-teal-100' }, // legacy cell type
     [CellType.SIM]: { bg: 'bg-emerald-500', label: 'text-emerald-100' },
     [CellType.CHART]: { bg: 'bg-amber-500', label: 'text-amber-100' },
     [CellType.CONTEST]: { bg: 'bg-rose-500', label: 'text-rose-100' },

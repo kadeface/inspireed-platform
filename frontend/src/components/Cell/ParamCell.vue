@@ -39,7 +39,10 @@
 <script setup lang="ts">
 /* eslint-disable vue/no-mutating-props */
 import { ref } from 'vue'
-import type { ParamCell as ParamCellType } from '../../types/cell'
+import type { Cell } from '@/types/cell'
+
+/** Avoid importing `ParamCell` in this file (same name as the SFC confuses the language service). */
+type ParamCellType = Extract<Cell, { type: 'PARAM' }>
 import { useFullscreen } from '@/composables/useFullscreen'
 
 interface Props {

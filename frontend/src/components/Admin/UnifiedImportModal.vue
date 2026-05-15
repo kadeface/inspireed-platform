@@ -357,7 +357,6 @@ const HEADER_MAP: Record<string, string | null> = {
   座号: 'seat_no',
   role_in_class: 'role_in_class',
   班级角色: 'role_in_class',
-  角色: 'role_in_class',
   cadre_title: 'cadre_title',
   职务名称: 'cadre_title',
   职务: 'cadre_title',

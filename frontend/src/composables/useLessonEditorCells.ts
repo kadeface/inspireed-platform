@@ -9,6 +9,7 @@ import { CellType } from '../types/cell'
 import type { LessonRelatedMaterial } from '../types/lesson'
 import type { SectionInContent } from '../types/section'
 import { getCellTypeName } from '../utils/lessonEditorHelpers'
+import { renumberCellsGloballyInSections } from '../utils/lessonContent'
 import { useLessonStore } from '../store/lesson'
 
 export function getDefaultCell(cellType: (typeof CellType)[keyof typeof CellType], order: number): Cell {
@@ -182,6 +183,7 @@ export function useLessonEditorCells(
     const newCell = getDefaultCell(cellType, idx)
     if (!activeSec.cells) activeSec.cells = []
     activeSec.cells.push(newCell)
+    renumberCellsGloballyInSections(sections.value)
     showToast('success', `已添加${getCellTypeName(cellType)}`)
     const previousCellsCount = sections.value
       .slice(0, activeSectionIndex.value)
@@ -275,13 +277,9 @@ export function useLessonEditorCells(
         currentCells.splice(safeIndex, 0, newCell)
       }
       
-      // 更新所有 cell 的 order
-      currentCells.forEach((c, i) => { 
-        if (c) c.order = i 
-      })
-      
       // 重新赋值以触发响应式更新
       sec.cells = currentCells
+      renumberCellsGloballyInSections(sections.value)
       
       showToast('success', `已添加${getCellTypeName(cellType)}`)
       const globalIndex =
@@ -339,7 +337,7 @@ export function useLessonEditorCells(
       const idx = arr.findIndex((c) => String(c.id) === String(cellId))
       if (idx >= 0) {
         arr.splice(idx, 1)
-        arr.forEach((c, j) => { c.order = j })
+        renumberCellsGloballyInSections(sections.value)
         showToast('success', '单元已删除')
         return
       }
@@ -352,7 +350,7 @@ export function useLessonEditorCells(
       const idx = arr.findIndex((c) => String(c.id) === String(cellId))
       if (idx > 0) {
         [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]
-        arr.forEach((c, j) => { c.order = j })
+        renumberCellsGloballyInSections(sections.value)
         return
       }
     }
@@ -364,7 +362,7 @@ export function useLessonEditorCells(
       const idx = arr.findIndex((c) => String(c.id) === String(cellId))
       if (idx >= 0 && idx < arr.length - 1) {
         [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]
-        arr.forEach((c, j) => { c.order = j })
+        renumberCellsGloballyInSections(sections.value)
         return
       }
     }

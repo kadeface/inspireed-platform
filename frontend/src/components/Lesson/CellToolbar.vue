@@ -153,30 +153,6 @@ const cellTypes = [
     icon: '🎮',
     description: '3D仿真/物理引擎',
   },
-  {
-    type: CellType.FLOWCHART,
-    name: '流程图单元',
-    icon: '📊',
-    description: '流程图/思维导图',
-  },
-  {
-    type: CellType.CHART,
-    name: '图表单元',
-    icon: '📈',
-    description: '数据可视化',
-  },
-  {
-    type: CellType.CONTEST,
-    name: '竞赛单元',
-    icon: '🏆',
-    description: '竞技排行榜',
-  },
-  {
-    type: CellType.PARAM,
-    name: '参数单元',
-    icon: '⚙️',
-    description: '参数配置表单',
-  },
 ]
 
 async function handleAddCell(cellType: CellType) {

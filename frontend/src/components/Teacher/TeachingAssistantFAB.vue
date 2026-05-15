@@ -112,26 +112,6 @@
                 </svg>
               </button>
 
-              <!-- 班级助手 -->
-              <button
-                @click="handleClassAssistant"
-                class="fab-menu-item"
-                :disabled="!classroomId"
-                :title="!classroomId ? '上课时选择班级后可用' : '进入班级助手'"
-              >
-                <div class="fab-menu-item-icon bg-indigo-500">
-                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                </div>
-                <div class="fab-menu-item-content">
-                  <div class="fab-menu-item-title">班级助手</div>
-                  <div class="fab-menu-item-desc">进入完整功能</div>
-                </div>
-                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
             </div>
           </div>
     </Transition>
@@ -275,25 +255,6 @@
                 </svg>
               </button>
 
-              <button
-                @click="handleClassAssistant"
-                class="fab-menu-item"
-                :disabled="!classroomId"
-                :title="!classroomId ? '上课时选择班级后可用' : '进入班级助手'"
-              >
-                <div class="fab-menu-item-icon bg-indigo-500">
-                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                </div>
-                <div class="fab-menu-item-content">
-                  <div class="fab-menu-item-title">班级助手</div>
-                  <div class="fab-menu-item-desc">进入完整功能</div>
-                </div>
-                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
             </div>
           </div>
         </Transition>
@@ -336,7 +297,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount, withDefaults } from 'vue'
-import { useRouter } from 'vue-router'
 
 const props = withDefaults(
   defineProps<{
@@ -348,14 +308,13 @@ const props = withDefaults(
   { layout: 'floating' }
 )
 
-const router = useRouter()
 const showMenu = ref(false)
 
 /** 嵌入导播台：悬停说明与人像/叉号图标对应关系 */
 const embeddedFabTitle = computed(() =>
   showMenu.value
     ? '关闭教学助手菜单（当前图标为叉号）'
-    : '教学助手（当前图标为人像剪影）：打开菜单，可使用点名考勤、课堂表现、纪律记录、值日管理、班级助手等'
+    : '教学助手（当前图标为人像剪影）：打开菜单，可使用点名考勤、课堂表现、纪律记录、值日管理等'
 )
 const embeddedFabAriaLabel = computed(() =>
   showMenu.value ? '关闭教学助手菜单' : '打开教学助手功能菜单'
@@ -365,7 +324,7 @@ const embeddedFabAriaLabel = computed(() =>
 const cornerFabTitle = computed(() =>
   showMenu.value
     ? '关闭教学助手菜单（当前图标为叉号）'
-    : '教学助手（人像图标浮动按钮）：打开菜单，点名、课堂表现、纪律、值日、班级助手等'
+    : '教学助手（人像图标浮动按钮）：打开菜单，点名、课堂表现、纪律、值日等'
 )
 const cornerFabAriaLabel = computed(() =>
   showMenu.value ? '关闭教学助手菜单' : '打开教学助手功能菜单'
@@ -440,15 +399,6 @@ const handleDuty = () => {
   showMenu.value = false
 }
 
-// 处理班级助手
-const handleClassAssistant = () => {
-  if (!props.classroomId) {
-    router.push('/teacher/class-assistant')
-  } else {
-    router.push(`/teacher/class-assistant`)
-  }
-  showMenu.value = false
-}
 </script>
 
 <style scoped>

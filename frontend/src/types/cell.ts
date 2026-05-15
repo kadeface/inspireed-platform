@@ -78,8 +78,8 @@ export interface SimCellContent {
   phetCategory?: 'physics' | 'chemistry' | 'biology' | 'earth' | 'math'
   // Hardware simulation
   hardwareSim?: string // Hardware simulation ID (from hardware-simulations.ts)
-  hardwarePlatform?: 'wokwi' | 'tinkercad' | 'circuitjs' | 'custom'
-  hardwareCategory?: 'arduino' | 'esp32' | 'circuit' | 'microcontroller'
+  hardwarePlatform?: 'wokwi' | 'tinkercad' | 'circuitjs' | 'makecode' | 'mblock' | 'funcode' | 'custom'
+  hardwareCategory?: 'arduino' | 'esp32' | 'circuit' | 'microcontroller' | 'graphical'
   // Generic iframe/URL
   url?: string
   // Simulation configuration
@@ -107,6 +107,17 @@ export interface ChartCellContent {
 export interface ChartCell extends CellBase {
   type: typeof CellType.CHART
   content: ChartCellContent
+}
+
+/** Legacy param cell — not in CellType add menu; kept for existing lesson content */
+export interface ParamCellContent {
+  values: Record<string, string>
+  schema?: Record<string, unknown>
+}
+
+export interface ParamCell extends Omit<CellBase, 'type'> {
+  type: 'PARAM'
+  content: ParamCellContent
 }
 
 export interface ContestCellContent {
@@ -275,6 +286,7 @@ export type Cell =
   | CodeCell
   | SimCell
   | ChartCell
+  | ParamCell
   | ContestCell
   | VideoCell
   | ImageCell

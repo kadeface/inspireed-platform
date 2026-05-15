@@ -5,6 +5,7 @@
 import type { Lesson } from '@/types/lesson'
 import type { Cell } from '@/types/cell'
 import { getCellId } from '@/utils/cellId'
+import { findFlatCellIndexByOrder } from '@/components/Classroom/cellUtils'
 import {
   normalizeContentToSections,
   sectionsToFlatCells,
@@ -62,10 +63,7 @@ export function getTeachingPreviewScrollTarget(
   const orders = settings.display_cell_orders as number[] | undefined
   if (Array.isArray(orders) && orders.length > 0) {
     const firstOrder = orders[0]
-    const index = flatCells.findIndex((cell, idx) => {
-      const cellOrder = cell.order !== undefined ? cell.order : idx
-      return cellOrder === firstOrder
-    })
+    const index = findFlatCellIndexByOrder(flatCells, firstOrder)
     if (index >= 0) {
       const c = flatCells[index]
       return {

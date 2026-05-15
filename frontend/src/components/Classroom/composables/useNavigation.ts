@@ -8,6 +8,7 @@ import { ref, type Ref, computed, nextTick } from 'vue'
 import { CellType, type Cell } from '@/types/cell'
 import classroomSessionService from '@/services/classroomSession'
 import { getCellId as getCellIdUtil, toNumericId, isUUID } from '@/utils/cellId'
+import { findFlatCellIndexByOrder } from '@/components/Classroom/cellUtils'
 
 function isActivityCell(cell: Cell): boolean {
   const t = cell.type as string
@@ -234,10 +235,13 @@ export function useNavigation(options: UseNavigationOptions) {
 
       // 如果点击的是活动模块，确保数据库记录存在
       if (cellOrder !== null && lessonContentCells.value.length > 0) {
-        const clickedCell = lessonContentCells.value.find((cell, idx) => {
-          const cellOrderValue = cell.order !== undefined ? cell.order : idx
-          return cellOrderValue === cellOrder
-        })
+        const clickedIndex = findFlatCellIndexByOrder(
+          lessonContentCells.value,
+          cellOrder,
+          selectedCellIndex.value
+        )
+        const clickedCell =
+          clickedIndex >= 0 ? lessonContentCells.value[clickedIndex] : undefined
 
         if (clickedCell && isActivityCell(clickedCell)) {
           const createdCellId = await ensureActivityCellExists(clickedCell, cellOrder)
@@ -262,15 +266,14 @@ export function useNavigation(options: UseNavigationOptions) {
       if (cellId === 0) {
         selectedCellIndex.value = -1
       } else if (cellOrder !== null && cellOrder !== undefined && lessonContentCells.value.length > 0) {
-        // 通过 cellOrder 查找对应的数组索引
-        const index = lessonContentCells.value.findIndex((cell, idx) => {
-          const cellOrderValue = cell.order !== undefined ? cell.order : idx
-          return cellOrderValue === cellOrder
-        })
+        const hint =
+          selectedCellIndex.value >= 0
+            ? selectedCellIndex.value
+            : currentModuleIndex.value
+        const index = findFlatCellIndexByOrder(lessonContentCells.value, cellOrder, hint)
         if (index >= 0) {
           selectedCellIndex.value = index
         } else {
-          // 如果找不到，尝试使用 cellOrder 作为索引（向后兼容）
           selectedCellIndex.value = cellOrder < lessonContentCells.value.length ? cellOrder : -1
         }
       } else if (cellId && lessonContentCells.value.length > 0) {

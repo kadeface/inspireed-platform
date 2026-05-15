@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
-import { sectionsToContent } from '../utils/lessonContent'
+import { renumberCellsGloballyInSections, sectionsToContent } from '../utils/lessonContent'
 import type { SectionInContent } from '../types/section'
 import { useLessonStore } from '../store/lesson'
 
@@ -39,6 +39,7 @@ export function useLessonEditorSave(
     saveStatus.value = 'saving'
     try {
       (cur as any).title = lessonTitle.value
+      renumberCellsGloballyInSections(sections.value)
       ;(cur as any).content = sectionsToContent(sections.value)
       await lessonStore.saveCurrentLesson()
       saveStatus.value = 'saved'
@@ -117,6 +118,7 @@ export function useLessonEditorSave(
     isSavingOnUnmount.value = true
     try {
       (cur as any).title = lessonTitle.value
+      renumberCellsGloballyInSections(sections.value)
       ;(cur as any).content = sectionsToContent(sections.value)
       await lessonStore.saveCurrentLesson()
       hasUnsavedChanges.value = false
@@ -137,6 +139,7 @@ export function useLessonEditorSave(
     isSavingOnUnmount.value = true
     try {
       (cur as any).title = lessonTitle.value
+      renumberCellsGloballyInSections(sections.value)
       ;(cur as any).content = sectionsToContent(sections.value)
       await lessonStore.saveCurrentLesson()
       hasUnsavedChanges.value = false

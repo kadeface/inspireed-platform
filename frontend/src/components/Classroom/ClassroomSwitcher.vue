@@ -175,7 +175,7 @@ function getCellTypeLabel(type: string): string {
     [CellType.SIM]: '仿真',
     [CellType.CHART]: '图表',
     [CellType.CONTEST]: '竞赛',
-    [CellType.PARAM]: '参数',
+    PARAM: '参数', // legacy cell type (not in CellType enum)
     [CellType.BROWSER]: '浏览器',
     [CellType.INTERACTIVE]: '交互式课件',
     [CellType.REFERENCE_MATERIAL]: '参考',
@@ -195,7 +195,7 @@ function getCellIcon(type: string): string {
     [CellType.SIM]: '🎮',
     [CellType.CHART]: '📈',
     [CellType.CONTEST]: '🏆',
-    [CellType.PARAM]: '⚙️',
+    PARAM: '⚙️', // legacy cell type (not in CellType enum)
     [CellType.BROWSER]: '🌐',
     [CellType.INTERACTIVE]: '🎮',
     [CellType.REFERENCE_MATERIAL]: '📚',

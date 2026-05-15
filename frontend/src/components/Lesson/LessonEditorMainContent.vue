@@ -460,7 +460,6 @@ const mobileCellTypes = computed(
       { type: CellType.INTERACTIVE, name: '交互', icon: '🎮' },
       { type: CellType.CODE, name: '代码', icon: '💻' },
       { type: CellType.ACTIVITY, name: '活动', icon: '✅' },
-      { type: CellType.FLOWCHART, name: '流程图', icon: '📊' },
     ] as const
 )
 

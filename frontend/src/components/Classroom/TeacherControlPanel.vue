@@ -680,6 +680,7 @@ import {
   getModuleTooltip,
   getCurrentModuleIndex,
   getCellByOrder,
+  findFlatCellIndexByOrder,
   getTextPreview,
   getCodePreview,
   handleThumbnailError,
@@ -866,10 +867,11 @@ const currentModuleIndex = computed(() => {
   if (!lessonContentCells.value.length) return -1
   if (displayCellOrders.value?.length > 0) {
     const firstOrder = displayCellOrders.value[0]
-    const index = lessonContentCells.value.findIndex((cell, idx) => {
-      const cellOrder = cell.order !== undefined ? cell.order : idx
-      return cellOrder === firstOrder
-    })
+    const hint =
+      selectedCellIndex.value >= 0
+        ? selectedCellIndex.value
+        : -1
+    const index = findFlatCellIndexByOrder(lessonContentCells.value, firstOrder, hint)
     if (index >= 0) return index
   }
   if (selectedCellIndex.value >= 0 && selectedCellIndex.value < lessonContentCells.value.length) {
@@ -1461,10 +1463,11 @@ watch(() => session.value, (newSession) => {
     // 如果有选中的 orders，使用第一个的索引
     if (orders.length > 0) {
       // 🆕 通过 order 查找对应的数组索引
-      const index = lessonContentCells.value.findIndex((cell, idx) => {
-        const cellOrder = cell.order !== undefined ? cell.order : idx
-        return cellOrder === orders[0]
-      })
+      const index = findFlatCellIndexByOrder(
+        lessonContentCells.value,
+        orders[0],
+        selectedCellIndex.value
+      )
       selectedCellIndex.value = index >= 0 ? index : orders[0]
       return
     }

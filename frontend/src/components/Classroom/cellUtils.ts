@@ -4,7 +4,7 @@
  * 用于处理Cell相关的操作和显示逻辑
  */
 
-import { CellType, type Cell } from '@/types/cell'
+import { CellType, type Cell, type CodeCell, type TextCell } from '@/types/cell'
 import { getCellId as getCellIdUtil } from '@/utils/cellId'
 
 /**
@@ -157,13 +157,41 @@ export function getCurrentModuleIndex(lessonContentCells: Cell[], session: any):
  * @param lessonContentCells - 课程内容Cells数组
  * @returns 找到的Cell，未找到返回null
  */
-export function getCellByOrder(order: number, lessonContentCells: Cell[]): Cell | null {
-  if (!lessonContentCells.length) return null
+/**
+ * 在扁平 cell 列表中按 order 查找索引；若存在重复 order（历史 section 局部编号），优先最接近 hintIndex 的项。
+ */
+export function findFlatCellIndexByOrder(
+  lessonContentCells: Cell[],
+  order: number,
+  hintIndex = -1
+): number {
+  if (!lessonContentCells.length) return -1
 
-  return lessonContentCells.find((cell, index) => {
+  let best = -1
+  let bestDist = Infinity
+  lessonContentCells.forEach((cell, index) => {
     const cellOrder = cell.order !== undefined ? cell.order : index
-    return cellOrder === order
-  }) || null
+    if (cellOrder !== order) return
+    if (hintIndex < 0) {
+      if (best < 0) best = index
+      return
+    }
+    const dist = Math.abs(index - hintIndex)
+    if (dist < bestDist) {
+      bestDist = dist
+      best = index
+    }
+  })
+  return best
+}
+
+export function getCellByOrder(
+  order: number,
+  lessonContentCells: Cell[],
+  hintIndex = -1
+): Cell | null {
+  const index = findFlatCellIndexByOrder(lessonContentCells, order, hintIndex)
+  return index >= 0 ? lessonContentCells[index] : null
 }
 
 /**
@@ -173,9 +201,9 @@ export function getCellByOrder(order: number, lessonContentCells: Cell[]): Cell 
  * @returns 预览文本
  */
 export function getTextPreview(cell: Cell, maxLength: number = 100): string {
-  if (cell.type !== 'text') return ''
+  if (cell.type !== CellType.TEXT) return ''
 
-  const content = (cell as any).content
+  const content = (cell as TextCell).content
   if (!content?.html) return '文本内容'
 
   // 去除HTML标签
@@ -189,9 +217,9 @@ export function getTextPreview(cell: Cell, maxLength: number = 100): string {
  * @returns 代码预览文本
  */
 export function getCodePreview(cell: Cell): string {
-  if (cell.type !== 'code') return ''
+  if (cell.type !== CellType.CODE) return ''
 
-  const content = (cell as any).content
+  const content = (cell as CodeCell).content
   if (!content?.code) return '// 代码内容'
 
   const lines = content.code.split('\n')
