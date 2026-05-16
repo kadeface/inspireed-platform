@@ -26,9 +26,11 @@
           :lesson-id="currentLesson.id"
           :lesson="currentLesson"
           :assistant-classroom-id="assistantClassroomId ?? null"
+          :teaching-interactive-viewer-mode="teachingInteractiveViewerMode"
           @session-changed="emit('session-changed', $event)"
           @open-assistant-drawer="emit('open-assistant-drawer', $event)"
           @minimal-teaching-assistant-docked="emit('minimal-teaching-assistant-docked', $event)"
+          @update:teaching-interactive-viewer-mode="emit('update:teachingInteractiveViewerMode', $event)"
         />
       </div>
     </Teleport>
@@ -153,9 +155,11 @@
               :lesson-id="currentLesson.id"
               :lesson="currentLesson"
               :assistant-classroom-id="assistantClassroomId ?? null"
+              :teaching-interactive-viewer-mode="teachingInteractiveViewerMode"
               @session-changed="emit('session-changed', $event)"
               @open-assistant-drawer="emit('open-assistant-drawer', $event)"
               @minimal-teaching-assistant-docked="emit('minimal-teaching-assistant-docked', $event)"
+              @update:teaching-interactive-viewer-mode="emit('update:teachingInteractiveViewerMode', $event)"
             />
           </div>
 
@@ -318,7 +322,7 @@
                   :compact-mode="false"
                   :lesson-id="currentLesson?.id"
                   :show-header="true"
-                  interactive-viewer-mode="student"
+                  :interactive-viewer-mode="teachingInteractiveViewerMode"
                   @update:section="(p) => emit('update-section', { index: si, payload: p })"
                   @add-cell="(sectionIndex, indexInSection, cellType) => emit('add-cell-in-section', { sectionIndex, indexInSection, cellType })"
                   @cell-update="emit('cell-update', $event)"
@@ -397,6 +401,7 @@
 import { computed, nextTick, ref } from 'vue'
 import type { Lesson } from '@/types/lesson'
 import type { SectionInContent } from '@/types/section'
+import type { InteractiveViewerRole } from '@/utils/interactiveView'
 import CellToolbar from '@/components/Lesson/CellToolbar.vue'
 import SectionContainer from '@/components/Lesson/SectionContainer.vue'
 import TeacherClassroomControlPanel from '@/components/Classroom/TeacherControlPanel.vue'
@@ -422,9 +427,13 @@ interface Props {
   cellListRef: any
   tabsContainerRef: any
   assistantClassroomId?: number | null
+  /** 授课/预览下交互单元的 iframe 视角（教师大屏 / 学生视角） */
+  teachingInteractiveViewerMode?: InteractiveViewerRole
 }
 
-defineProps<Props>()
+withDefaults(defineProps<Props>(), {
+  teachingInteractiveViewerMode: 'teacher',
+})
 
 const emit = defineEmits<{
   'toggle-toolbar-collapsed': []
@@ -450,6 +459,7 @@ const emit = defineEmits<{
   'cell-delete': [cellId: string]
   'cell-move-up': [cellId: string]
   'cell-move-down': [cellId: string]
+  'update:teachingInteractiveViewerMode': [mode: InteractiveViewerRole]
 }>()
 
 const showMobileAddMenu = ref(false)

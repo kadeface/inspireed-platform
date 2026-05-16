@@ -716,9 +716,7 @@ watch(
 
 function normalizeResolvedHttp(u: string | undefined | null): string | null {
   if (!u?.trim()) return null
-  const raw = u.trim()
-  if (!isValidUrl(raw)) return null
-  return resolveUrl(raw) || raw
+  return resolveUrl(u.trim())
 }
 
 function editableBlobForRole(role: InteractiveViewerRole): string | null {

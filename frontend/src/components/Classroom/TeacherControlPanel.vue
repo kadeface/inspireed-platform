@@ -418,6 +418,40 @@
             </div>
           </section>
 
+          <!-- 交互课件预览（教师大屏 / 学生视角）：与教案预览 iframe 同步 -->
+          <section
+            class="minimal-more-group minimal-more-group--always-open minimal-more-group--interactive-viewer"
+            aria-label="交互课件预览"
+          >
+            <h4 class="minimal-more-group-heading">交互课件预览</h4>
+            <div class="minimal-more-settings-row minimal-more-settings-row--interactive-viewer">
+              <div class="minimal-more-inline-group">
+                <span class="minimal-more-label">教师端</span>
+                <div class="minimal-interactive-viewer-segment" role="group" aria-label="切换交互课件预览视角">
+                  <button
+                    type="button"
+                    class="minimal-interactive-viewer-segment__btn"
+                    :class="{ 'is-active': teachingInteractiveViewerMode === 'teacher' }"
+                    @click="emit('update:teachingInteractiveViewerMode', 'teacher')"
+                  >
+                    教师大屏
+                  </button>
+                  <button
+                    type="button"
+                    class="minimal-interactive-viewer-segment__btn"
+                    :class="{ 'is-active': teachingInteractiveViewerMode === 'student' }"
+                    @click="emit('update:teachingInteractiveViewerMode', 'student')"
+                  >
+                    学生视角
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p class="minimal-more-hint minimal-more-hint--interactive-viewer">
+              切换当前教案预览里交互单元的展示视角（不影响学生端）。
+            </p>
+          </section>
+
           <!-- 播出设置：可折叠 -->
           <section
             v-if="
@@ -612,6 +646,7 @@ import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, provide,
 import type { Lesson } from '../../types/lesson'
 import type { LessonClassroom } from '../../types/lesson'
 import { CellType, type Cell, type ActivityCell } from '../../types/cell'
+import type { InteractiveViewerRole } from '@/utils/interactiveView'
 
 // ============================================================================
 // 3. Store
@@ -703,9 +738,13 @@ interface Props {
   lesson?: Lesson
   /** 教学助手（点名等）用的班级 ID，与教案 classroom_ids 等对齐 */
   assistantClassroomId?: number | null
+  /** 教案授课预览中交互单元的 iframe 视角（与 LessonEditor 同步） */
+  teachingInteractiveViewerMode?: InteractiveViewerRole
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  teachingInteractiveViewerMode: 'teacher',
+})
 
 // ============================================================================
 // Props & Emits
@@ -717,6 +756,7 @@ const emit = defineEmits<{
   'open-assistant-drawer': [type: 'attendance' | 'behavior' | 'discipline' | 'duty']
   /** 极简授课下教学助手按钮已收入浮动导播台，用于隐藏视口角落的重复 FAB */
   'minimal-teaching-assistant-docked': [docked: boolean]
+  'update:teachingInteractiveViewerMode': [mode: InteractiveViewerRole]
 }>()
 
 // ============================================================================
@@ -4827,6 +4867,63 @@ input[type="checkbox"].checkbox-input {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #e5e7eb;
+}
+
+.minimal-more-group--interactive-viewer {
+  padding-top: 4px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.minimal-more-settings-row--interactive-viewer {
+  margin-bottom: 6px;
+}
+
+.minimal-interactive-viewer-segment {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+  padding: 2px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.minimal-interactive-viewer-segment__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.minimal-interactive-viewer-segment__btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.minimal-interactive-viewer-segment__btn.is-active {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.25);
+}
+
+.minimal-more-hint--interactive-viewer {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #94a3b8;
 }
 
 .minimal-more-end-class-btn {

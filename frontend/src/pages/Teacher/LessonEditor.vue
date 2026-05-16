@@ -46,6 +46,8 @@
       :cell-list-ref="cellListRef"
       :tabs-container-ref="tabsContainerRef"
       :assistant-classroom-id="currentClassroomId"
+      :teaching-interactive-viewer-mode="teachingInteractiveViewerMode"
+      @update:teaching-interactive-viewer-mode="teachingInteractiveViewerMode = $event"
       @toggle-toolbar-collapsed="toolbarCollapsed = !toolbarCollapsed"
       @add-cell-to-end="(cellType) => {
         console.log('LessonEditor: 收到 add-cell-to-end 事件', { cellType })
@@ -111,6 +113,7 @@
       :slide-mode="slideMode"
       :slide-fullscreen="slideFullscreen"
       :compact-mode="compactMode"
+      :teaching-interactive-viewer-mode="teachingInteractiveViewerMode"
       :display-cells="displayCells"
       :current-cell="currentCell"
       :current-slide-index="currentSlideIndex"
@@ -322,6 +325,7 @@ import {
   scrollToTeachingPreviewCell,
   getTeachingPreviewScrollTarget,
 } from '@/utils/scrollToTeachingCell'
+import type { InteractiveViewerRole } from '@/utils/interactiveView'
 
 const logger = createLogger('LESSON_EDITOR')
 
@@ -339,6 +343,8 @@ const isLoading = ref(true)
 const loadError = ref<string | null>(null)
 const toolbarCollapsed = ref(false)
 const isPreviewMode = ref(false)
+/** 授课 / 全屏预览下交互课件 iframe 视角（教师大屏 ↔ 学生视角） */
+const teachingInteractiveViewerMode = ref<InteractiveViewerRole>('teacher')
 const compactMode = ref(true)
 const lessonTitle = ref('')
 const isFlowInteractionActive = ref(false)
@@ -495,6 +501,7 @@ watch(isPreviewMode, (newValue) => {
       showClassroomPanel.value = true
     }
   } else {
+    teachingInteractiveViewerMode.value = 'teacher'
     nextTick(() => {
       setTimeout(initSortable, 100)
       setTimeout(initTabsSortable, 100)

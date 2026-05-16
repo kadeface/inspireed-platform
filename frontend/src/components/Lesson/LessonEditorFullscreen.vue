@@ -8,16 +8,16 @@
         <!-- 全屏预览顶部栏 -->
         <header v-if="!slideFullscreen" class="bg-white shadow-sm z-10 flex-shrink-0">
           <div class="px-6 py-4">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-4">
-                <div>
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+              <div class="flex flex-wrap items-center gap-4 min-w-0">
+                <div class="min-w-0">
                   <h1 class="text-xl font-bold text-gray-900">{{ lessonTitle }}</h1>
                   <p class="text-sm text-gray-500 mt-1">
                     {{ slideMode ? '幻灯片模式' : '沉浸式预览' }}
                   </p>
                 </div>
               </div>
-              <div class="flex items-center gap-4">
+              <div class="flex items-center gap-2 sm:gap-4 flex-wrap justify-end">
                 <!-- 幻灯片模式切换 -->
                 <button
                   @click="emit('toggle-slide-mode')"
@@ -99,7 +99,7 @@
                   :draggable="false"
                   :show-move-buttons="false"
                   :compact-mode="compactMode"
-                  interactive-viewer-mode="student"
+                  :interactive-viewer-mode="teachingInteractiveViewerMode"
                 />
               </div>
 
@@ -159,7 +159,7 @@
                       :draggable="false"
                       :show-move-buttons="false"
                       :compact-mode="false"
-                      interactive-viewer-mode="student"
+                      :interactive-viewer-mode="teachingInteractiveViewerMode"
                     />
                   </div>
                 </div>
@@ -284,8 +284,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 import type { Cell } from '@/types/cell'
+import type { InteractiveViewerRole } from '@/utils/interactiveView'
 import CellContainer from '@/components/Cell/CellContainer.vue'
 
 interface Props {
@@ -299,9 +299,13 @@ interface Props {
   currentSlideIndex: number
   showSlideControls: boolean
   slideContainerRef: any
+  /** 交互课件 iframe 视角（与授课主界面同步） */
+  teachingInteractiveViewerMode?: InteractiveViewerRole
 }
 
-defineProps<Props>()
+withDefaults(defineProps<Props>(), {
+  teachingInteractiveViewerMode: 'teacher',
+})
 
 const emit = defineEmits<{
   'exit-fullscreen': []
