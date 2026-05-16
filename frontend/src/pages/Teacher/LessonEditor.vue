@@ -47,6 +47,7 @@
       :tabs-container-ref="tabsContainerRef"
       :assistant-classroom-id="currentClassroomId"
       :teaching-interactive-viewer-mode="teachingInteractiveViewerMode"
+      :restore-session-id="restoreSessionId"
       @update:teaching-interactive-viewer-mode="teachingInteractiveViewerMode = $event"
       @toggle-toolbar-collapsed="toolbarCollapsed = !toolbarCollapsed"
       @add-cell-to-end="(cellType) => {
@@ -315,6 +316,7 @@ import { useLessonEditorSlides } from '@/composables/useLessonEditorSlides'
 import { useLessonEditorCover } from '@/composables/useLessonEditorCover'
 import { useLessonEditorPublish } from '@/composables/useLessonEditorPublish'
 import { useFullscreen } from '@/composables/useFullscreen'
+import { useLessonExternalReturn } from '@/composables/useLessonExternalReturn'
 import { summarizeCell, markdownToHtml } from '@/utils/lessonEditorHelpers'
 import api from '../../services/api'
 import courseExportService from '../../services/courseExport'
@@ -326,12 +328,24 @@ import {
   getTeachingPreviewScrollTarget,
 } from '@/utils/scrollToTeachingCell'
 import type { InteractiveViewerRole } from '@/utils/interactiveView'
+import {
+  LESSON_PREVIEW_QUERY,
+  LESSON_PREVIEW_QUERY_VALUE,
+  LESSON_SESSION_QUERY,
+  parseSessionIdParam,
+  readPreviewModeFromRoute,
+  readTeachingContext,
+  saveTeachingContext,
+  teachingPreviewStorageKey,
+} from '@/utils/lessonTeachingMode'
 
 const logger = createLogger('LESSON_EDITOR')
 
 const router = useRouter()
 const route = useRoute()
 const lessonStore = useLessonStore()
+
+useLessonExternalReturn()
 
 // 模板 refs
 const cellListRef = ref<HTMLElement>()
@@ -440,6 +454,15 @@ const canEnterPreviewMode = computed(() => {
   return currentLesson.value?.status === 'published'
 })
 
+/** 从外部浏览返回时需恢复的课堂会话（授课中） */
+const restoreSessionId = computed(() => {
+  const fromRoute = parseSessionIdParam(route.query[LESSON_SESSION_QUERY])
+  if (fromRoute) return fromRoute
+  const lessonId = currentLesson.value?.id ?? Number(route.params.id)
+  if (!lessonId || Number.isNaN(lessonId)) return null
+  return readTeachingContext(lessonId)?.sessionId ?? null
+})
+
 // 获取当前班级ID（用于教学助手）
 const currentClassroomId = computed(() => {
   // 优先从 lesson 的 classroom_ids 中获取第一个
@@ -492,8 +515,43 @@ async function handleSlideFullscreenToggle() {
   }
 }
 
+function syncTeachingContextToUrl() {
+  const lessonId = currentLesson.value?.id ?? route.params.id
+  const preview = isPreviewMode.value
+  const sessionId =
+    currentSessionId.value ?? providedSessionRef.value?.id ?? null
+
+  if (lessonId != null && lessonId !== '') {
+    saveTeachingContext(lessonId, { preview, sessionId })
+  }
+
+  const nextQuery: Record<string, string | string[]> = { ...route.query }
+  if (preview) {
+    nextQuery[LESSON_PREVIEW_QUERY] = LESSON_PREVIEW_QUERY_VALUE
+  } else {
+    delete nextQuery[LESSON_PREVIEW_QUERY]
+    delete nextQuery[LESSON_SESSION_QUERY]
+  }
+
+  if (preview && sessionId != null) {
+    nextQuery[LESSON_SESSION_QUERY] = String(sessionId)
+  } else if (!preview) {
+    delete nextQuery[LESSON_SESSION_QUERY]
+  }
+
+  const previewInUrl = route.query[LESSON_PREVIEW_QUERY] === LESSON_PREVIEW_QUERY_VALUE
+  const sessionInUrl = String(route.query[LESSON_SESSION_QUERY] ?? '')
+  const sessionNext = String(nextQuery[LESSON_SESSION_QUERY] ?? '')
+
+  if (previewInUrl === preview && sessionInUrl === sessionNext) return
+
+  router.replace({ path: route.path, query: nextQuery })
+}
+
 // 监听预览模式变化
 watch(isPreviewMode, (newValue) => {
+  syncTeachingContextToUrl()
+
   if (newValue) {
     destroySortable()
     // 进入授课模式时，自动打开课堂控制面板
@@ -506,6 +564,12 @@ watch(isPreviewMode, (newValue) => {
       setTimeout(initSortable, 100)
       setTimeout(initTabsSortable, 100)
     })
+  }
+})
+
+watch([currentSessionId, providedSessionRef], () => {
+  if (isPreviewMode.value) {
+    syncTeachingContextToUrl()
   }
 })
 
@@ -766,6 +830,19 @@ onMounted(async () => {
       } catch (error) {
         console.error('Failed to load reference resource:', error)
       }
+    }
+
+    // 从 URL 或 sessionStorage 恢复授课（预览）模式（例如从外部浏览页返回）
+    const teachingCtx = readTeachingContext(lessonId)
+    const shouldRestorePreview =
+      (readPreviewModeFromRoute(route.query) ||
+        sessionStorage.getItem(teachingPreviewStorageKey(lessonId)) === '1' ||
+        teachingCtx?.preview) &&
+      currentLesson.value?.status === 'published'
+
+    if (shouldRestorePreview) {
+      isPreviewMode.value = true
+      showClassroomPanel.value = true
     }
 
     // 初始化拖拽

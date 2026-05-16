@@ -79,6 +79,14 @@
             />
             允许全屏
           </label>
+          <label>
+            <input
+              v-model="embedPreviewEnabled"
+              type="checkbox"
+              @change="onEmbedPreviewToggle"
+            />
+            允许内嵌预览（不支持登录/下载）
+          </label>
         </div>
       </div>
     </div>
@@ -91,24 +99,69 @@
         <p v-if="displayContent.description" class="browser-description">{{ displayContent.description }}</p>
       </div>
 
-      <!-- 只读：二选一展示（优先尝试内嵌，失败后自动降级为链接模式） -->
+      <!-- 只读：外部打开（推荐，支持登录/下载） -->
+      <div
+        v-if="shouldShowExternalCard"
+        class="link-mode-card external-mode-card"
+        :class="{ 'fullscreen-preview': isFullscreenPreview }"
+      >
+        <div class="link-card-content">
+          <div class="link-header">
+            <svg class="link-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            <div class="link-info">
+              <h3 class="link-title">{{ displayContent.title || '网站链接' }}</h3>
+              <p class="link-url">{{ displayUrl }}</p>
+            </div>
+          </div>
+          <p class="external-open-hint">
+            登录、下载等操作请在外部页面完成；本页将保持打开，完成后可切回继续听课。
+          </p>
+          <div class="qr-code-section">
+            <img
+              v-if="qrCodeDataUrl"
+              :src="qrCodeDataUrl"
+              class="qr-code"
+              alt="二维码"
+              @click="showLargeQR = true"
+            />
+            <div v-else class="qr-code-loading">
+              <div class="loading-spinner-small"></div>
+              <p>生成二维码中...</p>
+            </div>
+            <p class="qr-hint">手机可扫码打开；授课页请勿关闭</p>
+          </div>
+          <button type="button" class="link-open-btn" @click="openManagedExternal">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            在外部页面打开（推荐）
+          </button>
+        </div>
+      </div>
+
+      <!-- 只读：可选内嵌预览（教师开启 embed 时） -->
       <div v-if="!editable && shouldShowEmbed" class="browser-embed-section">
+        <p class="browser-embed-login-hint">
+          下方为只读预览，无法登录或下载；请使用上方「在外部页面打开」。
+        </p>
         <div class="browser-embed-wrap">
           <iframe
             :src="displayUrl"
             class="browser-embed-iframe"
             title="浏览器单元预览"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+            :sandbox="iframeSandbox"
             @load="handleIframeLoad"
             @error="handleIframeError"
           />
         </div>
         <p v-if="embedState === 'checking'" class="browser-embed-hint">
-          正在尝试内嵌加载，若目标网站禁止嵌入将自动切换为链接模式...
+          正在尝试内嵌加载...
         </p>
       </div>
 
-      <!-- 链接与二维码（仅在编辑模式或内嵌失败时显示） -->
+      <!-- 编辑模式：链接预览 -->
       <div
         v-if="shouldShowLinkMode"
         class="link-mode-card"
@@ -143,11 +196,11 @@
           </div>
 
           <!-- 打开按钮 -->
-          <button @click="openInNewWindow" class="link-open-btn">
+          <button type="button" class="link-open-btn" @click="openManagedExternal">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
-            在新窗口打开
+            在外部页面打开
           </button>
         </div>
       </div>
@@ -207,18 +260,31 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, onBeforeUnmount, onMounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import type { BrowserCell } from '../../types/cell'
 import { useFullscreen } from '@/composables/useFullscreen'
+import { useExternalBrowser } from '@/composables/useExternalBrowser'
+import { useToast } from '@/composables/useToast'
+import { resolveBrowserOpenMode } from '@/utils/browserExternalHosts'
+import { buildLessonReturnPath } from '@/utils/lessonTeachingMode'
 import QRCode from 'qrcode'
+
+const DEFAULT_IFRAME_SANDBOX =
+  'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads'
 
 interface Props {
   cell: BrowserCell
   editable?: boolean
+  lessonId?: number | string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   editable: false
 })
+
+const route = useRoute()
+const { openExternal } = useExternalBrowser()
+const toast = useToast()
 
 const emit = defineEmits<{
   update: [cell: BrowserCell]
@@ -228,10 +294,13 @@ const containerRef = ref<HTMLElement | null>(null)
 const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)
 
 const localContent = ref({ ...props.cell.content })
-const localConfig = ref<BrowserCell['config']>({ 
+const localConfig = ref<BrowserCell['config']>({
   allowFullscreen: true,
-  ...(props.cell.config || {})
+  openMode: 'auto',
+  ...(props.cell.config || {}),
 })
+
+const embedPreviewEnabled = ref(localConfig.value?.openMode === 'embed')
 
 const urlError = ref<string | null>(null)
 const embedState = ref<'checking' | 'embedded' | 'fallback'>('checking')
@@ -257,15 +326,38 @@ const displayConfig = computed(() => {
   return props.editable ? localConfig.value : (props.cell.config || {} as BrowserCell['config'])
 })
 
+const resolvedOpenMode = computed(() =>
+  resolveBrowserOpenMode(displayConfig.value?.openMode, displayUrl.value)
+)
+
+const iframeSandbox = computed(() => {
+  const custom = displayConfig.value?.sandbox
+  if (custom?.length) return custom.join(' ')
+  return DEFAULT_IFRAME_SANDBOX
+})
+
+const effectiveLessonId = computed((): string | number => {
+  if (props.lessonId != null && props.lessonId !== '') return props.lessonId
+  const id = route.params.id
+  if (Array.isArray(id)) return id[0] ?? 'lesson'
+  if (id != null && id !== '') return id
+  return 'lesson'
+})
+
+const shouldShowExternalCard = computed(() => {
+  if (!displayUrl.value || props.editable) return false
+  return true
+})
+
 const shouldShowEmbed = computed(() => {
   if (props.editable || !displayUrl.value) return false
+  if (resolvedOpenMode.value !== 'embed') return false
   return embedState.value !== 'fallback'
 })
 
 const shouldShowLinkMode = computed(() => {
   if (!displayUrl.value) return false
-  if (props.editable) return true
-  return embedState.value === 'fallback'
+  return props.editable
 })
 
 function clearIframeFallbackTimer() {
@@ -277,6 +369,10 @@ function clearIframeFallbackTimer() {
 
 function startEmbedAttempt() {
   if (props.editable || !displayUrl.value) return
+  if (resolvedOpenMode.value !== 'embed') {
+    embedState.value = 'fallback'
+    return
+  }
   clearIframeFallbackTimer()
   embedState.value = 'checking'
   iframeFallbackTimer.value = window.setTimeout(() => {
@@ -339,18 +435,50 @@ function updateCell() {
   emit('update', updatedCell)
 }
 
-// 在新窗口预览
-function previewUrl() {
-  if (localContent.value.url && isValidUrl(localContent.value.url)) {
-    window.open(localContent.value.url, '_blank', 'noopener,noreferrer')
+function onEmbedPreviewToggle() {
+  localConfig.value = {
+    ...localConfig.value,
+    openMode: embedPreviewEnabled.value ? 'embed' : 'auto',
   }
+  updateCell()
 }
 
+function openManagedExternal() {
+  if (!displayUrl.value) return
 
-// 在新窗口打开
-function openInNewWindow() {
-  if (displayUrl.value) {
-    window.open(displayUrl.value, '_blank', 'noopener,noreferrer')
+  const title =
+    displayContent.value.title ||
+    (() => {
+      try {
+        return new URL(displayUrl.value).hostname
+      } catch {
+        return '外部网页'
+      }
+    })()
+
+  const returnUrl = buildLessonReturnPath(route.path, route.query, effectiveLessonId.value)
+
+  const result = openExternal(displayUrl.value, {
+    lessonId: effectiveLessonId.value,
+    cellId: props.cell.id,
+    title,
+    returnUrl,
+  })
+
+  if (result.ok === false) {
+    if (result.reason === 'blocked') {
+      toast.warning('无法打开外部页面，请允许浏览器弹窗后重试')
+    }
+    return
+  }
+
+  toast.info('已在外部窗口打开，底部可点击「继续听课」返回授课页', '浏览器单元')
+}
+
+// 编辑模式：在新窗口预览
+function previewUrl() {
+  if (localContent.value.url && isValidUrl(localContent.value.url)) {
+    openManagedExternal()
   }
 }
 
@@ -417,8 +545,10 @@ watch(() => props.cell, (newCell) => {
       localContent.value = { ...newCell.content }
       localConfig.value = {
         allowFullscreen: true,
-        ...(newCell.config || {})
+        openMode: 'auto',
+        ...(newCell.config || {}),
       }
+      embedPreviewEnabled.value = localConfig.value?.openMode === 'embed'
       // 重置并重新生成二维码
       qrCodeDataUrl.value = null
       qrCodeLargeDataUrl.value = null
@@ -638,6 +768,18 @@ onBeforeUnmount(() => {
 
 .browser-embed-hint {
   @apply mt-2 text-xs text-gray-500;
+}
+
+.browser-embed-login-hint {
+  @apply mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800;
+}
+
+.external-open-hint {
+  @apply max-w-md text-center text-sm text-gray-600;
+}
+
+.external-mode-card {
+  @apply mb-4 border-cyan-200;
 }
 
 .empty-state {

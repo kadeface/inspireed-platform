@@ -830,10 +830,13 @@ interface Props {
   assistantClassroomId?: number | null
   /** 教案授课预览中交互单元的 iframe 视角（与 LessonEditor 同步） */
   teachingInteractiveViewerMode?: InteractiveViewerRole
+  /** 从外部浏览返回时恢复的课堂会话 ID */
+  restoreSessionId?: number | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   teachingInteractiveViewerMode: 'teacher',
+  restoreSessionId: null,
 })
 
 // ============================================================================
@@ -898,6 +901,7 @@ const {
   handleEnd,
   handleStartActivity,
   handleEndActivity,
+  restoreSessionById,
 } = sessionManager
 
 /** 切换窗口/全屏展示：写入会话 settings 并广播给学生端 / 观摩端 */
@@ -1658,10 +1662,24 @@ watch(() => session.value, (newSession) => {
 // function loadDbCells, ensureActivityCellExists
 // 现在从 dataLoader 导入
 
+async function tryRestoreSessionFromProps() {
+  const sid = props.restoreSessionId
+  if (sid == null || sid <= 0 || session.value?.id === sid) return
+
+  const ok = await restoreSessionById(sid)
+  if (!ok) return
+
+  const st = normalizedSessionStatus.value
+  if (st === 'teaching' || st === 'active') {
+    minimalTeachingFocus.value = true
+  }
+
+  await loadParticipants()
+  loadStatistics()
+}
+
 // 初始化
 onMounted(async () => {
-  // 静默执行，不输出日志
-
   // v2.0: 设置全屏监听器
   setupFullscreenListeners()
 
@@ -1671,13 +1689,21 @@ onMounted(async () => {
   // v2.0: 监听 currentCell 变化，自动加载活动统计
   watchCurrentCell()
 
-  // ✅ 重要：不自动加载会话和启动 WebSocket
-  // 只有在用户明确点击"创建课堂"或"准备上课"时才加载会话
-  // 这样可以避免在非授课模式下不必要的 WebSocket 连接
-
-  // 确保没有遗留的 WebSocket 连接
   wsManager?.disconnect()
+
+  if (props.restoreSessionId != null && props.restoreSessionId > 0) {
+    await tryRestoreSessionFromProps()
+  }
 })
+
+watch(
+  () => props.restoreSessionId,
+  async (sid) => {
+    if (sid != null && sid > 0) {
+      await tryRestoreSessionFromProps()
+    }
+  }
+)
 
 // 组件卸载前清理（轮询 + WebSocket）
 onBeforeUnmount(() => {

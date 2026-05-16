@@ -451,6 +451,7 @@ import StudentAiAssistantPanel from '@/components/Student/StudentAiAssistantPane
 import MarkdownEditor from '@/components/Editor/MarkdownEditor.vue'
 import StudentClassroomSync from '@/components/Classroom/StudentClassroomSync.vue'
 import { useClassroomSession } from '@/composables/useClassroomSession'
+import { useLessonExternalReturn } from '@/composables/useLessonExternalReturn'
 import classroomSessionService from '@/services/classroomSession'
 import type { ClassSession } from '@/types/classroomSession'
 import { isContentWithSections, normalizeContentToSections, sectionsToFlatCells } from '@/utils/lessonContent'
@@ -459,6 +460,8 @@ import { createLogger } from '@/utils/logger'
 const log = createLogger('LessonView')
 const route = useRoute()
 const router = useRouter()
+
+useLessonExternalReturn()
 
 // 计算属性（需要在使用前定义）
 const lessonId = computed(() => Number(route.params.id))
@@ -919,11 +922,12 @@ const classroomDisplayKey = computed(() => {
 */
 // ========== 旧代码全部结束 ==========
 
-function lessonViewCellBind(cell: { type: string }) {
+function lessonViewCellBind(cell: { type: string; id?: string | number }) {
   const base: Record<string, unknown> = {
     cell,
     editable: false,
     sessionId: classroomSession.value?.id,
+    lessonId: lessonId.value,
   }
   const t = cell.type
   if (t === CellType.INTERACTIVE || t === 'interactive' || t === 'INTERACTIVE') {

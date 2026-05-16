@@ -26,6 +26,7 @@
           :lesson-id="currentLesson.id"
           :lesson="currentLesson"
           :assistant-classroom-id="assistantClassroomId ?? null"
+          :restore-session-id="restoreSessionId"
           :teaching-interactive-viewer-mode="teachingInteractiveViewerMode"
           @session-changed="emit('session-changed', $event)"
           @open-assistant-drawer="emit('open-assistant-drawer', $event)"
@@ -155,6 +156,7 @@
               :lesson-id="currentLesson.id"
               :lesson="currentLesson"
               :assistant-classroom-id="assistantClassroomId ?? null"
+              :restore-session-id="restoreSessionId"
               :teaching-interactive-viewer-mode="teachingInteractiveViewerMode"
               @session-changed="emit('session-changed', $event)"
               @open-assistant-drawer="emit('open-assistant-drawer', $event)"
@@ -429,10 +431,13 @@ interface Props {
   assistantClassroomId?: number | null
   /** 授课/预览下交互单元的 iframe 视角（教师大屏 / 学生视角） */
   teachingInteractiveViewerMode?: InteractiveViewerRole
+  /** 从外部浏览返回时恢复的课堂会话 ID */
+  restoreSessionId?: number | null
 }
 
 withDefaults(defineProps<Props>(), {
   teachingInteractiveViewerMode: 'teacher',
+  restoreSessionId: null,
 })
 
 const emit = defineEmits<{

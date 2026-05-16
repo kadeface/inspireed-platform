@@ -253,6 +253,8 @@ export interface BrowserCell extends CellBase {
   content: BrowserCellContent
   config?: {
     allowFullscreen?: boolean      // 是否允许全屏（默认true）
+    /** 打开方式：auto/external 默认外部标签（支持登录下载）；embed 仅内嵌预览 */
+    openMode?: 'auto' | 'external' | 'embed'
     allowNavigation?: boolean       // 是否允许导航（默认true）
     sandbox?: string[]             // iframe sandbox 属性（安全控制）
     width?: string                 // iframe 宽度（默认100%）

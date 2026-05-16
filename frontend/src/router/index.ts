@@ -21,6 +21,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '访客观摩 - InspireEd' },
   },
   {
+    path: '/external-browser',
+    name: 'ExternalBrowser',
+    component: () => import('../pages/ExternalBrowser.vue'),
+    meta: { title: '外部浏览 - InspireEd' },
+  },
+  {
     path: '/review-channel/judge',
     name: 'ReviewChannelJudge',
     component: () => import('../pages/ReviewChannel/Judge.vue'),

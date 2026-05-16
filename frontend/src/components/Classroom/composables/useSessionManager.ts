@@ -425,6 +425,38 @@ export function useSessionManager(options: UseSessionManagerOptions) {
     }
   }
 
+  /** 从外部页返回等场景：按会话 ID 恢复课堂（含进行中授课） */
+  async function restoreSessionById(sessionId: number): Promise<boolean> {
+    if (!Number.isFinite(sessionId) || sessionId <= 0) return false
+
+    loading.value = true
+    try {
+      const loaded = await classroomSessionService.getSession(sessionId)
+      if (!loaded?.id) return false
+
+      const st = String(loaded.status ?? '').toLowerCase()
+      if (st === 'ended') {
+        session.value = null
+        return false
+      }
+
+      session.value = loaded
+      onSessionCreated?.(loaded)
+
+      if (st === 'teaching' || st === 'active') {
+        onSessionStarted?.(loaded)
+      }
+
+      return true
+    } catch (error) {
+      console.error('restoreSessionById failed:', error)
+      onError?.(error)
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 结束活动
   async function handleEndActivity() {
     if (!session.value) return
@@ -464,5 +496,6 @@ export function useSessionManager(options: UseSessionManagerOptions) {
     handleEnd,
     handleStartActivity,
     handleEndActivity,
+    restoreSessionById,
   }
 }

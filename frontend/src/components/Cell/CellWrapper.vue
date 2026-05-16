@@ -1,5 +1,6 @@
 <template>
-  <div 
+  <div
+    :data-cell-id="cell.id"
     :class="[
       'cell-wrapper',
       'relative transition-all duration-300',
