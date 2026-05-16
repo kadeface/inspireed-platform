@@ -124,11 +124,7 @@
 
         <component
           :is="cellComponent"
-          :cell="cell as any"
-          :editable="editable"
-          :compact-mode="compactMode"
-          :lesson-id="finalLessonId"
-          :session-id="finalSessionId"
+          v-bind="(childCellProps as any)"
           @update="handleUpdate"
         />
       </div>
@@ -140,6 +136,7 @@
 import { computed, ref, nextTick, watch, inject, onMounted, type ComputedRef, type Ref } from 'vue'
 import type { Cell } from '../../types/cell'
 import { CellType } from '../../types/cell'
+import type { InteractiveViewerRole } from '@/utils/interactiveView'
 import TextCell from './TextCell.vue'
 import CodeCell from './CodeCell.vue'
 import ParamCell from './ParamCell.vue'
@@ -169,6 +166,8 @@ interface Props {
   compactMode?: boolean // 紧凑模式：限制长内容的高度
   sessionId?: number // 课堂会话ID（课堂模式传递）
   lessonId?: number // 教案ID
+  /** 交互式课件：教师大屏 / 学生活动（仅 INTERACTIVE 单元使用） */
+  interactiveViewerMode?: InteractiveViewerRole
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -253,6 +252,20 @@ const finalLessonId = computed(() => {
     return injectedSession.value.lesson_id
   }
   return undefined
+})
+
+const childCellProps = computed(() => {
+  const o: Record<string, unknown> = {
+    cell: props.cell,
+    editable: props.editable,
+    compactMode: props.compactMode,
+    lessonId: finalLessonId.value,
+    sessionId: finalSessionId.value,
+  }
+  if (props.cell.type === CellType.INTERACTIVE) {
+    o.interactiveViewerMode = props.interactiveViewerMode
+  }
+  return o
 })
 
 const emit = defineEmits<{

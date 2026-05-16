@@ -95,7 +95,14 @@ export function getDefaultCell(cellType: (typeof CellType)[keyof typeof CellType
       return {
         ...baseCell,
         type: CellType.INTERACTIVE,
-        content: { url: '', html_code: undefined, title: '', description: '' },
+        content: {
+          url: '',
+          html_code: undefined,
+          teacher_html_code: undefined,
+          student_html_code: undefined,
+          title: '',
+          description: '',
+        },
         config: { allowFullscreen: true, height: '800px' },
       } as Cell
     default:

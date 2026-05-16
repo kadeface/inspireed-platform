@@ -99,6 +99,7 @@
               :draggable="false"
               :show-move-buttons="false"
               :compact-mode="false"
+              interactive-viewer-mode="student"
               @update="handle_cell_update"
               @delete="handle_delete_cell"
             />
@@ -411,8 +412,14 @@ function project_cell_to_cell(project_cell: ProjectCell, index: number): Cell {
         type: CellType.INTERACTIVE,
         content: {
           asset_id: project_cell.content?.asset_id,
+          teacher_asset_id: project_cell.content?.teacher_asset_id,
+          student_asset_id: project_cell.content?.student_asset_id,
           url: project_cell.content?.url || '',
+          teacher_url: project_cell.content?.teacher_url,
+          student_url: project_cell.content?.student_url,
           html_code: project_cell.content?.html_code,
+          teacher_html_code: project_cell.content?.teacher_html_code,
+          student_html_code: project_cell.content?.student_html_code,
           title: project_cell.content?.title,
           description: project_cell.content?.description,
           thumbnail: project_cell.content?.thumbnail,
@@ -559,8 +566,14 @@ function cell_to_project_cell(cell: Cell): ProjectCell {
     case CellType.INTERACTIVE:
       project_cell.content = {
         asset_id: (cell.content as any).asset_id,
+        teacher_asset_id: (cell.content as any).teacher_asset_id,
+        student_asset_id: (cell.content as any).student_asset_id,
         url: (cell.content as any).url || '',
+        teacher_url: (cell.content as any).teacher_url,
+        student_url: (cell.content as any).student_url,
         html_code: (cell.content as any).html_code,
+        teacher_html_code: (cell.content as any).teacher_html_code,
+        student_html_code: (cell.content as any).student_html_code,
         title: (cell.content as any).title,
         description: (cell.content as any).description,
         thumbnail: (cell.content as any).thumbnail,
@@ -797,7 +810,18 @@ function handle_add_cell(cell_type: string) {
       default_content = { url: '', title: '', description: '' }
       break
     case 'interactive':
-      default_content = { url: '', html_code: undefined, title: '', description: '' }
+      default_content = {
+        url: '',
+        teacher_url: undefined,
+        student_url: undefined,
+        html_code: undefined,
+        teacher_html_code: undefined,
+        student_html_code: undefined,
+        teacher_asset_id: undefined,
+        student_asset_id: undefined,
+        title: '',
+        description: '',
+      }
       break
     default:
       default_content = { html: '<p>未知单元类型</p>' }

@@ -99,6 +99,7 @@
                   :draggable="false"
                   :show-move-buttons="false"
                   :compact-mode="compactMode"
+                  interactive-viewer-mode="student"
                 />
               </div>
 
@@ -158,6 +159,7 @@
                       :draggable="false"
                       :show-move-buttons="false"
                       :compact-mode="false"
+                      interactive-viewer-mode="student"
                     />
                   </div>
                 </div>

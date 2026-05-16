@@ -262,9 +262,24 @@ export interface BrowserCell extends CellBase {
 }
 
 export interface InteractiveCellContent {
-  asset_id?: number                // 资源库资产ID（如果从资源库选择）
-  url?: string                     // 交互式课件URL（直接输入URL时使用）
-  html_code?: string               // HTML代码（粘贴HTML代码时使用）
+  /** @deprecated 兼容旧版：等价于未单独指定时的学生活动侧资源 */
+  asset_id?: number
+  /** 教师大屏侧资源库资产 */
+  teacher_asset_id?: number
+  /** 学生活动侧资源库资产 */
+  student_asset_id?: number
+  /** @deprecated 兼容旧版：建议改用 teacher_url / student_url */
+  url?: string
+  /** 教师大屏课件 URL（输入或来自资源库） */
+  teacher_url?: string
+  /** 学生活动课件 URL（输入或来自资源库） */
+  student_url?: string
+  /** @deprecated 旧版单页 HTML；新数据请用 teacher_html_code / student_html_code */
+  html_code?: string
+  /** 教师大屏（粘贴 HTML） */
+  teacher_html_code?: string
+  /** 学生活动（粘贴 HTML） */
+  student_html_code?: string
   title?: string                   // 课件标题
   description?: string             // 课件描述
   thumbnail?: string               // 缩略图URL

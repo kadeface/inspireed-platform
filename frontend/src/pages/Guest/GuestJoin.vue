@@ -334,7 +334,7 @@
                   style="min-height: 480px"
                 >
                   <iframe
-                    :src="cell.content.url"
+                    :src="guestInteractiveEmbedUrl(cell.content.url)"
                     class="h-[70vh] min-h-[480px] w-full border-0"
                     title="交互式课件"
                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-fullscreen"
@@ -518,10 +518,15 @@ import classroomSessionService, {
 } from '@/services/classroomSession'
 import api from '@/services/api'
 import { markdownToHtml } from '@/utils/lessonEditorHelpers'
+import { appendInteractiveViewToUrl } from '@/utils/interactiveView'
 import type { GuestSessionInfo } from '@/types/classroomSession'
 
 const route = useRoute()
 const router = useRouter()
+
+function guestInteractiveEmbedUrl(url: string) {
+  return appendInteractiveViewToUrl(url, 'student') || url
+}
 
 const accessCode = ref('')
 const loading = ref(false)

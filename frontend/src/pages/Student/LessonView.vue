@@ -231,9 +231,7 @@
               <!-- 渲染不同类型的 Cell -->
               <component
                 :is="getCellComponent(cell.type)"
-                :cell="cell as any"
-                :editable="false"
-                :session-id="classroomSession?.id"
+                v-bind="lessonViewCellBind(cell)"
               />
             </CellWrapper>
           </div>
@@ -921,7 +919,19 @@ const classroomDisplayKey = computed(() => {
 */
 // ========== 旧代码全部结束 ==========
 
-// 方法
+function lessonViewCellBind(cell: { type: string }) {
+  const base: Record<string, unknown> = {
+    cell,
+    editable: false,
+    sessionId: classroomSession.value?.id,
+  }
+  const t = cell.type
+  if (t === CellType.INTERACTIVE || t === 'interactive' || t === 'INTERACTIVE') {
+    base.interactiveViewerMode = 'student'
+  }
+  return base
+}
+
 const getCellComponent = (type: CellType | string): Component => {
   // 与 CellContainer / 后端 CellType 一致（大写）；保留小写键以兼容旧数据
   const components: Record<string, Component> = {

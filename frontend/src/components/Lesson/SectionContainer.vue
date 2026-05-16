@@ -103,6 +103,7 @@
             :show-move-buttons="editable"
             :compact-mode="compactMode && editable"
             :lesson-id="lessonId"
+            :interactive-viewer-mode="interactiveViewerMode"
             @update="(c) => $emit('cell-update', c)"
             @delete="(id) => $emit('cell-delete', id)"
             @move-up="(id) => $emit('cell-move-up', id)"
@@ -129,6 +130,7 @@ import { ref, watch, nextTick } from 'vue'
 import type { SectionInContent } from '../../types/section'
 import AddCellMenu from './AddCellMenu.vue'
 import CellContainer from '../Cell/CellContainer.vue'
+import type { InteractiveViewerRole } from '@/utils/interactiveView'
 
 const props = withDefaults(
   defineProps<{
@@ -140,6 +142,8 @@ const props = withDefaults(
     compactMode?: boolean
     lessonId?: number
     showHeader?: boolean
+    /** 交互式课件教师/学生视图（透传 CellContainer） */
+    interactiveViewerMode?: InteractiveViewerRole
   }>(),
   { cellOffset: 0, editable: true, compactMode: false, showHeader: true }
 )

@@ -62,122 +62,248 @@
         </div>
       </div>
 
-      <!-- 从资源库选择 -->
-      <div v-if="sourceMode === 'library'" class="form-group">
-        <label>选择交互式课件:</label>
-        <div class="library-picker-wrapper">
-          <button
-            v-if="!selectedAsset"
-            @click="showLibraryPicker = true"
-            class="library-picker-btn"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            点击选择资源库中的交互式课件
-          </button>
-          <div v-else class="selected-asset-card">
+      <!-- 从资源库选择（教师 / 学生可分别选择；可选任意带访问链接的资源） -->
+      <div v-if="sourceMode === 'library'" class="form-group space-y-6">
+        <p class="text-xs text-gray-500 leading-relaxed">
+          教师大屏与学生活动可各选一条资源库素材（需带访问链接）；请选择类型或使用搜索筛选。
+        </p>
+
+        <div class="rounded-lg border border-gray-200 p-4 space-y-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sm font-medium text-gray-800">教师大屏 — 资源库</span>
+            <button type="button" class="library-mini-btn" @click="openLibraryPicker('teacher')">选择资源</button>
+            <button
+              v-if="selectedTeacherAsset || localContent.teacher_url"
+              type="button"
+              class="text-sm text-red-600 hover:text-red-800"
+              @click="clearLibrarySide('teacher')"
+            >
+              清除
+            </button>
+          </div>
+          <div v-if="selectedTeacherAsset" class="selected-asset-card compact">
             <div class="flex items-center gap-3">
-              <div class="flex-shrink-0 w-12 h-12 bg-purple-100 rounded flex items-center justify-center">
-                <span class="text-2xl">🎮</span>
-              </div>
+              <div class="flex-shrink-0 w-10 h-10 bg-purple-100 rounded flex items-center justify-center text-lg">🎮</div>
               <div class="flex-1 min-w-0">
-                <h4 class="font-medium text-gray-900 truncate">{{ selectedAsset.title }}</h4>
-                <p class="text-sm text-gray-500">交互式课件</p>
+                <h4 class="font-medium text-gray-900 truncate text-sm">{{ selectedTeacherAsset.title }}</h4>
+                <p class="text-xs text-gray-500">{{ getAssetTypeLabel(selectedTeacherAsset.asset_type) }}</p>
               </div>
-              <button
-                @click="clearAsset"
-                class="text-red-500 hover:text-red-700"
-                title="清除选择"
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
           </div>
+          <p v-else-if="localContent.teacher_url" class="text-xs text-gray-600 break-all">{{ localContent.teacher_url }}</p>
+          <p v-else class="text-xs text-gray-400">未选择教师侧资源</p>
+        </div>
+
+        <div class="rounded-lg border border-gray-200 p-4 space-y-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sm font-medium text-gray-800">学生活动 — 资源库</span>
+            <button type="button" class="library-mini-btn" @click="openLibraryPicker('student')">选择资源</button>
+            <button
+              v-if="selectedStudentAsset || localContent.student_url || localContent.url"
+              type="button"
+              class="text-sm text-red-600 hover:text-red-800"
+              @click="clearLibrarySide('student')"
+            >
+              清除
+            </button>
+          </div>
+          <div v-if="selectedStudentAsset" class="selected-asset-card compact">
+            <div class="flex items-center gap-3">
+              <div class="flex-shrink-0 w-10 h-10 bg-purple-100 rounded flex items-center justify-center text-lg">🎮</div>
+              <div class="flex-1 min-w-0">
+                <h4 class="font-medium text-gray-900 truncate text-sm">{{ selectedStudentAsset.title }}</h4>
+                <p class="text-xs text-gray-500">{{ getAssetTypeLabel(selectedStudentAsset.asset_type) }}</p>
+              </div>
+            </div>
+          </div>
+          <p v-else-if="studentUrlModel" class="text-xs text-gray-600 break-all">{{ studentUrlModel }}</p>
+          <p v-else class="text-xs text-gray-400">未选择学生侧资源</p>
         </div>
       </div>
 
-      <!-- 粘贴HTML代码 -->
-      <div v-if="sourceMode === 'html'" class="form-group">
-        <label>HTML代码:</label>
-        <div class="html-editor-wrapper">
-          <textarea
-            v-model="htmlCode"
-            @input="handleHtmlCodeChange"
-            @paste="handlePaste"
-            placeholder="粘贴或输入HTML代码..."
-            rows="12"
-            class="html-code-input"
-            :class="{ 'error': htmlError }"
-          ></textarea>
-          <div class="html-actions">
+      <!-- 输入 URL（教师 / 学生各一条） -->
+      <div v-if="sourceMode === 'url'" class="form-group space-y-6">
+        <p class="text-xs text-gray-500 leading-relaxed">
+          为师生分别填写可嵌入的 http(s) 链接；保存后分别用于授课大屏与学生活动预览。
+        </p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">教师大屏 URL</label>
+          <div class="url-input-wrapper">
+            <input
+              v-model="localContent.teacher_url"
+              type="url"
+              placeholder="https://example.com/teacher.html"
+              @blur="validateUrlsAndUpdate"
+              class="url-input"
+              :class="{ error: teacherUrlError }"
+            />
             <button
-              v-if="htmlCode && htmlCode.trim()"
-              @click="generateFromHtml"
-              :disabled="isGeneratingHtml"
-              class="generate-html-btn"
+              v-if="localContent.teacher_url && isValidUrl(localContent.teacher_url)"
+              type="button"
+              @click="previewExternalUrl(localContent.teacher_url)"
+              class="preview-btn"
+              title="在新窗口预览"
             >
-              <svg v-if="!isGeneratingHtml" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </button>
+          </div>
+          <p v-if="teacherUrlError" class="error-text">{{ teacherUrlError }}</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">学生活动 URL</label>
+          <div class="url-input-wrapper">
+            <input
+              v-model="studentUrlModel"
+              type="url"
+              placeholder="https://example.com/student.html"
+              @blur="validateUrlsAndUpdate"
+              class="url-input"
+              :class="{ error: studentUrlError }"
+            />
+            <button
+              v-if="studentUrlModel && isValidUrl(studentUrlModel)"
+              type="button"
+              @click="previewExternalUrl(studentUrlModel)"
+              class="preview-btn"
+              title="在新窗口预览"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </button>
+          </div>
+          <p v-if="studentUrlError" class="error-text">{{ studentUrlError }}</p>
+        </div>
+      </div>
+
+      <!-- 粘贴 HTML（仅在选择「粘贴 HTML」模式时显示） -->
+      <div v-if="sourceMode === 'html'" class="form-group space-y-8 mt-2">
+        <div>
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-2">
+            <div class="min-w-0 flex-1">
+              <label class="block text-sm font-medium text-gray-700">教师大屏 HTML</label>
+              <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+                若此处留空，教师预览与授课大屏将自动使用「学生活动 HTML」（或旧版单页
+                <code class="rounded bg-gray-100 px-0.5">html_code</code>）。
+              </p>
+            </div>
+            <button
+              type="button"
+              class="html-inline-upload-btn"
+              title="从本地选择 .html 文件填入下方编辑器"
+              @click="triggerLocalHtmlFile('teacher')"
+            >
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
-              <div v-else class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              {{ isGeneratingHtml ? '生成中...' : '生成课件' }}
+              <span>上传本地 HTML</span>
+            </button>
+          </div>
+          <textarea
+            v-model="teacherHtmlCode"
+            @input="onTeacherHtmlInput"
+            @paste="handlePaste"
+            placeholder="粘贴或输入教师端大屏页面 HTML..."
+            rows="10"
+            class="html-code-input"
+            :class="{ 'error': htmlError && htmlErrorField === 'teacher' }"
+          />
+          <div class="html-actions mt-2 flex flex-wrap gap-2">
+            <button
+              v-if="teacherHtmlCode.trim()"
+              type="button"
+              @click="generateFromHtml('teacher')"
+              :disabled="isGeneratingTeacherHtml"
+              class="generate-html-btn"
+            >
+              <div v-if="isGeneratingTeacherHtml" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              {{ isGeneratingTeacherHtml ? '生成中...' : '生成 / 包装文档' }}
             </button>
             <button
-              v-if="htmlCode && htmlCode.trim()"
-              @click="showSaveToLibraryModal = true"
+              v-if="teacherHtmlCode.trim()"
+              type="button"
+              @click="openSaveToLibraryModal('teacher')"
               :disabled="isSavingToLibrary"
               class="save-to-library-btn"
             >
-              <svg v-if="!isSavingToLibrary" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              {{ isSavingToLibrary && saveToLibrarySide === 'teacher' ? '保存中...' : '存储到资源库' }}
+            </button>
+            <button v-if="teacherHtmlCode.trim()" type="button" @click="clearTeacherHtml" class="clear-html-btn">
+              清空教师端
+            </button>
+          </div>
+        </div>
+        <div>
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 mb-2">
+            <label class="block text-sm font-medium text-gray-700 sm:mb-0">学生活动 HTML</label>
+            <button
+              type="button"
+              class="html-inline-upload-btn"
+              title="从本地选择 .html 文件填入下方编辑器"
+              @click="triggerLocalHtmlFile('student')"
+            >
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
-              <div v-else class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              {{ isSavingToLibrary ? '保存中...' : '存储到资源库' }}
+              <span>上传本地 HTML</span>
+            </button>
+          </div>
+          <textarea
+            v-model="studentHtmlCode"
+            @input="onStudentHtmlInput"
+            @paste="handlePaste"
+            placeholder="粘贴或输入学生端活动页 HTML..."
+            rows="10"
+            class="html-code-input"
+            :class="{ 'error': htmlError && htmlErrorField === 'student' }"
+          />
+          <div class="html-actions mt-2 flex flex-wrap gap-2">
+            <button
+              v-if="studentHtmlCode.trim()"
+              type="button"
+              @click="generateFromHtml('student')"
+              :disabled="isGeneratingStudentHtml"
+              class="generate-html-btn"
+            >
+              <div v-if="isGeneratingStudentHtml" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              {{ isGeneratingStudentHtml ? '生成中...' : '生成 / 包装文档' }}
             </button>
             <button
-              v-if="htmlCode && htmlCode.trim()"
-              @click="clearHtmlCode"
-              class="clear-html-btn"
+              v-if="studentHtmlCode.trim()"
+              type="button"
+              @click="openSaveToLibraryModal('student')"
+              :disabled="isSavingToLibrary"
+              class="save-to-library-btn"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              清空
+              {{ isSavingToLibrary && saveToLibrarySide === 'student' ? '保存中...' : '存储到资源库' }}
+            </button>
+            <button v-if="studentHtmlCode.trim()" type="button" @click="clearStudentHtml" class="clear-html-btn">
+              清空学生端
             </button>
           </div>
         </div>
         <p v-if="htmlError" class="error-text">{{ htmlError }}</p>
-        <p v-else class="hint-text">粘贴完整的HTML代码，系统将自动生成可用的交互式课件</p>
-      </div>
+        <p v-else class="hint-text">
+          教师端与学生端可分别粘贴完整 HTML；保存后教案中分别存储。若仍使用单页 + URL 参数
+          <code class="rounded bg-gray-100 px-1">view=teacher|student</code>，也可只在其中一栏粘贴并在课件内分支。
+        </p>
 
-      <!-- 输入URL -->
-      <div v-if="sourceMode === 'url'" class="form-group">
-        <label>课件URL:</label>
-        <div class="url-input-wrapper">
-          <input
-            v-model="localContent.url"
-            type="url"
-            placeholder="https://example.com/interactive.html"
-            @blur="validateAndUpdate"
-            class="url-input"
-            :class="{ 'error': urlError }"
-          />
-          <button
-            v-if="localContent.url && isValidUrl(localContent.url)"
-            @click="previewUrl"
-            class="preview-btn"
-            title="在新窗口预览"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </button>
-        </div>
-        <p v-if="urlError" class="error-text">{{ urlError }}</p>
-        <p v-else class="hint-text">请输入有效的 http:// 或 https:// 网址</p>
+        <input
+          ref="teacherHtmlFileInputRef"
+          type="file"
+          accept=".html,.htm,text/html"
+          class="hidden"
+          @change="onLocalHtmlFileChange('teacher', $event)"
+        />
+        <input
+          ref="studentHtmlFileInputRef"
+          type="file"
+          accept=".html,.htm,text/html"
+          class="hidden"
+          @change="onLocalHtmlFileChange('student', $event)"
+        />
       </div>
 
       <!-- 标题和描述 -->
@@ -218,7 +344,7 @@
     </div>
 
     <!-- 交互式课件显示区域 -->
-    <div v-if="displayUrl" class="interactive-display">
+    <div v-if="baseEmbedUrl" class="interactive-display">
       <!-- 标题和描述显示 -->
       <div v-if="displayContent.title || displayContent.description" class="interactive-info">
         <h3 v-if="displayContent.title" class="interactive-title">{{ displayContent.title }}</h3>
@@ -229,18 +355,19 @@
       <div class="iframe-container">
         <iframe
           ref="interactiveIframeRef"
-          :src="displayUrl"
+          :src="iframeSrc || undefined"
           class="interactive-iframe"
           :style="iframeStyle"
           frameborder="0"
           allowfullscreen
           :sandbox="displayConfig?.sandbox?.join(' ') || 'allow-scripts allow-forms allow-popups'"
+          @load="onInteractiveIframeLoad"
         ></iframe>
       </div>
     </div>
 
     <!-- 空状态提示 -->
-    <div v-if="!editable && !displayUrl" class="empty-state">
+    <div v-if="!editable && !baseEmbedUrl" class="empty-state">
       <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
@@ -258,7 +385,9 @@
         <div class="flex min-h-full items-center justify-center p-4">
           <div class="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div class="px-6 pt-6 pb-4 border-b flex items-center justify-between">
-              <h3 class="text-xl font-semibold text-gray-900">选择交互式课件</h3>
+              <h3 class="text-xl font-semibold text-gray-900">
+                {{ libraryPickSide === 'teacher' ? '选择教师大屏资源' : '选择学生活动资源' }}
+              </h3>
               <button @click="showLibraryPicker = false" class="text-gray-400 hover:text-gray-500">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -266,11 +395,7 @@
               </button>
             </div>
             <div class="flex-1 overflow-y-auto p-6">
-              <AssetPicker
-                ref="assetPicker"
-                @select="handleAssetSelect"
-                filter-type="interactive"
-              />
+              <AssetPicker ref="assetPicker" @select="handleAssetSelect" />
             </div>
           </div>
         </div>
@@ -296,6 +421,9 @@
               </button>
             </div>
             <div class="px-6 py-4">
+              <p class="text-xs text-gray-500 mb-3">
+                上传来源：<span class="font-medium text-gray-800">{{ saveToLibrarySide === 'teacher' ? '教师大屏 HTML' : '学生活动 HTML' }}</span>
+              </p>
               <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-1">
                   标题 <span class="text-red-500">*</span>
@@ -353,22 +481,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import type { InteractiveCell } from '../../types/cell'
 import type { LibraryAssetSummary, LibraryAssetDetail } from '../../types/library'
+import { getAssetTypeName } from '@/types/library'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { libraryService } from '@/services/library'
 import { getServerBaseUrl } from '@/utils/url'
 import AssetPicker from '@/components/Library/AssetPicker.vue'
 import KnowledgePointSelector from '@/components/Library/KnowledgePointSelector.vue'
+import type { InteractiveViewerRole } from '@/utils/interactiveView'
+import {
+  appendInteractiveViewToUrl,
+  buildInspireedInteractiveViewMessage,
+} from '@/utils/interactiveView'
 
 interface Props {
   cell: InteractiveCell
   editable?: boolean
+  /** 教师大屏 teacher / 学生活动 student；未传时默认 student */
+  interactiveViewerMode?: InteractiveViewerRole
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  editable: false
+  editable: false,
 })
 
 const emit = defineEmits<{
@@ -385,22 +521,129 @@ const localConfig = ref<InteractiveCell['config']>({
   ...(props.cell.config || {})
 })
 
-const urlError = ref<string | null>(null)
-const sourceMode = ref<'library' | 'html' | 'url'>(
-  (props.cell.content?.asset_id) ? 'library' : ((props.cell.content?.html_code) ? 'html' : 'url')
-)
-const showLibraryPicker = ref(false)
-const selectedAsset = ref<LibraryAssetSummary | null>(null)
-const assetPicker = ref<InstanceType<typeof AssetPicker>>()
+const teacherUrlError = ref<string | null>(null)
+const studentUrlError = ref<string | null>(null)
 
-// HTML代码相关状态
-const htmlCode = ref<string>(props.cell.content?.html_code || '')
+function interactiveHasAnyHtml(c?: InteractiveCell['content']): boolean {
+  if (!c) return false
+  return !!(c.html_code?.trim() || c.teacher_html_code?.trim() || c.student_html_code?.trim())
+}
+
+function inferInteractiveSourceMode(c?: InteractiveCell['content']): 'library' | 'html' | 'url' {
+  if (!c) return 'html'
+  if (c.teacher_asset_id || c.student_asset_id || c.asset_id) return 'library'
+  if (interactiveHasAnyHtml(c)) return 'html'
+  const hasUrl = !!(c.teacher_url?.trim() || c.student_url?.trim() || c.url?.trim())
+  if (hasUrl) return 'url'
+  return 'html'
+}
+
+const sourceMode = ref<'library' | 'html' | 'url'>(inferInteractiveSourceMode(props.cell.content))
+const showLibraryPicker = ref(false)
+const libraryPickSide = ref<'teacher' | 'student'>('student')
+const selectedTeacherAsset = ref<LibraryAssetSummary | null>(null)
+const selectedStudentAsset = ref<LibraryAssetSummary | null>(null)
+const assetPicker = ref<InstanceType<typeof AssetPicker>>()
+const teacherHtmlFileInputRef = ref<HTMLInputElement | null>(null)
+const studentHtmlFileInputRef = ref<HTMLInputElement | null>(null)
+
+/** 教师 / 学生 双栏 HTML（编辑区） */
+const teacherHtmlCode = ref('')
+const studentHtmlCode = ref('')
 const htmlError = ref<string | null>(null)
-const isGeneratingHtml = ref(false)
-const htmlBlobUrl = ref<string | null>(null)
+const htmlErrorField = ref<'teacher' | 'student' | null>(null)
+const isGeneratingTeacherHtml = ref(false)
+const isGeneratingStudentHtml = ref(false)
+const teacherHtmlBlobUrl = ref<string | null>(null)
+const studentHtmlBlobUrl = ref<string | null>(null)
+
+function generateBlobUrlFromHtml(html: string): string {
+  const blob = new Blob([html], { type: 'text/html' })
+  return URL.createObjectURL(blob)
+}
+
+function revokeTeacherBlob() {
+  if (teacherHtmlBlobUrl.value) {
+    URL.revokeObjectURL(teacherHtmlBlobUrl.value)
+    teacherHtmlBlobUrl.value = null
+  }
+}
+function revokeStudentBlob() {
+  if (studentHtmlBlobUrl.value) {
+    URL.revokeObjectURL(studentHtmlBlobUrl.value)
+    studentHtmlBlobUrl.value = null
+  }
+}
+function refreshTeacherBlob() {
+  revokeTeacherBlob()
+  if (teacherHtmlCode.value.trim()) {
+    teacherHtmlBlobUrl.value = generateBlobUrlFromHtml(teacherHtmlCode.value)
+  }
+}
+function refreshStudentBlob() {
+  revokeStudentBlob()
+  if (studentHtmlCode.value.trim()) {
+    studentHtmlBlobUrl.value = generateBlobUrlFromHtml(studentHtmlCode.value)
+  }
+}
+
+function syncHtmlRefsFromCellContent(c?: InteractiveCell['content']) {
+  teacherHtmlCode.value = c?.teacher_html_code || ''
+  studentHtmlCode.value = c?.student_html_code || c?.html_code || ''
+  refreshTeacherBlob()
+  refreshStudentBlob()
+}
+
+const studentUrlModel = computed({
+  get() {
+    return localContent.value.student_url ?? localContent.value.url ?? ''
+  },
+  set(v: string) {
+    const trimmed = v.trim()
+    localContent.value.student_url = trimmed || undefined
+    localContent.value.url = trimmed || undefined
+  },
+})
+
+function getAssetTypeLabel(assetType: string) {
+  return getAssetTypeName(assetType as any)
+}
+
+function openLibraryPicker(side: 'teacher' | 'student') {
+  libraryPickSide.value = side
+  showLibraryPicker.value = true
+}
+
+function triggerLocalHtmlFile(side: 'teacher' | 'student') {
+  if (side === 'teacher') teacherHtmlFileInputRef.value?.click()
+  else studentHtmlFileInputRef.value?.click()
+}
+
+function onLocalHtmlFileChange(side: 'teacher' | 'student', e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    const text = String(reader.result ?? '')
+    if (side === 'teacher') {
+      teacherHtmlCode.value = text
+      refreshTeacherBlob()
+    } else {
+      studentHtmlCode.value = text
+      refreshStudentBlob()
+    }
+    htmlError.value = null
+    htmlErrorField.value = null
+    updateCell()
+    input.value = ''
+  }
+  reader.readAsText(file)
+}
 
 // 存储到资源库相关状态
 const showSaveToLibraryModal = ref(false)
+const saveToLibrarySide = ref<'teacher' | 'student'>('student')
 const isSavingToLibrary = ref(false)
 const saveToLibraryError = ref<string | null>(null)
 const saveToLibraryForm = ref({
@@ -431,43 +674,160 @@ function resolveUrl(url: string | undefined): string | null {
   return null
 }
 
-// 从HTML代码生成Blob URL
-function generateBlobUrlFromHtml(html: string): string {
-  const blob = new Blob([html], { type: 'text/html' })
-  const url = URL.createObjectURL(blob)
-  return url
-}
-
 // 非编辑模式下的HTML Blob URL（避免重复生成）
 const displayHtmlBlobUrl = ref<string | null>(null)
 const interactiveIframeRef = ref<HTMLIFrameElement | null>(null)
 
-// 在编辑模式下使用 localContent，非编辑模式下使用 props
-const displayUrl = computed(() => {
-  // 优先使用 URL（无论是从资源库选择、直接输入URL还是HTML代码生成）
-  let url: string | undefined
-  
-  if (props.editable) {
-    // 编辑模式
-    if (selectedAsset.value?.public_url) {
-      url = selectedAsset.value.public_url
-    } else if (localContent.value.url) {
-      url = localContent.value.url
-    } else if (htmlCode.value && htmlCode.value.trim() && htmlBlobUrl.value) {
-      // 如果有HTML代码，使用生成的Blob URL
-      url = htmlBlobUrl.value
+const effectiveInteractiveView = computed<InteractiveViewerRole>(
+  () => props.interactiveViewerMode ?? 'student'
+)
+
+/** 只读：当前角色应展示的 HTML 源码（用于生成 blob）。教师端无内容时依次使用学生 HTML、旧版 html_code。 */
+const readonlyHtmlSource = computed(() => {
+  if (props.editable) return ''
+  const c = props.cell.content
+  if (!c) return ''
+  const role = effectiveInteractiveView.value
+  const leg = c.html_code?.trim() || ''
+  const t = c.teacher_html_code?.trim() || ''
+  const s = c.student_html_code?.trim() || ''
+  if (!t && !s && leg) return leg
+  if (role === 'teacher') {
+    return t || s || leg
+  }
+  return s || t || leg
+})
+
+watch(
+  () => [readonlyHtmlSource.value, props.editable] as const,
+  () => {
+    if (props.editable) return
+    if (displayHtmlBlobUrl.value) {
+      URL.revokeObjectURL(displayHtmlBlobUrl.value)
+      displayHtmlBlobUrl.value = null
     }
-  } else {
-    // 非编辑模式：从 cell.content 获取
-    if (props.cell.content?.url) {
-      url = props.cell.content?.url
-    } else if (props.cell.content?.html_code && displayHtmlBlobUrl.value) {
-      // 如果有HTML代码，使用已生成的Blob URL
-      url = displayHtmlBlobUrl.value
+    const src = readonlyHtmlSource.value.trim()
+    if (src) {
+      displayHtmlBlobUrl.value = generateBlobUrlFromHtml(src)
+    }
+  },
+  { immediate: true }
+)
+
+function normalizeResolvedHttp(u: string | undefined | null): string | null {
+  if (!u?.trim()) return null
+  const raw = u.trim()
+  if (!isValidUrl(raw)) return null
+  return resolveUrl(raw) || raw
+}
+
+function editableBlobForRole(role: InteractiveViewerRole): string | null {
+  if (sourceMode.value !== 'html') return null
+  if (role === 'teacher') {
+    if (teacherHtmlCode.value.trim() && teacherHtmlBlobUrl.value) return teacherHtmlBlobUrl.value
+    if (studentHtmlCode.value.trim() && studentHtmlBlobUrl.value) return studentHtmlBlobUrl.value
+    return null
+  }
+  if (studentHtmlCode.value.trim() && studentHtmlBlobUrl.value) return studentHtmlBlobUrl.value
+  if (teacherHtmlCode.value.trim() && teacherHtmlBlobUrl.value) return teacherHtmlBlobUrl.value
+  return null
+}
+
+function editableHttpUrlForRole(role: InteractiveViewerRole): string | null {
+  const lc = localContent.value
+  if (role === 'teacher') {
+    let u = normalizeResolvedHttp(lc.teacher_url)
+    if (u) return u
+    u = normalizeResolvedHttp(selectedTeacherAsset.value?.public_url)
+    if (u) return u
+    u = normalizeResolvedHttp(lc.student_url || lc.url)
+    if (u) return u
+    u = normalizeResolvedHttp(selectedStudentAsset.value?.public_url)
+    return u
+  }
+  let u = normalizeResolvedHttp(lc.student_url || lc.url)
+  if (u) return u
+  u = normalizeResolvedHttp(selectedStudentAsset.value?.public_url)
+  if (u) return u
+  u = normalizeResolvedHttp(lc.teacher_url)
+  if (u) return u
+  u = normalizeResolvedHttp(selectedTeacherAsset.value?.public_url)
+  return u
+}
+
+function readonlyHttpUrlForRole(
+  c: InteractiveCell['content'] | undefined,
+  role: InteractiveViewerRole
+): string | null {
+  if (!c) return null
+  const legacy = c.url?.trim()
+  if (role === 'teacher') {
+    let u = normalizeResolvedHttp(c.teacher_url)
+    if (u) return u
+    u = normalizeResolvedHttp(c.student_url || legacy)
+    return u
+  }
+  let u = normalizeResolvedHttp(c.student_url || legacy)
+  if (u) return u
+  u = normalizeResolvedHttp(c.teacher_url)
+  return u
+}
+
+/** 嵌入用原始地址（不含 view 参数）。粘贴 HTML 优先于资源库 / URL；教师侧 URL/HTML 空时回落到学生侧。 */
+const baseEmbedUrl = computed(() => {
+  const role = effectiveInteractiveView.value
+  if (props.editable) {
+    const blob = editableBlobForRole(role)
+    if (blob) return blob
+    const http = editableHttpUrlForRole(role)
+    if (http) return http
+    return null
+  }
+  const c = props.cell.content
+  const htmlReady = readonlyHtmlSource.value.trim() && displayHtmlBlobUrl.value
+  if (htmlReady) return displayHtmlBlobUrl.value
+  const httpReadonly = readonlyHttpUrlForRole(c, role)
+  if (httpReadonly) return httpReadonly
+  return displayHtmlBlobUrl.value
+})
+
+/** iframe 实际地址：http(s) 追加 view=；blob 不变，由 postMessage 传角色 */
+const iframeSrc = computed(() => {
+  const base = baseEmbedUrl.value
+  if (!base) return null
+  return appendInteractiveViewToUrl(base, effectiveInteractiveView.value) || base
+})
+
+function postInteractiveViewToIframe() {
+  const frame = interactiveIframeRef.value
+  if (!frame?.contentWindow || !iframeSrc.value) return
+  const payload = buildInspireedInteractiveViewMessage(effectiveInteractiveView.value)
+  let targetOrigin = '*'
+  try {
+    targetOrigin = new URL(frame.src).origin
+  } catch {
+    /* keep * */
+  }
+  try {
+    frame.contentWindow.postMessage(payload, targetOrigin)
+  } catch {
+    try {
+      frame.contentWindow.postMessage(payload, '*')
+    } catch {
+      /* ignore */
     }
   }
-  
-  return resolveUrl(url) || url || null
+}
+
+function onInteractiveIframeLoad() {
+  nextTick(() => {
+    postInteractiveViewToIframe()
+    window.setTimeout(() => postInteractiveViewToIframe(), 50)
+  })
+}
+
+watch([effectiveInteractiveView, iframeSrc], () => {
+  nextTick(() => postInteractiveViewToIframe())
 })
 
 const displayContent = computed(() => {
@@ -500,158 +860,262 @@ function isValidUrl(url: string): boolean {
   }
 }
 
-// 验证并更新
-function validateAndUpdate() {
-  urlError.value = null
-  
-  if (!localContent.value.url || !localContent.value.url.trim()) {
-    // 允许为空（编辑中）
-    updateCell()
+function validateUrlsAndUpdate() {
+  teacherUrlError.value = null
+  studentUrlError.value = null
+  const tu = localContent.value.teacher_url?.trim()
+  const su = (localContent.value.student_url || localContent.value.url)?.trim()
+  if (tu && !isValidUrl(tu)) {
+    teacherUrlError.value = '请输入有效的网址（必须以 http:// 或 https:// 开头）'
     return
   }
-  
-  if (!isValidUrl(localContent.value.url)) {
-    urlError.value = '请输入有效的网址（必须以 http:// 或 https:// 开头）'
+  if (su && !isValidUrl(su)) {
+    studentUrlError.value = '请输入有效的网址（必须以 http:// 或 https:// 开头）'
     return
   }
-  
   updateCell()
 }
 
-// 处理资源库资产选择
-function handleAssetSelect(asset: LibraryAssetSummary | null) {
-  if (asset && asset.asset_type === 'interactive') {
-    selectedAsset.value = asset
+function previewExternalUrl(rawUrl: string | undefined) {
+  const u = rawUrl?.trim()
+  if (!u || !isValidUrl(u)) return
+  const resolved = resolveUrl(u) || u
+  const withView = appendInteractiveViewToUrl(resolved, effectiveInteractiveView.value)
+  if (withView) window.open(withView, '_blank', 'noopener,noreferrer')
+}
+
+function mapDetailToSummary(assetDetail: LibraryAssetDetail): LibraryAssetSummary {
+  return {
+    id: assetDetail.id,
+    title: assetDetail.title,
+    asset_type: assetDetail.asset_type as any,
+    public_url: assetDetail.public_url,
+    thumbnail_url: assetDetail.thumbnail_url,
+    size_bytes: assetDetail.size_bytes,
+    visibility: assetDetail.visibility as any,
+    status: assetDetail.status as any,
+    updated_at: assetDetail.updated_at,
+    subject_id: assetDetail.subject_id,
+    grade_id: assetDetail.grade_id,
+  }
+}
+
+// 处理资源库资产选择（支持任意带 public_url 的类型；教师 / 学生分列）
+function handleAssetSelect(asset: LibraryAssetSummary | null, forcedSide?: 'teacher' | 'student') {
+  const side = forcedSide ?? libraryPickSide.value
+  if (!asset) {
+    clearLibrarySide(side)
+    showLibraryPicker.value = false
+    return
+  }
+  if (!asset.public_url?.trim()) {
+    window.alert('该资源没有可用的访问链接，请选择其他资源或使用下方粘贴 HTML / 本地上传。')
+    return
+  }
+  localContent.value.title = localContent.value.title || asset.title
+  if (asset.thumbnail_url) {
+    localContent.value.thumbnail = asset.thumbnail_url || localContent.value.thumbnail
+  }
+  if (side === 'teacher') {
+    selectedTeacherAsset.value = asset
+    localContent.value.teacher_asset_id = asset.id
+    localContent.value.teacher_url = asset.public_url || undefined
+  } else {
+    selectedStudentAsset.value = asset
+    localContent.value.student_asset_id = asset.id
+    localContent.value.student_url = asset.public_url || undefined
     localContent.value.asset_id = asset.id
     localContent.value.url = asset.public_url || undefined
-    localContent.value.title = localContent.value.title || asset.title
-    localContent.value.description = localContent.value.description || undefined
-    localContent.value.thumbnail = asset.thumbnail_url || undefined
-    showLibraryPicker.value = false
-    updateCell()
-  } else {
-    selectedAsset.value = null
-    localContent.value.asset_id = undefined
   }
-}
-
-// 清除选择的资产
-function clearAsset() {
-  selectedAsset.value = null
-  localContent.value.asset_id = undefined
-  localContent.value.url = undefined
+  showLibraryPicker.value = false
   updateCell()
 }
 
-// 处理HTML代码变化
-function handleHtmlCodeChange() {
-  htmlError.value = null
-  // 实时更新本地内容
-  localContent.value.html_code = htmlCode.value
-  // 如果有HTML代码，生成Blob URL用于预览
-  if (htmlCode.value && htmlCode.value.trim()) {
-    // 清理旧的Blob URL
-    if (htmlBlobUrl.value) {
-      URL.revokeObjectURL(htmlBlobUrl.value)
-    }
-    htmlBlobUrl.value = generateBlobUrlFromHtml(htmlCode.value)
+function clearLibrarySide(side: 'teacher' | 'student') {
+  if (side === 'teacher') {
+    selectedTeacherAsset.value = null
+    localContent.value.teacher_asset_id = undefined
+    localContent.value.teacher_url = undefined
   } else {
-    if (htmlBlobUrl.value) {
-      URL.revokeObjectURL(htmlBlobUrl.value)
-      htmlBlobUrl.value = null
-    }
+    selectedStudentAsset.value = null
+    localContent.value.student_asset_id = undefined
+    localContent.value.student_url = undefined
+    localContent.value.asset_id = undefined
+    localContent.value.url = undefined
   }
+  updateCell()
+}
+
+async function loadTeacherAssetDetail(assetId: number) {
+  try {
+    const assetDetail = await libraryService.getAsset(assetId)
+    selectedTeacherAsset.value = mapDetailToSummary(assetDetail)
+    if (assetDetail.public_url) {
+      localContent.value.teacher_url = assetDetail.public_url
+    }
+  } catch (error) {
+    console.error('Failed to load teacher asset:', error)
+  }
+}
+
+async function loadStudentAssetDetail(assetId: number) {
+  try {
+    const assetDetail = await libraryService.getAsset(assetId)
+    selectedStudentAsset.value = mapDetailToSummary(assetDetail)
+    if (assetDetail.public_url) {
+      localContent.value.student_url = assetDetail.public_url
+      localContent.value.url = assetDetail.public_url
+    }
+    if (!localContent.value.title && assetDetail.title) {
+      localContent.value.title = assetDetail.title
+    }
+    if (!localContent.value.description && assetDetail.description) {
+      localContent.value.description = assetDetail.description
+    }
+    if (assetDetail.thumbnail_url) {
+      localContent.value.thumbnail = assetDetail.thumbnail_url
+    }
+  } catch (error) {
+    console.error('Failed to load student asset:', error)
+  }
+}
+
+// 将 refs 中的双栏 HTML 写入 content（并清除旧版单字段 html_code）
+function persistDualHtmlToLocalContent() {
+  const t = teacherHtmlCode.value.trim()
+  const s = studentHtmlCode.value.trim()
+  localContent.value.teacher_html_code = t || undefined
+  localContent.value.student_html_code = s || undefined
+  if (t || s) {
+    localContent.value.html_code = undefined
+  } else {
+    localContent.value.html_code = undefined
+    localContent.value.teacher_html_code = undefined
+    localContent.value.student_html_code = undefined
+  }
+}
+
+// 处理HTML代码变化（教师 / 学生）
+function onTeacherHtmlInput() {
+  htmlError.value = null
+  htmlErrorField.value = null
+  refreshTeacherBlob()
+  updateCell()
+}
+
+function onStudentHtmlInput() {
+  htmlError.value = null
+  htmlErrorField.value = null
+  refreshStudentBlob()
   updateCell()
 }
 
 // 处理粘贴事件（自动清理格式）
-function handlePaste(event: ClipboardEvent) {
-  // 允许默认粘贴行为，但会在input事件中处理
-  // 可以在这里添加额外的处理逻辑
+function handlePaste(_event: ClipboardEvent) {
+  // 默认粘贴
 }
 
-// 从HTML代码生成课件
-function generateFromHtml() {
-  if (!htmlCode.value || !htmlCode.value.trim()) {
-    htmlError.value = '请输入HTML代码'
-    return
+function wrapHtmlFragment(trimmedHtml: string, docTitle: string): string {
+  if (trimmedHtml.includes('<html') || trimmedHtml.includes('<!DOCTYPE')) {
+    return trimmedHtml
   }
-  
-  isGeneratingHtml.value = true
-  htmlError.value = null
-  
-  try {
-    // 验证HTML代码（基本检查）
-    const trimmedHtml = htmlCode.value.trim()
-    
-    // 如果没有基本的HTML结构，尝试包装
-    let finalHtml = trimmedHtml
-    if (!trimmedHtml.includes('<html') && !trimmedHtml.includes('<!DOCTYPE')) {
-      // 如果没有完整的HTML结构，添加基本结构
-      if (!trimmedHtml.includes('<head>')) {
-        finalHtml = `<!DOCTYPE html>
+  if (trimmedHtml.includes('<head>')) {
+    return trimmedHtml
+  }
+  return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>交互式课件</title>
+  <title>${docTitle}</title>
 </head>
 <body>
 ${trimmedHtml}
 </body>
 </html>`
-      }
+}
+
+function generateFromHtml(side: 'teacher' | 'student') {
+  const raw = side === 'teacher' ? teacherHtmlCode.value : studentHtmlCode.value
+  if (!raw || !raw.trim()) {
+    htmlError.value = '请输入HTML代码'
+    htmlErrorField.value = side
+    return
+  }
+
+  if (side === 'teacher') isGeneratingTeacherHtml.value = true
+  else isGeneratingStudentHtml.value = true
+  htmlError.value = null
+  htmlErrorField.value = null
+
+  try {
+    const trimmedHtml = raw.trim()
+    const finalHtml = wrapHtmlFragment(trimmedHtml, '交互式课件')
+
+    if (side === 'teacher') {
+      teacherHtmlCode.value = finalHtml
+      refreshTeacherBlob()
+    } else {
+      studentHtmlCode.value = finalHtml
+      refreshStudentBlob()
     }
-    
-    // 更新HTML代码
-    htmlCode.value = finalHtml
-    localContent.value.html_code = finalHtml
-    
-    // 生成Blob URL
-    if (htmlBlobUrl.value) {
-      URL.revokeObjectURL(htmlBlobUrl.value)
-    }
-    htmlBlobUrl.value = generateBlobUrlFromHtml(finalHtml)
-    
-    // 清除URL（如果之前有）
+
+    localContent.value.teacher_url = undefined
+    localContent.value.student_url = undefined
     localContent.value.url = undefined
     localContent.value.asset_id = undefined
-    
-    // 如果没有标题，设置默认标题
+    localContent.value.teacher_asset_id = undefined
+    localContent.value.student_asset_id = undefined
+    selectedTeacherAsset.value = null
+    selectedStudentAsset.value = null
+
     if (!localContent.value.title) {
       localContent.value.title = '交互式课件'
     }
-    
+
     updateCell()
   } catch (error) {
     console.error('生成HTML课件失败:', error)
     htmlError.value = '生成课件失败，请检查HTML代码格式'
+    htmlErrorField.value = side
   } finally {
-    isGeneratingHtml.value = false
+    if (side === 'teacher') isGeneratingTeacherHtml.value = false
+    else isGeneratingStudentHtml.value = false
   }
 }
 
-// 清空HTML代码
-function clearHtmlCode() {
-  htmlCode.value = ''
-  localContent.value.html_code = undefined
-  if (htmlBlobUrl.value) {
-    URL.revokeObjectURL(htmlBlobUrl.value)
-    htmlBlobUrl.value = null
-  }
+function clearTeacherHtml() {
+  teacherHtmlCode.value = ''
+  revokeTeacherBlob()
   htmlError.value = null
+  htmlErrorField.value = null
   updateCell()
 }
 
+function clearStudentHtml() {
+  studentHtmlCode.value = ''
+  revokeStudentBlob()
+  htmlError.value = null
+  htmlErrorField.value = null
+  updateCell()
+}
+
+function openSaveToLibraryModal(side: 'teacher' | 'student') {
+  saveToLibrarySide.value = side
+  showSaveToLibraryModal.value = true
+}
+
 // 将HTML代码转换为File对象
-function htmlCodeToFile(htmlCode: string, filename: string = 'interactive-courseware.html'): File {
-  const blob = new Blob([htmlCode], { type: 'text/html' })
+function htmlCodeToFile(html: string, filename: string = 'interactive-courseware.html'): File {
+  const blob = new Blob([html], { type: 'text/html' })
   return new File([blob], filename, { type: 'text/html' })
 }
 
 // 存储HTML代码到资源库
 async function saveToLibrary() {
-  if (!htmlCode.value || !htmlCode.value.trim()) {
+  const raw =
+    saveToLibrarySide.value === 'teacher' ? teacherHtmlCode.value : studentHtmlCode.value
+  if (!raw || !raw.trim()) {
     saveToLibraryError.value = 'HTML代码不能为空'
     return
   }
@@ -665,8 +1129,7 @@ async function saveToLibrary() {
   saveToLibraryError.value = null
 
   try {
-    // 确保HTML代码是完整的
-    let finalHtml = htmlCode.value.trim()
+    let finalHtml = raw.trim()
     if (!finalHtml.includes('<html') && !finalHtml.includes('<!DOCTYPE')) {
       if (!finalHtml.includes('<head>')) {
         finalHtml = `<!DOCTYPE html>
@@ -700,19 +1163,22 @@ ${finalHtml}
     if (confirm(`保存成功！是否使用刚保存的资源？`)) {
       // 加载刚上传的资源信息并设置为当前使用的资源
       const assetDetail = await libraryService.getAsset(result.id)
-      handleAssetSelect({
-        id: assetDetail.id,
-        title: assetDetail.title,
-        asset_type: assetDetail.asset_type as any,
-        public_url: assetDetail.public_url,
-        thumbnail_url: assetDetail.thumbnail_url,
-        size_bytes: assetDetail.size_bytes,
-        visibility: assetDetail.visibility as any,
-        status: assetDetail.status as any,
-        updated_at: assetDetail.updated_at,
-        subject_id: assetDetail.subject_id,
-        grade_id: assetDetail.grade_id,
-      })
+      handleAssetSelect(
+        {
+          id: assetDetail.id,
+          title: assetDetail.title,
+          asset_type: assetDetail.asset_type as any,
+          public_url: assetDetail.public_url,
+          thumbnail_url: assetDetail.thumbnail_url,
+          size_bytes: assetDetail.size_bytes,
+          visibility: assetDetail.visibility as any,
+          status: assetDetail.status as any,
+          updated_at: assetDetail.updated_at,
+          subject_id: assetDetail.subject_id,
+          grade_id: assetDetail.grade_id,
+        },
+        saveToLibrarySide.value
+      )
       sourceMode.value = 'library'
     }
 
@@ -738,8 +1204,18 @@ watch(showSaveToLibraryModal, (isOpen) => {
   }
 })
 
+function syncLegacyInteractiveAliases() {
+  const c = localContent.value
+  c.asset_id = c.student_asset_id ?? c.teacher_asset_id ?? undefined
+  const su = c.student_url?.trim()
+  const tu = c.teacher_url?.trim()
+  c.url = su || tu || undefined
+}
+
 // 更新 Cell
 function updateCell() {
+  persistDualHtmlToLocalContent()
+  syncLegacyInteractiveAliases()
   const updatedCell: InteractiveCell = {
     ...props.cell,
     content: { ...localContent.value },
@@ -750,133 +1226,64 @@ function updateCell() {
 
 // 在新窗口预览
 function previewUrl() {
-  const url = displayUrl.value
-  if (url && isValidUrl(url)) {
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
-}
-
-// 加载资产详情
-async function loadAssetDetail(assetId: number) {
-  try {
-    const assetDetail: LibraryAssetDetail = await libraryService.getAsset(assetId)
-    selectedAsset.value = {
-      id: assetDetail.id,
-      title: assetDetail.title,
-      asset_type: assetDetail.asset_type as any,
-      public_url: assetDetail.public_url,
-      thumbnail_url: assetDetail.thumbnail_url,
-      size_bytes: assetDetail.size_bytes,
-      visibility: assetDetail.visibility as any,
-      status: assetDetail.status as any,
-      updated_at: assetDetail.updated_at,
-      subject_id: assetDetail.subject_id,
-      grade_id: assetDetail.grade_id,
-    }
-    // 更新本地内容
-    if (assetDetail.public_url) {
-      localContent.value.url = assetDetail.public_url
-    }
-    if (!localContent.value.title && assetDetail.title) {
-      localContent.value.title = assetDetail.title
-    }
-    if (!localContent.value.description && assetDetail.description) {
-      localContent.value.description = assetDetail.description
-    }
-    if (assetDetail.thumbnail_url) {
-      localContent.value.thumbnail = assetDetail.thumbnail_url
-    }
-  } catch (error) {
-    console.error('Failed to load asset detail:', error)
-  }
+  const url = iframeSrc.value
+  if (url) window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 // 监听 props.cell 的变化，同步到本地状态
-watch(() => props.cell, (newCell) => {
-  if (newCell) {
+watch(
+  () => props.cell,
+  (newCell) => {
+    if (!newCell) return
     localContent.value = { ...(newCell.content || {}) }
+    if (localContent.value.url && !localContent.value.student_url) {
+      localContent.value.student_url = localContent.value.url
+    }
+    if (localContent.value.asset_id && !localContent.value.student_asset_id) {
+      localContent.value.student_asset_id = localContent.value.asset_id
+    }
     localConfig.value = {
       allowFullscreen: true,
       height: '800px',
-      ...(newCell.config || {})
+      ...(newCell.config || {}),
     }
-    
-    // 同步HTML代码
-    if (newCell.content?.html_code) {
-      htmlCode.value = newCell.content.html_code
-      if (props.editable) {
-        if (htmlBlobUrl.value) {
-          URL.revokeObjectURL(htmlBlobUrl.value)
-        }
-        htmlBlobUrl.value = generateBlobUrlFromHtml(newCell.content.html_code)
-      } else {
-        // 非编辑模式
-        if (displayHtmlBlobUrl.value) {
-          URL.revokeObjectURL(displayHtmlBlobUrl.value)
-        }
-        displayHtmlBlobUrl.value = generateBlobUrlFromHtml(newCell.content.html_code)
-      }
+
+    syncHtmlRefsFromCellContent(newCell.content)
+
+    const tid = newCell.content?.teacher_asset_id
+    if (tid) {
+      if (selectedTeacherAsset.value?.id !== tid) loadTeacherAssetDetail(tid)
     } else {
-      // 清除HTML相关的Blob URL
-      if (htmlBlobUrl.value) {
-        URL.revokeObjectURL(htmlBlobUrl.value)
-        htmlBlobUrl.value = null
-      }
-      if (displayHtmlBlobUrl.value) {
-        URL.revokeObjectURL(displayHtmlBlobUrl.value)
-        displayHtmlBlobUrl.value = null
-      }
+      selectedTeacherAsset.value = null
     }
-    
-    // 如果 cell 有 asset_id，需要加载资产信息
-    if (newCell.content?.asset_id && !selectedAsset.value) {
-      loadAssetDetail(newCell.content.asset_id)
-      sourceMode.value = 'library'
-    } else if (newCell.content?.html_code) {
-      sourceMode.value = 'html'
-    } else if (newCell.content?.url) {
-      sourceMode.value = 'url'
-    }
-  }
-}, { deep: true, immediate: true })
 
-// 监听 sourceMode 变化
-watch(() => sourceMode.value, (newMode) => {
-  if (newMode === 'url' && selectedAsset.value) {
-    // 切换到 URL 模式时，保留 URL 但清除 asset_id
-    localContent.value.asset_id = undefined
-  } else if (newMode === 'html') {
-    // 切换到 HTML 模式时，清除其他来源
-    localContent.value.asset_id = undefined
-    localContent.value.url = undefined
-  } else if (newMode === 'library') {
-    // 切换到资源库模式时，清除HTML代码
-    htmlCode.value = ''
-    localContent.value.html_code = undefined
-    if (htmlBlobUrl.value) {
-      URL.revokeObjectURL(htmlBlobUrl.value)
-      htmlBlobUrl.value = null
+    const sid = newCell.content?.student_asset_id ?? newCell.content?.asset_id
+    if (sid) {
+      if (selectedStudentAsset.value?.id !== sid) loadStudentAssetDetail(sid)
+    } else {
+      selectedStudentAsset.value = null
     }
-  }
-})
 
-// 组件挂载时，如果已有 asset_id，加载资产详情
+    sourceMode.value = inferInteractiveSourceMode(newCell.content)
+  },
+  { deep: true, immediate: true }
+)
+
+// 组件挂载时补齐 legacy 字段并加载资产摘要（deep watch 会再跑一次，此处兜底）
 onMounted(() => {
-  if (props.cell.content?.asset_id && !selectedAsset.value) {
-    loadAssetDetail(props.cell.content.asset_id)
-    sourceMode.value = 'library'
-  } else if (props.cell.content?.html_code) {
-    sourceMode.value = 'html'
-    htmlCode.value = props.cell.content?.html_code || ''
-    if (props.editable && props.cell.content?.html_code) {
-      htmlBlobUrl.value = generateBlobUrlFromHtml(props.cell.content.html_code)
-    } else if (props.cell.content?.html_code) {
-      // 非编辑模式，生成显示用的Blob URL
-      displayHtmlBlobUrl.value = generateBlobUrlFromHtml(props.cell.content.html_code)
-    }
-  } else if (props.cell.content?.url) {
-    sourceMode.value = 'url'
+  const c = props.cell.content
+  if (!c) return
+  if (localContent.value.url && !localContent.value.student_url) {
+    localContent.value.student_url = localContent.value.url
   }
+  if (localContent.value.asset_id && !localContent.value.student_asset_id) {
+    localContent.value.student_asset_id = localContent.value.asset_id
+  }
+  syncHtmlRefsFromCellContent(c)
+  if (c.teacher_asset_id) loadTeacherAssetDetail(c.teacher_asset_id)
+  const sid = c.student_asset_id ?? c.asset_id
+  if (sid) loadStudentAssetDetail(sid)
+  sourceMode.value = inferInteractiveSourceMode(c)
 })
 
 // 组件卸载时先清空 iframe src 再 revoke blob，避免 "Not allowed to load local resource: blob:..."
@@ -884,10 +1291,8 @@ onBeforeUnmount(() => {
   if (interactiveIframeRef.value?.src && interactiveIframeRef.value.src.startsWith('blob:')) {
     interactiveIframeRef.value.src = 'about:blank'
   }
-  if (htmlBlobUrl.value) {
-    URL.revokeObjectURL(htmlBlobUrl.value)
-    htmlBlobUrl.value = null
-  }
+  revokeTeacherBlob()
+  revokeStudentBlob()
   if (displayHtmlBlobUrl.value) {
     URL.revokeObjectURL(displayHtmlBlobUrl.value)
     displayHtmlBlobUrl.value = null
@@ -978,6 +1383,18 @@ onBeforeUnmount(() => {
 
 .selected-asset-card {
   @apply w-full p-4 border-2 border-purple-200 rounded-lg bg-purple-50;
+}
+
+.selected-asset-card.compact {
+  @apply p-3 border border-purple-200;
+}
+
+.library-mini-btn {
+  @apply px-3 py-1.5 text-sm font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 transition-colors;
+}
+
+.library-mini-btn-secondary {
+  @apply px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors;
 }
 
 .url-input-wrapper {
@@ -1087,6 +1504,10 @@ onBeforeUnmount(() => {
 
 .html-code-input.error {
   @apply border-red-500 focus:ring-red-500;
+}
+
+.html-inline-upload-btn {
+  @apply inline-flex items-center justify-center gap-2 self-start sm:flex-shrink-0 px-3 py-2 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-colors;
 }
 
 .html-actions {
