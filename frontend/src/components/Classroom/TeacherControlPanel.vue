@@ -168,120 +168,47 @@
     />
 
     <!-- 浮动导播台（授课模式下始终显示） -->
-    <div v-if="isMinimalTeachingUi" class="panel teaching-modules teaching-modules-floating" :class="{ 'module-panel-fullscreen': modulePanelFullscreen, 'panel-collapsed': floatingPanelCollapsed }">
-      <div class="floating-panel-header">
-        <div class="floating-panel-title-group" title="当前课节模块快速切换">
-          <span class="floating-panel-title-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-          </span>
-          <div class="floating-panel-title-text">
-            <span class="floating-panel-title-main">模块切换</span>
-            <span class="floating-panel-title-kicker">播出导控</span>
-          </div>
-        </div>
-        <div class="floating-panel-header-right">
-          <div
-            v-if="session && normalizedSessionStatus !== 'pending'"
-            class="floating-panel-elapsed"
-            :title="`授课用时 ${formatRemainingTime(displayDuration)}（随课堂累计，不含课前等待）`"
-            :aria-label="`授课用时 ${formatRemainingTime(displayDuration)}`"
-            data-testid="floating-panel-elapsed"
+    <div
+      v-if="isMinimalTeachingUi"
+      class="panel teaching-modules teaching-modules-floating floating-panel-micro"
+      :class="{ 'module-panel-fullscreen': modulePanelFullscreen, 'panel-collapsed': floatingPanelCollapsed }"
+    >
+      <!-- 最简：仅上一 / 下一；标题、用时、模块选择与教学助手收入「课堂详情」抽屉 -->
+      <div v-if="floatingPanelCollapsed" class="floating-panel-micro-bar">
+        <div
+          class="floating-panel-micro-column"
+          role="group"
+          aria-label="播出导控与模块前后切换"
+        >
+          <button
+            type="button"
+            class="collapsed-nav-btn collapsed-nav-btn--micro-stack floating-panel-micro-expand"
+            data-testid="minimal-broadcast-drawer-open"
+            aria-label="打开播出导控（当前模块、用时、切换模块）"
+            title="打开播出导控：当前模块、用时、选择模块、教学助手"
+            @click="openMinimalBroadcastDrawer"
           >
-            <span class="floating-panel-elapsed-line" aria-hidden="true">
-              <span class="floating-panel-elapsed-label">用时</span>
-              <span class="floating-panel-elapsed-value">{{ formatRemainingTime(displayDuration) }}</span>
+            <span class="floating-panel-micro-expand-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
             </span>
-          </div>
-          <div
-            v-if="isMinimalTeachingUi"
-            class="floating-panel-assistant-slot"
-          >
-            <TeachingAssistantFAB
-              layout="embedded"
-              :visible="true"
-              :classroom-id="assistantClassroomId ?? null"
-              @open-drawer="emit('open-assistant-drawer', $event)"
-            />
-          </div>
-          <button
-            type="button"
-            class="floating-panel-toggle"
-            data-testid="minimal-more-drawer"
-            aria-label="课堂详情，打开侧栏"
-            title="课堂详情（当前为文档状图标）：打开课堂详情侧栏，查看学生、访客与模块；会暂退出极简顶栏，关闭侧栏后自动回到极简。"
-            @click="openMinimalDetailDrawerFromMinimalBar"
-          >
-            <svg
-              class="floating-panel-toggle-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            <span class="floating-panel-micro-expand-text">
+              <span class="floating-panel-micro-expand-line1">播出导控</span>
+              <span class="floating-panel-micro-expand-line2">
+                {{ simpleModuleDetailLabel
+                }}<template v-if="lessonContentCells.length > 0">
+                  <span class="floating-panel-micro-expand-sep" aria-hidden="true">·</span>{{ lessonContentCells.length }} 个
+                </template>
+              </span>
+            </span>
           </button>
           <button
             type="button"
-            class="floating-panel-toggle"
-            :title="floatingPanelCollapsed ? '展开模块列表（当前为左尖括号图标）：展开后显示全部模块、多选与统计等。' : '收起模块列表（当前为右尖括号图标）：收起到紧凑视图，仅保留下拉与上一条下一条。'"
-            :aria-label="floatingPanelCollapsed ? '展开全部模块列表' : '收起为紧凑模块视图'"
-            :aria-expanded="!floatingPanelCollapsed"
-            @click="floatingPanelCollapsed = !floatingPanelCollapsed"
-          >
-            <svg v-if="floatingPanelCollapsed" class="floating-panel-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-            <svg v-else class="floating-panel-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        </div>
-      </div>
-      
-      <!-- 折叠状态：模块下拉 + 快速切换 -->
-      <div v-if="floatingPanelCollapsed" class="floating-panel-collapsed">
-        <div v-if="lessonContentCells.length > 0" class="collapsed-select-card">
-          <div class="collapsed-select-card-head">
-            <label class="floating-panel-field-label" for="floating-module-select">当前播出</label>
-            <span class="collapsed-module-count" aria-hidden="true">{{ lessonContentCells.length }} 个模块</span>
-          </div>
-          <select
-            id="floating-module-select"
-            class="collapsed-module-select"
-            :value="collapsedFloatingSelectValue"
-            :disabled="loading"
-            aria-label="选择模块"
-            :title="collapsedFloatingSelectTitle"
-            @change="onCollapsedFloatingModuleSelect"
-          >
-            <option v-if="currentModuleIndex < 0" disabled value="">
-              未播出 / 已隐藏
-            </option>
-            <option
-              v-for="(cell, index) in lessonContentCells"
-              :key="cell.id ?? index"
-              :value="String(index)"
-            >
-              {{ formatCollapsedFloatingModuleOptionLabel(cell, index) }}
-            </option>
-          </select>
-        </div>
-        <div v-else class="collapsed-current-info collapsed-current-info--empty">
-          <span class="collapsed-empty-hint">暂无模块</span>
-        </div>
-        <div class="collapsed-nav-buttons">
-          <button
-            type="button"
-            class="collapsed-nav-btn"
+            class="collapsed-nav-btn collapsed-nav-btn--micro-stack"
             :disabled="loading || !canGoPrev"
             aria-label="上一模块"
             title="上一模块"
@@ -294,7 +221,7 @@
           </button>
           <button
             type="button"
-            class="collapsed-nav-btn"
+            class="collapsed-nav-btn collapsed-nav-btn--micro-stack"
             :disabled="loading || !canGoNext"
             aria-label="下一模块"
             title="下一模块"
@@ -309,7 +236,43 @@
       </div>
       
       <!-- 展开状态：显示完整模块列表（紧凑版） -->
-      <div v-else class="floating-panel-content">
+      <div v-else class="floating-panel-content floating-panel-content--expanded">
+        <div class="floating-panel-expanded-toolbar">
+          <button
+            type="button"
+            class="floating-panel-toggle floating-panel-toggle--text"
+            data-testid="minimal-more-drawer"
+            aria-label="课堂详情"
+            title="课堂详情：概况、学生与访客、本机预览、播出与模块"
+            @click="openMinimalDetailDrawerFromMinimalBar"
+          >
+            <svg
+              class="floating-panel-toggle-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span class="floating-panel-toggle-label">详情</span>
+          </button>
+          <button
+            type="button"
+            class="floating-panel-toggle"
+            title="收起到仅上一 / 下一"
+            aria-label="收起到仅上一与下一"
+            :aria-expanded="true"
+            @click="floatingPanelCollapsed = true"
+          >
+            <svg class="floating-panel-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
         <ModuleList
           :cells="lessonContentCells"
           :current-module-index="currentModuleIndex"
@@ -378,7 +341,7 @@
           </button>
         </div>
         <div class="minimal-more-panel-body">
-          <!-- 课堂概况：固定展开 -->
+          <div class="minimal-more-drawer-pinned">
           <section
             v-if="session && normalizedSessionStatus !== 'pending'"
             class="minimal-more-group minimal-more-group--always-open"
@@ -418,38 +381,211 @@
             </div>
           </section>
 
-          <!-- 交互课件预览（教师大屏 / 学生视角）：与教案预览 iframe 同步 -->
+          <section
+            class="minimal-more-group minimal-more-group--always-open minimal-more-group--students"
+            aria-label="学生与访客"
+          >
+            <div class="minimal-more-group-heading-row">
+              <h4 class="minimal-more-group-heading">学生与访客</h4>
+              <span class="minimal-more-group-heading-badge">
+                {{ activeStudents.length }}/{{ totalStudents }} 人
+                <template v-if="(session.guest_count || session.guestCount || 0) > 0">
+                  · 访客 {{ session.guest_count || session.guestCount }}
+                </template>
+              </span>
+            </div>
+            <div class="minimal-more-group-body minimal-more-group-body--tight minimal-more-group-body--pinned-scroll">
+              <WaitingForStudentsBanner
+                :session-status="session.status"
+                :active-count="activeStudents.length"
+              />
+              <GuestAccessToggle
+                :session-id="session.id"
+                :guest-access-enabled="session.guest_access_enabled || session.guestAccessEnabled || false"
+                :guest-access-code="session.guest_access_code || session.guestAccessCode || null"
+                :guest-count="session.guest_count || session.guestCount || 0"
+                class="px-0 py-2"
+                @updated="handleGuestAccessUpdated"
+              />
+              <JoinedStudentsList
+                v-if="session.status === 'PREPARING'"
+                :students="activeStudents"
+                :max-display="8"
+              />
+            </div>
+          </section>
+          </div>
+
+          <div class="minimal-more-drawer-scroll">
           <section
             class="minimal-more-group minimal-more-group--always-open minimal-more-group--interactive-viewer"
-            aria-label="交互课件预览"
+            aria-label="教案内交互单元预览视角"
           >
-            <h4 class="minimal-more-group-heading">交互课件预览</h4>
-            <div class="minimal-more-settings-row minimal-more-settings-row--interactive-viewer">
-              <div class="minimal-more-inline-group">
-                <span class="minimal-more-label">教师端</span>
-                <div class="minimal-interactive-viewer-segment" role="group" aria-label="切换交互课件预览视角">
+            <div class="minimal-interactive-viewer-card">
+              <div class="minimal-interactive-viewer-card-head">
+                <div class="minimal-interactive-viewer-head-row">
+                  <div class="minimal-interactive-viewer-head-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M2 8.5V6a2 2 0 012-2h16a2 2 0 012 2v2.5" />
+                      <path d="M2 15.5V18a2 2 0 002 2h16a2 2 0 002-2v-2.5" />
+                      <path d="M6 12h.01M12 12h.01M18 12h.01" />
+                    </svg>
+                  </div>
+                  <div class="minimal-interactive-viewer-head-copy">
+                    <div class="minimal-interactive-viewer-head-meta">
+                      <span class="minimal-interactive-viewer-kicker">本机预览</span>
+                      <span class="minimal-interactive-viewer-scope-badge">仅教师端</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                class="minimal-interactive-viewer-controls"
+                role="group"
+                aria-label="本机预览与课堂辅助"
+              >
+                <div
+                  class="minimal-interactive-viewer-pair"
+                  role="group"
+                  aria-label="切换交互课件预览视角"
+                >
                   <button
                     type="button"
-                    class="minimal-interactive-viewer-segment__btn"
+                    class="minimal-interactive-viewer-mode-btn"
                     :class="{ 'is-active': teachingInteractiveViewerMode === 'teacher' }"
+                    :aria-pressed="teachingInteractiveViewerMode === 'teacher'"
+                    title="教师大屏：与教室大屏一致"
                     @click="emit('update:teachingInteractiveViewerMode', 'teacher')"
                   >
-                    教师大屏
+                    <span class="minimal-interactive-viewer-mode-btn__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="4" width="20" height="14" rx="2" />
+                        <path d="M8 20h8" />
+                        <path d="M12 18v2" />
+                      </svg>
+                    </span>
+                    <span class="minimal-interactive-viewer-btn-label">教师大屏</span>
                   </button>
                   <button
                     type="button"
-                    class="minimal-interactive-viewer-segment__btn"
+                    class="minimal-interactive-viewer-mode-btn"
                     :class="{ 'is-active': teachingInteractiveViewerMode === 'student' }"
+                    :aria-pressed="teachingInteractiveViewerMode === 'student'"
+                    title="学生视角：与学生学习端一致"
                     @click="emit('update:teachingInteractiveViewerMode', 'student')"
                   >
-                    学生视角
+                    <span class="minimal-interactive-viewer-mode-btn__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="8" r="3.5" />
+                        <path d="M5.5 20.5a6.5 6.5 0 0113 0" />
+                      </svg>
+                    </span>
+                    <span class="minimal-interactive-viewer-btn-label">学生视角</span>
                   </button>
+                </div>
+                <div
+                  v-if="isMinimalTeachingUi"
+                  class="minimal-interactive-viewer-assistant-strip"
+                >
+                  <div class="minimal-interactive-viewer-assistant-intro">
+                    <span class="minimal-interactive-viewer-assistant-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3l1.2 3.6L17 8l-3 2.2.9 3.5L12 11.8 9.1 13.7 10 10.2 7 8l3.8-1.4L12 3z" />
+                        <path d="M5 19h14" />
+                        <path d="M8 22h8" />
+                      </svg>
+                    </span>
+                    <span class="minimal-interactive-viewer-assistant-label">教学助手</span>
+                  </div>
+                  <div class="minimal-interactive-viewer-assistant-slot">
+                    <TeachingAssistantFAB
+                      layout="embedded"
+                      embedded-menu-open-below
+                      :visible="true"
+                      :classroom-id="assistantClassroomId ?? null"
+                      @open-drawer="emit('open-assistant-drawer', $event)"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-            <p class="minimal-more-hint minimal-more-hint--interactive-viewer">
-              切换当前教案预览里交互单元的展示视角（不影响学生端）。
-            </p>
+          </section>
+
+          <!-- 播出导控：从浮动条移入抽屉（当前模块、用时、选择模块） -->
+          <section
+            v-if="isMinimalTeachingUi"
+            class="minimal-more-group"
+            aria-label="播出导控"
+          >
+            <button
+              type="button"
+              class="minimal-more-group-toggle"
+              :aria-expanded="minimalDrawerSectionBroadcastOpen"
+              @click="minimalDrawerSectionBroadcastOpen = !minimalDrawerSectionBroadcastOpen"
+            >
+              <span class="minimal-more-group-toggle-label">播出导控</span>
+              <svg
+                class="minimal-more-chevron"
+                :class="{ 'minimal-more-chevron--open': minimalDrawerSectionBroadcastOpen }"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div
+              v-show="minimalDrawerSectionBroadcastOpen"
+              class="minimal-more-group-body minimal-more-group-body--tight"
+            >
+              <div class="minimal-broadcast-head">
+                <div class="minimal-broadcast-title-block">
+                  <span class="minimal-broadcast-title-main">模块切换</span>
+                  <span class="minimal-broadcast-title-sub">当前播出与快速选模块</span>
+                </div>
+                <div
+                  v-if="session && normalizedSessionStatus !== 'pending'"
+                  class="minimal-broadcast-elapsed"
+                  :title="`授课用时 ${formatRemainingTime(displayDuration)}（随课堂累计，不含课前等待）`"
+                >
+                  <span class="minimal-broadcast-elapsed-label">用时</span>
+                  <span class="minimal-broadcast-elapsed-value">{{ formatRemainingTime(displayDuration) }}</span>
+                </div>
+              </div>
+              <div v-if="lessonContentCells.length > 0" class="minimal-broadcast-select-wrap">
+                <div class="minimal-broadcast-select-head">
+                  <label class="minimal-more-label minimal-broadcast-select-label" for="minimal-drawer-module-select">当前播出</label>
+                  <span class="minimal-broadcast-module-count">{{ lessonContentCells.length }} 个模块</span>
+                </div>
+                <select
+                  id="minimal-drawer-module-select"
+                  class="minimal-broadcast-module-select"
+                  :value="collapsedFloatingSelectValue"
+                  :disabled="loading"
+                  aria-label="选择模块"
+                  :title="collapsedFloatingSelectTitle"
+                  @change="onCollapsedFloatingModuleSelect"
+                >
+                  <option v-if="currentModuleIndex < 0" disabled value="">
+                    未播出 / 已隐藏
+                  </option>
+                  <option
+                    v-for="(cell, index) in lessonContentCells"
+                    :key="cell.id ?? index"
+                    :value="String(index)"
+                  >
+                    {{ formatCollapsedFloatingModuleOptionLabel(cell, index) }}
+                  </option>
+                </select>
+              </div>
+              <p v-else class="minimal-broadcast-empty">暂无模块</p>
+            </div>
           </section>
 
           <!-- 播出设置：可折叠 -->
@@ -520,53 +656,6 @@
             </div>
           </section>
 
-          <!-- 学生与访客：可折叠 -->
-          <section class="minimal-more-group" aria-label="学生与访客">
-            <button
-              type="button"
-              class="minimal-more-group-toggle"
-              :aria-expanded="minimalDrawerSectionStudentsOpen"
-              @click="minimalDrawerSectionStudentsOpen = !minimalDrawerSectionStudentsOpen"
-            >
-              <span class="minimal-more-group-toggle-label">学生与访客</span>
-              <svg
-                class="minimal-more-chevron"
-                :class="{ 'minimal-more-chevron--open': minimalDrawerSectionStudentsOpen }"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            <div
-              v-show="minimalDrawerSectionStudentsOpen"
-              class="minimal-more-group-body minimal-more-group-body--tight"
-            >
-              <WaitingForStudentsBanner
-                :session-status="session.status"
-                :active-count="activeStudents.length"
-              />
-              <GuestAccessToggle
-                :session-id="session.id"
-                :guest-access-enabled="session.guest_access_enabled || session.guestAccessEnabled || false"
-                :guest-access-code="session.guest_access_code || session.guestAccessCode || null"
-                :guest-count="session.guest_count || session.guestCount || 0"
-                class="px-0 py-2"
-                @updated="handleGuestAccessUpdated"
-              />
-              <JoinedStudentsList
-                v-if="session.status === 'PREPARING'"
-                :students="activeStudents"
-                :max-display="12"
-              />
-            </div>
-          </section>
-
           <!-- 模块与活动：可折叠 -->
           <section class="minimal-more-group" aria-label="模块与活动">
             <button
@@ -616,6 +705,7 @@
               />
             </div>
           </section>
+          </div>
         </div>
       </div>
     </div>
@@ -841,22 +931,20 @@ const floatingPanelCollapsed = ref(true)  // 浮动面板折叠状态
 
 const minimalMoreDrawerOpen = ref(false)
 /** 课堂详情抽屉分组折叠（路线 A）；打开抽屉时按会话状态重置默认展开 */
+const minimalDrawerSectionBroadcastOpen = ref(true)
 const minimalDrawerSectionSettingsOpen = ref(true)
-const minimalDrawerSectionStudentsOpen = ref(true)
 const minimalDrawerSectionModulesOpen = ref(true)
 
 function applyMinimalDrawerSectionDefaults() {
   if (!session.value) return
   const s = String(session.value.status ?? '').toLowerCase()
+  minimalDrawerSectionBroadcastOpen.value = true
   minimalDrawerSectionSettingsOpen.value = true
   if (s === 'preparing') {
-    minimalDrawerSectionStudentsOpen.value = true
     minimalDrawerSectionModulesOpen.value = false
   } else if (s === 'teaching' || s === 'active') {
-    minimalDrawerSectionStudentsOpen.value = false
     minimalDrawerSectionModulesOpen.value = true
   } else {
-    minimalDrawerSectionStudentsOpen.value = true
     minimalDrawerSectionModulesOpen.value = true
   }
 }
@@ -868,6 +956,12 @@ watch(minimalMoreDrawerOpen, (open) => {
 /** 极简顶栏：进入课堂详情 = 退出极简布局并打开抽屉（与 closeMinimalMoreDrawer 对称） */
 function openMinimalDetailDrawerFromMinimalBar() {
   minimalTeachingFocus.value = false
+  minimalMoreDrawerOpen.value = true
+}
+
+/** 浮动条「播出导控」：不退出极简顶栏，仅打开抽屉中的播出区块 */
+function openMinimalBroadcastDrawer() {
+  minimalDrawerSectionBroadcastOpen.value = true
   minimalMoreDrawerOpen.value = true
 }
 
@@ -1238,6 +1332,22 @@ const minimalCurrentIndexLabel = computed(() => {
   if (!n) return ''
   if (idx < 0) return '未播出'
   return `${idx + 1} / ${n}`
+})
+
+/** 浮动条「播出导控」入口副标题：当前模块一行展示 */
+const simpleModuleDetailLabel = computed(() => {
+  const idx = currentModuleIndex.value
+  const n = lessonContentCells.value.length
+  if (!n) return '暂无模块'
+  if (idx < 0) return '未播出'
+  const c = lessonContentCells.value[idx]
+  const title =
+    (c?.title && String(c.title).trim()) ||
+    (c ? getCellTypeLabel(c.type) : '') ||
+    `模块 ${idx + 1}`
+  const max = 22
+  const short = title.length > max ? `${title.slice(0, max - 1)}…` : title
+  return `${idx + 1}. ${short}`
 })
 
 const collapsedFloatingSelectValue = computed(() => {
@@ -2557,6 +2667,303 @@ defineExpose({
   border-color: rgba(79, 70, 229, 0.18);
 }
 
+.teaching-modules-floating.floating-panel-micro:not(.panel-collapsed) {
+  max-width: 280px !important;
+  width: 280px !important;
+}
+
+.teaching-modules-floating.floating-panel-micro.panel-collapsed {
+  max-width: 56px !important;
+  width: 56px !important;
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(14px) saturate(1.12);
+  -webkit-backdrop-filter: blur(14px) saturate(1.12);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 4px 18px rgba(15, 23, 42, 0.07),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+
+.teaching-modules-floating.floating-panel-micro.panel-collapsed:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(79, 70, 229, 0.22);
+  box-shadow:
+    0 6px 22px rgba(15, 23, 42, 0.1),
+    0 0 0 1px rgba(79, 70, 229, 0.1);
+}
+
+.floating-panel-micro-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  padding: 4px 3px 5px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 14px;
+}
+
+.teaching-modules-floating.floating-panel-micro.panel-collapsed .floating-panel-micro-bar {
+  background: transparent;
+}
+
+.floating-panel-micro-column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 3px;
+  width: 44px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.floating-panel-micro-column .floating-panel-micro-expand {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.floating-panel-micro-column .floating-panel-micro-expand:hover {
+  background: #f1f5f9;
+  border-color: rgba(15, 23, 42, 0.14);
+}
+
+.teaching-modules-floating.floating-panel-micro.panel-collapsed .collapsed-nav-btn--micro-stack {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+.teaching-modules-floating.floating-panel-micro.panel-collapsed .collapsed-nav-btn--micro-stack:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(79, 70, 229, 0.22);
+}
+
+.teaching-modules-floating.floating-panel-micro.panel-collapsed .collapsed-nav-btn--micro-stack:disabled {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.floating-panel-micro-expand-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: #475569;
+  justify-content: center;
+}
+
+.floating-panel-micro-expand-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.floating-panel-micro-expand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  width: 100%;
+}
+
+.floating-panel-micro-expand-line1 {
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #0f172a;
+  text-align: center;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.floating-panel-micro-expand-line2 {
+  font-size: 7px;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.floating-panel-micro-expand-sep {
+  margin: 0 1px;
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.floating-panel-micro-column .collapsed-nav-btn--micro-stack {
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  height: auto;
+  padding: 4px 2px;
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.floating-panel-micro-column .collapsed-nav-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.floating-panel-micro-column .collapsed-nav-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.floating-panel-expanded-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 10px 0;
+  flex-shrink: 0;
+}
+
+.floating-panel-toggle--text {
+  width: auto;
+  min-width: 30px;
+  padding: 0 8px;
+  gap: 4px;
+}
+
+.floating-panel-toggle-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.floating-panel-content--expanded {
+  padding-top: 4px;
+}
+
+.minimal-broadcast-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.minimal-broadcast-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.minimal-broadcast-title-main {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.minimal-broadcast-title-sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.minimal-broadcast-elapsed {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.minimal-broadcast-elapsed-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.minimal-broadcast-elapsed-value {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  color: #0f172a;
+}
+
+.minimal-broadcast-select-wrap {
+  margin-bottom: 12px;
+}
+
+.minimal-broadcast-select-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.minimal-broadcast-select-label {
+  margin-bottom: 0;
+}
+
+.minimal-broadcast-module-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.minimal-broadcast-module-select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 32px 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #0f172a;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.minimal-broadcast-module-select:focus {
+  outline: none;
+  border-color: rgba(79, 70, 229, 0.45);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.minimal-broadcast-module-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.minimal-broadcast-empty {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
 .teaching-modules-floating.panel-collapsed {
   max-width: 244px !important;
   width: 244px !important;
@@ -2940,6 +3347,19 @@ defineExpose({
     width: 222px !important;
     left: auto !important;
   }
+
+  .teaching-modules-floating.floating-panel-micro:not(.panel-collapsed) {
+    max-width: none !important;
+    width: auto !important;
+    left: 16px !important;
+    right: 16px !important;
+  }
+
+  .teaching-modules-floating.floating-panel-micro.panel-collapsed {
+    max-width: 56px !important;
+    width: 56px !important;
+    left: auto !important;
+  }
 }
 
 /* 小屏幕适配 */
@@ -2955,6 +3375,16 @@ defineExpose({
   .teaching-modules-floating.panel-collapsed {
     max-width: 200px !important;
     width: 200px !important;
+  }
+
+  .teaching-modules-floating.floating-panel-micro:not(.panel-collapsed) {
+    max-width: none !important;
+    width: auto !important;
+  }
+
+  .teaching-modules-floating.floating-panel-micro.panel-collapsed {
+    max-width: 54px !important;
+    width: 54px !important;
   }
   
   .floating-panel-header {
@@ -3019,6 +3449,16 @@ defineExpose({
   .teaching-modules-floating.panel-collapsed {
     max-width: 178px !important;
     width: 178px !important;
+  }
+
+  .teaching-modules-floating.floating-panel-micro:not(.panel-collapsed) {
+    max-width: none !important;
+    width: auto !important;
+  }
+
+  .teaching-modules-floating.floating-panel-micro.panel-collapsed {
+    max-width: 52px !important;
+    width: 52px !important;
   }
 
   .collapsed-module-count {
@@ -4772,10 +5212,68 @@ input[type="checkbox"].checkbox-input {
 }
 
 .minimal-more-panel-body {
-  overflow-y: auto;
-  padding: 10px 12px 18px;
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.minimal-more-drawer-pinned {
+  flex-shrink: 0;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.minimal-more-drawer-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px 18px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.minimal-more-group-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.minimal-more-group-heading-row .minimal-more-group-heading {
+  margin-bottom: 0;
+}
+
+.minimal-more-group-heading-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.minimal-more-group--students {
+  margin-bottom: 0;
+}
+
+.minimal-more-group-body--pinned-scroll {
+  max-height: min(32vh, 200px);
+  overflow-y: auto;
+  padding-top: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.minimal-more-drawer-pinned .minimal-more-overview-actions {
+  margin-top: 8px;
+  padding-top: 8px;
 }
 
 /* 课堂详情：分组（路线 A） */
@@ -4870,15 +5368,233 @@ input[type="checkbox"].checkbox-input {
 }
 
 .minimal-more-group--interactive-viewer {
-  padding-top: 4px;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  margin-bottom: 12px;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+  overflow: visible;
 }
 
-.minimal-more-settings-row--interactive-viewer {
+.minimal-interactive-viewer-card {
+  position: relative;
+  overflow: visible;
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.16);
+  background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+  box-shadow: 0 1px 2px rgba(79, 70, 229, 0.06);
+  padding: 8px;
+}
+
+.minimal-interactive-viewer-card-head {
   margin-bottom: 6px;
 }
+
+.minimal-interactive-viewer-head-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.minimal-interactive-viewer-head-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+}
+
+.minimal-interactive-viewer-head-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.minimal-interactive-viewer-head-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.minimal-interactive-viewer-head-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.minimal-interactive-viewer-kicker {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #4338ca;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.minimal-interactive-viewer-scope-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.minimal-interactive-viewer-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.minimal-interactive-viewer-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 100%;
+}
+
+.minimal-interactive-viewer-mode-btn {
+  appearance: none;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.12s ease;
+}
+
+.minimal-interactive-viewer-mode-btn:hover {
+  border-color: rgba(99, 102, 241, 0.28);
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.08);
+}
+
+.minimal-interactive-viewer-mode-btn:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.minimal-interactive-viewer-mode-btn:active {
+  transform: scale(0.98);
+}
+
+.minimal-interactive-viewer-mode-btn.is-active {
+  border-color: transparent;
+  background: linear-gradient(165deg, #4f46e5 0%, #6366f1 100%);
+  color: #fff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 6px 16px rgba(79, 70, 229, 0.28);
+}
+
+.minimal-interactive-viewer-mode-btn__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.65);
+  color: #4f46e5;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.minimal-interactive-viewer-mode-btn__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.minimal-interactive-viewer-mode-btn.is-active .minimal-interactive-viewer-mode-btn__icon {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.minimal-interactive-viewer-btn-label {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.minimal-interactive-viewer-assistant-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 6px 5px 8px;
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.95);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.minimal-interactive-viewer-assistant-intro {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.minimal-interactive-viewer-assistant-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  color: #d97706;
+  background: rgba(251, 191, 36, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+.minimal-interactive-viewer-assistant-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.minimal-interactive-viewer-assistant-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.minimal-interactive-viewer-assistant-slot {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  overflow: visible;
+  position: relative;
+  z-index: 3;
+}
+
 
 .minimal-interactive-viewer-segment {
   display: inline-flex;
@@ -4917,13 +5633,6 @@ input[type="checkbox"].checkbox-input {
   background: #2563eb;
   color: #fff;
   box-shadow: 0 1px 2px rgba(37, 99, 235, 0.25);
-}
-
-.minimal-more-hint--interactive-viewer {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.45;
-  color: #94a3b8;
 }
 
 .minimal-more-end-class-btn {

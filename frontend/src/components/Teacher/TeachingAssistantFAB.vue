@@ -2,10 +2,18 @@
   <!-- 嵌入极简浮动导播台：与「模块切换」面板同层，菜单在按钮上方展开 -->
   <div
     v-if="layout === 'embedded' && visible"
+    ref="embeddedAnchorRef"
     class="teaching-assistant-fab-container teaching-assistant-fab-container--embedded"
   >
-    <Transition name="menu-slide">
-      <div v-if="showMenu" class="fab-menu fab-menu--embedded">
+    <Teleport to="body">
+      <Transition name="menu-slide">
+        <div
+          v-if="showMenu"
+          data-fab-embedded-menu
+          class="fab-menu fab-menu--embedded fab-menu--embedded-teleport"
+          :class="{ 'fab-menu--embedded-below': embeddedMenuOpenBelow }"
+          :style="embeddedMenuFixedStyle"
+        >
             <div class="fab-menu-header">
               <h3 class="fab-menu-title">教学助手</h3>
               <button
@@ -25,7 +33,7 @@
                 <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span class="fab-menu-tip-text">请先发布教案，上课时选择班级</span>
+                <span class="fab-menu-tip-text">上课并选择班级后可用</span>
               </div>
 
               <!-- 点名考勤 -->
@@ -41,7 +49,7 @@
                   </svg>
                 </div>
                 <div class="fab-menu-item-content">
-                  <div class="fab-menu-item-title">点名考勤</div>
+                  <div class="fab-menu-item-title">点名</div>
                   <div class="fab-menu-item-desc">快速记录学生出勤</div>
                 </div>
                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,7 +70,7 @@
                   </svg>
                 </div>
                 <div class="fab-menu-item-content">
-                  <div class="fab-menu-item-title">课堂表现</div>
+                  <div class="fab-menu-item-title">表现</div>
                   <div class="fab-menu-item-desc">记录积极表现</div>
                 </div>
                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,7 +91,7 @@
                   </svg>
                 </div>
                 <div class="fab-menu-item-content">
-                  <div class="fab-menu-item-title">纪律记录</div>
+                  <div class="fab-menu-item-title">纪律</div>
                   <div class="fab-menu-item-desc">记录课堂纪律</div>
                 </div>
                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -104,7 +112,7 @@
                   </svg>
                 </div>
                 <div class="fab-menu-item-content">
-                  <div class="fab-menu-item-title">值日管理</div>
+                  <div class="fab-menu-item-title">值日</div>
                   <div class="fab-menu-item-desc">查看值日安排</div>
                 </div>
                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,7 +122,8 @@
 
             </div>
           </div>
-    </Transition>
+      </Transition>
+    </Teleport>
     <button
       type="button"
       @click="toggleMenu"
@@ -296,7 +305,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount, withDefaults } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, nextTick, withDefaults } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -304,11 +313,54 @@ const props = withDefaults(
     classroomId?: number | null
     /** floating：Teleport 到视口角落；embedded：由父级（如极简浮动导播台标题栏）布局 */
     layout?: 'floating' | 'embedded'
+    /**
+     * 嵌入布局下菜单展开方向。抽屉等顶部空间不足、父级有 overflow 时改为 true，在按钮下方展开以免被裁切。
+     */
+    embeddedMenuOpenBelow?: boolean
   }>(),
-  { layout: 'floating' }
+  { layout: 'floating', embeddedMenuOpenBelow: false }
 )
 
 const showMenu = ref(false)
+const embeddedAnchorRef = ref<HTMLElement | null>(null)
+const embeddedMenuFixedStyle = ref<Record<string, string>>({})
+
+function updateEmbeddedMenuPosition() {
+  const anchor = embeddedAnchorRef.value
+  if (!anchor || props.layout !== 'embedded') return
+  const rect = anchor.getBoundingClientRect()
+  const right = Math.max(8, window.innerWidth - rect.right)
+  const width = Math.min(200, Math.max(168, window.innerWidth - 16))
+  const zIndex = '10060'
+
+  if (props.embeddedMenuOpenBelow) {
+    const top = rect.bottom + 6
+    const maxHeight = Math.max(120, Math.min(440, window.innerHeight - top - 12))
+    embeddedMenuFixedStyle.value = {
+      position: 'fixed',
+      top: `${top}px`,
+      right: `${right}px`,
+      left: 'auto',
+      bottom: 'auto',
+      width: `${width}px`,
+      maxHeight: `${maxHeight}px`,
+      zIndex,
+    }
+  } else {
+    const bottom = window.innerHeight - rect.top + 6
+    const maxHeight = Math.max(120, Math.min(440, rect.top - 12))
+    embeddedMenuFixedStyle.value = {
+      position: 'fixed',
+      bottom: `${bottom}px`,
+      right: `${right}px`,
+      left: 'auto',
+      top: 'auto',
+      width: `${width}px`,
+      maxHeight: `${maxHeight}px`,
+      zIndex,
+    }
+  }
+}
 
 /** 嵌入导播台：悬停说明与人像/叉号图标对应关系 */
 const embeddedFabTitle = computed(() =>
@@ -332,26 +384,51 @@ const cornerFabAriaLabel = computed(() =>
 
 const toggleMenu = () => {
   showMenu.value = !showMenu.value
+  if (showMenu.value && props.layout === 'embedded') {
+    nextTick(() => updateEmbeddedMenuPosition())
+  }
 }
 
 // 关闭菜单（点击外部区域）
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as HTMLElement
-  if (!target.closest('.teaching-assistant-fab-container')) {
-    showMenu.value = false
+  if (
+    target.closest('.teaching-assistant-fab-container') ||
+    target.closest('[data-fab-embedded-menu]')
+  ) {
+    return
   }
+  showMenu.value = false
+}
+
+function bindEmbeddedMenuPositionListeners() {
+  window.addEventListener('resize', updateEmbeddedMenuPosition)
+  window.addEventListener('scroll', updateEmbeddedMenuPosition, true)
+}
+
+function unbindEmbeddedMenuPositionListeners() {
+  window.removeEventListener('resize', updateEmbeddedMenuPosition)
+  window.removeEventListener('scroll', updateEmbeddedMenuPosition, true)
 }
 
 // 监听菜单显示状态，添加/移除点击外部关闭的监听
 watch(showMenu, (isOpen) => {
   if (isOpen) {
+    if (props.layout === 'embedded') {
+      nextTick(() => {
+        updateEmbeddedMenuPosition()
+        bindEmbeddedMenuPositionListeners()
+      })
+    }
     document.addEventListener('click', handleClickOutside)
   } else {
+    unbindEmbeddedMenuPositionListeners()
     document.removeEventListener('click', handleClickOutside)
   }
 })
 
 onBeforeUnmount(() => {
+  unbindEmbeddedMenuPositionListeners()
   document.removeEventListener('click', handleClickOutside)
 })
 
@@ -424,20 +501,105 @@ const handleDuty = () => {
   align-items: flex-end;
 }
 
-.teaching-assistant-fab-container--embedded .fab-menu--embedded {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 6px);
-  min-width: 260px;
-  max-width: min(320px, calc(100vw - 20px));
-  max-height: min(72vh, 440px);
-  z-index: 20;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 14px 30px rgba(15, 23, 42, 0.12);
+.fab-menu.fab-menu--embedded-teleport {
+  min-width: 0;
+  max-width: none;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+}
+
+.fab-menu--embedded-teleport .fab-menu-header {
+  min-height: 34px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: #f8fafc;
+}
+
+.fab-menu--embedded-teleport .fab-menu-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fab-menu--embedded-teleport .fab-menu-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  color: #64748b;
+}
+
+.fab-menu--embedded-teleport .fab-menu-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.fab-menu--embedded-teleport .fab-menu-close .w-5 {
+  width: 14px;
+  height: 14px;
+}
+
+.fab-menu--embedded-teleport .fab-menu-content {
+  padding: 4px;
+  max-height: min(42vh, 220px);
+}
+
+.fab-menu--embedded-teleport .fab-menu-tip {
+  margin: 0 0 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.fab-menu--embedded-teleport .fab-menu-tip svg {
+  display: none;
+}
+
+.fab-menu--embedded-teleport .fab-menu-tip-text {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.fab-menu--embedded-teleport .fab-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  border-radius: 8px;
+}
+
+.fab-menu--embedded-teleport .fab-menu-item-icon {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px;
+  border-radius: 6px !important;
+}
+
+.fab-menu--embedded-teleport .fab-menu-item-icon svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.fab-menu--embedded-teleport .fab-menu-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.fab-menu--embedded-teleport .fab-menu-item-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0;
+  color: #0f172a;
+}
+
+.fab-menu--embedded-teleport .fab-menu-item-desc,
+.fab-menu--embedded-teleport .fab-menu-item > svg.w-4 {
+  display: none;
 }
 
 .teaching-assistant-fab-container--embedded .fab-menu-content {
@@ -782,6 +944,11 @@ const handleDuty = () => {
 .menu-slide-leave-to {
   opacity: 0;
   transform: translateY(-10px) scale(0.95);
+}
+
+.fab-menu--embedded-teleport.fab-menu--embedded-below.menu-slide-enter-from,
+.fab-menu--embedded-teleport.fab-menu--embedded-below.menu-slide-leave-to {
+  transform: translateY(10px) scale(0.95);
 }
 
 .icon-rotate-enter-active,
