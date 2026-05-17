@@ -1,6 +1,9 @@
 /** 教师端授课（预览）模式、课堂会话与 URL / sessionStorage 同步 */
 
+import { readGuestAccessCode } from '@/utils/guestSession'
+
 export const LESSON_PREVIEW_QUERY = 'mode'
+export const GUEST_ACCESS_CODE_QUERY = 'code'
 export const LESSON_PREVIEW_QUERY_VALUE = 'preview'
 export const LESSON_SESSION_QUERY = 'sessionId'
 
@@ -100,6 +103,15 @@ export function buildLessonReturnPath(
     const sessionId = sessionFromQuery ?? sessionFromCtx
     if (sessionId != null && !q[LESSON_SESSION_QUERY]) {
       q[LESSON_SESSION_QUERY] = String(sessionId)
+    }
+  }
+
+  if (path === '/guest' || path.startsWith('/guest/')) {
+    const fromQuery = q[GUEST_ACCESS_CODE_QUERY]
+    const fromStorage = readGuestAccessCode()
+    const code = (fromQuery || fromStorage || '').trim().toUpperCase()
+    if (code.length >= 6) {
+      q[GUEST_ACCESS_CODE_QUERY] = code
     }
   }
 

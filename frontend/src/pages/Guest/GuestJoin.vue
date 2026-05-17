@@ -246,6 +246,7 @@
             <div
               v-for="cell in cells"
               :key="guestCellKey(cell)"
+              :data-cell-id="cell.id"
               class="border border-gray-200 rounded-xl p-5 transition-all"
               :class="{ 'ring-2 ring-blue-400 bg-blue-50/30': isGuestCurrentCell(cell) }"
             >
@@ -307,23 +308,12 @@
                 </div>
               </div>
 
-              <!-- BROWSER cell（正文常仅来自教案 JSON） -->
-              <div v-else-if="cell.cell_type === 'BROWSER'" class="space-y-2 text-sm text-gray-700">
-                <p v-if="cell.content?.description" class="text-gray-600">{{ cell.content.description }}</p>
-                <div
-                  v-if="cell.content?.url"
-                  class="w-full overflow-hidden rounded-lg border border-gray-200 bg-white"
-                  style="min-height: 480px"
-                >
-                  <iframe
-                    :src="cell.content.url"
-                    class="h-[70vh] min-h-[480px] w-full border-0"
-                    title="浏览器单元"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-fullscreen"
-                  />
-                </div>
-                <p v-else class="text-gray-500">未配置网址</p>
-              </div>
+              <!-- BROWSER cell：与学生端一致，默认外部打开，可选内嵌预览 -->
+              <BrowserCell
+                v-else-if="cell.cell_type === 'BROWSER'"
+                :cell="guestBrowserCell(cell)"
+                :lesson-id="sessionInfo?.lessonId"
+              />
 
               <!-- INTERACTIVE cell -->
               <div v-else-if="cell.cell_type === 'INTERACTIVE'" class="space-y-2 text-sm text-gray-700">
@@ -513,19 +503,42 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import BrowserCell from '@/components/Cell/BrowserCell.vue'
+import { useLessonExternalReturn } from '@/composables/useLessonExternalReturn'
 import classroomSessionService, {
   normalizeClassSessionStatus,
 } from '@/services/classroomSession'
 import api from '@/services/api'
+import { CellType, type BrowserCell as BrowserCellModel } from '@/types/cell'
 import { markdownToHtml } from '@/utils/lessonEditorHelpers'
 import { appendInteractiveViewToUrl } from '@/utils/interactiveView'
+import {
+  clearGuestAccessCode,
+  readGuestAccessCode,
+  saveGuestAccessCode,
+} from '@/utils/guestSession'
 import type { GuestSessionInfo } from '@/types/classroomSession'
+
+useLessonExternalReturn()
 
 const route = useRoute()
 const router = useRouter()
 
 function guestInteractiveEmbedUrl(url: string) {
   return appendInteractiveViewToUrl(url, 'student') || url
+}
+
+function guestBrowserCell(cell: Record<string, unknown>): BrowserCellModel {
+  const content = (cell.content as BrowserCellModel['content']) ?? { url: '' }
+  return {
+    id: cell.id as number,
+    type: CellType.BROWSER,
+    order: typeof cell.order === 'number' ? cell.order : 0,
+    editable: false,
+    title: cell.title as string | undefined,
+    content,
+    config: cell.config as BrowserCellModel['config'],
+  }
 }
 
 const accessCode = ref('')
@@ -703,8 +716,12 @@ onMounted(() => {
   document.addEventListener('MSFullscreenChange', onDocumentFullscreenChange)
   updateDocumentFullscreenFlag()
 
-  const code = route.query.code as string
-  if (code) {
+  const codeFromQuery = route.query.code
+  const code =
+    (typeof codeFromQuery === 'string' ? codeFromQuery : '') ||
+    readGuestAccessCode() ||
+    ''
+  if (code.length >= 6) {
     accessCode.value = code.toUpperCase()
     lookupSession()
   }
@@ -750,6 +767,10 @@ async function lookupSession() {
     const info = await classroomSessionService.guestLookupSession(accessCode.value)
     lastKnownDisplayMode.value = null
     sessionInfo.value = info
+    saveGuestAccessCode(accessCode.value)
+    if (route.query.code !== accessCode.value) {
+      await router.replace({ path: '/guest', query: { code: accessCode.value } })
+    }
     applyServerDisplayMode(info.displayMode ?? 'window')
     await loadCells()
     connectWS()
@@ -919,6 +940,7 @@ async function exitGuest() {
   isInitialCellFetch.value = true
   cellsLoading.value = false
   accessCode.value = ''
+  clearGuestAccessCode()
   router.push('/guest')
 }
 
