@@ -3,26 +3,28 @@
 """
 
 import json
+import logging
+import secrets
 from typing import Any, Dict, List, Optional, Union
+
 from pydantic import AnyHttpUrl, PostgresDsn, field_validator, BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Annotated
+
+logger = logging.getLogger(__name__)
 
 
 def parse_cors(v: Any) -> List[str]:
     """解析 CORS origins"""
     if isinstance(v, str):
-        # 处理空字符串
         if not v or v.strip() == "":
             return []
-        # 尝试作为 JSON 解析
         try:
             parsed = json.loads(v)
             if isinstance(parsed, list):
                 return parsed
         except (json.JSONDecodeError, ValueError):
             pass
-        # 否则按逗号分隔
         return [i.strip() for i in v.split(",") if i.strip()]
     elif isinstance(v, list):
         return v
@@ -43,28 +45,35 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "InspireEd"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
+    ENVIRONMENT: str = "development"
+
+    # API 文档开关 — 生产环境应设为 False
+    DOCS_ENABLED: bool = True
 
     # 安全配置
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day (production-safe default)
 
-    # CORS - 允许局域网访问
-    # 在生产环境中，应该设置具体的域名而不是使用通配符
-    # 可以通过环境变量 BACKEND_CORS_ORIGINS 覆盖
-    # 支持格式：逗号分隔 或 JSON数组
-    # 例如：BACKEND_CORS_ORIGINS=http://localhost:5173,http://192.168.1.100:5173
-    # 或：BACKEND_CORS_ORIGINS=["http://localhost:5173","http://192.168.1.100:5173"]
+    @field_validator("SECRET_KEY", mode="before")
+    @classmethod
+    def ensure_secret_key(cls, v: Optional[str]) -> str:
+        if not v or v == "your-secret-key-change-in-production":
+            generated = secrets.token_urlsafe(64)
+            logger.warning(
+                "SECRET_KEY not set or using placeholder — "
+                "auto-generated a random key. Set SECRET_KEY in .env for production."
+            )
+            return generated
+        return v
+
+    # CORS
     BACKEND_CORS_ORIGINS: Annotated[List[str], BeforeValidator(parse_cors)] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
-        # 支持常见的局域网IP段 (192.168.x.x)
-        # 如需添加更多IP，请通过环境变量配置
     ]
 
-    # 是否允许局域网访问（开发模式）
-    # 生产环境应设置为 False
     ALLOW_LAN_ACCESS: bool = True
 
     # 数据库配置
@@ -109,7 +118,7 @@ class Settings(BaseSettings):
 
     # JupyterHub配置
     JUPYTERHUB_URL: str = "http://localhost:8000"
-    JUPYTERHUB_API_TOKEN: str = "your-jupyterhub-token"
+    JUPYTERHUB_API_TOKEN: str = ""
 
     # OpenAI配置
     OPENAI_API_KEY: str = ""
@@ -132,8 +141,8 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER: str = "admin@inspireed.com"
     FIRST_SUPERUSER_PASSWORD: str = "admin123"
 
-    # 文件上传配置 (MVP)
-    UPLOAD_DIR: str = "storage"  # 上传文件存储目录
+    # 文件上传配置
+    UPLOAD_DIR: str = "storage"
     MAX_UPLOAD_SIZE: int = 100 * 1024 * 1024  # 100MB
 
 
