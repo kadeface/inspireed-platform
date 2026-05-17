@@ -6,6 +6,7 @@ from typing import List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.models import Resource, Chapter, Lesson, User, UserRole, LibraryAsset
@@ -25,7 +26,9 @@ router = APIRouter()
 
 
 async def _enrich_resource_response(
-    resource: Resource, db: AsyncSession
+    resource: Resource,
+    db: AsyncSession,
+    preloaded_asset: Optional[LibraryAsset] = None,
 ) -> ResourceResponse:
     """
     为资源响应补充 asset 和 resolved_file_url 字段
@@ -55,7 +58,9 @@ async def _enrich_resource_response(
     # 如果有 asset_id，加载 asset 信息
     asset_summary = None
     if resource.asset_id:
-        asset = await db.get(LibraryAsset, resource.asset_id)
+        asset = preloaded_asset
+        if asset is None:
+            asset = await db.get(LibraryAsset, resource.asset_id)
         if asset:
             asset_summary = LibraryAssetSummary.model_validate(asset)
     
@@ -82,7 +87,11 @@ async def list_resources(
 ):
     """获取资源列表（支持按章节筛选）"""
 
-    query = select(Resource).order_by(Resource.display_order, Resource.created_at.desc())
+    query = (
+        select(Resource)
+        .options(selectinload(Resource.asset))
+        .order_by(Resource.display_order, Resource.created_at.desc())
+    )
 
     # 按章节筛选
     if chapter_id is not None:
@@ -100,10 +109,10 @@ async def list_resources(
     resources = result.scalars().all()
 
     # 补充 asset 和 resolved_file_url
-    enriched_resources = []
-    for resource in resources:
-        enriched = await _enrich_resource_response(resource, db)
-        enriched_resources.append(enriched)
+    enriched_resources = [
+        await _enrich_resource_response(resource, db, preloaded_asset=resource.asset)
+        for resource in resources
+    ]
     
     return enriched_resources
 
