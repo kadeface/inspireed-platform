@@ -10,7 +10,18 @@
       </div>
 
       <!-- Simulation Type Tabs -->
-      <div class="sim-type-tabs mb-4 flex gap-2 border-b border-gray-200">
+      <div class="sim-type-tabs mb-4 flex flex-wrap gap-2 border-b border-gray-200">
+        <button
+          @click="simMode = 'mathlab'"
+          :class="[
+            'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            simMode === 'mathlab'
+              ? 'border-teal-600 text-teal-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          ]"
+        >
+          数学机器人仿真
+        </button>
         <button
           @click="simMode = 'phet'"
           :class="[
@@ -45,8 +56,52 @@
       </div>
     </div>
 
+    <!-- Edit Mode - Mathlab Sim Selector -->
+    <div v-if="editable && simMode === 'mathlab' && !cell.content.mathlabSim && !cell.content.url && !showCustomUrlMode" class="mathlab-selector p-4">
+      <div class="selector-header mb-4 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold">{{ cell.title || '仿真演示' }}</h3>
+          <p class="text-sm text-gray-600 mt-1">数学学科 · 轮式机器人融合互动教学</p>
+        </div>
+        <button
+          @click="simMode = null"
+          class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+        >
+          ← 返回
+        </button>
+      </div>
+      <div class="simulation-grid">
+        <div
+          v-for="sim in mathlabSimulations"
+          :key="sim.id"
+          @click="selectMathlabSimulation(sim)"
+          class="sim-card group cursor-pointer border-teal-200 hover:border-teal-500"
+        >
+          <div class="card-content">
+            <div class="flex items-center gap-2 mb-1">
+              <h4 class="font-semibold text-base">{{ sim.nameCn }}</h4>
+              <span class="text-xs px-2 py-0.5 bg-teal-100 text-teal-700 rounded">mathlab</span>
+            </div>
+            <p class="text-sm text-gray-600 line-clamp-2">{{ sim.descriptionCn }}</p>
+            <div class="tags mt-2">
+              <span
+                v-for="topic in sim.topics.slice(0, 4)"
+                :key="topic"
+                class="tag bg-teal-50 text-teal-700"
+              >
+                {{ topic }}
+              </span>
+            </div>
+          </div>
+          <div class="card-overlay group-hover:opacity-100 bg-teal-600">
+            <span class="text-white font-medium">点击嵌入</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Edit Mode - PhET Sim Selector -->
-    <div v-if="editable && simMode === 'phet' && !cell.content.phetSim && !cell.content.url && !showCustomUrlMode" class="phet-selector p-4">
+    <div v-if="editable && simMode === 'phet' && !cell.content.phetSim && !cell.content.mathlabSim && !cell.content.url && !showCustomUrlMode" class="phet-selector p-4">
       <div class="selector-header mb-4 flex items-center justify-between">
         <div>
           <h3 class="text-lg font-semibold">{{ cell.title || '仿真演示' }}</h3>
@@ -119,7 +174,7 @@
     </div>
 
     <!-- Edit Mode - Hardware Sim Selector -->
-    <div v-if="editable && simMode === 'hardware' && !cell.content.hardwareSim && !cell.content.url && !showCustomUrlMode" class="hardware-selector p-4">
+    <div v-if="editable && simMode === 'hardware' && !cell.content.hardwareSim && !cell.content.mathlabSim && !cell.content.url && !showCustomUrlMode" class="hardware-selector p-4">
       <div class="selector-header mb-4 flex items-center justify-between">
         <div>
           <h3 class="text-lg font-semibold">{{ cell.title || '仿真演示' }}</h3>
@@ -250,7 +305,7 @@
     </div>
 
     <!-- Custom URL Mode -->
-    <div v-else-if="editable && !cell.content.phetSim && !cell.content.url && showCustomUrlMode" class="p-4">
+    <div v-else-if="editable && !cell.content.phetSim && !cell.content.hardwareSim && !cell.content.mathlabSim && !cell.content.url && showCustomUrlMode" class="p-4">
       <div class="custom-url-editor">
         <div class="flex items-center justify-between mb-4">
           <div>
@@ -333,13 +388,14 @@
     </div>
 
     <!-- Editor Mode - Selected Simulation -->
-    <div v-else-if="editable && (cell.content.phetSim || cell.content.hardwareSim || cell.content.url)" class="p-4">
+    <div v-else-if="editable && (cell.content.phetSim || cell.content.hardwareSim || cell.content.mathlabSim || cell.content.url)" class="p-4">
       <div class="editor-header mb-4 flex items-center justify-between">
         <div>
-          <h3 class="text-lg font-semibold">{{ cell.title || selectedSimInfo?.nameCn || selectedHardwareSimInfo?.nameCn || '仿真演示' }}</h3>
+          <h3 class="text-lg font-semibold">{{ cell.title || selectedSimInfo?.nameCn || selectedHardwareSimInfo?.nameCn || selectedMathlabSimInfo?.nameCn || '仿真演示' }}</h3>
           <p class="text-sm text-gray-600">
             {{ cell.content.phetSim ? selectedSimInfo?.descriptionCn : 
-               cell.content.hardwareSim ? selectedHardwareSimInfo?.descriptionCn : 
+               cell.content.hardwareSim ? selectedHardwareSimInfo?.descriptionCn :
+               cell.content.mathlabSim ? selectedMathlabSimInfo?.descriptionCn :
                '自定义仿真URL' }}
           </p>
         </div>
@@ -361,7 +417,7 @@
               v-model.number="localConfig.width"
               type="number"
               min="400"
-              max="1400"
+              max="1600"
               @blur="updateCell"
             />
           </div>
@@ -371,7 +427,7 @@
               v-model.number="localConfig.height"
               type="number"
               min="300"
-              max="900"
+              max="1000"
               @blur="updateCell"
             />
           </div>
@@ -422,13 +478,25 @@
       
       <div v-if="cell.title" class="sim-header mb-3">
         <h3 class="text-lg font-semibold">{{ cell.title }}</h3>
-        <p v-if="selectedSimInfo?.descriptionCn" class="text-sm text-gray-600 mt-1">
-          {{ selectedSimInfo.descriptionCn }}
+        <p v-if="displayDescription" class="text-sm text-gray-600 mt-1">
+          {{ displayDescription }}
         </p>
       </div>
 
+      <!-- Mathlab Simulation -->
+      <div v-if="cell.content.type === 'mathlab' && mathlabSimulationUrl" class="sim-display">
+        <iframe
+          :src="mathlabSimulationUrl"
+          :style="getIframeStyle(cell.content.config.width || 1320, cell.content.config.height || 820)"
+          frameborder="0"
+          allowfullscreen
+          class="sim-iframe rounded-lg shadow-lg"
+          title="轮式机器人数学融合互动教学"
+        ></iframe>
+      </div>
+
       <!-- PhET Simulation -->
-      <div v-if="cell.content.type === 'phet' && simulationUrl" class="sim-display">
+      <div v-else-if="cell.content.type === 'phet' && simulationUrl" class="sim-display">
         <iframe
           :src="simulationUrl"
           :style="getIframeStyle(cell.content.config.width || 800, cell.content.config.height || 600)"
@@ -488,6 +556,13 @@ import {
   getHardwareSimulationsByCategory,
   type HardwareSimulation
 } from '../../data/hardware-simulations'
+import {
+  MATHLAB_SIMULATIONS,
+  MATHLAB_DEFAULT_CONFIG,
+  getMathlabSimulation,
+  getMathlabEmbedUrl,
+  type MathlabSimulation
+} from '../../data/mathlab-simulations'
 
 interface Props {
   cell: SimCellType
@@ -505,8 +580,9 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLElement | null>(null)
 const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)
 
-// Simulation mode: 'phet' | 'hardware' | null
-const simMode = ref<'phet' | 'hardware' | null>(null)
+// Simulation mode: 'mathlab' | 'phet' | 'hardware' | null
+const simMode = ref<'mathlab' | 'phet' | 'hardware' | null>('mathlab')
+const mathlabSimulations = MATHLAB_SIMULATIONS
 const selectedCategory = ref<string>('all')
 const selectedHardwareCategory = ref<string>('all')
 const selectedProgrammingType = ref<'all' | 'graphical' | 'code'>('all')
@@ -515,7 +591,12 @@ const customUrl = ref('')
 
 // Check if any simulation is selected
 const hasSelectedSimulation = computed(() => {
-  return !!(props.cell.content.phetSim || props.cell.content.hardwareSim || props.cell.content.url)
+  return !!(
+    props.cell.content.phetSim ||
+    props.cell.content.hardwareSim ||
+    props.cell.content.mathlabSim ||
+    props.cell.content.url
+  )
 })
 
 const categories = computed(() => {
@@ -543,6 +624,27 @@ const selectedHardwareSimInfo = computed(() => {
     return getHardwareSimulation(props.cell.content.hardwareSim)
   }
   return null
+})
+
+const selectedMathlabSimInfo = computed(() => {
+  if (props.cell.content.mathlabSim) {
+    return getMathlabSimulation(props.cell.content.mathlabSim)
+  }
+  return null
+})
+
+const displayDescription = computed(() => {
+  if (props.cell.content.mathlabSim) return selectedMathlabSimInfo.value?.descriptionCn
+  if (props.cell.content.hardwareSim) return selectedHardwareSimInfo.value?.descriptionCn
+  if (props.cell.content.phetSim) return selectedSimInfo.value?.descriptionCn
+  return undefined
+})
+
+const mathlabSimulationUrl = computed(() => {
+  if (props.cell.content.mathlabSim) {
+    return getMathlabEmbedUrl(props.cell.content.mathlabSim, props.cell.content.mathlabTask)
+  }
+  return undefined
 })
 
 const hardwareCategories = computed(() => {
@@ -593,7 +695,9 @@ watch(localConfig, () => {
 
 // Auto-set simMode based on selected simulation
 watch(() => props.cell.content, (newContent) => {
-  if (newContent.phetSim) {
+  if (newContent.mathlabSim) {
+    simMode.value = 'mathlab'
+  } else if (newContent.phetSim) {
     simMode.value = 'phet'
   } else if (newContent.hardwareSim) {
     simMode.value = 'hardware'
@@ -628,19 +732,17 @@ const simulationUrl = computed(() => {
   return props.cell.content.url
 })
 
-// Editor mode simulation URL (handles PhET, hardware, and custom URLs)
+// Editor mode simulation URL (handles mathlab, PhET, hardware, and custom URLs)
 const editorSimulationUrl = computed(() => {
-  // Hardware simulation
+  if (props.cell.content.mathlabSim) {
+    return mathlabSimulationUrl.value
+  }
   if (props.cell.content.hardwareSim) {
     return hardwareSimulationUrl.value
   }
-  
-  // If it's a custom URL (iframe type or has url but no phetSim)
   if (props.cell.content.url && !props.cell.content.phetSim) {
     return props.cell.content.url
   }
-  
-  // Otherwise use the PhET simulation URL
   return simulationUrl.value
 })
 
@@ -690,24 +792,30 @@ function selectHardwareSimulation(sim: HardwareSimulation) {
   emit('update', updatedCell)
 }
 
+function selectMathlabSimulation(sim: MathlabSimulation) {
+  const updatedCell: SimCellType = {
+    ...props.cell,
+    title: props.cell.title || sim.nameCn,
+    content: {
+      type: 'mathlab',
+      mathlabSim: sim.id,
+      config: { ...MATHLAB_DEFAULT_CONFIG }
+    }
+  }
+  emit('update', updatedCell)
+}
+
 function changeSimulation() {
-  // Reset to selection mode by clearing the simulation data
   const updatedCell: SimCellType = {
     ...props.cell,
     content: {
-      type: 'phet',
-      config: {
-        width: 800,
-        height: 600,
-        autoplay: false,
-        locale: 'zh_CN'
-      }
+      type: 'mathlab',
+      config: { ...MATHLAB_DEFAULT_CONFIG }
     }
   }
-  // Reset custom URL state
   customUrl.value = ''
   showCustomUrlMode.value = false
-  simMode.value = null
+  simMode.value = 'mathlab'
   emit('update', updatedCell)
 }
 

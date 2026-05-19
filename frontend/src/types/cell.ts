@@ -72,10 +72,13 @@ export interface CodeCell extends CellBase {
 }
 
 export interface SimCellContent {
-  type: 'phet' | 'threejs' | 'matterjs' | 'iframe' | 'custom' | 'hardware'
+  type: 'phet' | 'threejs' | 'matterjs' | 'iframe' | 'custom' | 'hardware' | 'mathlab'
   // PhET simulation
   phetSim?: string // PhET simulation name/ID
   phetCategory?: 'physics' | 'chemistry' | 'biology' | 'earth' | 'math'
+  // Mathlab 学科仿真（轮式机器人数学融合）
+  mathlabSim?: string // ID from mathlab-simulations.ts
+  mathlabTask?: string // 可选：预选教案任务 id，如 p2t1
   // Hardware simulation
   hardwareSim?: string // Hardware simulation ID (from hardware-simulations.ts)
   hardwarePlatform?: 'wokwi' | 'tinkercad' | 'circuitjs' | 'makecode' | 'mblock' | 'funcode' | 'custom'
