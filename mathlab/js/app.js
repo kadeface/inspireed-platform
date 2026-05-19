@@ -166,7 +166,13 @@
 
       if (this.showGrid) this.drawGrid();
       this.drawScene();
-      if (typeof SceneProps !== 'undefined') SceneProps.draw(this.ctx, this);
+      if (typeof SceneProps !== 'undefined') {
+        try {
+          SceneProps.draw(this.ctx, this);
+        } catch (e) {
+          console.error('SceneProps.draw failed:', e);
+        }
+      }
       this.drawTrail();
       this.drawRobot(r);
       if (this.scene === SCENE.TIME) this.drawClock();

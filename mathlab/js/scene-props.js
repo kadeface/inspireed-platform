@@ -1,6 +1,10 @@
 /* 场景道具 — 定义、绘制与任务预设 */
 'use strict';
 
+/** 与 app.js 一致；须在 app.js 之前加载，不可依赖其 IIFE 内变量 */
+const PX_PER_CM = 5;
+const GRID_STEP = 50;
+
 const PROP_CATALOG = {
   tape:    { icon: '📏', name: '距离标',  color: '#f97316' },
   cone:    { icon: '🔶', name: '路锥',    color: '#fb923c' },
@@ -101,7 +105,7 @@ const SceneProps = {
       });
     }
     if (cfg.target && sim) {
-      const cell = (cfg.cellCm || 10) * 5;
+      const cell = (cfg.cellCm || 10) * PX_PER_CM;
       const ox = sim.state.startX;
       const oy = sim.state.startY;
       const [tc, tr] = cfg.target;

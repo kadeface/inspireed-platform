@@ -166,7 +166,13 @@
 
       if (this.showGrid) this.drawGrid();
       this.drawScene();
-      if (typeof SceneProps !== 'undefined') SceneProps.draw(this.ctx, this);
+      if (typeof SceneProps !== 'undefined') {
+        try {
+          SceneProps.draw(this.ctx, this);
+        } catch (e) {
+          console.error('SceneProps.draw failed:', e);
+        }
+      }
       this.drawTrail();
       this.drawRobot(r);
       if (this.scene === SCENE.TIME) this.drawClock();
@@ -912,11 +918,35 @@
     }
   }
 
+  function findTaskById(taskId) {
+    for (const [stageKey, stage] of Object.entries(CURRICULUM)) {
+      for (const [gradeKey, grade] of Object.entries(stage.grades)) {
+        const index = grade.tasks.findIndex(t => t.id === taskId);
+        if (index >= 0) return { stageKey, gradeKey, index, task: grade.tasks[index] };
+      }
+    }
+    return null;
+  }
+
+  function applyTaskFromUrl() {
+    const taskId = new URLSearchParams(window.location.search).get('task');
+    if (!taskId) return;
+    const found = findTaskById(taskId);
+    if (!found) return;
+    document.getElementById('selStage').value = found.stageKey;
+    refreshGrades();
+    document.getElementById('selGrade').value = found.gradeKey;
+    refreshTasks();
+    document.getElementById('selTask').value = String(found.index);
+    renderTask(found.task);
+  }
+
   function init() {
     sim.init();
     initPropUI();
     blocklyApp.init();
     fillSelectors();
+    applyTaskFromUrl();
     document.getElementById('btnRun').onclick = runProgram;
     document.getElementById('btnStart').onclick = startDemo;
     document.getElementById('btnReset').onclick = () => { sim.reset(); setStatus('已重置'); };
