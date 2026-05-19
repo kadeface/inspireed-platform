@@ -315,6 +315,12 @@
                 :lesson-id="sessionInfo?.lessonId"
               />
 
+              <!-- IMAGE cell：与学生端一致，显示图片 -->
+              <ImageCell
+                v-else-if="cell.cell_type === 'IMAGE'"
+                :cell="guestImageCell(cell)"
+              />
+
               <!-- INTERACTIVE cell -->
               <div v-else-if="cell.cell_type === 'INTERACTIVE'" class="space-y-2 text-sm text-gray-700">
                 <p v-if="cell.content?.description" class="text-gray-600">{{ cell.content.description }}</p>
@@ -504,12 +510,13 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BrowserCell from '@/components/Cell/BrowserCell.vue'
+import ImageCell from '@/components/Cell/ImageCell.vue'
 import { useLessonExternalReturn } from '@/composables/useLessonExternalReturn'
 import classroomSessionService, {
   normalizeClassSessionStatus,
 } from '@/services/classroomSession'
 import api from '@/services/api'
-import { CellType, type BrowserCell as BrowserCellModel } from '@/types/cell'
+import { CellType, type BrowserCell as BrowserCellModel, type ImageCell as ImageCellModel } from '@/types/cell'
 import { markdownToHtml } from '@/utils/lessonEditorHelpers'
 import { appendInteractiveViewToUrl } from '@/utils/interactiveView'
 import {
@@ -538,6 +545,19 @@ function guestBrowserCell(cell: Record<string, unknown>): BrowserCellModel {
     title: cell.title as string | undefined,
     content,
     config: cell.config as BrowserCellModel['config'],
+  }
+}
+
+function guestImageCell(cell: Record<string, unknown>): ImageCellModel {
+  const content = (cell.content as ImageCellModel['content']) ?? { src: '' }
+  return {
+    id: cell.id as number,
+    type: CellType.IMAGE,
+    order: typeof cell.order === 'number' ? cell.order : 0,
+    editable: false,
+    title: cell.title as string | undefined,
+    content,
+    config: cell.config as ImageCellModel['config'],
   }
 }
 
