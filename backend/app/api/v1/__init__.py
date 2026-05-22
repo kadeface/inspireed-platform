@@ -20,6 +20,7 @@ from app.api.v1 import (
     classroom_assistant,
     classroom_sessions,
     course_export,
+    courseware,
     curriculum,
     daily_performance,
     data_center,
@@ -189,4 +190,8 @@ api_router.include_router(
 )
 api_router.include_router(
     review_channel.router, tags=["作品评审通道"]
+)
+# 创AI课件交互数据
+api_router.include_router(
+    courseware.router, prefix="/courseware", tags=["创AI-课件交互"]
 )

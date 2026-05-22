@@ -17,7 +17,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:report": "playwright show-report",
-    "sync:mathlab": "mkdir -p public/mathlab/js && cp ../mathlab/index.html public/mathlab/ && cp ../mathlab/js/*.js public/mathlab/js/"
+    "sync:mathlab": "mkdir -p public/mathlab/js public/mathlab/css && cp ../mathlab/index.html public/mathlab/ && cp ../mathlab/css/*.css public/mathlab/css/ 2>/dev/null; cp ../mathlab/js/*.js public/mathlab/js/"
   },
   "dependencies": {
     "@antv/x6": "^2.18.1",

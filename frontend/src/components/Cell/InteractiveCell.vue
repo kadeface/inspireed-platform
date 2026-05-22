@@ -59,6 +59,19 @@
             </svg>
             输入URL
           </button>
+          <button
+            :class="[
+              'source-option-btn',
+              sourceMode === 'feixiang' ? 'active' : ''
+            ]"
+            @click="sourceMode = 'feixiang'"
+            title="嵌入飞象老师生成的AI互动课件，自动采集学生交互数据"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+            </svg>
+            飞象AI课件
+          </button>
         </div>
       </div>
 
@@ -175,6 +188,58 @@
             </button>
           </div>
           <p v-if="studentUrlError" class="error-text">{{ studentUrlError }}</p>
+        </div>
+      </div>
+
+      <!-- 飞象AI课件（教师提供飞象老师生成的课程链接，嵌入并自动采集学生交互数据） -->
+      <div v-if="sourceMode === 'feixiang'" class="form-group space-y-4">
+        <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+            <span class="text-sm font-medium text-blue-800">飞象老师 · AI互动课件</span>
+            <span class="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">数据回传</span>
+          </div>
+          <p class="text-xs text-blue-700 leading-relaxed">
+            输入飞象老师平台生成的互动课件链接。学生使用时，InspireEd 将自动采集答题、交互时长等数据，在「创AI数据看板」中可视化展示。
+          </p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">飞象课件链接</label>
+          <div class="url-input-wrapper">
+            <input
+              v-model="feixiangUrl"
+              type="url"
+              placeholder="/feixiang-demo/quiz.html 或飞象老师平台链接"
+              @blur="onFeixiangUrlBlur"
+              class="url-input"
+            />
+            <button
+              v-if="feixiangUrl"
+              type="button"
+              @click="previewExternalUrl(feixiangUrl)"
+              class="preview-btn"
+              title="在新窗口预览飞象课件"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </button>
+          </div>
+          <p v-if="!feixiangUrl" class="text-xs text-gray-400 mt-1">
+            默认使用飞象老师风格演示课件（人工智能初探·互动答题）
+          </p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">课件标题（可选）</label>
+          <input
+            v-model="feixiangTitle"
+            type="text"
+            placeholder="人工智能初探 — 互动答题"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            @blur="updateCell"
+          />
         </div>
       </div>
 
@@ -529,8 +594,9 @@ function interactiveHasAnyHtml(c?: InteractiveCell['content']): boolean {
   return !!(c.html_code?.trim() || c.teacher_html_code?.trim() || c.student_html_code?.trim())
 }
 
-function inferInteractiveSourceMode(c?: InteractiveCell['content']): 'library' | 'html' | 'url' {
+function inferInteractiveSourceMode(c?: InteractiveCell['content']): 'library' | 'html' | 'url' | 'feixiang' {
   if (!c) return 'html'
+  if (c.feixiang_url?.trim()) return 'feixiang'
   if (c.teacher_asset_id || c.student_asset_id || c.asset_id) return 'library'
   if (interactiveHasAnyHtml(c)) return 'html'
   const hasUrl = !!(c.teacher_url?.trim() || c.student_url?.trim() || c.url?.trim())
@@ -538,7 +604,7 @@ function inferInteractiveSourceMode(c?: InteractiveCell['content']): 'library' |
   return 'html'
 }
 
-const sourceMode = ref<'library' | 'html' | 'url'>(inferInteractiveSourceMode(props.cell.content))
+const sourceMode = ref<'library' | 'html' | 'url' | 'feixiang'>(inferInteractiveSourceMode(props.cell.content))
 const showLibraryPicker = ref(false)
 const libraryPickSide = ref<'teacher' | 'student'>('student')
 const selectedTeacherAsset = ref<LibraryAssetSummary | null>(null)
@@ -546,6 +612,17 @@ const selectedStudentAsset = ref<LibraryAssetSummary | null>(null)
 const assetPicker = ref<InstanceType<typeof AssetPicker>>()
 const teacherHtmlFileInputRef = ref<HTMLInputElement | null>(null)
 const studentHtmlFileInputRef = ref<HTMLInputElement | null>(null)
+
+// 飞象老师课件状态
+const feixiangUrl = ref(localContent.value.feixiang_url || '/feixiang-demo/quiz.html')
+const feixiangTitle = ref(localContent.value.title || '人工智能初探 — 互动答题')
+const feixiangInteractionData = ref<any[]>([])
+
+function onFeixiangUrlBlur() {
+  localContent.value.feixiang_url = feixiangUrl.value || undefined
+  localContent.value.url = feixiangUrl.value || undefined
+  updateCell()
+}
 
 /** 教师 / 学生 双栏 HTML（编辑区） */
 const teacherHtmlCode = ref('')
@@ -775,6 +852,10 @@ function readonlyHttpUrlForRole(
 const baseEmbedUrl = computed(() => {
   const role = effectiveInteractiveView.value
   if (props.editable) {
+    // 飞象模式：使用飞象URL
+    if (sourceMode.value === 'feixiang' && feixiangUrl.value.trim()) {
+      return resolveUrl(feixiangUrl.value.trim())
+    }
     const blob = editableBlobForRole(role)
     if (blob) return blob
     const http = editableHttpUrlForRole(role)
@@ -782,6 +863,10 @@ const baseEmbedUrl = computed(() => {
     return null
   }
   const c = props.cell.content
+  // 只读模式飞象课件
+  if (c?.feixiang_url?.trim()) {
+    return resolveUrl(c.feixiang_url.trim())
+  }
   const htmlReady = readonlyHtmlSource.value.trim() && displayHtmlBlobUrl.value
   if (htmlReady) return displayHtmlBlobUrl.value
   const httpReadonly = readonlyHttpUrlForRole(c, role)
@@ -1214,6 +1299,12 @@ function syncLegacyInteractiveAliases() {
 function updateCell() {
   persistDualHtmlToLocalContent()
   syncLegacyInteractiveAliases()
+  // 飞象模式下写入飞象字段
+  if (sourceMode.value === 'feixiang') {
+    localContent.value.feixiang_url = feixiangUrl.value || undefined
+    localContent.value.url = feixiangUrl.value || undefined
+    localContent.value.title = feixiangTitle.value || '飞象AI互动课件'
+  }
   const updatedCell: InteractiveCell = {
     ...props.cell,
     content: { ...localContent.value },
@@ -1282,7 +1373,40 @@ onMounted(() => {
   const sid = c.student_asset_id ?? c.asset_id
   if (sid) loadStudentAssetDetail(sid)
   sourceMode.value = inferInteractiveSourceMode(c)
+  // 飞象状态初始化
+  if (c.feixiang_url) feixiangUrl.value = c.feixiang_url
+  if (c.title) feixiangTitle.value = c.title
+  // 飞象课件 postMessage 数据监听
+  window.addEventListener('message', handleFeixiangMessage)
 })
+
+// 飞象课件 postMessage 数据处理
+function handleFeixiangMessage(event: MessageEvent) {
+  if (!event.data || event.data.type !== 'feixiang-interaction') return
+  const data = event.data
+  feixiangInteractionData.value = [...feixiangInteractionData.value, data]
+  // 同步发送到 courseware API（如果可用）
+  try {
+    const payload = {
+      courseware_id: data.coursewareId || 'feixiang-demo',
+      courseware_title: data.coursewareTitle || '',
+      platform: data.platform || '飞象老师',
+      student_id: data.studentId || 'anonymous',
+      total_questions: data.totalQuestions || 0,
+      correct_count: data.correctCount || 0,
+      score: data.score || 0,
+      total_time_ms: data.totalTimeMs || 0,
+      answers: data.answers || [],
+      interaction_data: data
+    }
+    fetch('/api/v1/courseware/interactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(() => { /* 后台异步上报，静默失败 */ })
+  } catch (_) { /* ignore */ }
+  console.log('[InspireEd·飞象] 课件交互数据:', data)
+}
 
 // 组件卸载时先清空 iframe src 再 revoke blob，避免 "Not allowed to load local resource: blob:..."
 onBeforeUnmount(() => {
@@ -1295,6 +1419,7 @@ onBeforeUnmount(() => {
     URL.revokeObjectURL(displayHtmlBlobUrl.value)
     displayHtmlBlobUrl.value = null
   }
+  window.removeEventListener('message', handleFeixiangMessage)
 })
 </script>
 

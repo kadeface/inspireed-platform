@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>飞象老师 · AI互动课件</title>
+<style>
+  :root {
+    --feixiang-blue: #4A6CF7;
+    --feixiang-light: #EEF1FE;
+    --feixiang-green: #10B981;
+    --feixiang-red: #EF4444;
+    --feixiang-orange: #F59E0B;
+    --feixiang-text: #1E293B;
+    --feixiang-muted: #94A3B8;
+    --feixiang-bg: #F8FAFC;
+    --feixiang-card: #FFFFFF;
+    --feixiang-radius: 16px;
+    --feixiang-shadow: 0 4px 24px rgba(0,0,0,0.06);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--feixiang-bg);
+    color: var(--feixiang-text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  .header {
+    width: 100%;
+    max-width: 720px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 24px;
+    background: var(--feixiang-card);
+    border-radius: var(--feixiang-radius);
+    box-shadow: var(--feixiang-shadow);
+    margin-bottom: 24px;
+  }
+  .header-logo {
+    width: 40px; height: 40px;
+    background: var(--feixiang-blue);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 20px; font-weight: 700;
+  }
+  .header-info { flex: 1; }
+  .header-title { font-size: 15px; font-weight: 600; }
+  .header-sub { font-size: 12px; color: var(--feixiang-muted); }
+  .ai-badge {
+    font-size: 11px; padding: 4px 8px;
+    background: var(--feixiang-light); color: var(--feixiang-blue);
+    border-radius: 6px; font-weight: 500;
+  }
+  .card {
+    width: 100%; max-width: 720px;
+    background: var(--feixiang-card);
+    border-radius: var(--feixiang-radius);
+    box-shadow: var(--feixiang-shadow);
+    padding: 32px;
+    margin-bottom: 16px;
+    transition: all 0.3s ease;
+  }
+  .question-num {
+    font-size: 13px; color: var(--feixiang-blue); font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .question-text {
+    font-size: 18px; font-weight: 600; line-height: 1.6;
+    margin-bottom: 24px;
+  }
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option {
+    padding: 16px 20px;
+    border: 2px solid #E2E8F0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 15px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .option:hover { border-color: var(--feixiang-blue); background: var(--feixiang-light); }
+  .option.selected { border-color: var(--feixiang-blue); background: var(--feixiang-light); }
+  .option.correct { border-color: var(--feixiang-green); background: #ECFDF5; }
+  .option.wrong { border-color: var(--feixiang-red); background: #FEF2F2; }
+  .option-letter {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: #F1F5F9;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 14px; flex-shrink: 0;
+  }
+  .option.selected .option-letter { background: var(--feixiang-blue); color: white; }
+  .option.correct .option-letter { background: var(--feixiang-green); color: white; }
+  .option.wrong .option-letter { background: var(--feixiang-red); color: white; }
+  .feedback {
+    margin-top: 16px; padding: 16px 20px;
+    border-radius: 12px; font-size: 14px; line-height: 1.5;
+    display: none;
+  }
+  .feedback.show { display: block; }
+  .feedback.correct { background: #ECFDF5; color: #065F46; }
+  .feedback.wrong { background: #FEF2F2; color: #991B1B; }
+  .btn {
+    padding: 12px 32px; border-radius: 12px; font-size: 15px; font-weight: 600;
+    border: none; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-primary { background: var(--feixiang-blue); color: white; }
+  .btn-primary:hover { background: #3B5DE7; }
+  .btn-primary:disabled { background: #CBD5E1; cursor: not-allowed; }
+  .btn-outline { background: white; color: var(--feixiang-blue); border: 2px solid var(--feixiang-blue); }
+  .progress-bar {
+    width: 100%; max-width: 720px; height: 6px;
+    background: #E2E8F0; border-radius: 3px; margin-bottom: 20px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: var(--feixiang-blue);
+    border-radius: 3px; transition: width 0.4s ease;
+  }
+  .controls { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; }
+  .result { text-align: center; }
+  .result-score { font-size: 48px; font-weight: 700; color: var(--feixiang-blue); }
+  .result-label { font-size: 14px; color: var(--feixiang-muted); margin-top: 4px; }
+  .result-stats { display: flex; gap: 24px; justify-content: center; margin-top: 24px; }
+  .stat { text-align: center; }
+  .stat-val { font-size: 24px; font-weight: 700; }
+  .stat-label { font-size: 12px; color: var(--feixiang-muted); }
+  .star { display: inline-block; font-size: 28px; color: #E2E8F0; }
+  .star.active { color: var(--feixiang-orange); }
+  .restart-hint { font-size: 13px; color: var(--feixiang-muted); margin-top: 16px; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card { animation: fadeIn 0.35s ease; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-logo">飞</div>
+  <div class="header-info">
+    <div class="header-title">信息科技 · AI互动答题</div>
+    <div class="header-sub">课题：人工智能初探 — 图像识别与机器学习</div>
+  </div>
+  <span class="ai-badge">AI生成</span>
+</div>
+<div class="progress-bar"><div class="progress-fill" id="progressBar" style="width:0%"></div></div>
+<div class="card" id="content"></div>
+
+<script>
+(function() {
+  const questions = [
+    {
+      q: '人工智能中的"机器学习"最核心的思想是什么？',
+      options: ['让计算机从数据中自动学习规律', '让程序员编写所有规则', '让计算机模仿人类外观', '让计算机运行得更快'],
+      answer: 0,
+      explanation: '机器学习的核心是让计算机从数据中自主学习模式和规律，而不是人工编写所有规则。正如人类通过经验学习一样，机器通过数据"训练"来提升能力。'
+    },
+    {
+      q: '在图像识别任务中，以下哪项是卷积神经网络（CNN）的主要作用？',
+      options: ['处理文本数据', '提取图像中的特征', '生成随机数字', '管理文件系统'],
+      answer: 1,
+      explanation: 'CNN通过卷积层自动提取图像中的边缘、纹理、形状等特征，是图像识别领域的核心算法。它模拟了人类视觉系统的层级处理方式。'
+    },
+    {
+      q: '训练一个图像分类模型时，"过拟合"是指什么？',
+      options: ['模型在训练集上表现好但测试集差', '训练速度太慢', '数据集太大', '模型层数太少'],
+      answer: 0,
+      explanation: '过拟合意味着模型"死记硬背"了训练数据，失去了泛化能力。就像学生只会做见过的题，遇到新题型就不会了。解决方法是增加数据量或使用正则化。'
+    },
+    {
+      q: '在日常生活中，人工智能应用最为广泛的是？',
+      options: ['太空探索', '推荐系统与语音助手', '深海探测', '核聚变研究'],
+      answer: 1,
+      explanation: '推荐系统（如短视频推荐、购物推荐）和语音助手（如小爱同学、Siri）是目前AI应用最广泛的领域，每天服务数十亿用户。'
+    },
+    {
+      q: '以下哪种做法符合"负责任的AI"原则？',
+      options: ['公开所有人的训练数据', '在AI生成内容上标注"AI生成"', '让AI自主决定一切', '隐藏AI的决策过程'],
+      answer: 1,
+      explanation: '标注"AI生成"是《生成式人工智能服务管理暂行办法》的要求，体现了透明和负责任的原则。用户有权知道内容是否由AI生成。'
+    }
+  ];
+
+  let currentQ = 0;
+  let answers = [];
+  let timestamps = [];
+  let answered = false;
+  let qStartTime = Date.now();
+
+  function updateProgress() {
+    document.getElementById('progressBar').style.width = ((currentQ) / questions.length * 100) + '%';
+  }
+
+  function sendData() {
+    const totalTime = timestamps.reduce((a,b) => a + (b.end - b.start), 0);
+    const correctCount = answers.filter((a, i) => a.chosen === questions[i].answer).length;
+    const data = {
+      type: 'feixiang-interaction',
+      coursewareId: 'info-tech-ai-quiz',
+      coursewareTitle: '人工智能初探 — 图像识别与机器学习',
+      platform: '飞象老师AI课件',
+      studentId: 'anonymous',
+      timestamp: new Date().toISOString(),
+      totalQuestions: questions.length,
+      correctCount: correctCount,
+      score: Math.round(correctCount / questions.length * 100),
+      totalTimeMs: totalTime,
+      answers: answers.map((a, i) => ({
+        questionIndex: i,
+        chosen: a.chosen,
+        correct: questions[i].answer,
+        isCorrect: a.chosen === questions[i].answer,
+        timeMs: a.timestamp.end - a.timestamp.start
+      }))
+    };
+    try {
+      window.parent.postMessage(data, '*');
+    } catch(e) {}
+  }
+
+  function selectOption(idx) {
+    if (answered) return;
+    answered = true;
+    answers[currentQ] = { chosen: idx, timestamp: { start: qStartTime, end: Date.now() } };
+
+    const options = document.querySelectorAll('.option');
+    options.forEach((opt, i) => {
+      opt.classList.remove('selected');
+      if (i === idx) {
+        opt.classList.add('selected');
+        if (idx === questions[currentQ].answer) opt.classList.add('correct');
+        else opt.classList.add('wrong');
+      }
+      if (i === questions[currentQ].answer) opt.classList.add('correct');
+    });
+
+    const fb = document.getElementById('feedback');
+    const isCorrect = idx === questions[currentQ].answer;
+    fb.className = 'feedback show ' + (isCorrect ? 'correct' : 'wrong');
+    fb.innerHTML = isCorrect
+      ? '✅ 回答正确！' + questions[currentQ].explanation
+      : '❌ 再想一想。' + questions[currentQ].explanation;
+
+    document.getElementById('nextBtn').disabled = false;
+    document.getElementById('nextBtn').style.display = '';
+  }
+
+  function nextQuestion() {
+    currentQ++;
+    if (currentQ >= questions.length) {
+      showResult();
+      sendData();
+      return;
+    }
+    answered = false;
+    qStartTime = Date.now();
+    updateProgress();
+    renderQuestion();
+  }
+
+  function renderQuestion() {
+    const q = questions[currentQ];
+    const progressText = `第 ${currentQ + 1} / ${questions.length} 题`;
+    document.getElementById('content').innerHTML = `
+      <div class="question-num">${progressText}</div>
+      <div class="question-text">${q.q}</div>
+      <div class="options">
+        ${q.options.map((opt, i) => `
+          <div class="option" onclick="selectOption(${i})">
+            <span class="option-letter">${String.fromCharCode(65 + i)}</span>
+            <span>${opt}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <div class="controls">
+        <button class="btn btn-primary" id="nextBtn" disabled style="display:none" onclick="nextQuestion()">
+          ${currentQ < questions.length - 1 ? '下一题' : '查看结果'}
+        </button>
+      </div>
+    `;
+  }
+
+  function showResult() {
+    updateProgress();
+    const correctCount = answers.filter((a, i) => a.chosen === questions[i].answer).length;
+    const score = Math.round(correctCount / questions.length * 100);
+    const totalSec = Math.round(answers.reduce((a,b) => a + (b.timestamp.end - b.timestamp.start), 0) / 1000);
+    const stars = score >= 90 ? 5 : score >= 70 ? 4 : score >= 50 ? 3 : score >= 30 ? 2 : 1;
+
+    document.getElementById('content').innerHTML = `
+      <div class="result">
+        <div class="result-score">${score}<span style="font-size:24px">分</span></div>
+        <div class="result-label">答题完成</div>
+        <div style="margin-top:12px">
+          ${Array(5).fill(0).map((_, i) => `<span class="star${i < stars ? ' active' : ''}">★</span>`).join('')}
+        </div>
+        <div class="result-stats">
+          <div class="stat">
+            <div class="stat-val" style="color:var(--feixiang-blue)">${correctCount}/${questions.length}</div>
+            <div class="stat-label">正确率</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" style="color:var(--feixiang-green)">${totalSec}s</div>
+            <div class="stat-label">总用时</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" style="color:var(--feixiang-orange)">${score >= 80 ? '优秀' : score >= 60 ? '良好' : '加油'}</div>
+            <div class="stat-label">等级</div>
+          </div>
+        </div>
+        <div class="restart-hint">数据已同步至 InspireEd 平台 · 按 R 键重新开始</div>
+      </div>
+    `;
+  }
+
+  window.selectOption = selectOption;
+  window.nextQuestion = nextQuestion;
+
+  renderQuestion();
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'r' || e.key === 'R') {
+      currentQ = 0; answers = []; timestamps = []; answered = false;
+      qStartTime = Date.now(); updateProgress(); renderQuestion();
+    }
+  });
+
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'get-feixiang-data') {
+      sendData();
+    }
+  });
+})();
+</script>
+</body>
+</html>

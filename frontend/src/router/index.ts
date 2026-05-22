@@ -162,6 +162,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'teacher', title: '班级教学助手 - 成员管理 - InspireEd' },
   },
   {
+    path: '/teacher/courseware-analytics',
+    name: 'TeacherCoursewareAnalytics',
+    component: () => import('../pages/Teacher/CoursewareAnalytics.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '创AI数据看板 - InspireEd' },
+  },
+  {
     path: '/student',
     name: 'Student',
     component: () => import('../pages/Student/Dashboard.vue'),

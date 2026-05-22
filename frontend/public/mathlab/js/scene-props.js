@@ -91,17 +91,9 @@ const SceneProps = {
     const cfg = task.sceneConfig || {};
     const out = [];
 
-    if (cfg.markers) {
+    if (cfg.markers && cfg.plant) {
       cfg.markers.forEach((cm, i) => {
-        if (cfg.plant && cm > 0) {
-          out.push({ type: 'tree', atCm: cm, label: String(i + 1) });
-        } else {
-          out.push({
-            type: 'tape',
-            atCm: cm,
-            label: cm >= 100 ? (cm / 100) + 'm' : cm + 'cm'
-          });
-        }
+        if (cm > 0) out.push({ type: 'tree', atCm: cm, label: String(i + 1) });
       });
     }
     if (cfg.target && sim) {

@@ -14,8 +14,11 @@
 
   // ─── 机器人模拟器 ───────────────────────────────────────
   const sim = {
-    canvas: null, ctx: null, showGrid: true, busy: false,
+    canvas: null, ctx: null, showGrid: true, showAxes: true, busy: false,
+    renderMode: 'car',
+    viewport: { offsetX: 0, offsetY: 0, scale: 1 },
     trail: [],
+    lastAnalysis: null,
     state: {
       x: GRID_STEP, y: GRID_STEP * 4, angle: 0, dist: 0, speed: 10, wheelAngle: 0,
       startX: GRID_STEP, startY: GRID_STEP * 4, elapsed: 0
@@ -30,7 +33,66 @@
       document.getElementById('inpSpeed').addEventListener('input', e => {
         this.state.speed = parseFloat(e.target.value) || 10;
       });
+      if (typeof ViewShell !== 'undefined') ViewShell.init(this);
       this.draw();
+    },
+
+    resetViewport() {
+      this.viewport = { offsetX: 0, offsetY: 0, scale: 1 };
+      this.draw();
+    },
+
+    zoomAt(mx, my, factor) {
+      const v = this.viewport;
+      const minS = 0.45, maxS = 3;
+      const newScale = Math.min(maxS, Math.max(minS, v.scale * factor));
+      const wx = (mx - v.offsetX) / v.scale;
+      const wy = (my - v.offsetY) / v.scale;
+      v.scale = newScale;
+      v.offsetX = mx - wx * newScale;
+      v.offsetY = my - wy * newScale;
+      this.draw();
+    },
+
+    screenToWorld(sx, sy) {
+      const v = this.viewport;
+      return {
+        x: (sx - v.offsetX) / v.scale,
+        y: (sy - v.offsetY) / v.scale
+      };
+    },
+
+    clearTrail() {
+      const s = this.state;
+      this.trail = [{ x: s.x, y: s.y }];
+      this.lastAnalysis = null;
+      this.draw();
+      if (typeof ViewShell !== 'undefined') ViewShell.refreshTrailPanel();
+    },
+
+    setOrigin(nx, ny) {
+      this.state.startX = snapGrid(nx);
+      this.state.startY = snapGrid(ny);
+      this.draw();
+      this.updateTelemetry();
+    },
+
+    isNearOrigin(wx, wy, thresholdPx) {
+      thresholdPx = thresholdPx ?? 18;
+      const scale = this.viewport?.scale || 1;
+      const t = thresholdPx / scale;
+      return Math.hypot(wx - this.state.startX, wy - this.state.startY) <= t;
+    },
+
+    runAnalysis() {
+      if (typeof TrailAnalysis === 'undefined') return null;
+      this.lastAnalysis = TrailAnalysis.analyze(this);
+      this.draw();
+      if (typeof ViewShell !== 'undefined') {
+        ViewShell.refreshTrailPanel();
+        ViewShell.refreshAnalysisUI(this.lastAnalysis);
+      }
+      return this.lastAnalysis;
     },
 
     diameter() { return parseFloat(document.getElementById('inpDiameter').value) || 3; },
@@ -40,6 +102,7 @@
       s.x = s.startX; s.y = s.startY; s.angle = 0; s.dist = 0;
       s.wheelAngle = 0; s.elapsed = 0;
       this.trail = [{ x: s.x, y: s.y }];
+      this.lastAnalysis = null;
       this.busy = false;
       runStats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
       this.draw();
@@ -81,15 +144,31 @@
 
     wait(ms) { return new Promise(res => setTimeout(res, ms)); },
 
-    async forward(cm) {
-      const s = this.state;
-      let pxPerCm = PX_PER_CM;
+    getPxPerCm() {
       if (this.scene === SCENE.NUMBERLINE) {
         const unitCm = this.sceneConfig.unitCm || 20;
-        pxPerCm = this.getNumberLineUnitPx() / unitCm;
+        return this.getNumberLineUnitPx() / unitCm;
       }
-      const dx = cm * pxPerCm * Math.cos(s.angle);
-      const dy = cm * pxPerCm * Math.sin(s.angle);
+      return PX_PER_CM;
+    },
+
+    /** 数学平面角度(°) → 画布位移：0°=+x，90°=+y（向上） */
+    mathAngleToDelta(cm, angleDeg) {
+      const rad = angleDeg * Math.PI / 180;
+      const px = this.getPxPerCm();
+      return {
+        dx: cm * px * Math.cos(rad),
+        dy: -cm * px * Math.sin(rad)
+      };
+    },
+
+    mathAngleToCanvasRad(angleDeg) {
+      const rad = angleDeg * Math.PI / 180;
+      return Math.atan2(-Math.sin(rad), Math.cos(rad));
+    },
+
+    async moveByDelta(dx, dy, cm, endAngle) {
+      const s = this.state;
       const x0 = s.x, y0 = s.y;
       const dur = Math.max(200, (Math.abs(cm) / s.speed) * 1000);
       const t0 = performance.now();
@@ -100,20 +179,63 @@
         s.y = y0 + dy * p;
         s.dist += Math.abs(cm) * (p - (s._lastP || 0));
         s._lastP = p;
-        s.wheelAngle += Math.abs(cm) * PX_PER_CM * 0.06 * Math.sign(cm || 1);
+        s.wheelAngle += Math.abs(cm) * this.getPxPerCm() * 0.06 * Math.sign(cm || 1);
         s.elapsed += dur * (p - (s._lastTp || 0)) / 1000;
         s._lastTp = p;
         if (p > 0.01) this.trail.push({ x: s.x, y: s.y });
         this.draw();
         this.updateTelemetry();
+        if (typeof ViewShell !== 'undefined') {
+          const panel = document.getElementById('trailPanel');
+          if (panel && !panel.hidden) ViewShell.refreshTrailPanel();
+        }
         if (p >= 1) break;
         await this.wait(16);
       }
+      if (endAngle != null) s.angle = endAngle;
       s.dist = runStats.totalDist;
       s._lastP = 0; s._lastTp = 0;
       runStats.totalTime += dur / 1000;
       this.draw();
       this.updateTelemetry();
+    },
+
+    /** 二维：沿坐标系角度移动（绝对方向，非车头朝向） */
+    async movePolar(angleDeg, cm) {
+      const { dx, dy } = this.mathAngleToDelta(cm, angleDeg);
+      await this.moveByDelta(dx, dy, cm, this.mathAngleToCanvasRad(angleDeg));
+    },
+
+    /** 二维：移动到相对原点的坐标 (x, y) cm */
+    async gotoCm(xCm, yCm) {
+      const ox = this.state.startX;
+      const oy = this.state.startY;
+      const px = this.getPxPerCm();
+      const tx = ox + xCm * px;
+      const ty = oy - yCm * px;
+      const dx = tx - this.state.x;
+      const dy = ty - this.state.y;
+      const cm = Math.hypot(dx, dy) / px;
+      if (cm < 0.01) return;
+      const angleDeg = Math.atan2(-dy, dx) * 180 / Math.PI;
+      await this.moveByDelta(dx, dy, cm, this.mathAngleToCanvasRad(angleDeg));
+    },
+
+    /** 面向坐标系角度（不移动） */
+    async faceAngle(angleDeg) {
+      const target = this.mathAngleToCanvasRad(angleDeg);
+      const cur = this.state.angle;
+      let delta = target - cur;
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      await this.turn(delta * 180 / Math.PI);
+    },
+
+    async forward(cm) {
+      const s = this.state;
+      const dx = cm * this.getPxPerCm() * Math.cos(s.angle);
+      const dy = cm * this.getPxPerCm() * Math.sin(s.angle);
+      await this.moveByDelta(dx, dy, cm, s.angle);
     },
 
     async backward(cm) { return this.forward(-cm); },
@@ -156,15 +278,41 @@
       if (runStats.turns.length) {
         html += '<br>累计转角：' + runStats.turns.map(t => t + '°').join('、');
       }
-      document.getElementById('telemetry').innerHTML = html;
+      if (typeof ViewShell !== 'undefined') {
+        ViewShell.refreshAlgebraBar();
+        let extra = '总行进 <strong>' + runStats.totalDist.toFixed(1) + '</strong> cm · 轮周长 ' + C.toFixed(2) + ' cm · 约 ' + n + ' 圈';
+        if (runStats.totalTime > 0) extra += ' · 用时 ' + runStats.totalTime.toFixed(1) + 's';
+        if (this.lastAnalysis) {
+          extra += ' · L=' + this.lastAnalysis.arcLengthCm.toFixed(1) + ' cm';
+          if (this.lastAnalysis.matchPercent != null) {
+            extra += ' · 吻合 ' + this.lastAnalysis.matchPercent + '%';
+          }
+        } else if (typeof TrailAnalysis !== 'undefined' && this.trail.length > 1) {
+          extra += ' · L≈' + TrailAnalysis.arcLengthCm(this.trail).toFixed(1) + ' cm';
+        }
+        ViewShell.setAlgebraExtra(extra);
+      }
+    },
+
+    applyViewport(ctx) {
+      const v = this.viewport;
+      ctx.setTransform(v.scale, 0, 0, v.scale, v.offsetX, v.offsetY);
     },
 
     draw() {
       const { ctx, canvas } = this;
       const r = this.state;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      this.applyViewport(ctx);
 
-      if (this.showGrid) this.drawGrid();
+      if (this.scene !== SCENE.NUMBERLINE) {
+        this.drawCoordinatePlane();
+      } else {
+        if (this.showGrid) this.drawGridLegacy();
+        if (this.showAxes) this.drawAxes();
+      }
       this.drawScene();
       if (typeof SceneProps !== 'undefined') {
         try {
@@ -173,15 +321,211 @@
           console.error('SceneProps.draw failed:', e);
         }
       }
+      if (typeof Annotations !== 'undefined') {
+        try {
+          Annotations.draw(this.ctx, this);
+        } catch (e) {
+          console.error('Annotations.draw failed:', e);
+        }
+      }
       this.drawTrail();
-      this.drawRobot(r);
+      if (this.renderMode === 'point') this.drawPoint(r);
+      else this.drawRobot(r);
+      this.drawTargetMatchHint(ctx);
+      ctx.restore();
+      this.drawAnalysisBadge();
       if (this.scene === SCENE.TIME) this.drawClock();
     },
 
-    drawGrid() {
+    drawTargetMatchHint(ctx) {
+      if (!this.lastAnalysis?.hasTarget || typeof TrailAnalysis === 'undefined') return;
+      const target = TrailAnalysis.getTargetPolyline(this);
+      if (!target) return;
+      const pct = this.lastAnalysis.matchPercent;
+      ctx.strokeStyle = pct >= 85 ? 'rgba(34,197,94,.75)' : pct >= 60 ? 'rgba(234,179,8,.7)' : 'rgba(239,68,68,.65)';
+      ctx.lineWidth = 3 / this.viewport.scale;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      target.points.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+    },
+
+    drawAnalysisBadge() {
+      const a = this.lastAnalysis;
+      if (!a || a.matchPercent == null) return;
       const { ctx, canvas } = this;
-      const sx = this.state.startX;
-      const sy = this.state.startY;
+      const pad = 10;
+      const text = '吻合度 ' + a.matchPercent + '%';
+      ctx.font = '600 13px Outfit, Noto Sans SC, sans-serif';
+      const w = ctx.measureText(text).width + 20;
+      const x = canvas.width - w - pad;
+      const y = pad + 36;
+      const bg = a.matchPercent >= 85 ? 'rgba(22,163,74,.9)' : a.matchPercent >= 60 ? 'rgba(202,138,4,.9)' : 'rgba(220,38,38,.88)';
+      ctx.fillStyle = bg;
+      this.roundRect(ctx, x, y, w, 26, 6);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillText(text, x + 10, y + 18);
+    },
+
+    /** 可见区域（世界坐标） */
+    getVisibleWorldBounds() {
+      const { canvas } = this;
+      const v = this.viewport;
+      const pad = 80;
+      return {
+        left: (-v.offsetX) / v.scale - pad,
+        top: (-v.offsetY) / v.scale - pad,
+        right: (canvas.width - v.offsetX) / v.scale + pad,
+        bottom: (canvas.height - v.offsetY) / v.scale + pad
+      };
+    },
+
+    /** GeoGebra 风格笛卡尔背景：浅底、主次网格、双轴刻度（单位 cm，原点可拖） */
+    drawCoordinatePlane() {
+      const { ctx, canvas } = this;
+      const ox = this.state.startX;
+      const oy = this.state.startY;
+      const scale = this.viewport.scale;
+      const b = this.getVisibleWorldBounds();
+      const minor = GRID_STEP / 5;
+      const major = GRID_STEP;
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(b.left, b.top, b.right - b.left, b.bottom - b.top);
+
+      if (this.showGrid) {
+        const i0x = Math.floor(b.left / minor) * minor;
+        const i0y = Math.floor(b.top / minor) * minor;
+        ctx.lineWidth = 1 / scale;
+        for (let x = i0x; x <= b.right; x += minor) {
+          const isMajor = Math.abs((x - ox) % major) < 0.5 || Math.abs((x - ox) % major - major) < 0.5;
+          if (!isMajor) {
+            ctx.strokeStyle = 'rgba(148,163,184,.22)';
+            ctx.beginPath();
+            ctx.moveTo(x, b.top);
+            ctx.lineTo(x, b.bottom);
+            ctx.stroke();
+          }
+        }
+        for (let y = i0y; y <= b.bottom; y += minor) {
+          const isMajor = Math.abs((y - oy) % major) < 0.5 || Math.abs((y - oy) % major - major) < 0.5;
+          if (!isMajor) {
+            ctx.strokeStyle = 'rgba(148,163,184,.22)';
+            ctx.beginPath();
+            ctx.moveTo(b.left, y);
+            ctx.lineTo(b.right, y);
+            ctx.stroke();
+          }
+        }
+        ctx.strokeStyle = 'rgba(100,116,139,.38)';
+        ctx.lineWidth = 1.2 / scale;
+        for (let x = Math.floor((b.left - ox) / major) * major + ox; x <= b.right; x += major) {
+          ctx.beginPath();
+          ctx.moveTo(x, b.top);
+          ctx.lineTo(x, b.bottom);
+          ctx.stroke();
+        }
+        for (let y = Math.floor((b.top - oy) / major) * major + oy; y <= b.bottom; y += major) {
+          ctx.beginPath();
+          ctx.moveTo(b.left, y);
+          ctx.lineTo(b.right, y);
+          ctx.stroke();
+        }
+      }
+
+      if (this.showAxes) {
+        const span = Math.max(canvas.width, canvas.height) * 4;
+        const axisW = Math.max(1.8, 2.2 / scale);
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = axisW;
+        ctx.beginPath();
+        ctx.moveTo(ox - span, oy);
+        ctx.lineTo(ox + span, oy);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(ox, oy - span);
+        ctx.lineTo(ox, oy + span);
+        ctx.stroke();
+
+        const fs = Math.max(9, 10 / scale);
+        ctx.font = '500 ' + fs + 'px Outfit, Noto Sans SC, sans-serif';
+        ctx.fillStyle = '#475569';
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1 / scale;
+
+        const xStart = Math.ceil((b.left - ox) / major) * major + ox;
+        for (let x = xStart; x <= b.right; x += major) {
+          const val = Math.round((x - ox) / PX_PER_CM);
+          if (val === 0) continue;
+          ctx.beginPath();
+          ctx.moveTo(x, oy - 5 / scale);
+          ctx.lineTo(x, oy + 5 / scale);
+          ctx.stroke();
+          const label = val > 0 ? String(val) : String(val);
+          ctx.fillText(label, x - ctx.measureText(label).width / 2, oy + 16 / scale);
+        }
+
+        const yStart = Math.ceil((b.top - oy) / major) * major + oy;
+        for (let y = yStart; y <= b.bottom; y += major) {
+          const val = Math.round((oy - y) / PX_PER_CM);
+          if (val === 0) continue;
+          ctx.beginPath();
+          ctx.moveTo(ox - 5 / scale, y);
+          ctx.lineTo(ox + 5 / scale, y);
+          ctx.stroke();
+          const label = val > 0 ? String(val) : String(val);
+          ctx.fillText(label, ox - 8 / scale - ctx.measureText(label).width, y + 4 / scale);
+        }
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '600 ' + fs + 'px Outfit, sans-serif';
+        ctx.fillText('0', ox - 10 / scale, oy + 16 / scale);
+        ctx.fillStyle = '#334155';
+        ctx.fillText('x', ox + span * 0.35, oy - 10 / scale);
+        ctx.fillText('y', ox + 10 / scale, oy - span * 0.25);
+
+        const handleR = Math.max(5, 8 / scale);
+        const dragTool = typeof ViewShell !== 'undefined' && ViewShell.activeTool === 'origin';
+        ctx.fillStyle = dragTool ? '#fbbf24' : '#0d9488';
+        ctx.strokeStyle = dragTool ? '#ea580c' : '#0f766e';
+        ctx.lineWidth = (dragTool ? 2 : 1.5) / scale;
+        ctx.beginPath();
+        ctx.arc(ox, oy, handleR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        if (dragTool) {
+          ctx.fillStyle = '#b45309';
+          ctx.font = '600 ' + Math.max(8, 9 / scale) + 'px sans-serif';
+          ctx.fillText('拖动原点', ox + handleR + 4, oy + 4);
+        }
+      }
+    },
+
+    drawAxes() {
+      if (this.scene === SCENE.NUMBERLINE) this._drawAxesNumberLineOverlay();
+    },
+
+    _drawAxesNumberLineOverlay() {
+      const { ctx } = this;
+      const ox = this.state.startX;
+      const oy = this.state.startY;
+      const span = 5000;
+      const scale = this.viewport.scale;
+      ctx.strokeStyle = 'rgba(94,234,212,.55)';
+      ctx.lineWidth = Math.max(1, 2 / scale);
+      ctx.beginPath();
+      ctx.moveTo(ox - span, oy);
+      ctx.lineTo(ox + span, oy);
+      ctx.stroke();
+    },
+
+    drawGridLegacy() {
+      const { ctx, canvas } = this;
       ctx.strokeStyle = 'rgba(148,163,184,.2)';
       ctx.lineWidth = 1;
       for (let x = 0; x <= canvas.width; x += GRID_STEP) {
@@ -190,46 +534,11 @@
       for (let y = 0; y <= canvas.height; y += GRID_STEP) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
-      // 起点标记
-      ctx.fillStyle = 'rgba(13,148,136,0.85)';
-      ctx.beginPath();
-      ctx.arc(sx, sy, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#5eead4';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(sx, sy, 8, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(148,163,184,.55)';
-      ctx.font = '10px sans-serif';
-      if (this.scene !== SCENE.NUMBERLINE) {
-        for (let x = GRID_STEP; x < canvas.width; x += GRID_STEP) {
-          ctx.fillText((x / PX_PER_CM) + '', x - 6, canvas.height - 4);
-        }
-      }
-      ctx.fillStyle = 'rgba(13,148,136,.75)';
-      ctx.font = '600 9px sans-serif';
-      ctx.fillText('起点', sx + 10, sy - 10);
     },
 
     drawScene() {
       const cfg = this.sceneConfig;
       const { ctx, canvas } = this;
-
-      if (this.scene === SCENE.DISTANCE && cfg.markers) {
-        const baseY = this.state.startY;
-        cfg.markers.forEach(cm => {
-          const x = this.state.startX + cm * PX_PER_CM;
-          ctx.strokeStyle = '#f97316';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath(); ctx.moveTo(x, baseY - 40); ctx.lineTo(x, baseY + 40); ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.fillStyle = '#fbbf24';
-          ctx.font = '600 11px Outfit, sans-serif';
-          ctx.fillText(cm + 'cm', x - 14, baseY - 48);
-        });
-      }
 
       if (this.scene === SCENE.ANGLE || cfg.showCross) {
         const cx = this.state.startX, cy = this.state.startY;
@@ -375,12 +684,47 @@
     drawTrail() {
       if (this.trail.length < 2) return;
       const { ctx } = this;
+      const isPoint = this.renderMode === 'point';
       ctx.beginPath();
       ctx.moveTo(this.trail[0].x, this.trail[0].y);
       for (let i = 1; i < this.trail.length; i++) ctx.lineTo(this.trail[i].x, this.trail[i].y);
-      ctx.strokeStyle = '#f97316';
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = isPoint ? '#38bdf8' : '#f97316';
+      ctx.lineWidth = isPoint ? 3 : 2.5;
+      if (isPoint) ctx.setLineDash([6, 4]);
       ctx.stroke();
+      ctx.setLineDash([]);
+      if (isPoint && this.trail.length <= 80) {
+        ctx.fillStyle = 'rgba(56,189,248,.85)';
+        this.trail.forEach((p, i) => {
+          if (i === 0 || i === this.trail.length - 1) return;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+    },
+
+    drawPoint(r) {
+      const ctx = this.ctx;
+      const rad = 8;
+      ctx.save();
+      ctx.translate(r.x, r.y);
+      ctx.rotate(r.angle);
+      ctx.fillStyle = '#38bdf8';
+      ctx.strokeStyle = '#0ea5e9';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, rad, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(rad + 4, 0);
+      ctx.lineTo(rad + 14, -5);
+      ctx.lineTo(rad + 14, 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
     },
 
     drawClock() {
@@ -559,6 +903,9 @@
   window.__robot = {
     forward: cm => sim.forward(cm),
     backward: cm => sim.forward(-cm),
+    move2d: (angle, cm) => sim.movePolar(angle, cm),
+    goto: (x, y) => sim.gotoCm(x, y),
+    faceAngle: deg => sim.faceAngle(deg),
     turn: deg => sim.turn(deg),
     turnLeft: deg => sim.turn(-deg),
     turnRight: deg => sim.turn(deg),
@@ -575,10 +922,20 @@
       const J = Blockly.JavaScript;
       Blockly.defineBlocksWithJsonArray([
         { type: 'event_start', message0: '当程序开始时', nextStatement: true, colour: 120, hat: 'cap' },
-        { type: 'motion_forward', message0: '前进 %1 厘米', args0: [{ type: 'input_value', name: 'D', check: 'Number' }],
+        { type: 'motion_move_2d', message0: '向角度 %1 ° 移动 %2 厘米', args0: [
+            { type: 'input_value', name: 'ANGLE', check: 'Number' },
+            { type: 'input_value', name: 'D', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_goto_xy', message0: '移动到 x %1  y %2 厘米', args0: [
+            { type: 'input_value', name: 'X', check: 'Number' },
+            { type: 'input_value', name: 'Y', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_face_angle', message0: '面向角度 %1 °', args0: [{ type: 'input_value', name: 'ANGLE', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 160 },
-        { type: 'motion_backward', message0: '后退 %1 厘米', args0: [{ type: 'input_value', name: 'D', check: 'Number' }],
-          previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_forward', message0: '沿当前朝向前进 %1 厘米', args0: [{ type: 'input_value', name: 'D', check: 'Number' }],
+          previousStatement: true, nextStatement: true, colour: 45 },
+        { type: 'motion_backward', message0: '沿当前朝向后退 %1 厘米', args0: [{ type: 'input_value', name: 'D', check: 'Number' }],
+          previousStatement: true, nextStatement: true, colour: 45 },
         { type: 'motion_turn_right', message0: '右转 %1 度', args0: [{ type: 'input_value', name: 'A', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 280 },
         { type: 'motion_turn_left', message0: '左转 %1 度', args0: [{ type: 'input_value', name: 'A', check: 'Number' }],
@@ -613,6 +970,17 @@
       const gen = (type, fn) => { J.forBlock = J.forBlock || {}; J.forBlock[type] = fn; if (!J[type]) J[type] = fn; };
 
       gen('event_start', () => '');
+      gen('motion_move_2d', b => {
+        const a = J.valueToCode(b, 'ANGLE', J.ORDER_NONE) || 0;
+        const d = J.valueToCode(b, 'D', J.ORDER_NONE) || 0;
+        return `await __robot.move2d(${a}, ${d});\n`;
+      });
+      gen('motion_goto_xy', b => {
+        const x = J.valueToCode(b, 'X', J.ORDER_NONE) || 0;
+        const y = J.valueToCode(b, 'Y', J.ORDER_NONE) || 0;
+        return `await __robot.goto(${x}, ${y});\n`;
+      });
+      gen('motion_face_angle', b => `await __robot.faceAngle(${J.valueToCode(b, 'ANGLE', J.ORDER_NONE) || 0});\n`);
       gen('motion_forward', b => `await __robot.forward(${J.valueToCode(b, 'D', J.ORDER_NONE) || 0});\n`);
       gen('motion_backward', b => `await __robot.backward(${J.valueToCode(b, 'D', J.ORDER_NONE) || 0});\n`);
       gen('motion_turn_right', b => `await __robot.turnRight(${J.valueToCode(b, 'A', J.ORDER_NONE) || 0});\n`);
@@ -668,7 +1036,18 @@
       this.workspace = Blockly.inject('blockly', {
         toolbox: `<xml>
           <category name="事件" colour="120"><block type="event_start"></block></category>
-          <category name="运动" colour="160">
+          <category name="二维运动" colour="160">
+            <block type="motion_move_2d">
+              <value name="ANGLE"><shadow type="math_num"><field name="N">0</field></shadow></value>
+              <value name="D"><shadow type="math_num"><field name="N">50</field></shadow></value>
+            </block>
+            <block type="motion_goto_xy">
+              <value name="X"><shadow type="math_num"><field name="N">50</field></shadow></value>
+              <value name="Y"><shadow type="math_num"><field name="N">0</field></shadow></value>
+            </block>
+            <block type="motion_face_angle"><value name="ANGLE"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
+          </category>
+          <category name="机器人运动" colour="45">
             <block type="motion_forward"><value name="D"><shadow type="math_num"><field name="N">30</field></shadow></value></block>
             <block type="motion_backward"><value name="D"><shadow type="math_num"><field name="N">20</field></shadow></value></block>
             <block type="motion_turn_right"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
@@ -694,6 +1073,7 @@
       if (typeof Blockly.JavaScript.init === 'function') {
         Blockly.JavaScript.init(this.workspace);
       }
+      window.__blocklyWorkspace = this.workspace;
       window.addEventListener('resize', () => Blockly.svgResize(this.workspace));
     },
 
@@ -708,13 +1088,17 @@
 
   function canvasPoint(e) {
     const rect = sim.canvas.getBoundingClientRect();
-    const sx = sim.canvas.width / rect.width;
-    const sy = sim.canvas.height / rect.height;
+    const scaleX = sim.canvas.width / rect.width;
+    const scaleY = sim.canvas.height / rect.height;
+    const screenX = (e.clientX - rect.left) * scaleX;
+    const screenY = (e.clientY - rect.top) * scaleY;
+    const w = sim.screenToWorld(screenX, screenY);
     return {
-      x: snapGrid((e.clientX - rect.left) * sx),
-      y: snapGrid((e.clientY - rect.top) * sy)
+      x: snapGrid(w.x),
+      y: snapGrid(w.y)
     };
   }
+  window.__canvasPoint = canvasPoint;
 
   function updateCanvasCursor() {
     const c = sim.canvas;
@@ -834,9 +1218,11 @@
     }
 
     sim.setScene(task.scene, task.sceneConfig);
+    sim.lastAnalysis = null;
     loadTaskProps();
     blocklyApp.loadStarter(task);
     if (window.MathJax?.typesetPromise) MathJax.typesetPromise();
+    if (typeof ViewShell !== 'undefined') ViewShell.setTaskSummary(task.title);
     setStatus('已加载：' + task.title);
   }
 
@@ -896,6 +1282,7 @@
       console.error(e);
     } finally {
       sim.busy = false;
+      sim.runAnalysis();
     }
   }
 
@@ -915,6 +1302,7 @@
       setStatus('失败: ' + e.message, 'err');
     } finally {
       sim.busy = false;
+      sim.runAnalysis();
     }
   }
 
@@ -945,6 +1333,7 @@
     sim.init();
     initPropUI();
     blocklyApp.init();
+    if (typeof ViewShell !== 'undefined') ViewShell.refreshAlgebraBar();
     fillSelectors();
     applyTaskFromUrl();
     document.getElementById('btnRun').onclick = runProgram;
@@ -961,7 +1350,6 @@
     document.getElementById('btnClear').onclick = () => {
       if (confirm('清空所有积木？')) blocklyApp.workspace.clear();
     };
-    document.getElementById('btnGrid').onclick = () => { sim.showGrid = !sim.showGrid; sim.draw(); };
     document.getElementById('btnLoadProps').onclick = () => {
       loadTaskProps();
       setStatus('已加载任务推荐道具');

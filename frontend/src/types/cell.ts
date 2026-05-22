@@ -288,6 +288,7 @@ export interface InteractiveCellContent {
   title?: string                   // 课件标题
   description?: string             // 课件描述
   thumbnail?: string               // 缩略图URL
+  feixiang_url?: string            // 飞象老师AI课件链接
 }
 
 export interface InteractiveCell extends CellBase {

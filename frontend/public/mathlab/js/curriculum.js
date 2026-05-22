@@ -523,6 +523,12 @@ function buildStarterXml(s) {
     return `<shadow type="math_num"><field name="N">${v}</field></shadow>`;
   }
 
+  function blockMove2d(angle, dist) {
+    return `<block type="motion_move_2d"><value name="ANGLE">${numShadow(angle)}</value><value name="D">${numShadow(dist)}</value>`;
+  }
+  function blockGoto(x, y) {
+    return `<block type="motion_goto_xy"><value name="X">${numShadow(x)}</value><value name="Y">${numShadow(y)}</value>`;
+  }
   function blockForward(v) {
     return `<block type="motion_forward"><value name="D">${numShadow(v)}</value>`;
   }
@@ -548,11 +554,25 @@ function buildStarterXml(s) {
   const steps = [];
   if (s.repeat && s.forward != null && s.turn != null) {
     if (s.speed != null) steps.push(blockSpeed(s.speed));
-    const inner = `<block type="motion_forward"><value name="D">${numShadow(s.forward)}</value><next><block type="motion_turn_right"><value name="A">${numShadow(s.turn)}</value></block></next></block>`;
-    steps.push(`<block type="control_repeat"><value name="N">${numShadow(s.repeat)}</value><statement name="DO">${inner}</statement>`);
+    if (s.repeat === 4 && s.turn === 90) {
+      [0, 90, 180, 270].forEach(deg => steps.push(blockMove2d(deg, s.forward)));
+    } else {
+      const inner = `<block type="motion_forward"><value name="D">${numShadow(s.forward)}</value><next><block type="motion_turn_right"><value name="A">${numShadow(s.turn)}</value></block></next></block>`;
+      steps.push(`<block type="control_repeat"><value name="N">${numShadow(s.repeat)}</value><statement name="DO">${inner}</statement>`);
+    }
+  } else if (s.move2d) {
+    if (s.speed != null) steps.push(blockSpeed(s.speed));
+    (Array.isArray(s.move2d) ? s.move2d : [s.move2d]).forEach(m => {
+      steps.push(blockMove2d(m.angle ?? m.a ?? 0, m.dist ?? m.d ?? m.forward ?? 0));
+    });
+  } else if (s.goto) {
+    if (s.speed != null) steps.push(blockSpeed(s.speed));
+    (Array.isArray(s.goto) ? s.goto : [s.goto]).forEach(p => {
+      steps.push(blockGoto(p.x ?? p[0] ?? 0, p.y ?? p[1] ?? 0));
+    });
   } else {
     if (s.speed != null) steps.push(blockSpeed(s.speed));
-    if (s.forward != null) steps.push(blockForward(s.forward));
+    if (s.forward != null) steps.push(blockMove2d(0, s.forward));
     if (s.backward != null) steps.push(blockBackward(s.backward));
     if (s.wait != null) steps.push(blockWait(s.wait));
     if (s.turn != null) steps.push(blockTurnRight(s.turn));
