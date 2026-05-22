@@ -12,7 +12,8 @@ const SCENE = {
   NUMBERLINE: 'numberline',   // 数轴（有理数）
   CIRCLE: 'circle',           // 圆周/圆弧
   PATH: 'path',               // 通用路径（默认）
-  DATA: 'data'                // 数据统计面板
+  DATA: 'data',               // 数据统计面板
+  TRIG: 'trig'                // 直角三角形叠加（邻边/对边/斜边、仰角/坡度）
 };
 
 const DEFAULT_FORMULAS = [
@@ -406,12 +407,32 @@ const CURRICULUM = {
       '8d': {
         name: '八年级下册',
         tasks: [
-          task('j8d14', '任务14：距离测算与勾股定理', '勾股定理', SCENE.GRID, {
-            tags: ['勾股定理', 'a²+b²=c²'],
-            goals: ['走 3-4-5 直角三角形', '验证勾股定理'],
-            formulas: [{ title: '勾股定理', tex: '$$a^2 + b^2 = c^2$$' }],
-            sceneConfig: { shape: 'triangle', sides: [30, 40, 50] },
-            starter: { forward: 30, turn: 90, forward2: 40, turn2: 135, forward3: 50 },
+          task('j8d14', '任务14：距离测算与勾股定理', '勾股定理', SCENE.TRIG, {
+            tags: ['勾股定理', 'a²+b²=c²', '3-4-5'],
+            goals: [
+              '对照叠加层认识直角边 a、b 与斜边 c',
+              '沿 0°→90°→233° 走 30+40+50 cm 闭合路径',
+              '验证 30²+40²=50²'
+            ],
+            focus: '叠加层为 3-4-5 直角三角形；机器人路径沿三边行走',
+            formulas: [
+              { title: '勾股定理', tex: '$$a^2 + b^2 = c^2$$' },
+              { title: '本课', tex: '$$30^2 + 40^2 = 50^2$$' }
+            ],
+            challenges: ['沿 a→b→c 走完全程', '口算验证 900+1600=2500'],
+            sceneConfig: {
+              cols: 10, rows: 8, cellCm: 10,
+              shape: 'triangle', sides: [30, 40, 50],
+              trigTriangle: { adjacent: 30, opposite: 40, mode: 'pythagoras' }
+            },
+            hint: '沿叠加层：向 0° 走 30（a）→ 向 90° 走 40（b）→ 向 233° 走 50（c）闭合。',
+            starter: {
+              move2d: [
+                { angle: 0, dist: 30 },
+                { angle: 90, dist: 40 },
+                { angle: 233.13, dist: 50 }
+              ]
+            },
             demo: 'pythagoras'
           }),
           task('j8d15', '任务15：圆柱面最短路径', '展开图', SCENE.PATH, {
@@ -438,6 +459,41 @@ const CURRICULUM = {
             goals: ['多次测量', '求平均与方差思想', '数据可视化'],
             starter: { repeat: 5, forward: 30 },
             demo: 'average'
+          }),
+          task('j8d_trig1', '任务19：30°方向移动与 sin、cos', '三角函数入门', SCENE.TRIG, {
+            tags: ['sin', 'cos', '特殊角', '30°'],
+            goals: [
+              '理解 sin30°=1/2、cos30°=√3/2',
+              '用「向角度移动」走 30° 方向',
+              '用三角积木计算竖直分量 sin30°×20'
+            ],
+            focus: '平面角 0°=东、90°=北；位移 x=r·cosθ，y=r·sinθ',
+            formulas: [
+              { title: '30°', tex: '$$\\sin 30°=\\frac{1}{2},\\; \\cos 30°=\\frac{\\sqrt{3}}{2}$$' },
+              { title: '位移分解', tex: '$$x=r\\cos\\theta,\\; y=r\\sin\\theta$$' }
+            ],
+            challenges: ['向 30° 移动 20 cm', '用 sin30°×20 验证竖直约 10 cm'],
+            sceneConfig: {
+              cols: 12, rows: 8, cellCm: 10,
+              trigTriangle: { angle: 30, hypotenuse: 20, mode: 'coords' }
+            },
+            hint: '「向角度移动」填 30 与 20；或用 sin(30°)×20 算高度再编程。',
+            starter: { move2d: { angle: 30, dist: 20 } },
+            demo: 'trig30'
+          }),
+          task('j8d_trig2', '任务20：45°与 tan45°=1', '三角函数入门', SCENE.TRIG, {
+            tags: ['tan', '45°', '等腰直角三角形'],
+            goals: ['认识 tan45°=1', '45° 方向水平与竖直分量相等', '走等腰直角三角形路线'],
+            formulas: [
+              { title: '45°', tex: '$$\\tan 45° = 1,\\; \\sin 45°=\\cos 45°=\\frac{\\sqrt{2}}{2}$$' }
+            ],
+            challenges: ['向 45° 移动 28 cm', '水平、竖直分量各约 20 cm'],
+            sceneConfig: {
+              trigTriangle: { angle: 45, adjacent: 20, opposite: 20, mode: 'standard' }
+            },
+            hint: 'tan45°=对边/邻边=1，故水平路程≈竖直路程。',
+            starter: { move2d: [{ angle: 45, dist: 28 }, { angle: 0, dist: 20 }, { angle: 90, dist: 20 }] },
+            demo: 'trig45'
           })
         ]
       },
@@ -495,14 +551,54 @@ const CURRICULUM = {
             starter: { forward: 60, turn: 90, forward2: 40 },
             demo: 'similar'
           }),
-          task('j9d26', '任务26：坡度与角度测量', '锐角三角函数', SCENE.ANGLE, {
+          task('j9d_trig1', '任务26：坐标与 sin、cos', '锐角三角函数', SCENE.TRIG, {
+            tags: ['sin', 'cos', '坐标'],
+            goals: [
+              '已知 r=20、θ=30°，求终点坐标',
+              '用 cosθ·r 与 sinθ·r 计算 x、y',
+              '编程移动到 (17.3, 10) 附近'
+            ],
+            formulas: [
+              { title: '坐标', tex: '$$x=r\\cos\\theta,\\; y=r\\sin\\theta$$' },
+              { title: '本课', tex: '$$x=20\\cos30°\\approx17.3,\\; y=20\\sin30°=10$$' }
+            ],
+            challenges: ['移动到 x≈17.3, y≈10', '再向 90° 移动 10 cm'],
+            sceneConfig: {
+              cols: 12, rows: 8, cellCm: 10,
+              trigTriangle: { angle: 30, hypotenuse: 20, mode: 'coords' }
+            },
+            hint: '用 cos(30°)×20、sin(30°)×20 积木算出坐标，再「移动到 x y」。',
+            starter: { goto: { x: 17.3, y: 10 } },
+            demo: 'trigGoto'
+          }),
+          task('j9d_trig2', '任务27：仰角测高度', '锐角三角函数', SCENE.TRIG, {
+            tags: ['仰角', 'tan', '测高'],
+            goals: ['仰角 α 时高度 h=l·tanα', '沿仰角方向前进模拟视线', '理解 tan 为对边/邻边'],
+            formulas: [
+              { title: '仰角', tex: '$$h = l \\cdot \\tan\\alpha$$' },
+              { title: '30°示例', tex: '$$h = 40 \\times \\tan 30° \\approx 23.1\\text{ cm}$$' }
+            ],
+            challenges: ['沿 30° 移动 40 cm', '水平 40 cm 时高度 tan30°×40≈23 cm'],
+            sceneConfig: {
+              trigTriangle: { angle: 30, adjacent: 40, mode: 'elevation' }
+            },
+            hint: '用「向角度移动」模拟仰角；tan(30°)×水平距离 算高度。',
+            starter: { move2d: { angle: 30, dist: 40 } },
+            demo: 'elevation30'
+          }),
+          task('j9d26', '任务28：坡度与角度测量', '锐角三角函数', SCENE.TRIG, {
             tags: ['坡度', 'tan', '角度'],
-            goals: ['坡度=tanα', '角度与高度关系'],
+            goals: ['坡度 i=tanα', '水平路程 l 与高度 h 的关系 h=l·tanα', '编程走斜坡路线'],
             formulas: [{ title: '坡度', tex: '$$i = \\tan\\alpha = \\frac{h}{l}$$' }],
+            challenges: ['先转 15° 再走 80 cm', '用 tan15°×80 估算爬升高度'],
+            sceneConfig: {
+              trigTriangle: { angle: 15, adjacent: 80, mode: 'slope' }
+            },
+            hint: '右转 15° 后前进；爬升≈tan(15°)×80≈21 cm。',
             starter: { turn: 15, forward: 80 },
             demo: 'slope'
           }),
-          task('j9d27', '任务27：综合感知与自主规划', '综合应用', SCENE.PATH, {
+          task('j9d27', '任务29：综合感知与自主规划', '综合应用', SCENE.PATH, {
             tags: ['综合', '规划', '项目'],
             goals: ['综合数学与编程', '自主规划路径', '完成任务目标'],
             challenges: ['设计一条包含 2 次转弯的总长 150cm 路径'],

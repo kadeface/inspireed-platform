@@ -19,6 +19,7 @@ from app.api.v1 import (
     chapters,
     classroom_assistant,
     classroom_sessions,
+    mathlab_contest,
     course_export,
     courseware,
     curriculum,
@@ -78,6 +79,7 @@ api_router.include_router(cells.router, prefix="/cells", tags=["单元"])
 api_router.include_router(sections.router, prefix="", tags=["大环节"])
 api_router.include_router(activities.router, prefix="/activities", tags=["教学活动"])
 api_router.include_router(classroom_sessions.router, prefix="/classroom-sessions", tags=["课堂会话"])
+api_router.include_router(mathlab_contest.router, prefix="/classroom-sessions", tags=["MathLab竞赛"])
 api_router.include_router(classroom_assistant.router, prefix="/classroom-assistant", tags=["班级教学助手"])
 api_router.include_router(questions.router, prefix="/questions", tags=["问答系统"])
 

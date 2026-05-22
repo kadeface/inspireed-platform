@@ -16,12 +16,16 @@ import { useUserStore } from '../store/user'
 import type { ClassSession, StudentParticipation } from '../types/classroomSession'
 import { createLogger } from '../utils/logger'
 import { normalizeSessionStatus, isSessionActive } from '../utils/sessionStatus'
+import { useMathlabContest } from '@/composables/useMathlabContest'
 
 const log = createLogger('ClassroomSession')
 
 export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mode: 'fullscreen' | 'window') => void) {
   const route = useRoute()
   const session = ref<ClassSession | null>(null)
+  const sessionIdRef = computed(() => session.value?.id)
+  const { handleWsMessage: handleMathlabContestWs, refreshActive: refreshMathlabContest } =
+    useMathlabContest(sessionIdRef)
   const participation = ref<StudentParticipation | null>(null)
   const currentCellId = ref<number | null>(null)
   /** 显示版本：每次收到 cell_changed/connected 更新显示内容时递增，供学生端用 :key 强制刷新视图 */
@@ -123,7 +127,8 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
         currentCellId.value = cellId
         
         log.debug('会话已加载', { sessionId: session.value?.id, status: session.value?.status })
-        
+        refreshMathlabContest().catch(() => {})
+
         // 尝试加入会话（带重试）
         try {
           participation.value = await classroomSessionService.joinSession(session.value.id)
@@ -397,6 +402,7 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
       isWebSocketConnected.value = true
       stopPolling()
       stopReconnectInterval()
+      refreshMathlabContest().catch(() => {})
     } catch (error) {
       console.error('❌ WebSocket 连接失败:', error)
       isWebSocketConnected.value = false
@@ -571,6 +577,14 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
     websocketService.on('activity_ended', (message: WebSocketMessage) => {
       // TODO: 显示活动结果
     })
+
+    ;['mathlab_contest_started', 'mathlab_contest_task_changed', 'mathlab_contest_submission', 'mathlab_contest_ended'].forEach(
+      (eventType) => {
+        websocketService.on(eventType, (message: WebSocketMessage) => {
+          handleMathlabContestWs(message)
+        })
+      }
+    )
     
     // 6. 监听错误消息
     websocketService.on('error', (message: WebSocketMessage) => {

@@ -115,8 +115,24 @@ const SceneProps = {
     if (task.id === 'p2t5') {
       [20, 40, 60].forEach((cm, i) => out.push({ type: 'candy', atCm: cm, label: '份' + (i + 1) }));
     }
-    if (task.scene === SCENE.ANGLE) {
+    if (task.scene === SCENE.ANGLE || task.scene === SCENE.TRIG) {
       out.push({ type: 'cone', atCm: 0, label: '顶点' });
+    }
+    if (task.scene === SCENE.TRIG && cfg.trigTriangle && sim) {
+      const sides = typeof sim.resolveTrigSides === 'function'
+        ? sim.resolveTrigSides(cfg.trigTriangle)
+        : null;
+      if (sides) {
+        const px = PX_PER_CM;
+        const ox = sim.state.startX;
+        const oy = sim.state.startY;
+        out.push({
+          type: 'flag',
+          x: ox + sides.adj * px,
+          y: oy - sides.opp * px,
+          label: '终点'
+        });
+      }
     }
     if (cfg.props) out.push.apply(out, cfg.props);
 

@@ -67,6 +67,9 @@ export interface UseWebSocketOptions {
    */
   onSubmissionStatisticsUpdated?: (data: any) => void
 
+  /** MathLab 竞赛相关 WebSocket 事件 */
+  onMathlabContest?: (type: string, data: Record<string, unknown>) => void
+
   /**
    * 心跳间隔（毫秒），默认 30000（30秒）
    */
@@ -85,6 +88,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
     onCellChanged,
     onSessionEnded,
     onSubmissionStatisticsUpdated,
+    onMathlabContest,
     heartbeatInterval = 30000,
   } = options
 
@@ -228,6 +232,13 @@ export function useWebSocket(options: UseWebSocketOptions) {
 
         case 'submission_statistics_updated':
           onSubmissionStatisticsUpdated?.(data)
+          break
+
+        case 'mathlab_contest_started':
+        case 'mathlab_contest_task_changed':
+        case 'mathlab_contest_submission':
+        case 'mathlab_contest_ended':
+          onMathlabContest?.(type, data)
           break
 
         case 'pong':

@@ -485,7 +485,17 @@
 
       <!-- Mathlab Simulation -->
       <div v-if="cell.content.type === 'mathlab' && mathlabSimulationUrl" class="sim-display">
+        <div
+          v-if="activeContest?.status === 'running' && !editable"
+          class="mb-2 px-3 py-2 rounded-lg bg-teal-50 border border-teal-200 text-sm text-teal-900 flex flex-wrap items-center gap-2"
+        >
+          <span class="font-semibold">🏁 课堂竞赛进行中</span>
+          <span>任务 {{ activeContest.taskId }}</span>
+          <span v-if="contestEndsLabel" class="text-teal-700">{{ contestEndsLabel }}</span>
+        </div>
         <iframe
+          ref="mathlabIframeRef"
+          :key="mathlabIframeKey"
           :src="mathlabSimulationUrl"
           :style="getIframeStyle(cell.content.config.width || 1320, cell.content.config.height || 820)"
           frameborder="0"
@@ -563,10 +573,12 @@ import {
   getMathlabEmbedUrl,
   type MathlabSimulation
 } from '../../data/mathlab-simulations'
+import { useMathlabContestState, useMathlabContestBridge } from '@/composables/useMathlabContest'
 
 interface Props {
   cell: SimCellType
   editable?: boolean
+  sessionId?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -640,12 +652,46 @@ const displayDescription = computed(() => {
   return undefined
 })
 
+const { activeContest } = useMathlabContestState()
+const mathlabIframeRef = ref<HTMLIFrameElement | null>(null)
+const mathlabIframeKey = ref(0)
+
 const mathlabSimulationUrl = computed(() => {
-  if (props.cell.content.mathlabSim) {
-    return getMathlabEmbedUrl(props.cell.content.mathlabSim, props.cell.content.mathlabTask)
-  }
-  return undefined
+  if (!props.cell.content.mathlabSim) return undefined
+  const running = activeContest.value?.status === 'running'
+  return getMathlabEmbedUrl(props.cell.content.mathlabSim, {
+    taskId: running ? activeContest.value!.taskId : props.cell.content.mathlabTask,
+    mode: running ? 'contest' : undefined,
+    sessionId: props.sessionId,
+    contestId: running ? activeContest.value!.id : undefined,
+  })
 })
+
+const contestEndsLabel = computed(() => {
+  const ends = activeContest.value?.endsAt
+  if (!ends) return ''
+  const ms = new Date(ends).getTime() - Date.now()
+  if (ms <= 0) return '（已超时）'
+  const sec = Math.ceil(ms / 1000)
+  return `剩余 ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+})
+
+useMathlabContestBridge({
+  iframeRef: mathlabIframeRef,
+  contestId: computed(() =>
+    activeContest.value?.status === 'running' ? activeContest.value.id : undefined
+  ),
+  passThreshold: computed(() => activeContest.value?.passThreshold ?? 85),
+})
+
+watch(
+  () => activeContest.value?.taskId,
+  (taskId, old) => {
+    if (!taskId || taskId === old) return
+    if (activeContest.value?.status !== 'running') return
+    mathlabIframeKey.value += 1
+  }
+)
 
 const hardwareCategories = computed(() => {
   return [

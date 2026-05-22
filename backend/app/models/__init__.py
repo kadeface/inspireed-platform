@@ -38,6 +38,11 @@ from app.models.classroom_session import (
     ClassSessionStatus,
     StudentSessionParticipation,
 )
+from app.models.mathlab_contest import (
+    MathlabContest,
+    MathlabContestStatus,
+    MathlabContestSubmission,
+)
 from app.models.classroom_assistant import (
     RoleInClass,
     AttendanceStatus,

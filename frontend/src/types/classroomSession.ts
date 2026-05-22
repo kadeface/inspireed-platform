@@ -123,7 +123,9 @@ export interface ActivityStatistics {
 export interface ClassroomEvent {
   type: 'session_started' | 'session_ended' | 'cell_changed' | 
         'activity_started' | 'activity_ended' | 'student_joined' | 
-        'student_left' | 'student_progress' | 'statistics_updated'
+        'student_left' | 'student_progress' | 'statistics_updated' |
+        'mathlab_contest_started' | 'mathlab_contest_task_changed' |
+        'mathlab_contest_submission' | 'mathlab_contest_ended'
   sessionId: number
   data: Record<string, any>
   timestamp: string

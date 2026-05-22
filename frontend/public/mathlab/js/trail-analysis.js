@@ -90,6 +90,27 @@ const TrailAnalysis = {
       return { kind: 'hexagon', points: pts, perimeterCm: 6 * cfg.side };
     }
 
+    const tri = cfg.trigTriangle;
+    if (tri && typeof sim.resolveTrigSides === 'function') {
+      const { adj, opp, hyp } = sim.resolveTrigSides(tri);
+      const ax = ox;
+      const ay = oy;
+      const bx = ox + adj * px;
+      const by = oy;
+      const cx = bx;
+      const cy = oy - opp * px;
+      return {
+        kind: 'triangle',
+        points: [
+          { x: ax, y: ay },
+          { x: bx, y: by },
+          { x: cx, y: cy },
+          { x: ax, y: ay }
+        ],
+        perimeterCm: adj + opp + hyp
+      };
+    }
+
     return null;
   },
 

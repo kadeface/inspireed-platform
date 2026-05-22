@@ -385,6 +385,14 @@ html, body {
   font-size: .78rem;
 }
 
+body.contest-mode .topbar {
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.35);
+}
+
+body.contest-mode #btnContestSubmit {
+  background: linear-gradient(135deg, #0d9488, #0f766e);
+}
+
 .status-bar {
   flex-shrink: 0;
   height: var(--status-h);

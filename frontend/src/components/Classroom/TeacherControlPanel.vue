@@ -316,6 +316,13 @@
           :activity-statistics="activityStatistics"
           :loading="loadingActivityStats"
         />
+
+        <MathlabContestPanel
+          v-if="session"
+          :current-cell="currentCell"
+          :session-id="session.id"
+          :session-status="normalizedSessionStatus ?? session.status"
+        />
       </div>
     </div>
   </div>
@@ -703,6 +710,11 @@
                 :activity-statistics="activityStatistics"
                 :loading="loadingActivityStats"
               />
+              <MathlabContestPanel
+                :current-cell="currentCell"
+                :session-id="session.id"
+                :session-status="normalizedSessionStatus ?? session.status"
+              />
             </div>
           </section>
           </div>
@@ -762,6 +774,8 @@ import GuestAccessToggle from './GuestAccessToggle.vue'
 import ModuleList from './ModuleList.vue'
 import ClassroomSelectModal from './ClassroomSelectModal.vue'
 import ActivityStatisticsPanel from './ActivityStatisticsPanel.vue'
+import MathlabContestPanel from './MathlabContestPanel.vue'
+import { useMathlabContest } from '@/composables/useMathlabContest'
 import CellTypeIcon from './CellTypeIcon.vue'
 import TeachingAssistantFAB from '@/components/Teacher/TeachingAssistantFAB.vue'
 
@@ -1094,6 +1108,9 @@ const wsEndpointUrl = computed(() => {
   return `/api/v1/classroom-sessions/sessions/${session.value.id}/ws/teacher`
 })
 
+const mathlabContestSessionId = computed(() => session.value?.id)
+const { handleWsMessage: handleMathlabContestWs } = useMathlabContest(mathlabContestSessionId)
+
 // v2.0: 使用 WebSocket composable 管理实时通信
 const wsManager = useWebSocket({
   endpointUrl: wsEndpointUrl,
@@ -1136,6 +1153,13 @@ const wsManager = useWebSocket({
       activityStatistics.value.submittedCount = data.submitted_count || 0
       activityStatistics.value.itemStatistics = data.item_statistics || null
     }
+  },
+  onMathlabContest: (type, data) => {
+    handleMathlabContestWs({
+      type,
+      data,
+      timestamp: new Date().toISOString(),
+    })
   },
 })
 

@@ -116,7 +116,7 @@
       const w = this.canvas.width;
       const midY = snapGrid(h / 2);
 
-      if (this.scene === SCENE.GRID) {
+      if (this.scene === SCENE.GRID || (this.scene === SCENE.TRIG && config.cols)) {
         // 数对网格原点 (1,1) 落在背景网格交点
         this.state.startX = GRID_STEP;
         this.state.startY = snapGrid(h - GRID_STEP);
@@ -536,11 +536,204 @@
       }
     },
 
+    /** 数对/坐标网格叠加 */
+    drawGridOverlay(cfg) {
+      const cols = cfg.cols || 6;
+      const rows = cfg.rows || 6;
+      const cell = (cfg.cellCm || 10) * PX_PER_CM;
+      const ox = this.state.startX;
+      const oy = this.state.startY;
+      const { ctx } = this;
+      ctx.strokeStyle = 'rgba(148,163,184,.35)';
+      for (let c = 0; c <= cols; c++) {
+        ctx.beginPath();
+        ctx.moveTo(ox + c * cell, oy);
+        ctx.lineTo(ox + c * cell, oy - rows * cell);
+        ctx.stroke();
+      }
+      for (let row = 0; row <= rows; row++) {
+        ctx.beginPath();
+        ctx.moveTo(ox, oy - row * cell);
+        ctx.lineTo(ox + cols * cell, oy - row * cell);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(148,163,184,.6)';
+      ctx.font = Math.max(9, 10 / this.viewport.scale) + 'px sans-serif';
+      for (let c = 1; c <= cols; c++) ctx.fillText(c, ox + (c - 0.5) * cell - 3, oy + 14);
+      for (let row = 1; row <= rows; row++) ctx.fillText(row, ox - 16, oy - (row - 0.5) * cell + 3);
+      if (cfg.target) {
+        const [tc, tr] = cfg.target;
+        ctx.fillStyle = 'rgba(249,115,22,.35)';
+        ctx.fillRect(ox + (tc - 1) * cell, oy - tr * cell, cell, cell);
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = '600 ' + Math.max(10, 12 / this.viewport.scale) + 'px sans-serif';
+        ctx.fillText('(' + tc + ',' + tr + ')', ox + (tc - 1) * cell + 4, oy - (tr - 0.5) * cell + 4);
+      }
+    },
+
+    /** 解析直角三角形边长（cm） */
+    resolveTrigSides(tri) {
+      const angle = tri.angle ?? 30;
+      const rad = angle * Math.PI / 180;
+      let adj, opp, hyp;
+      if (tri.hypotenuse != null) {
+        hyp = tri.hypotenuse;
+        adj = hyp * Math.cos(rad);
+        opp = hyp * Math.sin(rad);
+      } else if (tri.adjacent != null) {
+        adj = tri.adjacent;
+        opp = tri.opposite != null ? tri.opposite : adj * Math.tan(rad);
+        hyp = Math.hypot(adj, opp);
+        if (tri.opposite != null) {
+          rad = Math.atan2(opp, adj);
+          angle = rad * 180 / Math.PI;
+        }
+      } else if (tri.opposite != null) {
+        opp = tri.opposite;
+        adj = opp / Math.tan(rad);
+        hyp = Math.hypot(adj, opp);
+      } else {
+        adj = 40;
+        opp = adj * Math.tan(rad);
+        hyp = Math.hypot(adj, opp);
+      }
+      return { angle, rad, adj, opp, hyp };
+    },
+
+    /** 直角三角形叠加：顶点在起点，邻边沿 +x，对边沿 +y（数学向上） */
+    drawTrigTriangle(tri) {
+      if (!tri) return;
+      const { ctx } = this;
+      const px = this.getPxPerCm();
+      const scale = this.viewport.scale;
+      const fs = Math.max(10, 12 / scale);
+      const fsSm = Math.max(9, 10 / scale);
+      const { angle, rad, adj, opp, hyp } = this.resolveTrigSides(tri);
+      const mode = tri.mode || 'standard';
+
+      const ax = this.state.startX;
+      const ay = this.state.startY;
+      const bx = ax + adj * px;
+      const by = ay;
+      const cx = bx;
+      const cy = ay - opp * px;
+
+      ctx.save();
+
+      ctx.fillStyle = 'rgba(56,189,248,.14)';
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.lineTo(cx, cy);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.lineWidth = Math.max(2, 2.5 / scale);
+      ctx.strokeStyle = '#2dd4bf';
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#34d399';
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#fbbf24';
+      ctx.setLineDash([7, 5]);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const corner = Math.min(16, adj * px * 0.12, opp * px * 0.12);
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = Math.max(1.5, 2 / scale);
+      ctx.beginPath();
+      ctx.moveTo(bx - corner, by);
+      ctx.lineTo(bx - corner, by - corner);
+      ctx.lineTo(bx, by - corner);
+      ctx.stroke();
+
+      if (mode !== 'pythagoras') {
+        const arcR = Math.min(42, hyp * px * 0.38);
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = Math.max(1.5, 2 / scale);
+        ctx.beginPath();
+        ctx.arc(ax, ay, arcR, 0, -rad, true);
+        ctx.stroke();
+      }
+
+      const labels = {
+        standard: { adj: '邻边 l', opp: '对边 h', hyp: '斜边 c', angle: 'α' },
+        coords: { adj: 'x = l·cosα', opp: 'y = l·sinα', hyp: 'r', angle: 'θ' },
+        elevation: { adj: '水平 l', opp: '高度 h', hyp: '视线', angle: '仰角 α' },
+        slope: { adj: '水平 l', opp: '爬升 h', hyp: '坡面', angle: '坡度角 α' },
+        pythagoras: { adj: '直角边 a', opp: '直角边 b', hyp: '斜边 c', angle: '' }
+      }[mode] || { adj: '邻边', opp: '对边', hyp: '斜边', angle: 'α' };
+
+      ctx.font = '600 ' + fs + 'px Outfit, Noto Sans SC, sans-serif';
+      ctx.fillStyle = '#5eead4';
+      ctx.fillText(labels.adj + ' = ' + adj.toFixed(1) + ' cm', (ax + bx) / 2 - 28, ay + 18);
+
+      ctx.fillStyle = '#6ee7b7';
+      ctx.fillText(labels.opp + ' = ' + opp.toFixed(1) + ' cm', bx + 8, (by + cy) / 2);
+
+      ctx.fillStyle = '#fde68a';
+      const midHx = (ax + cx) / 2;
+      const midHy = (ay + cy) / 2;
+      ctx.fillText(labels.hyp + ' = ' + hyp.toFixed(1) + ' cm', midHx - 18, midHy - 12);
+
+      if (mode === 'pythagoras') {
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '600 ' + fsSm + 'px sans-serif';
+        ctx.fillText('∠C = 90°', bx - corner - 40, by - corner - 6);
+      } else if (labels.angle) {
+        const arcR = Math.min(42, hyp * px * 0.38);
+        ctx.fillStyle = '#fcd34d';
+        ctx.font = '600 ' + fsSm + 'px sans-serif';
+        ctx.fillText(labels.angle + ' = ' + Math.round(angle * 10) / 10 + '°', ax + arcR + 6, ay - 6);
+      }
+
+      if (tri.showFormulas !== false) {
+        const boxW = mode === 'pythagoras' ? 178 : 168;
+        const boxH = mode === 'coords' ? 52 : mode === 'pythagoras' ? 40 : 44;
+        const bx0 = ax + adj * px + 12;
+        const by0 = ay - opp * px - boxH - 8;
+        ctx.fillStyle = 'rgba(15,23,42,.72)';
+        ctx.strokeStyle = 'rgba(148,163,184,.35)';
+        ctx.lineWidth = 1;
+        this.roundRect(ctx, bx0, by0, boxW, boxH, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = fsSm + 'px sans-serif';
+        const a0 = Math.round(adj);
+        const b0 = Math.round(opp);
+        const c0 = Math.round(hyp);
+        const lines = mode === 'coords'
+          ? ['sinθ = y/r', 'cosθ = x/r', 'tanθ = y/x']
+          : mode === 'elevation' || mode === 'slope'
+            ? ['tanα = h/l', 'h = l·tanα']
+            : mode === 'pythagoras'
+              ? [a0 + '² + ' + b0 + '² = ' + c0 + '²', 'a² + b² = c²']
+              : ['sinα = h/c', 'cosα = l/c', 'tanα = h/l'];
+        lines.forEach((t, i) => ctx.fillText(t, bx0 + 10, by0 + 16 + i * 14));
+      }
+
+      ctx.restore();
+    },
+
     drawScene() {
       const cfg = this.sceneConfig;
       const { ctx, canvas } = this;
+      const tri = cfg.trigTriangle;
 
-      if (this.scene === SCENE.ANGLE || cfg.showCross) {
+      if (this.scene === SCENE.ANGLE || this.scene === SCENE.TRIG || cfg.showCross) {
         const cx = this.state.startX, cy = this.state.startY;
         ctx.strokeStyle = 'rgba(13,148,136,.5)';
         ctx.lineWidth = 2;
@@ -557,30 +750,12 @@
         this.drawRectOutline(cfg.side, cfg.side, '#a78bfa');
       }
 
-      if (this.scene === SCENE.GRID) {
-        const cols = cfg.cols || 6, rows = cfg.rows || 6;
-        const cell = (cfg.cellCm || 10) * PX_PER_CM;
-        const ox = this.state.startX;
-        const oy = this.state.startY;
-        ctx.strokeStyle = 'rgba(148,163,184,.35)';
-        for (let c = 0; c <= cols; c++) {
-          ctx.beginPath(); ctx.moveTo(ox + c * cell, oy); ctx.lineTo(ox + c * cell, oy - rows * cell); ctx.stroke();
-        }
-        for (let row = 0; row <= rows; row++) {
-          ctx.beginPath(); ctx.moveTo(ox, oy - row * cell); ctx.lineTo(ox + cols * cell, oy - row * cell); ctx.stroke();
-        }
-        ctx.fillStyle = 'rgba(148,163,184,.6)';
-        ctx.font = '10px sans-serif';
-        for (let c = 1; c <= cols; c++) ctx.fillText(c, ox + (c - 0.5) * cell - 3, oy + 14);
-        for (let row = 1; row <= rows; row++) ctx.fillText(row, ox - 16, oy - (row - 0.5) * cell + 3);
-        if (cfg.target) {
-          const [tc, tr] = cfg.target;
-          ctx.fillStyle = 'rgba(249,115,22,.35)';
-          ctx.fillRect(ox + (tc - 1) * cell, oy - tr * cell, cell, cell);
-          ctx.fillStyle = '#fbbf24';
-          ctx.font = '600 12px sans-serif';
-          ctx.fillText('(' + tc + ',' + tr + ')', ox + (tc - 1) * cell + 4, oy - (tr - 0.5) * cell + 4);
-        }
+      if (this.scene === SCENE.GRID || (this.scene === SCENE.TRIG && cfg.cols)) {
+        this.drawGridOverlay(cfg);
+      }
+
+      if (tri) {
+        this.drawTrigTriangle(tri);
       }
 
       if (this.scene === SCENE.NUMBERLINE) {
@@ -892,7 +1067,17 @@
         triangle: async () => { for (let i = 0; i < 3; i++) { await this.forward(40); await this.turn(120); } },
         hexagon: async () => { for (let i = 0; i < 6; i++) { await this.forward(25); await this.turn(60); } },
         planting: async () => { for (let i = 0; i < 5; i++) { await this.forward(20); await this.wait(500); } },
-        comprehensive: async () => { await this.forward(50); await this.turn(90); await this.forward(50); await this.turn(90); await this.forward(50); }
+        comprehensive: async () => { await this.forward(50); await this.turn(90); await this.forward(50); await this.turn(90); await this.forward(50); },
+        slope: async () => { await this.turn(15); await this.forward(80); },
+        trig30: () => this.movePolar(30, 20),
+        trig45: async () => { await this.movePolar(45, 28); await this.movePolar(0, 20); await this.movePolar(90, 20); },
+        trigGoto: async () => { await this.gotoCm(17.3, 10); },
+        elevation30: () => this.movePolar(30, 40),
+        pythagoras: async () => {
+          await this.movePolar(0, 30);
+          await this.movePolar(90, 40);
+          await this.movePolar(233.13, 50);
+        }
       };
       if (demos[name]) await demos[name]();
       else if (name === 'forward100') await this.forward(100);
@@ -964,7 +1149,15 @@
             { type: 'field_dropdown', name: 'OP', options: [['+', 'ADD'], ['-', 'MINUS'], ['×', 'MUL'], ['÷', 'DIV']] },
             { type: 'input_value', name: 'B', check: 'Number' }
           ], output: 'Number', colour: 230 },
-        { type: 'math_pi', message0: 'π', output: 'Number', colour: 230 }
+        { type: 'math_pi', message0: 'π', output: 'Number', colour: 230 },
+        { type: 'math_trig', message0: '%1 ( %2 ° )', args0: [
+            { type: 'field_dropdown', name: 'FN', options: [['sin', 'SIN'], ['cos', 'COS'], ['tan', 'TAN']] },
+            { type: 'input_value', name: 'DEG', check: 'Number' }
+          ], output: 'Number', colour: 290 },
+        { type: 'math_trig_special', message0: '特殊角 %1 的 %2', args0: [
+            { type: 'field_dropdown', name: 'ANGLE', options: [['30°', '30'], ['45°', '45'], ['60°', '60']] },
+            { type: 'field_dropdown', name: 'FN', options: [['sin', 'SIN'], ['cos', 'COS'], ['tan', 'TAN']] }
+          ], output: 'Number', colour: 290 }
       ]);
 
       const gen = (type, fn) => { J.forBlock = J.forBlock || {}; J.forBlock[type] = fn; if (!J[type]) J[type] = fn; };
@@ -1010,6 +1203,23 @@
         return [`(${a} ${map[b.getFieldValue('OP')]} ${bb})`, J.ORDER_ATOMIC];
       });
       gen('math_pi', () => ['Math.PI', J.ORDER_ATOMIC]);
+      const TRIG_SPECIAL = {
+        30: { SIN: 0.5, COS: Math.sqrt(3) / 2, TAN: Math.sqrt(3) / 3 },
+        45: { SIN: Math.SQRT2 / 2, COS: Math.SQRT2 / 2, TAN: 1 },
+        60: { SIN: Math.sqrt(3) / 2, COS: 0.5, TAN: Math.sqrt(3) }
+      };
+      gen('math_trig', b => {
+        const fn = b.getFieldValue('FN');
+        const deg = J.valueToCode(b, 'DEG', J.ORDER_NONE) || 0;
+        const map = { SIN: 'Math.sin', COS: 'Math.cos', TAN: 'Math.tan' };
+        return [`(${map[fn]}((${deg}) * Math.PI / 180))`, J.ORDER_ATOMIC];
+      });
+      gen('math_trig_special', b => {
+        const angle = b.getFieldValue('ANGLE');
+        const fn = b.getFieldValue('FN');
+        const v = TRIG_SPECIAL[angle][fn];
+        return [String(v), J.ORDER_ATOMIC];
+      });
     },
 
     chainFromStart() {
@@ -1064,6 +1274,12 @@
             <block type="math_num"></block>
             <block type="math_op"></block>
             <block type="math_pi"></block>
+          </category>
+          <category name="三角函数" colour="290">
+            <block type="math_trig">
+              <value name="DEG"><shadow type="math_num"><field name="N">30</field></shadow></value>
+            </block>
+            <block type="math_trig_special"></block>
           </category>
         </xml>`,
         grid: { spacing: 20, length: 3, colour: '#d4dde8', snap: true },
@@ -1316,17 +1532,24 @@
     return null;
   }
 
-  function applyTaskFromUrl() {
-    const taskId = new URLSearchParams(window.location.search).get('task');
-    if (!taskId) return;
+  function loadTaskById(taskId) {
+    if (!taskId) return false;
     const found = findTaskById(taskId);
-    if (!found) return;
+    if (!found) return false;
     document.getElementById('selStage').value = found.stageKey;
     refreshGrades();
     document.getElementById('selGrade').value = found.gradeKey;
     refreshTasks();
     document.getElementById('selTask').value = String(found.index);
     renderTask(found.task);
+    return true;
+  }
+
+  window.loadTaskById = loadTaskById;
+
+  function applyTaskFromUrl() {
+    const taskId = new URLSearchParams(window.location.search).get('task');
+    if (taskId) loadTaskById(taskId);
   }
 
   function init() {
