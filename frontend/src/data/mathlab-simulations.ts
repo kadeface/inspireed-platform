@@ -1,6 +1,6 @@
 /**
  * 学科仿真 — mathlab 轮式机器人数学融合互动教学
- * 静态资源部署于 frontend/public/mathlab/（源目录：仓库根 mathlab/）
+ * 静态资源位于 frontend/public/mathlab/（Vite public → dist/mathlab/）
  */
 
 export interface MathlabSimulation {

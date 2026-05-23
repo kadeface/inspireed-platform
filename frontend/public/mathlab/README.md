@@ -2,21 +2,24 @@
 
 基于《轮式机器人数学融合教案（完整版）》开发的浏览器互动教学平台：拖拽 Blockly 积木控制虚拟机器人，在模拟中完成测距、转角、走图形、坐标导航等任务。
 
-## 在线演示
+## 目录位置
 
-<https://kadeface.gitee.io/mathlab/>
+静态资源唯一源码目录：`frontend/public/mathlab/`（Vite build 时会复制到 `dist/mathlab/`，Docker 生产环境由 Nginx 提供）。
 
-（需在 Gitee 仓库「服务 → Gitee Pages」中启用并更新后生效。）
+## 本地预览
 
-## 快速开始
-
-在项目根目录用浏览器打开 [`index.html`](index.html)（推荐，覆盖 50 个教案任务）。
-
-也可打开 [`轮式机器人互动教学网页_完整版.html`](轮式机器人互动教学网页_完整版.html)（早期单文件 Blockly 版）。
-
-本地预览（可选）：
+**方式一（推荐，与平台一致）**
 
 ```bash
+cd frontend
+pnpm dev
+# 访问 http://localhost:5173/mathlab/index.html
+```
+
+**方式二（仅 mathlab 静态页）**
+
+```bash
+cd frontend/public/mathlab
 python3 -m http.server 8080
 # 访问 http://localhost:8080/index.html
 ```
@@ -34,10 +37,11 @@ python3 -m http.server 8080
 
 ```
 index.html          # 主入口
+css/shell.css       # 样式
 js/curriculum.js    # 教案任务数据与场景配置
 js/app.js           # Blockly + Canvas 模拟器
-轮式机器人数学融合教案_合并版.md
-轮式机器人互动教学网页_完整版.html
+js/contest.js       # 课堂竞赛模式
+docs/               # 教案文档与早期单文件版（归档）
 ```
 
 ## 使用说明
@@ -46,6 +50,16 @@ js/app.js           # Blockly + Canvas 模拟器
 2. 阅读右侧教学目标与挑战，点击「加载示例程序」或自行拖拽积木
 3. 调整轮子直径、速度，点击「运行程序」或「一键演示」
 4. 观察轨迹、距离、圈数与用时等实时数据
+
+## 部署更新
+
+修改本目录后需重新构建前端 Docker 镜像（仅 `restart` 不会生效）：
+
+```bash
+cd docker
+docker compose -f docker-compose.prod.yml build --no-cache frontend
+docker compose -f docker-compose.prod.yml up -d frontend
+```
 
 ## 许可
 
