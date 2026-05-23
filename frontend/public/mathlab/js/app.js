@@ -169,6 +169,15 @@
 
     async moveByDelta(dx, dy, cm, endAngle) {
       const s = this.state;
+      // 先原地转向再直线前进，避免边移边转造成轨迹/车头“打滑”观感
+      if (endAngle != null) {
+        let delta = endAngle - s.angle;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        const turnDeg = delta * 180 / Math.PI;
+        if (Math.abs(turnDeg) > 0.5) await this.turn(turnDeg);
+        else s.angle = endAngle;
+      }
       const x0 = s.x, y0 = s.y;
       const dur = Math.max(200, (Math.abs(cm) / s.speed) * 1000);
       const t0 = performance.now();
@@ -1103,8 +1112,7 @@
   const blocklyApp = {
     workspace: null,
 
-    defineBlocks() {
-      const J = Blockly.JavaScript;
+    defineBlocklyTypes() {
       Blockly.defineBlocksWithJsonArray([
         { type: 'event_start', message0: '当程序开始时', nextStatement: true, colour: 120, hat: 'cap' },
         { type: 'motion_move_2d', message0: '向角度 %1 ° 移动 %2 厘米', args0: [
@@ -1159,8 +1167,12 @@
             { type: 'field_dropdown', name: 'FN', options: [['sin', 'SIN'], ['cos', 'COS'], ['tan', 'TAN']] }
           ], output: 'Number', colour: 290 }
       ]);
+    },
 
-      const gen = (type, fn) => { J.forBlock = J.forBlock || {}; J.forBlock[type] = fn; if (!J[type]) J[type] = fn; };
+    registerCodeGenerators() {
+      const J = Blockly.JavaScript;
+      if (!J.forBlock) J.forBlock = Object.create(null);
+      const gen = (type, fn) => { J.forBlock[type] = fn; J[type] = fn; };
 
       gen('event_start', () => '');
       gen('motion_move_2d', b => {
@@ -1180,13 +1192,25 @@
       gen('motion_turn_left', b => `await __robot.turnLeft(${J.valueToCode(b, 'A', J.ORDER_NONE) || 0});\n`);
       gen('motion_speed', b => `__robot.setSpeed(${J.valueToCode(b, 'S', J.ORDER_NONE) || 10});\n`);
       gen('motion_wait', b => `await __robot.wait(${J.valueToCode(b, 'T', J.ORDER_NONE) || 1});\n`);
+      const statementChain = (parent, inputName) => {
+        let inner = '';
+        let child = parent.getInputTargetBlock(inputName);
+        while (child) {
+          if (child.isEnabled()) {
+            const chunk = J.blockToCode(child, true);
+            inner += typeof chunk === 'string' ? chunk : (chunk && chunk[0]) || '';
+          }
+          child = child.getNextBlock();
+        }
+        return inner ? J.prefixLines(inner, J.INDENT) : '';
+      };
       gen('control_repeat', b => {
         const n = J.valueToCode(b, 'N', J.ORDER_NONE) || 0;
-        return `for (let __i = 0; __i < ${n}; __i++) {\n${J.statementToCode(b, 'DO')}}\n`;
+        return `for (let __i = 0; __i < ${n}; __i++) {\n${statementChain(b, 'DO')}}\n`;
       });
       gen('control_if', b => {
         const c = J.valueToCode(b, 'COND', J.ORDER_NONE) || 'false';
-        return `if (${c}) {\n${J.statementToCode(b, 'DO')}}\n`;
+        return `if (${c}) {\n${statementChain(b, 'DO')}}\n`;
       });
       gen('robot_logic_compare', b => {
         const a = J.valueToCode(b, 'A', J.ORDER_NONE) || 0;
@@ -1223,26 +1247,30 @@
     },
 
     chainFromStart() {
+      if (!this.workspace) return '';
+      const J = Blockly.JavaScript;
+      if (!J.isInitialized) J.init(this.workspace);
       const starts = this.workspace.getBlocksByType('event_start', false);
       if (!starts.length) return '';
-      let code = '', block = starts[0].getNextBlock();
-      const J = Blockly.JavaScript;
+      let code = '';
+      let block = starts[0].getNextBlock();
       while (block) {
-        const chunk = J.blockToCode(block);
-        code += typeof chunk === 'string' ? chunk : chunk[0];
+        if (block.isEnabled()) {
+          // 第二参数 true = 只生成当前块，禁止 Blockly 自动拼接 next 积木（否则 N 块变 N+(N-1) 行）
+          const chunk = J.blockToCode(block, true);
+          code += typeof chunk === 'string' ? chunk : (chunk && chunk[0]) || '';
+        }
         block = block.getNextBlock();
       }
       return code;
     },
 
     generate() {
-      let code = this.chainFromStart();
-      if (!code.trim()) code = Blockly.JavaScript.workspaceToCode(this.workspace).trim();
-      return code;
+      return this.chainFromStart();
     },
 
     init() {
-      this.defineBlocks();
+      this.defineBlocklyTypes();
       this.workspace = Blockly.inject('blockly', {
         toolbox: `<xml>
           <category name="事件" colour="120"><block type="event_start"></block></category>
@@ -1289,6 +1317,7 @@
       if (typeof Blockly.JavaScript.init === 'function') {
         Blockly.JavaScript.init(this.workspace);
       }
+      this.registerCodeGenerators();
       window.__blocklyWorkspace = this.workspace;
       window.addEventListener('resize', () => Blockly.svgResize(this.workspace));
     },
