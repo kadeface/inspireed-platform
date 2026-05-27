@@ -323,6 +323,12 @@
           :session-id="session.id"
           :session-status="normalizedSessionStatus ?? session.status"
         />
+
+        <WhiteboardPanel
+          v-if="session"
+          :current-cell="currentCell"
+          :session-id="session.id"
+        />
       </div>
     </div>
   </div>
@@ -775,6 +781,8 @@ import ModuleList from './ModuleList.vue'
 import ClassroomSelectModal from './ClassroomSelectModal.vue'
 import ActivityStatisticsPanel from './ActivityStatisticsPanel.vue'
 import MathlabContestPanel from './MathlabContestPanel.vue'
+import WhiteboardPanel from './WhiteboardPanel.vue'
+import { handleWhiteboardWsMessage, registerWhiteboardTeacherSend } from '@/composables/useWhiteboard'
 import { useMathlabContest } from '@/composables/useMathlabContest'
 import CellTypeIcon from './CellTypeIcon.vue'
 import TeachingAssistantFAB from '@/components/Teacher/TeachingAssistantFAB.vue'
@@ -1156,6 +1164,13 @@ const wsManager = useWebSocket({
   },
   onMathlabContest: (type, data) => {
     handleMathlabContestWs({
+      type,
+      data,
+      timestamp: new Date().toISOString(),
+    })
+  },
+  onWhiteboard: (type, data) => {
+    handleWhiteboardWsMessage({
       type,
       data,
       timestamp: new Date().toISOString(),
@@ -1703,7 +1718,11 @@ async function tryRestoreSessionFromProps() {
 }
 
 // 初始化
+let unregisterWhiteboardSend: (() => void) | null = null
+
 onMounted(async () => {
+  unregisterWhiteboardSend = registerWhiteboardTeacherSend((msg) => wsManager.sendMessage(msg))
+
   // v2.0: 设置全屏监听器
   setupFullscreenListeners()
 
@@ -1732,9 +1751,13 @@ watch(
 // 组件卸载前清理（轮询 + WebSocket）
 onBeforeUnmount(() => {
   pollingManager.clearAllPollingIntervals()
+  unregisterWhiteboardSend?.()
 })
 
 onUnmounted(() => {
+  unregisterWhiteboardSend?.()
+  unregisterWhiteboardSend = null
+
   // v2.0: 使用 durationTimer composable 停止计时
   durationTimer.stopDurationTimer()
 

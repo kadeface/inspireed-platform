@@ -110,6 +110,12 @@ const cellTypes = [
     description: '嵌入网页内容',
   },
   {
+    type: CellType.WHITEBOARD,
+    name: '协作白板',
+    icon: '🗂️',
+    description: '小组分区协作画板',
+  },
+  {
     type: CellType.INTERACTIVE,
     name: '交互式课件单元',
     icon: '🎮',

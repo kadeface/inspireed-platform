@@ -17,21 +17,67 @@
     canvas: null, ctx: null, showGrid: true, showAxes: true, busy: false,
     renderMode: 'car',
     viewport: { offsetX: 0, offsetY: 0, scale: 1 },
-    trail: [],
+    taskMode: 'regular',
+    travelSamples: [],
+    robots: [],
     lastAnalysis: null,
-    state: {
-      x: GRID_STEP, y: GRID_STEP * 4, angle: 0, dist: 0, speed: 10, wheelAngle: 0,
-      startX: GRID_STEP, startY: GRID_STEP * 4, elapsed: 0
-    },
     scene: SCENE.PATH,
     sceneConfig: {},
+
+    get state() {
+      return this.getPrimaryRobot()?.state || {
+        x: GRID_STEP, y: GRID_STEP * 4, angle: 0, dist: 0, speed: 10, wheelAngle: 0,
+        startX: GRID_STEP, startY: GRID_STEP * 4, elapsed: 0
+      };
+    },
+
+    get trail() {
+      return this.getPrimaryRobot()?.trail || [];
+    },
+
+    set trail(v) {
+      const r = this.getPrimaryRobot();
+      if (r) r.trail = Array.isArray(v) ? v : [];
+    },
+
+    getPrimaryRobot() {
+      return this.robots[0] || null;
+    },
+
+    getRobot(id) {
+      if (!id) return this.getPrimaryRobot();
+      return this.robots.find(r => r.id === id) || null;
+    },
+
+    resolveRobot(robotOrId) {
+      if (!robotOrId) return this.getPrimaryRobot();
+      if (typeof robotOrId === 'string') return this.getRobot(robotOrId);
+      return robotOrId;
+    },
 
     init() {
       this.canvas = document.getElementById('canvas');
       this.ctx = this.canvas.getContext('2d');
+      this.robots = [
+        createRobot('A', {
+          label: 'A',
+          color: '#14b8a6',
+          x: GRID_STEP,
+          y: GRID_STEP * 4,
+          startX: GRID_STEP,
+          startY: GRID_STEP * 4,
+          speed: 10
+        })
+      ];
+      this.getPrimaryRobot().trail = [{ x: GRID_STEP, y: GRID_STEP * 4 }];
       window.__simRef = this;
       document.getElementById('inpSpeed').addEventListener('input', e => {
-        this.state.speed = parseFloat(e.target.value) || 10;
+        const v = parseFloat(e.target.value) || 10;
+        if (this.taskMode === 'travel') {
+          this.robots.forEach(r => { r.state.speed = v; });
+        } else {
+          this.state.speed = v;
+        }
       });
       if (typeof ViewShell !== 'undefined') ViewShell.init(this);
       this.draw();
@@ -63,16 +109,22 @@
     },
 
     clearTrail() {
-      const s = this.state;
-      this.trail = [{ x: s.x, y: s.y }];
+      this.robots.forEach(r => {
+        r.trail = [{ x: r.state.x, y: r.state.y }];
+      });
+      this.travelSamples = [];
       this.lastAnalysis = null;
       this.draw();
       if (typeof ViewShell !== 'undefined') ViewShell.refreshTrailPanel();
     },
 
     setOrigin(nx, ny) {
-      this.state.startX = snapGrid(nx);
-      this.state.startY = snapGrid(ny);
+      const sx = snapGrid(nx);
+      const sy = snapGrid(ny);
+      this.robots.forEach(r => {
+        r.state.startX = sx;
+        r.state.startY = sy;
+      });
       this.draw();
       this.updateTelemetry();
     },
@@ -85,8 +137,13 @@
     },
 
     runAnalysis() {
-      if (typeof TrailAnalysis === 'undefined') return null;
-      this.lastAnalysis = TrailAnalysis.analyze(this);
+      if (this.taskMode === 'travel' && typeof TravelValidation !== 'undefined') {
+        this.lastAnalysis = TravelValidation.analyze(this, currentTask);
+      } else if (typeof TrailAnalysis !== 'undefined') {
+        this.lastAnalysis = TrailAnalysis.analyze(this);
+      } else {
+        return null;
+      }
       this.draw();
       if (typeof ViewShell !== 'undefined') {
         ViewShell.refreshTrailPanel();
@@ -98,10 +155,19 @@
     diameter() { return parseFloat(document.getElementById('inpDiameter').value) || 3; },
 
     reset() {
-      const s = this.state;
-      s.x = s.startX; s.y = s.startY; s.angle = 0; s.dist = 0;
-      s.wheelAngle = 0; s.elapsed = 0;
-      this.trail = [{ x: s.x, y: s.y }];
+      this.robots.forEach((r, idx) => {
+        const s = r.state;
+        s.x = s.startX;
+        s.y = s.startY;
+        s.angle = r.initialAngle != null ? r.initialAngle : (s.angle || 0);
+        s.dist = 0;
+        s.wheelAngle = 0;
+        s.elapsed = 0;
+        r.trail = [{ x: s.x, y: s.y }];
+        r.stats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
+      });
+      this.travelSamples = [];
+      if (this.taskMode === 'travel') this.seedTravelSample();
       this.lastAnalysis = null;
       this.busy = false;
       runStats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
@@ -109,25 +175,81 @@
       this.updateTelemetry();
     },
 
-    setScene(scene, config) {
-      this.scene = scene || SCENE.PATH;
+    setTaskMode(mode, config) {
+      this.taskMode = mode === 'travel' ? 'travel' : 'regular';
       this.sceneConfig = config || {};
+    },
+
+    initRobots(startX, startY) {
+      if (this.taskMode !== 'travel') {
+        const a = this.getRobot('A') || createRobot('A', { x: startX, y: startY, startX, startY, speed: 10, color: '#14b8a6' });
+        a.state.startX = startX;
+        a.state.startY = startY;
+        if (!this.getRobot('A')) this.robots = [a];
+        else this.robots = [a];
+        return;
+      }
+      const cfg = this.sceneConfig || {};
+      const px = this.getPxPerCm ? this.getPxPerCm() : PX_PER_CM;
+      const defs = Array.isArray(cfg.robots) && cfg.robots.length ? cfg.robots : [
+        { id: 'A', label: '甲车', xCm: 0, yCm: 0, speed: 10, color: '#14b8a6' },
+        { id: 'B', label: '乙车', xCm: 60, yCm: 0, speed: 8, color: '#f97316' }
+      ];
+      this.trackOriginX = startX;
+      this.trackOriginY = startY;
+      this.robots = defs.map(def => {
+        const x = startX + (def.xCm || 0) * px;
+        const y = startY - (def.yCm || 0) * px;
+        const robot = createRobot(def.id || 'A', {
+          label: def.label || def.id,
+          color: def.color,
+          x,
+          y,
+          startX: x,
+          startY: y,
+          speed: def.speed || 10,
+          angleDeg: def.face || 0
+        });
+        robot.initialAngle = robot.state.angle;
+        robot.trackS0Cm = def.s0Cm != null ? def.s0Cm : (def.xCm || 0);
+        return robot;
+      });
+    },
+
+    /** 沿赛道轴的绝对位置 s（cm），原点为场景 trackOrigin，非各车自身起点 */
+    trackPositionCm(robot) {
+      const cfg = this.sceneConfig || {};
+      const axisDeg = cfg.trackAxisDeg || 0;
+      const rad = axisDeg * Math.PI / 180;
+      const ux = Math.cos(rad);
+      const uy = -Math.sin(rad);
+      const px = this.getPxPerCm();
+      const ox = this.trackOriginX ?? robot.state.startX;
+      const oy = this.trackOriginY ?? robot.state.startY;
+      return ((robot.state.x - ox) * ux + (robot.state.y - oy) * uy) / px;
+    },
+
+    setScene(scene, config, mode) {
+      this.setTaskMode(mode || 'regular', config);
+      this.scene = scene || SCENE.PATH;
       const h = this.canvas.height;
       const w = this.canvas.width;
       const midY = snapGrid(h / 2);
+      let startX = GRID_STEP;
+      let startY = midY;
 
-      if (this.scene === SCENE.GRID || (this.scene === SCENE.TRIG && config.cols)) {
+      if (this.scene === SCENE.GRID || (this.scene === SCENE.TRIG && config?.cols)) {
         // 数对网格原点 (1,1) 落在背景网格交点
-        this.state.startX = GRID_STEP;
-        this.state.startY = snapGrid(h - GRID_STEP);
+        startX = GRID_STEP;
+        startY = snapGrid(h - GRID_STEP);
       } else if (this.scene === SCENE.NUMBERLINE) {
-        this.state.startX = snapGrid(w / 2);
-        this.state.startY = midY;
-        this.state.angle = 0;
+        startX = snapGrid(w / 2);
+        startY = midY;
       } else {
-        this.state.startX = GRID_STEP;
-        this.state.startY = midY;
+        startX = GRID_STEP;
+        startY = midY;
       }
+      this.initRobots(startX, startY);
       this.reset();
     },
 
@@ -143,6 +265,11 @@
     },
 
     wait(ms) { return new Promise(res => setTimeout(res, ms)); },
+
+    async runParallel(jobs) {
+      if (typeof MotionScheduler === 'undefined') return;
+      await MotionScheduler.run(this, jobs);
+    },
 
     getPxPerCm() {
       if (this.scene === SCENE.NUMBERLINE) {
@@ -167,21 +294,47 @@
       return Math.atan2(-Math.sin(rad), Math.cos(rad));
     },
 
-    async moveByDelta(dx, dy, cm, endAngle) {
-      const s = this.state;
+    seedTravelSample() {
+      if (this.taskMode !== 'travel') return;
+      const a = this.getRobot('A');
+      const b = this.getRobot('B');
+      if (!a || !b) return;
+      this.travelSamples = [{ t: 0, sA: this.trackPositionCm(a), sB: this.trackPositionCm(b) }];
+    },
+
+    sampleTravel() {
+      if (this.taskMode !== 'travel') return;
+      const a = this.getRobot('A');
+      const b = this.getRobot('B');
+      if (!a || !b) return;
+      const t = Math.max(a.state.elapsed, b.state.elapsed);
+      const sA = this.trackPositionCm(a);
+      const sB = this.trackPositionCm(b);
+      const last = this.travelSamples[this.travelSamples.length - 1];
+      if (last && last.t === t && last.sA === sA && last.sB === sB) return;
+      this.travelSamples.push({ t, sA, sB });
+      if (this.travelSamples.length > 600) this.travelSamples.shift();
+    },
+
+    async moveByDelta(dx, dy, cm, endAngle, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      const s = robot.state;
+      const stats = robot.stats || runStats;
       // 先原地转向再直线前进，避免边移边转造成轨迹/车头“打滑”观感
       if (endAngle != null) {
         let delta = endAngle - s.angle;
         while (delta > Math.PI) delta -= Math.PI * 2;
         while (delta < -Math.PI) delta += Math.PI * 2;
         const turnDeg = delta * 180 / Math.PI;
-        if (Math.abs(turnDeg) > 0.5) await this.turn(turnDeg);
+        if (Math.abs(turnDeg) > 0.5) await this.turn(turnDeg, robot);
         else s.angle = endAngle;
       }
       const x0 = s.x, y0 = s.y;
       const dur = Math.max(200, (Math.abs(cm) / s.speed) * 1000);
       const t0 = performance.now();
-      runStats.totalDist += Math.abs(cm);
+      stats.totalDist += Math.abs(cm);
+      if (robot.id === 'A') runStats.totalDist = stats.totalDist;
       while (true) {
         const p = Math.min(1, (performance.now() - t0) / dur);
         s.x = x0 + dx * p;
@@ -191,7 +344,8 @@
         s.wheelAngle += Math.abs(cm) * this.getPxPerCm() * 0.06 * Math.sign(cm || 1);
         s.elapsed += dur * (p - (s._lastTp || 0)) / 1000;
         s._lastTp = p;
-        if (p > 0.01) this.trail.push({ x: s.x, y: s.y });
+        if (p > 0.01) robot.trail.push({ x: s.x, y: s.y });
+        this.sampleTravel();
         this.draw();
         this.updateTelemetry();
         if (typeof ViewShell !== 'undefined') {
@@ -202,77 +356,105 @@
         await this.wait(16);
       }
       if (endAngle != null) s.angle = endAngle;
-      s.dist = runStats.totalDist;
+      s.dist = stats.totalDist;
       s._lastP = 0; s._lastTp = 0;
-      runStats.totalTime += dur / 1000;
+      stats.totalTime += dur / 1000;
+      if (robot.id === 'A') runStats.totalTime = stats.totalTime;
       this.draw();
       this.updateTelemetry();
     },
 
     /** 二维：沿坐标系角度移动（绝对方向，非车头朝向） */
-    async movePolar(angleDeg, cm) {
+    async movePolar(angleDeg, cm, robotOrId) {
       const { dx, dy } = this.mathAngleToDelta(cm, angleDeg);
-      await this.moveByDelta(dx, dy, cm, this.mathAngleToCanvasRad(angleDeg));
+      await this.moveByDelta(dx, dy, cm, this.mathAngleToCanvasRad(angleDeg), robotOrId);
     },
 
     /** 二维：移动到相对原点的坐标 (x, y) cm */
-    async gotoCm(xCm, yCm) {
-      const ox = this.state.startX;
-      const oy = this.state.startY;
+    async gotoCm(xCm, yCm, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      const ox = robot.state.startX;
+      const oy = robot.state.startY;
       const px = this.getPxPerCm();
       const tx = ox + xCm * px;
       const ty = oy - yCm * px;
-      const dx = tx - this.state.x;
-      const dy = ty - this.state.y;
+      const dx = tx - robot.state.x;
+      const dy = ty - robot.state.y;
       const cm = Math.hypot(dx, dy) / px;
       if (cm < 0.01) return;
       const angleDeg = Math.atan2(-dy, dx) * 180 / Math.PI;
-      await this.moveByDelta(dx, dy, cm, this.mathAngleToCanvasRad(angleDeg));
+      await this.moveByDelta(dx, dy, cm, this.mathAngleToCanvasRad(angleDeg), robot);
     },
 
     /** 面向坐标系角度（不移动） */
-    async faceAngle(angleDeg) {
+    async faceAngle(angleDeg, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
       const target = this.mathAngleToCanvasRad(angleDeg);
-      const cur = this.state.angle;
+      const cur = robot.state.angle;
       let delta = target - cur;
       while (delta > Math.PI) delta -= Math.PI * 2;
       while (delta < -Math.PI) delta += Math.PI * 2;
-      await this.turn(delta * 180 / Math.PI);
+      await this.turn(delta * 180 / Math.PI, robot);
     },
 
-    async forward(cm) {
-      const s = this.state;
+    async forward(cm, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      const s = robot.state;
       const dx = cm * this.getPxPerCm() * Math.cos(s.angle);
       const dy = cm * this.getPxPerCm() * Math.sin(s.angle);
-      await this.moveByDelta(dx, dy, cm, s.angle);
+      await this.moveByDelta(dx, dy, cm, s.angle, robot);
     },
 
-    async backward(cm) { return this.forward(-cm); },
+    async backward(cm, robotOrId) { return this.forward(-(cm || 0), robotOrId); },
 
-    async turn(deg) {
-      const s = this.state;
+    async turn(deg, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      const s = robot.state;
+      const stats = robot.stats || runStats;
       const target = s.angle + deg * Math.PI / 180;
       const a0 = s.angle;
       const dur = Math.min(1200, Math.abs(deg) * 8);
       const t0 = performance.now();
-      runStats.turns.push(deg);
+      stats.turns.push(deg);
+      if (robot.id === 'A') runStats.turns = stats.turns;
       while (true) {
         const p = Math.min(1, (performance.now() - t0) / dur);
         s.angle = a0 + (target - a0) * p;
+        this.sampleTravel();
         this.draw();
         if (p >= 1) break;
         await this.wait(16);
       }
       s.elapsed += dur / 1000;
-      runStats.totalTime += dur / 1000;
+      stats.totalTime += dur / 1000;
+      if (robot.id === 'A') runStats.totalTime = stats.totalTime;
     },
 
-    setSpeed(v) {
-      this.state.speed = v;
-      document.getElementById('inpSpeed').value = v;
+    setSpeed(v, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      robot.state.speed = v;
+      if (robot.id === 'A') document.getElementById('inpSpeed').value = v;
     },
 
     updateTelemetry() {
+      if (this.taskMode === 'travel') {
+        const a = this.getRobot('A');
+        const b = this.getRobot('B');
+        const aDist = a?.stats?.totalDist || 0;
+        const bDist = b?.stats?.totalDist || 0;
+        if (typeof ViewShell !== 'undefined') {
+          ViewShell.refreshAlgebraBar();
+          let extra = `A ${aDist.toFixed(1)} cm · B ${bDist.toFixed(1)} cm`;
+          if (this.lastAnalysis?.message) extra += ` · ${this.lastAnalysis.message}`;
+          ViewShell.setAlgebraExtra(extra);
+        }
+        return;
+      }
       const C = Math.PI * this.diameter();
       const n = C > 0 ? (runStats.totalDist / C).toFixed(2) : '0';
       let html = '<strong>实时数据</strong><br>' +
@@ -310,7 +492,6 @@
 
     draw() {
       const { ctx, canvas } = this;
-      const r = this.state;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
@@ -337,13 +518,16 @@
           console.error('Annotations.draw failed:', e);
         }
       }
-      this.drawTrail();
-      if (this.renderMode === 'point') this.drawPoint(r);
-      else this.drawRobot(r);
+      this.robots.forEach(r => {
+        this.drawTrail(r);
+        if (this.renderMode === 'point') this.drawPoint(r.state);
+        else this.drawRobot(r.state, r.color);
+      });
       this.drawTargetMatchHint(ctx);
       ctx.restore();
       this.drawAnalysisBadge();
       if (this.scene === SCENE.TIME) this.drawClock();
+      this.drawTravelGraph();
     },
 
     drawTargetMatchHint(ctx) {
@@ -865,22 +1049,23 @@
       this.ctx.setLineDash([]);
     },
 
-    drawTrail() {
-      if (this.trail.length < 2) return;
+    drawTrail(robot) {
+      const tr = robot?.trail || this.trail;
+      if (tr.length < 2) return;
       const { ctx } = this;
       const isPoint = this.renderMode === 'point';
       ctx.beginPath();
-      ctx.moveTo(this.trail[0].x, this.trail[0].y);
-      for (let i = 1; i < this.trail.length; i++) ctx.lineTo(this.trail[i].x, this.trail[i].y);
-      ctx.strokeStyle = isPoint ? '#38bdf8' : '#f97316';
+      ctx.moveTo(tr[0].x, tr[0].y);
+      for (let i = 1; i < tr.length; i++) ctx.lineTo(tr[i].x, tr[i].y);
+      ctx.strokeStyle = isPoint ? '#38bdf8' : (robot?.color || '#f97316');
       ctx.lineWidth = isPoint ? 3 : 2.5;
       if (isPoint) ctx.setLineDash([6, 4]);
       ctx.stroke();
       ctx.setLineDash([]);
-      if (isPoint && this.trail.length <= 80) {
+      if (isPoint && tr.length <= 80) {
         ctx.fillStyle = 'rgba(56,189,248,.85)';
-        this.trail.forEach((p, i) => {
-          if (i === 0 || i === this.trail.length - 1) return;
+        tr.forEach((p, i) => {
+          if (i === 0 || i === tr.length - 1) return;
           ctx.beginPath();
           ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
           ctx.fill();
@@ -925,6 +1110,68 @@
       ctx.fillText(runStats.totalTime.toFixed(1) + 's', cx - 14, cy + r + 14);
     },
 
+    drawTravelGraph() {
+      const wrap = document.getElementById('travelGraphWrap');
+      const canvas = document.getElementById('travelGraphCanvas');
+      if (!wrap || !canvas) return;
+      const stCfg = this.sceneConfig?.stGraph || {};
+      const enabled = this.taskMode === 'travel' && stCfg.enabled !== false;
+      wrap.hidden = !enabled;
+      if (!enabled) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = 'rgba(148,163,184,.25)';
+      for (let x = 36; x < w - 12; x += 34) {
+        ctx.beginPath(); ctx.moveTo(x, 12); ctx.lineTo(x, h - 28); ctx.stroke();
+      }
+      for (let y = 12; y < h - 20; y += 24) {
+        ctx.beginPath(); ctx.moveTo(36, y); ctx.lineTo(w - 12, y); ctx.stroke();
+      }
+      ctx.strokeStyle = '#94a3b8';
+      ctx.beginPath();
+      ctx.moveTo(36, h - 28);
+      ctx.lineTo(w - 12, h - 28);
+      ctx.moveTo(36, h - 28);
+      ctx.lineTo(36, 12);
+      ctx.stroke();
+      const lastSample = this.travelSamples.length ? this.travelSamples[this.travelSamples.length - 1] : null;
+      const tMax = stCfg.tMaxSec || Math.max(10, (lastSample?.t || 0) + 2);
+      const sVals = this.travelSamples.flatMap(p => [p.sA, p.sB].filter(v => v != null));
+      const sLo = Math.min(0, ...sVals);
+      const sHi = stCfg.sMaxCm || Math.max(100, ...sVals, 0) + 10;
+      const sSpan = Math.max(sHi - sLo, 1);
+      const mapX = t => 36 + (Math.max(0, t) / tMax) * (w - 48);
+      const mapY = s => (h - 28) - ((s - sLo) / sSpan) * (h - 40);
+      const drawLine = (key, color) => {
+        const pts = this.travelSamples;
+        if (!pts.length) return;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        pts.forEach((p, i) => {
+          const x = mapX(p.t || 0);
+          const y = mapY(p[key] || 0);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      };
+      drawLine('sA', '#22d3ee');
+      if (stCfg.showBoth !== false) drawLine('sB', '#f97316');
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('t (s)', w - 34, h - 10);
+      ctx.fillText('s (cm)', 6, 20);
+      ctx.fillStyle = '#22d3ee';
+      ctx.fillText('A', w - 68, 18);
+      ctx.fillStyle = '#f97316';
+      ctx.fillText('B', w - 48, 18);
+    },
+
     drawWheel(ctx, lx, ly, radius, spin) {
       ctx.save();
       ctx.translate(lx, ly);
@@ -967,7 +1214,7 @@
     },
 
     /** 俯视图轮式机器人（车头朝 +x，差速左右轮） */
-    drawRobot(r) {
+    drawRobot(r, color) {
       const ctx = this.ctx;
       const bodyL = 40;
       const bodyW = 28;
@@ -989,8 +1236,9 @@
 
       // 底盘
       const g = ctx.createLinearGradient(-bodyL / 2, 0, bodyL / 2, 0);
-      g.addColorStop(0, '#0f766e');
-      g.addColorStop(0.45, '#14b8a6');
+      const c = color || '#14b8a6';
+      g.addColorStop(0, c);
+      g.addColorStop(0.45, c);
       g.addColorStop(1, '#2dd4bf');
       ctx.fillStyle = g;
       this.roundRect(ctx, -bodyL / 2 + 4, -bodyW / 2, bodyL - 6, bodyW, 7);
@@ -1082,6 +1330,35 @@
         trig45: async () => { await this.movePolar(45, 28); await this.movePolar(0, 20); await this.movePolar(90, 20); },
         trigGoto: async () => { await this.gotoCm(17.3, 10); },
         elevation30: () => this.movePolar(30, 40),
+        travelMeet: async () => {
+          const d = typeof travelMeetDistances === 'function'
+            ? travelMeetDistances(this.sceneConfig)
+            : { da: 40, db: 60 };
+          await this.runParallel([
+            { robot: 'A', action: 'forward', cm: d.da },
+            { robot: 'B', action: 'forward', cm: d.db }
+          ]);
+        },
+        travelMeetDelay: async () => {
+          const waitSec = currentTask?.starter?.travelDelayStart?.waitSec ?? 2;
+          await this.wait(waitSec * 1000);
+          const d = typeof travelMeetDistances === 'function'
+            ? travelMeetDistances(this.sceneConfig)
+            : { da: 36, db: 54 };
+          await this.runParallel([
+            { robot: 'A', action: 'forward', cm: d.da },
+            { robot: 'B', action: 'forward', cm: d.db }
+          ]);
+        },
+        travelChase: async () => {
+          const d = typeof travelChaseDistances === 'function'
+            ? travelChaseDistances(this.sceneConfig)
+            : { da: 54, db: 94 };
+          await this.runParallel([
+            { robot: 'A', action: 'forward', cm: d.da },
+            { robot: 'B', action: 'forward', cm: d.db }
+          ]);
+        },
         pythagoras: async () => {
           await this.movePolar(0, 30);
           await this.movePolar(90, 40);
@@ -1094,19 +1371,10 @@
     }
   };
 
-  window.__robot = {
-    forward: cm => sim.forward(cm),
-    backward: cm => sim.forward(-cm),
-    move2d: (angle, cm) => sim.movePolar(angle, cm),
-    goto: (x, y) => sim.gotoCm(x, y),
-    faceAngle: deg => sim.faceAngle(deg),
-    turn: deg => sim.turn(deg),
-    turnLeft: deg => sim.turn(-deg),
-    turnRight: deg => sim.turn(deg),
-    setSpeed: v => { sim.setSpeed(v); },
-    wait: sec => { runStats.waits++; return sim.wait(sec * 1000); },
-    stop: () => {}
-  };
+  window.__robot = makeRobotApi(sim, 'A');
+  window.__robotA = makeRobotApi(sim, 'A');
+  window.__robotB = makeRobotApi(sim, 'B');
+  window.__parallel = jobs => sim.runParallel(jobs);
 
   // ─── Blockly ───────────────────────────────────────────
   const blocklyApp = {
@@ -1137,6 +1405,22 @@
           previousStatement: true, nextStatement: true, colour: 120 },
         { type: 'motion_wait', message0: '等待 %1 秒', args0: [{ type: 'input_value', name: 'T', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 60 },
+        { type: 'motion_forward_robot', message0: '小车 %1 前进 %2 厘米', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'input_value', name: 'D', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 45 },
+        { type: 'motion_turn_robot', message0: '小车 %1 右转 %2 度', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'input_value', name: 'A', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 280 },
+        { type: 'motion_speed_robot', message0: '小车 %1 速度设为 %2', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'input_value', name: 'S', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 120 },
+        { type: 'control_parallel_move', message0: '同时执行 A前进 %1 cm 与 B前进 %2 cm', args0: [
+            { type: 'input_value', name: 'DA', check: 'Number' },
+            { type: 'input_value', name: 'DB', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 20 },
         { type: 'control_repeat', message0: '重复 %1 次', args0: [{ type: 'input_value', name: 'N', check: 'Number' }],
           message1: '%1', args1: [{ type: 'input_statement', name: 'DO' }],
           previousStatement: true, nextStatement: true, colour: 65 },
@@ -1158,11 +1442,11 @@
             { type: 'input_value', name: 'B', check: 'Number' }
           ], output: 'Number', colour: 230 },
         { type: 'math_pi', message0: 'π', output: 'Number', colour: 230 },
-        { type: 'math_trig', message0: '%1 ( %2 ° )', args0: [
+        { type: 'ml_math_trig', message0: '%1 ( %2 ° )', args0: [
             { type: 'field_dropdown', name: 'FN', options: [['sin', 'SIN'], ['cos', 'COS'], ['tan', 'TAN']] },
             { type: 'input_value', name: 'DEG', check: 'Number' }
           ], output: 'Number', colour: 290 },
-        { type: 'math_trig_special', message0: '特殊角 %1 的 %2', args0: [
+        { type: 'ml_math_trig_special', message0: '特殊角 %1 的 %2', args0: [
             { type: 'field_dropdown', name: 'ANGLE', options: [['30°', '30'], ['45°', '45'], ['60°', '60']] },
             { type: 'field_dropdown', name: 'FN', options: [['sin', 'SIN'], ['cos', 'COS'], ['tan', 'TAN']] }
           ], output: 'Number', colour: 290 }
@@ -1192,6 +1476,23 @@
       gen('motion_turn_left', b => `await __robot.turnLeft(${J.valueToCode(b, 'A', J.ORDER_NONE) || 0});\n`);
       gen('motion_speed', b => `__robot.setSpeed(${J.valueToCode(b, 'S', J.ORDER_NONE) || 10});\n`);
       gen('motion_wait', b => `await __robot.wait(${J.valueToCode(b, 'T', J.ORDER_NONE) || 1});\n`);
+      gen('motion_forward_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        return `await __robot${robot}.forward(${J.valueToCode(b, 'D', J.ORDER_NONE) || 0});\n`;
+      });
+      gen('motion_turn_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        return `await __robot${robot}.turnRight(${J.valueToCode(b, 'A', J.ORDER_NONE) || 0});\n`;
+      });
+      gen('motion_speed_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        return `__robot${robot}.setSpeed(${J.valueToCode(b, 'S', J.ORDER_NONE) || 10});\n`;
+      });
+      gen('control_parallel_move', b => {
+        const da = J.valueToCode(b, 'DA', J.ORDER_NONE) || 0;
+        const db = J.valueToCode(b, 'DB', J.ORDER_NONE) || 0;
+        return `await __parallel([{ robot: 'A', action: 'forward', cm: ${da} }, { robot: 'B', action: 'forward', cm: ${db} }]);\n`;
+      });
       const statementChain = (parent, inputName) => {
         let inner = '';
         let child = parent.getInputTargetBlock(inputName);
@@ -1232,13 +1533,13 @@
         45: { SIN: Math.SQRT2 / 2, COS: Math.SQRT2 / 2, TAN: 1 },
         60: { SIN: Math.sqrt(3) / 2, COS: 0.5, TAN: Math.sqrt(3) }
       };
-      gen('math_trig', b => {
+      gen('ml_math_trig', b => {
         const fn = b.getFieldValue('FN');
         const deg = J.valueToCode(b, 'DEG', J.ORDER_NONE) || 0;
         const map = { SIN: 'Math.sin', COS: 'Math.cos', TAN: 'Math.tan' };
         return [`(${map[fn]}((${deg}) * Math.PI / 180))`, J.ORDER_ATOMIC];
       });
-      gen('math_trig_special', b => {
+      gen('ml_math_trig_special', b => {
         const angle = b.getFieldValue('ANGLE');
         const fn = b.getFieldValue('FN');
         const v = TRIG_SPECIAL[angle][fn];
@@ -1269,10 +1570,19 @@
       return this.chainFromStart();
     },
 
-    init() {
-      this.defineBlocklyTypes();
-      this.workspace = Blockly.inject('blockly', {
-        toolbox: `<xml>
+    buildToolboxXml(mode) {
+      const travelExtra = mode === 'travel'
+        ? `<category name="双车运动" colour="20">
+            <block type="motion_forward_robot"><value name="D"><shadow type="math_num"><field name="N">30</field></shadow></value></block>
+            <block type="motion_turn_robot"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
+            <block type="motion_speed_robot"><value name="S"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
+            <block type="control_parallel_move">
+              <value name="DA"><shadow type="math_num"><field name="N">40</field></shadow></value>
+              <value name="DB"><shadow type="math_num"><field name="N">20</field></shadow></value>
+            </block>
+          </category>`
+        : '';
+      return `<xml>
           <category name="事件" colour="120"><block type="event_start"></block></category>
           <category name="二维运动" colour="160">
             <block type="motion_move_2d">
@@ -1291,6 +1601,7 @@
             <block type="motion_turn_right"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
             <block type="motion_turn_left"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
           </category>
+          ${travelExtra}
           <category name="控制" colour="65">
             <block type="control_repeat"><value name="N"><shadow type="math_num"><field name="N">4</field></shadow></value></block>
             <block type="control_if"></block>
@@ -1304,12 +1615,23 @@
             <block type="math_pi"></block>
           </category>
           <category name="三角函数" colour="290">
-            <block type="math_trig">
+            <block type="ml_math_trig">
               <value name="DEG"><shadow type="math_num"><field name="N">30</field></shadow></value>
             </block>
-            <block type="math_trig_special"></block>
+            <block type="ml_math_trig_special"></block>
           </category>
-        </xml>`,
+        </xml>`;
+    },
+
+    setMode(mode) {
+      if (!this.workspace) return;
+      this.workspace.updateToolbox(this.buildToolboxXml(mode));
+    },
+
+    init() {
+      this.defineBlocklyTypes();
+      this.workspace = Blockly.inject('blockly', {
+        toolbox: this.buildToolboxXml('regular'),
         grid: { spacing: 20, length: 3, colour: '#d4dde8', snap: true },
         zoom: { controls: true, wheel: true, startScale: 1, maxScale: 2.5, minScale: 0.4 },
         trashcan: true
@@ -1324,7 +1646,7 @@
 
     loadStarter(task) {
       this.workspace.clear();
-      const xmlStr = buildStarterXml(task.starter);
+      const xmlStr = buildStarterXml(task.starter, task.sceneConfig);
       if (!xmlStr) return;
       const xml = Blockly.utils.xml.textToDom(xmlStr);
       Blockly.Xml.domToWorkspace(xml, this.workspace);
@@ -1462,7 +1784,8 @@
       cBox.style.display = 'none';
     }
 
-    sim.setScene(task.scene, task.sceneConfig);
+    sim.setScene(task.scene, task.sceneConfig, task.mode);
+    blocklyApp.setMode(task.mode || 'regular');
     sim.lastAnalysis = null;
     loadTaskProps();
     blocklyApp.loadStarter(task);
@@ -1512,11 +1835,16 @@
     const code = blocklyApp.generate();
     document.getElementById('codeOut').textContent = code || '（无代码）';
     document.getElementById('codeOut').classList.add('show');
-    if (!code || !/__robot\./.test(code)) {
+    if (!code || !/__robot\.|__robotA\.|__robotB\.|__parallel/.test(code)) {
       setStatus('请把运动积木接在「当程序开始时」下方', 'err');
       return;
     }
-    sim.state.speed = parseFloat(document.getElementById('inpSpeed').value) || 10;
+    const speed = parseFloat(document.getElementById('inpSpeed').value) || 10;
+    if (sim.taskMode === 'travel') {
+      sim.robots.forEach(r => { r.state.speed = speed; });
+    } else {
+      sim.state.speed = speed;
+    }
     try {
       sim.busy = true;
       setStatus('程序运行中…', 'busy');
@@ -1534,9 +1862,11 @@
   async function startDemo() {
     if (sim.busy) return;
     const code = blocklyApp.generate();
-    if (code && /__robot\./.test(code)) { await runProgram(); return; }
+    if (code && /__robot\.|__robotA\.|__robotB\.|__parallel/.test(code)) { await runProgram(); return; }
     sim.reset();
-    sim.state.speed = parseFloat(document.getElementById('inpSpeed').value) || 10;
+    const speed = parseFloat(document.getElementById('inpSpeed').value) || 10;
+    if (sim.taskMode === 'travel') sim.robots.forEach(r => { r.state.speed = speed; });
+    else sim.state.speed = speed;
     try {
       sim.busy = true;
       setStatus('演示运行中…', 'busy');

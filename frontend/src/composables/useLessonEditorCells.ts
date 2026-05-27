@@ -91,6 +91,21 @@ export function getDefaultCell(cellType: (typeof CellType)[keyof typeof CellType
         content: { url: '', title: '', description: '' },
         config: { allowFullscreen: true, allowNavigation: true, showToolbar: false, height: '600px' },
       } as Cell
+    case CellType.WHITEBOARD:
+      return {
+        ...baseCell,
+        type: CellType.WHITEBOARD,
+        content: {
+          initialDocument: {
+            version: 0,
+            mode: 'setup',
+            zones: [],
+            elements: [],
+          },
+          defaultGroupCount: 4,
+        },
+        config: { height: '720px', showMinimap: true },
+      } as Cell
     case CellType.INTERACTIVE:
       return {
         ...baseCell,

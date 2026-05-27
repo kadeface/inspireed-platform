@@ -104,6 +104,16 @@ class ClassSession(Base):
         back_populates="session",
         cascade="all, delete-orphan",
     )
+    groups = relationship(
+        "SessionGroup",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+    group_members = relationship(
+        "SessionGroupMember",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<ClassSession(id={self.id}, lesson_id={self.lesson_id}, status={self.status})>"

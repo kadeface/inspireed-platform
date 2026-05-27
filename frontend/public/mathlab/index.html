@@ -62,6 +62,10 @@
         <div class="canvas-wrap" id="canvasWrap">
           <canvas id="canvas"></canvas>
           <span class="scale-hint" id="scaleHint">1 格 = 10 cm</span>
+          <div id="travelGraphWrap" class="travel-graph-wrap" hidden>
+            <div class="travel-graph-title">行程图 s-t（travel）</div>
+            <canvas id="travelGraphCanvas" width="320" height="150"></canvas>
+          </div>
         </div>
         <div class="prop-popover" id="propPopover" hidden>
           <label>场景道具 · 选中后点击画布放置</label>
@@ -165,6 +169,9 @@
   <script src="js/curriculum.js?v=8"></script>
   <script src="js/scene-props.js?v=7"></script>
   <script src="js/trail-analysis.js?v=6"></script>
+  <script src="js/robot.js?v=1"></script>
+  <script src="js/motion-scheduler.js?v=1"></script>
+  <script src="js/travel-validation.js?v=1"></script>
   <script src="js/annotations.js?v=6"></script>
   <script src="js/view-shell.js?v=6"></script>
   <script src="js/contest.js?v=1"></script>

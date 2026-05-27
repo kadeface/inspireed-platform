@@ -46,6 +46,7 @@ const CELL_TYPE_NAMES: Record<string, string> = {
   [CellType.ACTIVITY]: '活动单元',
   [CellType.FLOWCHART]: '流程图单元',
   [CellType.BROWSER]: '浏览器单元',
+  [CellType.WHITEBOARD]: '协作白板',
   [CellType.INTERACTIVE]: '交互式课件单元',
   [CellType.REFERENCE_MATERIAL]: '参考素材单元',
 }

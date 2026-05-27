@@ -1,7 +1,7 @@
 <template>
   <div
     class="mb-4 rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-    :class="{ 'overflow-hidden': cell.type !== CellType.FLOWCHART }"
+    :class="{ 'overflow-hidden': cell.type !== CellType.FLOWCHART && cell.type !== CellType.WHITEBOARD }"
     :data-cell-id="cell.id"
     :data-cell-index="props.index"
   >
@@ -151,6 +151,7 @@ import FlowchartCellX6 from './FlowchartCellX6.vue'
 import BrowserCell from './BrowserCell.vue'
 import InteractiveCell from './InteractiveCell.vue'
 import ReferenceMaterialCell from '@/components/Cell/ReferenceMaterialCell.vue'
+import WhiteboardCell from './WhiteboardCell.vue'
 import { useFeatureFlag } from '@/composables/useFeatureFlag'
 import { createLogger } from '../../utils/logger'
 
@@ -327,6 +328,7 @@ const cellComponent = computed(() => {
     [CellType.BROWSER]: BrowserCell,
     [CellType.INTERACTIVE]: InteractiveCell,
     [CellType.REFERENCE_MATERIAL]: ReferenceMaterialCell,
+    [CellType.WHITEBOARD]: WhiteboardCell,
   }
   return componentMap[props.cell.type]
 })
@@ -346,6 +348,7 @@ const cellTypeLabel = computed(() => {
     [CellType.BROWSER]: '浏览器',
     [CellType.INTERACTIVE]: '交互式课件',
     [CellType.REFERENCE_MATERIAL]: '参考素材',
+    [CellType.WHITEBOARD]: '协作白板',
   }
   return labelMap[props.cell.type]
 })

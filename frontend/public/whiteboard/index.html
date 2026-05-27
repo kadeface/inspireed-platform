@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>协作白板 · InspireEd</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    body { display: flex; flex-direction: column; background: #0f1419; color: #e7ecf3; user-select: none; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      flex-shrink: 0; height: 52px; display: flex; align-items: center; gap: 4px;
+      padding: 0 12px; background: #1a2332; border-bottom: 1px solid #2d3a4d;
+      z-index: 100;
+    }
+    .toolbar-brand { font-size: 13px; font-weight: 600; color: #8b9cb3; margin-right: 12px; white-space: nowrap; }
+    .toolbar-brand span { color: #5eead4; }
+    .tool-sep { width: 1px; height: 28px; background: #2d3a4d; margin: 0 6px; }
+    .tool-btn {
+      width: 36px; height: 36px; border: none; border-radius: 8px; background: transparent;
+      color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: background .15s, color .15s;
+    }
+    .tool-btn:hover { background: #243044; color: #e7ecf3; }
+    .tool-btn.active { background: #2563eb; color: #fff; }
+    .tool-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .tool-label { font-size: 11px; color: #64748b; margin-left: auto; padding-right: 8px; }
+
+    .tool-opts { display: flex; align-items: center; gap: 8px; }
+    .tool-opts label { font-size: 11px; color: #64748b; }
+    .tool-opts input[type="color"] { width: 28px; height: 28px; border: none; border-radius: 6px; cursor: pointer; background: transparent; padding: 0; }
+    .tool-opts input[type="range"] { width: 72px; accent-color: #2563eb; }
+    .tool-opts .conn-arrow-label {
+      display: flex; align-items: center; gap: 4px; font-size: 11px; color: #94a3b8;
+      cursor: pointer; user-select: none;
+    }
+    .tool-opts .conn-arrow-label input { accent-color: #2563eb; cursor: pointer; }
+    .color-swatches { display: flex; gap: 4px; }
+    .swatch {
+      width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
+    }
+    .swatch.active { border-color: #fff; box-shadow: 0 0 0 1px #2563eb; }
+
+    /* ── Stage ── */
+    .stage { flex: 1; position: relative; overflow: hidden; cursor: grab; }
+    .stage.panning { cursor: grabbing; }
+    .stage.tool-select { cursor: default; }
+    .stage.tool-sticky, .stage.tool-zone { cursor: crosshair; }
+    .stage.tool-pen { cursor: crosshair; }
+    .stage.tool-connector { cursor: crosshair; }
+
+    .world {
+      position: absolute; left: 0; top: 0; transform-origin: 0 0;
+      width: 1px; height: 1px;
+    }
+
+    .grid-layer {
+      position: absolute; left: -50000px; top: -50000px;
+      width: 100000px; height: 100000px;
+      background-color: #fafbfc;
+      background-image:
+        linear-gradient(#e8ecf0 1px, transparent 1px),
+        linear-gradient(90deg, #e8ecf0 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+    }
+
+    .zones-layer {
+      position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;
+      z-index: 1;
+    }
+    /* 与 grid 同尺度世界坐标；勿用 100%（父级 .world 仅 1px，会裁切笔画/连线） */
+    .draw-layer, .connectors-layer {
+      position: absolute; left: 0; top: 0;
+      width: 100000px; height: 100000px;
+      overflow: visible; pointer-events: none;
+    }
+    .draw-layer { z-index: 2; }
+    .connectors-layer { z-index: 3; }
+    .stickies-layer { position: absolute; left: 0; top: 0; z-index: 4; }
+
+    .zone-rect {
+      position: absolute; border: 2px dashed; border-radius: 8px;
+      pointer-events: none;
+    }
+    .zone-rect .zone-label {
+      position: absolute; top: 8px; left: 12px; font-size: 13px; font-weight: 600;
+      padding: 2px 10px; border-radius: 4px; background: rgba(255,255,255,.9);
+      pointer-events: none;
+    }
+    .zone-rect.locked { opacity: .6; }
+    .zone-mask {
+      position: absolute; left: -50000px; top: -50000px;
+      width: 100000px; height: 100000px; pointer-events: none; z-index: 0;
+    }
+
+    /* Sticky */
+    .sticky {
+      position: absolute; min-width: 140px; min-height: 100px; max-width: 320px;
+      padding: 10px 12px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+      font-size: 14px; line-height: 1.45; color: #1e293b; cursor: move;
+      word-break: break-word; border: 2px solid transparent;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .sticky.selected { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.3); }
+    .sticky.editing { cursor: text; user-select: text; }
+    .sticky-media { position: relative; line-height: 0; }
+    .sticky-img {
+      width: 100%; height: auto; max-height: 200px; object-fit: contain;
+      border-radius: 3px; display: block; background: rgba(255,255,255,.5);
+    }
+    .sticky-img-rm {
+      position: absolute; top: 4px; right: 4px; width: 22px; height: 22px;
+      border: none; border-radius: 4px; background: rgba(15,20,25,.65); color: #fff;
+      font-size: 14px; line-height: 1; cursor: pointer; pointer-events: auto;
+    }
+    .sticky-img-rm:hover { background: rgba(220,38,38,.9); }
+    .sticky-text { min-height: 1.2em; white-space: pre-wrap; }
+    .sticky textarea {
+      width: 100%; min-height: 60px; border: none; background: transparent; resize: none;
+      font: inherit; color: inherit; outline: none; user-select: text;
+    }
+    .sticky-toolbar-btn {
+      font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid #3d4f66;
+      background: #243044; color: #e7ecf3; cursor: pointer; white-space: nowrap;
+    }
+    .sticky-toolbar-btn:hover { background: #334155; }
+
+    /* Selection handles */
+    .handles {
+      position: absolute; pointer-events: none; border: 2px solid #2563eb; z-index: 20;
+    }
+    .handle {
+      position: absolute; width: 10px; height: 10px; background: #fff; border: 2px solid #2563eb;
+      border-radius: 2px; pointer-events: auto; cursor: nwse-resize;
+    }
+    .handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
+    .handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
+    .handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+    .handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
+
+    /* Minimap */
+    .minimap {
+      position: absolute; right: 16px; bottom: 16px; width: 180px; height: 120px;
+      background: #1a2332; border: 1px solid #2d3a4d; border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.35); z-index: 50; overflow: hidden;
+    }
+    .minimap canvas { width: 100%; height: 100%; display: block; cursor: pointer; }
+    .minimap-title {
+      position: absolute; top: 6px; left: 10px; font-size: 10px; color: #64748b; pointer-events: none;
+    }
+
+    /* Connector preview */
+    .connector-preview { stroke: #64748b; stroke-width: 2; fill: none; stroke-dasharray: 6 4; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      padding: 8px 16px; background: #1e293b; color: #e2e8f0; font-size: 13px;
+      border-radius: 8px; z-index: 200; opacity: 0; transition: opacity .25s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* Context hint */
+    .hint-bar {
+      position: absolute; bottom: 16px; left: 16px; font-size: 11px; color: #64748b;
+      background: rgba(26,35,50,.85); padding: 6px 12px; border-radius: 6px; z-index: 50;
+      max-width: 420px; line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <header class="toolbar" id="toolbar">
+    <div class="toolbar-brand">InspireEd <span>白板</span></div>
+    <button type="button" class="tool-btn active" data-tool="pan" title="平移 (H)">✥</button>
+    <button type="button" class="tool-btn" data-tool="select" title="选择 (V)">↖</button>
+    <div class="tool-sep"></div>
+    <button type="button" class="tool-btn" data-tool="sticky" title="便签 (N)">📝</button>
+    <button type="button" class="tool-btn" data-tool="pen" title="画笔 (P)">✏️</button>
+    <button type="button" class="tool-btn" data-tool="connector" title="连线 (L)">⟷</button>
+    <button type="button" class="tool-btn" data-tool="zone" id="btnZone" title="小组区域 (G)">▦</button>
+    <div class="tool-sep"></div>
+    <div class="tool-opts" id="penOpts">
+      <label>粗细</label>
+      <input type="range" id="penWidth" min="1" max="24" value="3">
+      <input type="color" id="penColor" value="#2563eb">
+    </div>
+    <div class="tool-opts" id="connectorOpts" style="display:none">
+      <label>粗细</label>
+      <input type="range" id="connWidth" min="1" max="12" value="2">
+      <input type="color" id="connColor" value="#64748b">
+      <label class="conn-arrow-label" title="在目标便签一端显示箭头">
+        <input type="checkbox" id="connArrow" checked>
+        箭头
+      </label>
+    </div>
+    <div class="tool-opts" id="stickyOpts" style="display:none">
+      <div class="color-swatches" id="stickyColors"></div>
+      <button type="button" class="sticky-toolbar-btn" id="btnStickyUpload" title="上传图片到选中便签">🖼 上传</button>
+      <input type="file" id="stickyImageInput" accept="image/*" hidden>
+    </div>
+    <div class="tool-sep"></div>
+    <button type="button" class="tool-btn" id="btnDelete" title="删除选中 (Del)" disabled>🗑</button>
+    <button type="button" class="tool-btn" id="btnFit" title="适应视口">⤢</button>
+    <span class="tool-label" id="roleLabel"></span>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="world" id="world">
+      <div class="grid-layer"></div>
+      <div class="zone-mask" id="zoneMask"></div>
+      <div class="zones-layer" id="zonesLayer"></div>
+      <svg class="draw-layer" id="drawSvg" xmlns="http://www.w3.org/2000/svg"
+        width="100000" height="100000" viewBox="0 0 100000 100000" overflow="visible">
+        <g id="strokesG"></g>
+      </svg>
+      <svg class="connectors-layer" id="connSvg" xmlns="http://www.w3.org/2000/svg"
+        width="100000" height="100000" viewBox="0 0 100000 100000" overflow="visible">
+        <g id="connectorsG"></g>
+        <path id="connPreview" class="connector-preview" style="display:none"></path>
+      </svg>
+      <div class="stickies-layer" id="stickiesLayer"></div>
+    </div>
+    <div class="handles" id="handles" style="display:none">
+      <span class="handle nw" data-h="nw"></span>
+      <span class="handle ne" data-h="ne"></span>
+      <span class="handle sw" data-h="sw"></span>
+      <span class="handle se" data-h="se"></span>
+    </div>
+    <div class="minimap">
+      <span class="minimap-title">小地图</span>
+      <canvas id="minimapCanvas" width="180" height="120"></canvas>
+    </div>
+    <div class="hint-bar" id="hintBar"></div>
+  </main>
+  <div class="toast" id="toast"></div>
+
+  <script>
+(function () {
+  'use strict';
+
+  const STICKY_COLORS = [
+    { id: 'yellow', bg: '#fef08a', border: '#eab308' },
+    { id: 'pink', bg: '#fbcfe8', border: '#ec4899' },
+    { id: 'blue', bg: '#bfdbfe', border: '#3b82f6' },
+    { id: 'green', bg: '#bbf7d0', border: '#22c55e' },
+    { id: 'orange', bg: '#fed7aa', border: '#f97316' },
+    { id: 'purple', bg: '#e9d5ff', border: '#a855f7' },
+  ];
+  const ZONE_COLORS = ['#3b82f6', '#22c55e', '#f97316', '#a855f7', '#ec4899', '#06b6d4'];
+  const MAX_IMAGE_BYTES = 512 * 1024;
+  const STICKY_IMAGE_MAX_DIM = 720;
+
+  const params = new URLSearchParams(location.search);
+  const EMBEDDED = params.get('embedded') === '1' || window.parent !== window;
+  let ROLE = params.get('role') === 'teacher' ? 'teacher' : 'student';
+  let GROUP_INDEX = Math.max(0, parseInt(params.get('groupIndex') || '0', 10));
+  let boardMode = 'setup';
+  let syncEnabled = false;
+  let suppressEmit = false;
+
+  let tool = 'pan';
+  let viewport = { x: 80, y: 60, scale: 1 };
+  let elements = [];
+  let zones = [];
+  let selectedId = null;
+  let stickyColor = STICKY_COLORS[0];
+  let connectorColor = '#64748b';
+  let connectorWidth = 2;
+  let connectorArrow = true;
+  let nextId = 1;
+
+  let panning = false;
+  let panStart = null;
+  let drawingStroke = null;
+  let connectorFrom = null;
+  let zoneDrag = null;
+  let dragState = null;
+  let resizeState = null;
+
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage');
+  const world = $('world');
+  const stickiesLayer = $('stickiesLayer');
+  const zonesLayer = $('zonesLayer');
+  const strokesG = $('strokesG');
+  const connectorsG = $('connectorsG');
+  const connPreview = $('connPreview');
+  const handles = $('handles');
+  const zoneMask = $('zoneMask');
+  const minimapCanvas = $('minimapCanvas');
+  const mmCtx = minimapCanvas.getContext('2d');
+
+  function uid() { return 'el-' + (nextId++); }
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._tm);
+    toast._tm = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  function isTeacher() { return ROLE === 'teacher'; }
+  function myGroupIndex() { return GROUP_INDEX; }
+
+  function postToParent(type, data) {
+    if (!EMBEDDED) return;
+    window.parent.postMessage({ source: 'whiteboard', type, data: data || {} }, '*');
+  }
+
+  function emitOp(op) {
+    if (!syncEnabled || suppressEmit) return;
+    postToParent('WB_OP_LOCAL', { op });
+  }
+
+  function canEditBoard() {
+    if (boardMode === 'locked') return false;
+    if (!isTeacher() && boardMode !== 'collaborate') return false;
+    return true;
+  }
+
+  function getZoneByGroup(gi) {
+    return zones.find(z => z.groupIndex === gi);
+  }
+
+  function pointInRect(px, py, r) {
+    return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+  }
+
+  function elementCenter(el) {
+    if (el.type === 'sticky') {
+      const w = el.w || 160, h = el.h || 110;
+      return { x: el.x + w / 2, y: el.y + h / 2 };
+    }
+    if (el.type === 'stroke' && el.points.length) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      el.points.forEach(p => {
+        minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+      });
+      return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    }
+    return { x: 0, y: 0 };
+  }
+
+  function canEditInZone(wx, wy, groupIndex) {
+    if (!canEditBoard()) return false;
+    if (isTeacher()) return true;
+    const gi = groupIndex != null ? groupIndex : myGroupIndex();
+    if (!gi) return false;
+    const z = getZoneByGroup(gi);
+    if (!z) return false;
+    if (z.locked) return false;
+    return pointInRect(wx, wy, z.rect);
+  }
+
+  function elementAllowed(el) {
+    if (!canEditBoard()) return false;
+    if (isTeacher()) return true;
+    if (el.groupIndex !== myGroupIndex()) return false;
+    const c = elementCenter(el);
+    return canEditInZone(c.x, c.y, el.groupIndex);
+  }
+
+  function screenToWorld(sx, sy) {
+    const rect = stage.getBoundingClientRect();
+    return {
+      x: (sx - rect.left - viewport.x) / viewport.scale,
+      y: (sy - rect.top - viewport.y) / viewport.scale,
+    };
+  }
+
+  function applyViewport() {
+    world.style.transform = `translate(${viewport.x}px,${viewport.y}px) scale(${viewport.scale})`;
+    updateHandles();
+    drawMinimap();
+  }
+
+  function updateConnectorOptsVisibility() {
+    const sel = selectedId ? getElement(selectedId) : null;
+    const show = tool === 'connector' || (tool === 'select' && sel && sel.type === 'connector');
+    $('connectorOpts').style.display = show ? 'flex' : 'none';
+  }
+
+  function readConnectorOptsFromToolbar() {
+    connectorColor = $('connColor').value;
+    connectorWidth = +$('connWidth').value;
+    connectorArrow = $('connArrow').checked;
+  }
+
+  function writeConnectorOptsToToolbar(c) {
+    if (!c) {
+      $('connColor').value = connectorColor;
+      $('connWidth').value = String(connectorWidth);
+      $('connArrow').checked = connectorArrow;
+      return;
+    }
+    $('connColor').value = c.color || connectorColor;
+    $('connWidth').value = String(c.width != null ? c.width : connectorWidth);
+    $('connArrow').checked = c.arrowEnd !== false;
+    connectorColor = $('connColor').value;
+    connectorWidth = +$('connWidth').value;
+    connectorArrow = $('connArrow').checked;
+  }
+
+  function applyConnectorStyleToPath(path, style) {
+    const color = style.color || '#64748b';
+    const width = style.width != null ? style.width : 2;
+    const arrow = style.arrowEnd !== false;
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', String(width));
+    path.setAttribute('vector-effect', 'non-scaling-stroke');
+    if (arrow) path.setAttribute('marker-end', 'url(#conn-arrow-end)');
+    else path.removeAttribute('marker-end');
+  }
+
+  function ensureConnectorMarkers() {
+    if (document.getElementById('conn-arrow-end')) return;
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    marker.setAttribute('id', 'conn-arrow-end');
+    marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('markerWidth', '8');
+    marker.setAttribute('markerHeight', '8');
+    marker.setAttribute('refX', '8');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('orient', 'auto');
+    marker.setAttribute('markerUnits', 'strokeWidth');
+    const arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arrowPath.setAttribute('d', 'M0,0 L10,5 L0,10 Z');
+    arrowPath.setAttribute('fill', 'context-stroke');
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+    connSvg.insertBefore(defs, connectorsG);
+  }
+
+  function cancelConnectorDraft(quiet) {
+    if (!connectorFrom) return;
+    connectorFrom = null;
+    connPreview.style.display = 'none';
+    if (!quiet) toast('已取消连线');
+    updateHint();
+  }
+
+  function setTool(t) {
+    tool = t;
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tool === t);
+    });
+    stage.className = 'stage tool-' + t;
+    $('penOpts').style.display = t === 'pen' ? 'flex' : 'none';
+    updateStickyOptsVisibility();
+    if (t === 'connector') writeConnectorOptsToToolbar(null);
+    updateConnectorOptsVisibility();
+    if (t !== 'connector') cancelConnectorDraft(true);
+    updateHint();
+  }
+
+  function updateHint() {
+    const hints = {
+      pan: '拖拽平移 · 滚轮缩放',
+      select: '点击选中 · 拖拽移动 · Del 删除 · 选中便签可粘贴/上传图片',
+      sticky: (isTeacher() ? '点击画布添加便签' : '在本组区域内点击添加便签') + ' · Ctrl+V 粘贴截图 · 上传图片',
+      pen: isTeacher() ? '按住绘制' : '在本组区域内按住绘制',
+      connector: connectorFrom
+        ? '点击目标便签完成连线 · 点击空白或 Esc 取消'
+        : '依次点击两个便签建立连线',
+      zone: '拖拽画出小组区域 · 仅教师',
+    };
+    let h = hints[tool] || '';
+    if (!isTeacher() && myGroupIndex()) h += ` · 当前：第 ${myGroupIndex()} 组`;
+    $('hintBar').textContent = h;
+  }
+
+  /* ── Elements CRUD ── */
+  function addElement(el, opts) {
+    elements.push(el);
+    renderElement(el);
+    renderConnectors();
+    drawMinimap();
+    if (!opts?.silent) emitOp({ action: 'add', element: el });
+  }
+
+  function removeElement(id, opts) {
+    const el = getElement(id);
+    if (el && !opts?.silent) emitOp({ action: 'delete', element: { id } });
+    elements = elements.filter(e => e.id !== id);
+    elements = elements.filter(e => !(e.type === 'connector' && (e.fromId === id || e.toId === id)));
+    const node = document.querySelector(`[data-id="${id}"]`);
+    if (node) node.remove();
+    document.querySelectorAll(`[data-connector-from="${id}"], [data-connector-to="${id}"]`).forEach(() => {});
+    if (selectedId === id) select(null);
+    renderAll();
+  }
+
+  function getElement(id) { return elements.find(e => e.id === id); }
+
+  function renderStroke(el) {
+    let path = document.querySelector(`path[data-id="${el.id}"]`);
+    if (!path) {
+      path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.dataset.id = el.id;
+      strokesG.appendChild(path);
+    }
+    if (el.points.length < 2) {
+      path.setAttribute('d', '');
+      return;
+    }
+    const d = el.points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join(' ');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', el.color);
+    path.setAttribute('stroke-width', el.width);
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.style.pointerEvents = tool === 'select' ? 'stroke' : 'none';
+    path.style.cursor = tool === 'select' ? 'pointer' : 'default';
+    path.onclick = (e) => {
+      if (tool !== 'select') return;
+      e.stopPropagation();
+      if (elementAllowed(el)) select(el.id);
+    };
+  }
+
+  function updateStickyOptsVisibility() {
+    const sel = selectedId ? getElement(selectedId) : null;
+    const show = tool === 'sticky' || (sel && sel.type === 'sticky');
+    $('stickyOpts').style.display = show ? 'flex' : 'none';
+  }
+
+  function dataUrlByteSize(dataUrl) {
+    const i = dataUrl.indexOf(',');
+    const b64 = i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
+    return Math.floor((b64.length * 3) / 4);
+  }
+
+  function fileToCompressedDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('读取文件失败'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('无效的图片'));
+        img.onload = () => {
+          try {
+            let w = img.width;
+            let h = img.height;
+            const maxDim = STICKY_IMAGE_MAX_DIM;
+            if (w > maxDim || h > maxDim) {
+              const s = Math.min(maxDim / w, maxDim / h);
+              w = Math.round(w * s);
+              h = Math.round(h * s);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            let quality = 0.82;
+            let dataUrl = canvas.toDataURL('image/jpeg', quality);
+            while (dataUrlByteSize(dataUrl) > MAX_IMAGE_BYTES && quality > 0.35) {
+              quality -= 0.08;
+              dataUrl = canvas.toDataURL('image/jpeg', quality);
+            }
+            if (dataUrlByteSize(dataUrl) > MAX_IMAGE_BYTES) {
+              reject(new Error('图片过大，请换一张较小的图'));
+              return;
+            }
+            resolve(dataUrl);
+          } catch {
+            reject(new Error('图片处理失败'));
+          }
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function buildStickyContent(div, el) {
+    div.innerHTML = '';
+    if (el.imageUrl) {
+      const wrap = document.createElement('div');
+      wrap.className = 'sticky-media';
+      const img = document.createElement('img');
+      img.className = 'sticky-img';
+      img.src = el.imageUrl;
+      img.alt = '';
+      img.draggable = false;
+      img.addEventListener('pointerdown', (e) => e.stopPropagation());
+      wrap.appendChild(img);
+      if (elementAllowed(el)) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sticky-img-rm';
+        btn.textContent = '×';
+        btn.title = '移除图片';
+        btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeStickyImage(el.id);
+        });
+        wrap.appendChild(btn);
+      }
+      div.appendChild(wrap);
+    }
+    const text = document.createElement('div');
+    text.className = 'sticky-text';
+    text.textContent = el.text || '双击编辑';
+    div.appendChild(text);
+  }
+
+  function getTargetStickyForImage() {
+    if (!selectedId) return null;
+    const el = getElement(selectedId);
+    if (el?.type === 'sticky' && elementAllowed(el)) return el;
+    return null;
+  }
+
+  async function attachImageToSticky(el, file) {
+    if (!elementAllowed(el)) {
+      toast('无权编辑');
+      return;
+    }
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file);
+      el.imageUrl = dataUrl;
+      if ((el.w || 160) < 180) el.w = 220;
+      if ((el.h || 110) < 130) el.h = 150;
+      renderSticky(el);
+      emitOp({ action: 'update', element: el });
+      toast('图片已插入');
+    } catch (err) {
+      toast(err.message || '图片处理失败');
+    }
+  }
+
+  function removeStickyImage(id) {
+    const el = getElement(id);
+    if (!el || !el.imageUrl || !elementAllowed(el)) return;
+    delete el.imageUrl;
+    renderSticky(el);
+    emitOp({ action: 'update', element: el });
+  }
+
+  async function handleImageFile(file) {
+    if (!file || !file.type.startsWith('image/')) {
+      toast('请选择图片文件');
+      return;
+    }
+    if (!canEditBoard()) {
+      toast('当前不可编辑');
+      return;
+    }
+    let el = getTargetStickyForImage();
+    if (!el) {
+      const rect = stage.getBoundingClientRect();
+      const w = screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      const gi = isTeacher() ? null : myGroupIndex();
+      if (!canEditInZone(w.x, w.y, gi)) {
+        toast(isTeacher() ? '无法放置' : '请在本组区域内添加');
+        return;
+      }
+      el = {
+        id: uid(), type: 'sticky', x: w.x - 100, y: w.y - 90,
+        w: 220, h: 150, text: '便签', colorId: stickyColor.id,
+        groupIndex: gi, createdBy: 0,
+      };
+      addElement(el);
+      select(el.id);
+    }
+    await attachImageToSticky(el, file);
+  }
+
+  function renderSticky(el) {
+    let div = document.querySelector(`.sticky[data-id="${el.id}"]`);
+    if (!div) {
+      div = document.createElement('div');
+      div.className = 'sticky';
+      div.dataset.id = el.id;
+      stickiesLayer.appendChild(div);
+      div.addEventListener('pointerdown', onStickyPointerDown);
+      div.addEventListener('dblclick', onStickyDblClick);
+      div.addEventListener('contextmenu', onStickyContext);
+    }
+    const col = STICKY_COLORS.find(c => c.id === el.colorId) || STICKY_COLORS[0];
+    div.style.left = el.x + 'px';
+    div.style.top = el.y + 'px';
+    div.style.width = (el.w || 160) + 'px';
+    div.style.minHeight = (el.h || 110) + 'px';
+    div.style.background = col.bg;
+    div.classList.toggle('selected', selectedId === el.id);
+    if (div.classList.contains('editing')) return;
+    buildStickyContent(div, el);
+  }
+
+  function renderElement(el) {
+    if (el.type === 'stroke') renderStroke(el);
+    else if (el.type === 'sticky') renderSticky(el);
+  }
+
+  function renderZones() {
+    zonesLayer.innerHTML = '';
+    zones.forEach(z => {
+      const d = document.createElement('div');
+      d.className = 'zone-rect' + (z.locked ? ' locked' : '');
+      const col = ZONE_COLORS[(z.groupIndex - 1) % ZONE_COLORS.length];
+      d.style.left = z.rect.x + 'px';
+      d.style.top = z.rect.y + 'px';
+      d.style.width = z.rect.w + 'px';
+      d.style.height = z.rect.h + 'px';
+      d.style.borderColor = col;
+      d.style.background = col + '14';
+      d.innerHTML = `<span class="zone-label" style="color:${col}">${z.label || '第 ' + z.groupIndex + ' 组'}</span>`;
+      zonesLayer.appendChild(d);
+    });
+    updateZoneMask();
+  }
+
+  function updateZoneMask() {
+    if (isTeacher() || !myGroupIndex()) {
+      zoneMask.style.display = 'none';
+      return;
+    }
+    const z = getZoneByGroup(myGroupIndex());
+    if (!z) {
+      zoneMask.style.display = 'block';
+      zoneMask.style.background = 'rgba(15,20,25,.55)';
+      return;
+    }
+    const r = z.rect;
+    zoneMask.style.display = 'block';
+    zoneMask.style.background = `rgba(15,20,25,.5)`;
+    zoneMask.style.clipPath = `polygon(
+      evenodd,
+      -50000px -50000px, 100500px -50000px, 100500px 100500px, -50000px 100500px, -50000px -50000px,
+      ${r.x}px ${r.y}px, ${r.x}px ${r.y + r.h}px, ${r.x + r.w}px ${r.y + r.h}px, ${r.x + r.w}px ${r.y}px, ${r.x}px ${r.y}px
+    )`;
+  }
+
+  function stickyAnchor(el, side) {
+    const w = el.w || 160, h = el.h || 110;
+    const cx = el.x + w / 2, cy = el.y + h / 2;
+    if (side === 'left') return { x: el.x, y: cy };
+    if (side === 'right') return { x: el.x + w, y: cy };
+    if (side === 'top') return { x: cx, y: el.y };
+    return { x: cx, y: el.y + h };
+  }
+
+  function bestAnchors(from, to) {
+    const sides = ['left', 'right', 'top', 'bottom'];
+    let best = { a: stickyAnchor(from, 'right'), b: stickyAnchor(to, 'left'), d: Infinity };
+    sides.forEach(s1 => {
+      sides.forEach(s2 => {
+        const a = stickyAnchor(from, s1), b = stickyAnchor(to, s2);
+        const d = (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+        if (d < best.d) best = { a, b, d };
+      });
+    });
+    return best;
+  }
+
+  function connectorPath(x1, y1, x2, y2) {
+    const mx = (x1 + x2) / 2;
+    return `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+  }
+
+  /** 两便签之间是否已有连线（不区分方向） */
+  function hasConnectorBetween(idA, idB) {
+    return elements.some(
+      (e) =>
+        e.type === 'connector' &&
+        ((e.fromId === idA && e.toId === idB) || (e.fromId === idB && e.toId === idA))
+    );
+  }
+
+  function renderConnectors() {
+    ensureConnectorMarkers();
+    connectorsG.innerHTML = '';
+    elements.filter(e => e.type === 'connector').forEach(c => {
+      const from = getElement(c.fromId), to = getElement(c.toId);
+      if (!from || !to || from.type !== 'sticky' || to.type !== 'sticky') return;
+      const { a, b } = bestAnchors(from, to);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.dataset.id = c.id;
+      path.setAttribute('d', connectorPath(a.x, a.y, b.x, b.y));
+      path.setAttribute('fill', 'none');
+      applyConnectorStyleToPath(path, c);
+      path.style.pointerEvents = tool === 'select' ? 'stroke' : 'none';
+      path.style.cursor = tool === 'select' ? 'pointer' : 'default';
+      path.addEventListener('pointerdown', (e) => {
+        if (tool !== 'select') return;
+        e.stopPropagation();
+        if (!elementAllowed(c)) return;
+        select(c.id);
+      });
+      connectorsG.appendChild(path);
+    });
+  }
+
+  function renderAll() {
+    strokesG.innerHTML = '';
+    stickiesLayer.innerHTML = '';
+    elements.forEach(renderElement);
+    renderZones();
+    renderConnectors();
+    drawMinimap();
+  }
+
+  function select(id) {
+    selectedId = id;
+    document.querySelectorAll('.sticky').forEach(s => {
+      s.classList.toggle('selected', s.dataset.id === id);
+    });
+    const el = id ? getElement(id) : null;
+    if (el && el.type === 'connector') writeConnectorOptsToToolbar(el);
+    updateConnectorOptsVisibility();
+    updateStickyOptsVisibility();
+    $('btnDelete').disabled = !id || (id && !canDeleteSelected());
+    updateHandles();
+  }
+
+  function patchSelectedConnector() {
+    if (!selectedId) return;
+    const el = getElement(selectedId);
+    if (!el || el.type !== 'connector' || !elementAllowed(el)) return;
+    readConnectorOptsFromToolbar();
+    el.color = connectorColor;
+    el.width = connectorWidth;
+    el.arrowEnd = connectorArrow;
+    renderConnectors();
+    emitOp({ action: 'update', element: el });
+  }
+
+  function canDeleteSelected() {
+    if (!selectedId) return false;
+    const el = getElement(selectedId);
+    return el && elementAllowed(el);
+  }
+
+  function updateHandles() {
+    if (!selectedId || tool !== 'select') {
+      handles.style.display = 'none';
+      return;
+    }
+    const el = getElement(selectedId);
+    if (!el || el.type !== 'sticky') {
+      handles.style.display = 'none';
+      return;
+    }
+    const w = el.w || 160, h = el.h || 110;
+    const sx = el.x * viewport.scale + viewport.x;
+    const sy = el.y * viewport.scale + viewport.y;
+    handles.style.display = 'block';
+    handles.style.left = sx + 'px';
+    handles.style.top = sy + 'px';
+    handles.style.width = w * viewport.scale + 'px';
+    handles.style.height = h * viewport.scale + 'px';
+  }
+
+  /* ── Create helpers ── */
+  function createSticky(wx, wy) {
+    const gi = isTeacher() ? null : myGroupIndex();
+    if (!canEditInZone(wx, wy, gi)) {
+      toast(isTeacher() ? '无法放置' : '请在本组区域内添加');
+      return;
+    }
+    const el = {
+      id: uid(), type: 'sticky', x: wx - 70, y: wy - 50,
+      w: 160, h: 110, text: '', colorId: stickyColor.id,
+      groupIndex: gi, createdBy: 0,
+    };
+    addElement(el);
+    select(el.id);
+    startEditSticky(el.id);
+  }
+
+  function createZone(rect, opts) {
+    const gi = zones.length + 1;
+    const zone = {
+      id: uid(),
+      label: '第 ' + gi + ' 组',
+      groupIndex: gi,
+      rect,
+      color: ZONE_COLORS[(gi - 1) % ZONE_COLORS.length],
+      locked: false,
+    };
+    zones.push(zone);
+    renderZones();
+    drawMinimap();
+    if (!opts?.silent) emitOp({ action: 'zone.add', zone });
+    toast('已添加 ' + zone.label);
+  }
+
+  function applyRemoteOp(op) {
+    suppressEmit = true;
+    const action = op.action;
+    if (action === 'zone.add' && op.zone) {
+      zones.push(op.zone);
+    } else if (action === 'zone.update' && op.zone) {
+      const i = zones.findIndex(z => z.id === op.zone.id);
+      if (i >= 0) zones[i] = { ...zones[i], ...op.zone };
+    } else if (action === 'zone.delete') {
+      zones = zones.filter(z => z.id !== op.zoneId);
+    } else if (action === 'add' && op.element) {
+      if (!elements.find(e => e.id === op.element.id)) elements.push(op.element);
+    } else if (action === 'update' && op.element) {
+      const i = elements.findIndex(e => e.id === op.element.id);
+      if (i >= 0) elements[i] = { ...elements[i], ...op.element };
+      else elements.push(op.element);
+    } else if (action === 'delete') {
+      const eid = op.element?.id || op.elementId;
+      elements = elements.filter(e => e.id !== eid);
+      elements = elements.filter(e => !(e.type === 'connector' && (e.fromId === eid || e.toId === eid)));
+    }
+    renderAll();
+    suppressEmit = false;
+  }
+
+  function loadDocument(doc) {
+    suppressEmit = true;
+    zones = (doc && doc.zones) ? doc.zones.slice() : [];
+    elements = (doc && doc.elements) ? doc.elements.slice() : [];
+    if (doc && doc.mode) boardMode = doc.mode;
+    renderAll();
+    updateHint();
+    suppressEmit = false;
+  }
+
+  /* ── Sticky interaction ── */
+  function onStickyPointerDown(e) {
+    if (tool !== 'select' && tool !== 'connector') return;
+    const id = e.currentTarget.dataset.id;
+    const el = getElement(id);
+    if (!el) return;
+
+    if (tool === 'connector') {
+      e.stopPropagation();
+      if (!elementAllowed(el)) return;
+      if (!connectorFrom) {
+        connectorFrom = id;
+        toast('选择目标便签');
+        updateHint();
+      } else if (connectorFrom === id) {
+        cancelConnectorDraft();
+      } else if (connectorFrom !== id) {
+        if (hasConnectorBetween(connectorFrom, id)) {
+          toast('这两个便签已经连过线了');
+          cancelConnectorDraft(true);
+          return;
+        }
+        readConnectorOptsFromToolbar();
+        const c = {
+          id: uid(), type: 'connector', fromId: connectorFrom, toId: id,
+          color: connectorColor,
+          width: connectorWidth,
+          arrowEnd: connectorArrow,
+          groupIndex: el.groupIndex,
+        };
+        addElement(c);
+        connectorFrom = null;
+        connPreview.style.display = 'none';
+        toast('连线已创建');
+        updateHint();
+      }
+      return;
+    }
+
+    if (tool !== 'select') return;
+    e.stopPropagation();
+    if (!elementAllowed(el)) return;
+    select(id);
+    const w = screenToWorld(e.clientX, e.clientY);
+    dragState = { id, ox: w.x - el.x, oy: w.y - el.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onStickyDblClick(e) {
+    e.stopPropagation();
+    const id = e.currentTarget.dataset.id;
+    const el = getElement(id);
+    if (!el || !elementAllowed(el)) return;
+    startEditSticky(id);
+  }
+
+  function onStickyContext(e) {
+    e.preventDefault();
+    const id = e.currentTarget.dataset.id;
+    const el = getElement(id);
+    if (!el || !elementAllowed(el)) return;
+    removeElement(id);
+    toast('已删除');
+  }
+
+  function startEditSticky(id) {
+    const el = getElement(id);
+    const div = document.querySelector(`.sticky[data-id="${id}"]`);
+    if (!div || !el) return;
+    div.classList.add('editing');
+    const ta = document.createElement('textarea');
+    const placeholder = '双击编辑';
+    ta.value = (!el.text || el.text === placeholder) ? '' : el.text;
+    const textNode = div.querySelector('.sticky-text');
+    if (textNode) textNode.replaceWith(ta);
+    else div.appendChild(ta);
+    ta.focus();
+    const finish = () => {
+      el.text = ta.value.trim() || '便签';
+      div.classList.remove('editing');
+      renderSticky(el);
+      emitOp({ action: 'update', element: el });
+    };
+    ta.addEventListener('blur', finish);
+    ta.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') { ta.blur(); }
+      ev.stopPropagation();
+    });
+  }
+
+  /* ── Pointer on stage ── */
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.sticky') || e.target.closest('.handle')) return;
+
+    const w = screenToWorld(e.clientX, e.clientY);
+
+    if (tool === 'connector' && connectorFrom && e.button === 0) {
+      cancelConnectorDraft();
+      return;
+    }
+
+    if (tool === 'pan' || (e.button === 1) || (tool === 'select' && e.target === stage)) {
+      if (tool === 'pan' || e.button === 1) {
+        panning = true;
+        panStart = { x: e.clientX - viewport.x, y: e.clientY - viewport.y };
+        stage.classList.add('panning');
+        return;
+      }
+      if (tool === 'select' && e.target === stage) select(null);
+    }
+
+    if (tool === 'sticky') {
+      createSticky(w.x, w.y);
+      return;
+    }
+
+    if (tool === 'pen') {
+      if (!canEditInZone(w.x, w.y, isTeacher() ? null : myGroupIndex())) {
+        toast(isTeacher() ? '' : '请在本组区域内绘制');
+        return;
+      }
+      drawingStroke = {
+        id: uid(), type: 'stroke',
+        points: [{ x: w.x, y: w.y }],
+        color: $('penColor').value,
+        width: +$('penWidth').value,
+        groupIndex: isTeacher() ? null : myGroupIndex(),
+      };
+      addElement(drawingStroke);
+      stage.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    if (tool === 'zone' && isTeacher()) {
+      zoneDrag = { x0: w.x, y0: w.y, x1: w.x, y1: w.y };
+      stage.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    if (tool === 'select') {
+      const hitStroke = hitTestStroke(w.x, w.y);
+      if (hitStroke && elementAllowed(hitStroke)) {
+        select(hitStroke.id);
+        return;
+      }
+      select(null);
+    }
+  });
+
+  stage.addEventListener('pointermove', (e) => {
+    const w = screenToWorld(e.clientX, e.clientY);
+
+    if (panning && panStart) {
+      viewport.x = e.clientX - panStart.x;
+      viewport.y = e.clientY - panStart.y;
+      applyViewport();
+      return;
+    }
+
+    if (dragState) {
+      const el = getElement(dragState.id);
+      if (el && el.type === 'sticky') {
+        const nx = w.x - dragState.ox, ny = w.y - dragState.oy;
+        if (canEditInZone(nx + (el.w || 80), ny + (el.h || 55), el.groupIndex)) {
+          el.x = nx;
+          el.y = ny;
+          renderSticky(el);
+          renderConnectors();
+          updateHandles();
+        }
+      }
+      return;
+    }
+
+    if (resizeState) {
+      const el = getElement(resizeState.id);
+      if (el && el.type === 'sticky') {
+        const minW = 100, minH = 80;
+        if (resizeState.h.includes('e')) el.w = Math.max(minW, w.x - el.x);
+        if (resizeState.h.includes('s')) el.h = Math.max(minH, w.y - el.y);
+        if (resizeState.h.includes('w')) {
+          const nw = el.x + (el.w || 160) - w.x;
+          if (nw >= minW) { el.x = w.x; el.w = nw; }
+        }
+        if (resizeState.h.includes('n')) {
+          const nh = el.y + (el.h || 110) - w.y;
+          if (nh >= minH) { el.y = w.y; el.h = nh; }
+        }
+        renderSticky(el);
+        renderConnectors();
+        updateHandles();
+      }
+      return;
+    }
+
+    if (drawingStroke) {
+      const last = drawingStroke.points[drawingStroke.points.length - 1];
+      if (Math.hypot(last.x - w.x, last.y - w.y) > 2) {
+        drawingStroke.points.push({ x: w.x, y: w.y });
+        renderStroke(drawingStroke);
+      }
+      return;
+    }
+
+    if (zoneDrag) {
+      zoneDrag.x1 = w.x;
+      zoneDrag.y1 = w.y;
+      renderZonePreview();
+      return;
+    }
+
+    if (connectorFrom && tool === 'connector') {
+      const from = getElement(connectorFrom);
+      if (from) {
+        readConnectorOptsFromToolbar();
+        const { a } = bestAnchors(from, { x: w.x - 50, y: w.y - 50, w: 100, h: 100 });
+        connPreview.style.display = '';
+        connPreview.setAttribute('d', connectorPath(a.x, a.y, w.x, w.y));
+        applyConnectorStyleToPath(connPreview, {
+          color: connectorColor,
+          width: connectorWidth,
+          arrowEnd: connectorArrow,
+        });
+      }
+    }
+  });
+
+  stage.addEventListener('pointerup', (e) => {
+    if (panning) {
+      panning = false;
+      panStart = null;
+      stage.classList.remove('panning');
+    }
+    if (drawingStroke) {
+      if (drawingStroke.points.length < 2) {
+        elements = elements.filter(x => x.id !== drawingStroke.id);
+        document.querySelector(`path[data-id="${drawingStroke.id}"]`)?.remove();
+      }
+      drawingStroke = null;
+    }
+    if (zoneDrag) {
+      const x = Math.min(zoneDrag.x0, zoneDrag.x1);
+      const y = Math.min(zoneDrag.y0, zoneDrag.y1);
+      const w = Math.abs(zoneDrag.x1 - zoneDrag.x0);
+      const h = Math.abs(zoneDrag.y1 - zoneDrag.y0);
+      zoneDrag = null;
+      clearZonePreview();
+      if (w > 40 && h > 40) createZone({ x, y, w, h });
+    }
+    if (dragState) {
+      const el = getElement(dragState.id);
+      if (el) emitOp({ action: 'update', element: el });
+    }
+    if (resizeState) {
+      const el = getElement(resizeState.id);
+      if (el) emitOp({ action: 'update', element: el });
+    }
+    dragState = null;
+    resizeState = null;
+  });
+
+  let zonePreviewEl = null;
+  function renderZonePreview() {
+    if (!zoneDrag) return;
+    if (!zonePreviewEl) {
+      zonePreviewEl = document.createElement('div');
+      zonePreviewEl.className = 'zone-rect';
+      zonePreviewEl.style.borderStyle = 'solid';
+      zonePreviewEl.style.borderColor = '#2563eb';
+      zonePreviewEl.style.background = 'rgba(37,99,235,.08)';
+      zonePreviewEl.style.pointerEvents = 'none';
+      zonesLayer.appendChild(zonePreviewEl);
+    }
+    const x = Math.min(zoneDrag.x0, zoneDrag.x1);
+    const y = Math.min(zoneDrag.y0, zoneDrag.y1);
+    zonePreviewEl.style.left = x + 'px';
+    zonePreviewEl.style.top = y + 'px';
+    zonePreviewEl.style.width = Math.abs(zoneDrag.x1 - zoneDrag.x0) + 'px';
+    zonePreviewEl.style.height = Math.abs(zoneDrag.y1 - zoneDrag.y0) + 'px';
+  }
+  function clearZonePreview() {
+    zonePreviewEl?.remove();
+    zonePreviewEl = null;
+  }
+
+  function hitTestStroke(wx, wy, threshold = 8) {
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i];
+      if (el.type !== 'stroke' || !elementAllowed(el)) continue;
+      for (let j = 1; j < el.points.length; j++) {
+        const d = distToSegment(wx, wy, el.points[j - 1], el.points[j]);
+        if (d < threshold / viewport.scale) return el;
+      }
+    }
+    return null;
+  }
+
+  function distToSegment(px, py, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return Math.hypot(px - a.x, py - a.y);
+    let t = ((px - a.x) * dx + (py - a.y) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
+  }
+
+  /* ── Resize handles ── */
+  handles.querySelectorAll('.handle').forEach(h => {
+    h.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      if (!selectedId) return;
+      const el = getElement(selectedId);
+      if (!el || !elementAllowed(el)) return;
+      resizeState = { id: selectedId, h: h.dataset.h };
+      h.setPointerCapture(e.pointerId);
+    });
+  });
+
+  /* ── Wheel zoom ── */
+  stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = stage.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const factor = e.deltaY > 0 ? 0.92 : 1.08;
+    const newScale = Math.min(4, Math.max(0.15, viewport.scale * factor));
+    const wx = (mx - viewport.x) / viewport.scale;
+    const wy = (my - viewport.y) / viewport.scale;
+    viewport.scale = newScale;
+    viewport.x = mx - wx * newScale;
+    viewport.y = my - wy * newScale;
+    applyViewport();
+  }, { passive: false });
+
+  /* ── Minimap ── */
+  function getContentBounds() {
+    let minX = -200, minY = -200, maxX = 1200, maxY = 800;
+    elements.forEach(el => {
+      if (el.type === 'sticky') {
+        minX = Math.min(minX, el.x); minY = Math.min(minY, el.y);
+        maxX = Math.max(maxX, el.x + (el.w || 160)); maxY = Math.max(maxY, el.y + (el.h || 110));
+      }
+      if (el.type === 'stroke') el.points.forEach(p => {
+        minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+      });
+    });
+    zones.forEach(z => {
+      minX = Math.min(minX, z.rect.x); minY = Math.min(minY, z.rect.y);
+      maxX = Math.max(maxX, z.rect.x + z.rect.w); maxY = Math.max(maxY, z.rect.y + z.rect.h);
+    });
+    return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+  }
+
+  function drawMinimap() {
+    const W = 180, H = 120;
+    mmCtx.fillStyle = '#0f1419';
+    mmCtx.fillRect(0, 0, W, H);
+    const b = getContentBounds();
+    const pad = 40;
+    const bw = b.w + pad * 2, bh = b.h + pad * 2;
+    const scale = Math.min(W / bw, H / bh) * 0.9;
+    const ox = (W - bw * scale) / 2 - (b.minX - pad) * scale;
+    const oy = (H - bh * scale) / 2 - (b.minY - pad) * scale;
+
+    zones.forEach(z => {
+      const col = ZONE_COLORS[(z.groupIndex - 1) % ZONE_COLORS.length];
+      mmCtx.fillStyle = col + '44';
+      mmCtx.strokeStyle = col;
+      mmCtx.lineWidth = 1;
+      mmCtx.fillRect(ox + z.rect.x * scale, oy + z.rect.y * scale, z.rect.w * scale, z.rect.h * scale);
+      mmCtx.strokeRect(ox + z.rect.x * scale, oy + z.rect.y * scale, z.rect.w * scale, z.rect.h * scale);
+    });
+
+    elements.filter(e => e.type === 'sticky').forEach(el => {
+      const c = STICKY_COLORS.find(x => x.id === el.colorId) || STICKY_COLORS[0];
+      mmCtx.fillStyle = c.bg;
+      mmCtx.fillRect(ox + el.x * scale, oy + el.y * scale, (el.w || 160) * scale, (el.h || 110) * scale);
+    });
+
+    const rect = stage.getBoundingClientRect();
+    const vx = (-viewport.x) / viewport.scale;
+    const vy = (-viewport.y) / viewport.scale;
+    const vw = rect.width / viewport.scale;
+    const vh = rect.height / viewport.scale;
+    mmCtx.strokeStyle = '#5eead4';
+    mmCtx.lineWidth = 2;
+    mmCtx.strokeRect(ox + vx * scale, oy + vy * scale, vw * scale, vh * scale);
+
+    minimapCanvas._map = { scale, ox, oy, b };
+  }
+
+  minimapCanvas.addEventListener('click', (e) => {
+    const m = minimapCanvas._map;
+    if (!m) return;
+    const r = minimapCanvas.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (180 / r.width);
+    const my = (e.clientY - r.top) * (120 / r.height);
+    const wx = (mx - m.ox) / m.scale;
+    const wy = (my - m.oy) / m.scale;
+    const rect = stage.getBoundingClientRect();
+    viewport.x = rect.width / 2 - wx * viewport.scale;
+    viewport.y = rect.height / 2 - wy * viewport.scale;
+    applyViewport();
+  });
+
+  function fitView() {
+    const b = getContentBounds();
+    const rect = stage.getBoundingClientRect();
+    const pad = 80;
+    const scale = Math.min(
+      (rect.width - pad) / Math.max(b.w, 400),
+      (rect.height - pad) / Math.max(b.h, 300)
+    );
+    viewport.scale = Math.min(2, Math.max(0.2, scale));
+    viewport.x = (rect.width - (b.minX + b.maxX) * viewport.scale) / 2;
+    viewport.y = (rect.height - (b.minY + b.maxY) * viewport.scale) / 2;
+    applyViewport();
+  }
+
+  /* ── Toolbar ── */
+  document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.tool === 'zone' && !isTeacher()) {
+        toast('仅教师可划分小组区域');
+        return;
+      }
+      setTool(btn.dataset.tool);
+    });
+  });
+
+  $('btnDelete').addEventListener('click', () => {
+    if (selectedId && canDeleteSelected()) {
+      removeElement(selectedId);
+      toast('已删除');
+    }
+  });
+
+  $('btnFit').addEventListener('click', fitView);
+
+  ensureConnectorMarkers();
+  ['connColor', 'connWidth', 'connArrow'].forEach((id) => {
+    const el = $(id);
+    el.addEventListener('input', () => {
+      if (tool === 'connector') readConnectorOptsFromToolbar();
+      else patchSelectedConnector();
+      if (connectorFrom && tool === 'connector') {
+        applyConnectorStyleToPath(connPreview, {
+          color: connectorColor,
+          width: connectorWidth,
+          arrowEnd: connectorArrow,
+        });
+      }
+    });
+    el.addEventListener('change', () => {
+      if (tool === 'connector') readConnectorOptsFromToolbar();
+      else patchSelectedConnector();
+    });
+  });
+
+  const sw = $('stickyColors');
+  STICKY_COLORS.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'swatch' + (i === 0 ? ' active' : '');
+    b.style.background = c.bg;
+    b.title = c.id;
+    b.addEventListener('click', () => {
+      stickyColor = c;
+      sw.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      b.classList.add('active');
+      if (selectedId) {
+        const el = getElement(selectedId);
+        if (el && el.type === 'sticky' && elementAllowed(el)) {
+          el.colorId = c.id;
+          renderSticky(el);
+        }
+      }
+    });
+    sw.appendChild(b);
+  });
+
+  document.addEventListener('paste', async (e) => {
+    if (e.target.tagName === 'TEXTAREA') return;
+    if (!canEditBoard()) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) await handleImageFile(file);
+        return;
+      }
+    }
+  });
+
+  $('btnStickyUpload').addEventListener('click', () => {
+    $('stickyImageInput').click();
+  });
+  $('stickyImageInput').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) await handleImageFile(file);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'Escape' && connectorFrom) {
+      cancelConnectorDraft();
+      return;
+    }
+    const map = { h: 'pan', v: 'select', n: 'sticky', p: 'pen', l: 'connector', g: 'zone' };
+    if (map[e.key.toLowerCase()]) {
+      if (map[e.key.toLowerCase()] === 'zone' && !isTeacher()) return;
+      setTool(map[e.key.toLowerCase()]);
+    }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (selectedId && canDeleteSelected()) removeElement(selectedId);
+    }
+  });
+
+  /* ── Demo zones for teacher preview ── */
+  function seedDemo() {
+    if (zones.length) return;
+    createZone({ x: 120, y: 120, w: 480, h: 360 });
+    createZone({ x: 640, y: 120, w: 480, h: 360 });
+    createZone({ x: 120, y: 520, w: 480, h: 360 });
+    createZone({ x: 640, y: 520, w: 480, h: 360 });
+  }
+
+  window.addEventListener('message', (event) => {
+    const msg = event.data;
+    if (!msg || msg.source !== 'inspireed') return;
+    if (msg.type === 'WB_INIT') {
+      const d = msg.data || {};
+      if (d.role) ROLE = d.role;
+      if (d.groupIndex != null) GROUP_INDEX = d.groupIndex;
+      if (d.mode) boardMode = d.mode;
+      syncEnabled = true;
+      if (d.document) loadDocument(d.document);
+      if (!isTeacher()) $('btnZone').disabled = true;
+      $('roleLabel').textContent = isTeacher()
+        ? '教师模式'
+        : (myGroupIndex() ? `学生 · 第 ${myGroupIndex()} 组` : '学生 · 未指定组');
+      updateHint();
+      return;
+    }
+    if (msg.type === 'WB_FULL_SYNC' && msg.data?.document) {
+      loadDocument(msg.data.document);
+      return;
+    }
+    if (msg.type === 'WB_REMOTE_OP' && msg.data?.op) {
+      applyRemoteOp(msg.data.op);
+      return;
+    }
+    if (msg.type === 'WB_MODE' && msg.data?.mode) {
+      boardMode = msg.data.mode;
+      updateHint();
+      return;
+    }
+    if (msg.type === 'WB_GROUPS' && msg.data?.groupIndex != null) {
+      GROUP_INDEX = msg.data.groupIndex;
+      $('roleLabel').textContent = `学生 · 第 ${GROUP_INDEX} 组`;
+      updateZoneMask();
+      return;
+    }
+  });
+
+  /* ── Init ── */
+  if (!isTeacher()) {
+    $('btnZone').disabled = true;
+  }
+  $('roleLabel').textContent = isTeacher()
+    ? '教师模式'
+    : (myGroupIndex() ? `学生 · 第 ${myGroupIndex()} 组` : '学生 · 未指定组');
+
+  if (EMBEDDED) {
+    syncEnabled = false;
+    setTool(isTeacher() ? 'zone' : 'pan');
+    postToParent('WB_READY', {});
+  } else {
+    seedDemo();
+    if (isTeacher()) {
+      setTool('zone');
+    } else if (myGroupIndex()) {
+      setTool('sticky');
+    } else {
+      toast('请使用 ?groupIndex=1 指定小组');
+      setTool('pan');
+    }
+    updateHint();
+  }
+
+  applyViewport();
+  fitView();
+})();
+  </script>
+</body>
+</html>

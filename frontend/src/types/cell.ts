@@ -15,6 +15,7 @@ export const CellType = {
   INTERACTIVE: 'INTERACTIVE',  // 交互式课件单元
   IMAGE: 'IMAGE',  // 图片单元
   REFERENCE_MATERIAL: 'REFERENCE_MATERIAL',
+  WHITEBOARD: 'WHITEBOARD',
 } as const
 
 export type CellType = typeof CellType[keyof typeof CellType]
@@ -302,6 +303,46 @@ export interface InteractiveCell extends CellBase {
   }
 }
 
+export interface WhiteboardZone {
+  id: string
+  label: string
+  groupIndex: number
+  rect: { x: number; y: number; w: number; h: number }
+  color?: string
+  locked?: boolean
+}
+
+export interface WhiteboardElement {
+  id: string
+  type: 'sticky' | 'stroke' | 'connector'
+  groupIndex: number | null
+  createdBy?: number
+  updatedAt?: string
+  [key: string]: unknown
+}
+
+export interface WhiteboardDocument {
+  version: number
+  mode: 'setup' | 'collaborate' | 'locked'
+  zones: WhiteboardZone[]
+  elements: WhiteboardElement[]
+  viewport?: { x: number; y: number; zoom: number }
+}
+
+export interface WhiteboardCellContent {
+  initialDocument?: WhiteboardDocument
+  defaultGroupCount?: number
+}
+
+export interface WhiteboardCell extends CellBase {
+  type: typeof CellType.WHITEBOARD
+  content: WhiteboardCellContent
+  config?: {
+    height?: string
+    showMinimap?: boolean
+  }
+}
+
 export type Cell =
   | TextCell
   | CodeCell
@@ -316,3 +357,4 @@ export type Cell =
   | BrowserCell
   | InteractiveCell
   | ReferenceMaterialCell
+  | WhiteboardCell

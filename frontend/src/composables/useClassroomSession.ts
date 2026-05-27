@@ -17,6 +17,11 @@ import type { ClassSession, StudentParticipation } from '../types/classroomSessi
 import { createLogger } from '../utils/logger'
 import { normalizeSessionStatus, isSessionActive } from '../utils/sessionStatus'
 import { useMathlabContest } from '@/composables/useMathlabContest'
+import { handleWhiteboardWsMessage } from '@/composables/useWhiteboard'
+import { handleWhiteboardWsMessage } from '@/composables/useWhiteboard'
+import { handleWhiteboardWsMessage } from '@/composables/useWhiteboard'
+import { handleWhiteboardWsMessage } from '@/composables/useWhiteboard'
+import { handleWhiteboardWsMessage } from '@/composables/useWhiteboard'
 
 const log = createLogger('ClassroomSession')
 
@@ -582,6 +587,14 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
       (eventType) => {
         websocketService.on(eventType, (message: WebSocketMessage) => {
           handleMathlabContestWs(message)
+        })
+      }
+    )
+
+    ;['whiteboard.sync', 'whiteboard.op', 'whiteboard.mode', 'whiteboard.groups', 'whiteboard.error'].forEach(
+      (eventType) => {
+        websocketService.on(eventType, (message: WebSocketMessage) => {
+          handleWhiteboardWsMessage(message)
         })
       }
     )

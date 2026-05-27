@@ -37,6 +37,7 @@ class CellType(str, Enum):
     INTERACTIVE = "INTERACTIVE"  # 交互式课件单元
     IMAGE = "IMAGE"  # 图片单元
     REFERENCE_MATERIAL = "REFERENCE_MATERIAL"  # 参考素材单元
+    WHITEBOARD = "WHITEBOARD"  # 协作白板单元
 
 
 class CognitiveLevel(str, Enum):

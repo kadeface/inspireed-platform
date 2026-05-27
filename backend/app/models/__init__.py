@@ -43,6 +43,8 @@ from app.models.mathlab_contest import (
     MathlabContestStatus,
     MathlabContestSubmission,
 )
+from app.models.session_group import SessionGroup, SessionGroupMember
+from app.models.whiteboard_state import WhiteboardState
 from app.models.classroom_assistant import (
     RoleInClass,
     AttendanceStatus,

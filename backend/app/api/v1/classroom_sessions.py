@@ -1933,9 +1933,25 @@ async def handle_client_message(
             completed_cells=data.get("completed_cells", []),
             progress_percentage=data.get("progress_percentage", 0),
         )
-    
+
     else:
-        logger.warning("Unknown WS message type: %s (session=%s, student=%s)", message_type, session_id, student_id)
+        from app.services.whiteboard_ws import handle_whiteboard_message
+
+        handled = await handle_whiteboard_message(
+            message,
+            session_id=session_id,
+            user_id=student_id,
+            is_teacher=False,
+            websocket=websocket,
+            db=db,
+        )
+        if not handled:
+            logger.warning(
+                "Unknown WS message type: %s (session=%s, student=%s)",
+                message_type,
+                session_id,
+                student_id,
+            )
 
 
 async def update_student_online_status(
@@ -2155,6 +2171,18 @@ async def websocket_teacher_session_endpoint(
                     "type": "pong",
                     "timestamp": datetime.utcnow().isoformat(),
                 }))
+
+            elif message_type and str(message_type).startswith("whiteboard."):
+                from app.services.whiteboard_ws import handle_whiteboard_message
+
+                await handle_whiteboard_message(
+                    message,
+                    session_id=session_id,
+                    user_id=cast(int, teacher_id),
+                    is_teacher=True,
+                    websocket=websocket,
+                    db=db,
+                )
 
             elif message_type == "request_statistics":
                 # 请求统计信息

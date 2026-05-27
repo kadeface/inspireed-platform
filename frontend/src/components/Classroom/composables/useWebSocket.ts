@@ -70,6 +70,21 @@ export interface UseWebSocketOptions {
   /** MathLab 竞赛相关 WebSocket 事件 */
   onMathlabContest?: (type: string, data: Record<string, unknown>) => void
 
+  /** 协作白板 WebSocket 事件 */
+  onWhiteboard?: (type: string, data: Record<string, unknown>) => void
+
+  /** 协作白板 WebSocket 事件 */
+  onWhiteboard?: (type: string, data: Record<string, unknown>) => void
+
+  /** 协作白板 WebSocket 事件 */
+  onWhiteboard?: (type: string, data: Record<string, unknown>) => void
+
+  /** 协作白板 WebSocket 事件 */
+  onWhiteboard?: (type: string, data: Record<string, unknown>) => void
+
+  /** 协作白板 WebSocket 事件 */
+  onWhiteboard?: (type: string, data: Record<string, unknown>) => void
+
   /**
    * 心跳间隔（毫秒），默认 30000（30秒）
    */
@@ -89,6 +104,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
     onSessionEnded,
     onSubmissionStatisticsUpdated,
     onMathlabContest,
+    onWhiteboard,
     heartbeatInterval = 30000,
   } = options
 
@@ -239,6 +255,14 @@ export function useWebSocket(options: UseWebSocketOptions) {
         case 'mathlab_contest_submission':
         case 'mathlab_contest_ended':
           onMathlabContest?.(type, data)
+          break
+
+        case 'whiteboard.sync':
+        case 'whiteboard.op':
+        case 'whiteboard.mode':
+        case 'whiteboard.groups':
+        case 'whiteboard.error':
+          onWhiteboard?.(type, data ?? {})
           break
 
         case 'pong':

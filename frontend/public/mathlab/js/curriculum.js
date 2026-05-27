@@ -24,6 +24,8 @@ const DEFAULT_FORMULAS = [
 function task(id, title, unit, scene, extra) {
   return Object.assign({
     id, title, unit, scene,
+    mode: extra?.mode || 'regular',
+    travelSubtype: extra?.travelSubtype || null,
     tags: extra?.tags || [],
     goals: extra?.goals || [],
     focus: extra?.focus || '',
@@ -608,11 +610,131 @@ const CURRICULUM = {
         ]
       }
     }
+  },
+  travel: {
+    name: '行程问题',
+    grades: {
+      meet_basic: {
+        name: 'L1 基础相遇',
+        tasks: [
+          task('tv_meet1', 'TV1：两地相向而行（相遇）', '行程问题', SCENE.PATH, {
+            mode: 'travel',
+            travelSubtype: 'meet',
+            tags: ['行程', '相遇', 'S=vt'],
+            goals: ['理解相向而行总路程守恒', '用双车并行仿真观察交点', '用 s-t 图读出相遇时刻'],
+            formulas: [{ title: '相遇', tex: '$$t=\\frac{S}{v_1+v_2}$$' }],
+            sceneConfig: {
+              robots: [
+                { id: 'A', label: '甲车', xCm: 0, yCm: 0, speed: 10, color: '#22d3ee' },
+                { id: 'B', label: '乙车', xCm: 100, yCm: 0, speed: 15, color: '#f97316', face: 180 }
+              ],
+              trackLengthCm: 100,
+              trackAxisDeg: 0,
+              meetValidate: { toleranceCm: 5 },
+              stGraph: { enabled: true, tMaxSec: 10, sMaxCm: 120, showBoth: true }
+            },
+            starter: { travelParallel: [], autoMeet: true },
+            demo: 'travelMeet'
+          })
+        ]
+      },
+      meet_var: {
+        name: 'L2 相遇变式',
+        tasks: [
+          task('tv_meet3', 'TV2：乙车延迟出发', '行程问题', SCENE.PATH, {
+            mode: 'travel',
+            travelSubtype: 'meet',
+            tags: ['行程', '延迟出发'],
+            goals: ['理解非同时起步的相遇', '能用程序表示“先后出发”'],
+            formulas: [{ title: '分段', tex: '$$S=v_1t_1+v_2t_2$$' }],
+            sceneConfig: {
+              robots: [
+                { id: 'A', label: '甲车', xCm: 0, yCm: 0, speed: 12, color: '#22d3ee' },
+                { id: 'B', label: '乙车', xCm: 90, yCm: 0, speed: 18, color: '#f97316', face: 180 }
+              ],
+              trackLengthCm: 90,
+              trackAxisDeg: 0,
+              meetValidate: { toleranceCm: 6 },
+              stGraph: { enabled: true, tMaxSec: 14, sMaxCm: 110, showBoth: true }
+            },
+            starter: { travelDelayStart: { waitSec: 2, autoMeet: true } },
+            demo: 'travelMeetDelay'
+          })
+        ]
+      },
+      chase_basic: {
+        name: 'L4 基础追及',
+        tasks: [
+          task('tv_chase1', 'TV3：同向追及', '行程问题', SCENE.PATH, {
+            mode: 'travel',
+            travelSubtype: 'chase',
+            tags: ['追及', '速度差'],
+            goals: ['理解追及核心是速度差', '从 s-t 图读交点与追及时刻'],
+            formulas: [{ title: '追及', tex: '$$t=\\frac{\\Delta s}{v_2-v_1}$$' }],
+            sceneConfig: {
+              robots: [
+                { id: 'A', label: '慢车', xCm: 0, yCm: 0, speed: 8, color: '#22d3ee' },
+                { id: 'B', label: '快车', xCm: -40, yCm: 0, speed: 14, color: '#f97316' }
+              ],
+              trackLengthCm: 120,
+              trackAxisDeg: 0,
+              chaseValidate: { toleranceCm: 6 },
+              stGraph: { enabled: true, tMaxSec: 20, sMaxCm: 140, showBoth: true }
+            },
+            starter: { travelParallel: [], autoMeet: true },
+            demo: 'travelChase'
+          })
+        ]
+      }
+    }
   }
 };
 
+/** 相向相遇：按初始间距与速度算两车应前进的距离（cm） */
+function travelMeetDistances(cfg) {
+  const robots = cfg?.robots || [];
+  const a = robots.find(r => r.id === 'A') || robots[0];
+  const b = robots.find(r => r.id === 'B') || robots[1];
+  if (!a || !b) return { da: 40, db: 60, tMeet: 4, meetS: 40 };
+  const s0A = a.xCm ?? 0;
+  const s0B = b.xCm ?? cfg.trackLengthCm ?? 100;
+  const gap = Math.abs(s0B - s0A);
+  const vA = a.speed ?? 10;
+  const vB = b.speed ?? 10;
+  const tMeet = gap / (vA + vB);
+  const meetS = Math.min(s0A, s0B) + vA * tMeet;
+  return {
+    da: Math.round((meetS - s0A) * 100) / 100,
+    db: Math.round((s0B - meetS) * 100) / 100,
+    tMeet,
+    meetS
+  };
+}
+
+/** 同向追及：快车追上慢车所需前进距离 */
+function travelChaseDistances(cfg) {
+  const robots = cfg?.robots || [];
+  const a = robots.find(r => r.id === 'A') || robots[0];
+  const b = robots.find(r => r.id === 'B') || robots[1];
+  if (!a || !b) return { da: 54, db: 94, tMeet: 6.67, meetS: 53.33 };
+  const s0A = a.xCm ?? 0;
+  const s0B = b.xCm ?? 0;
+  const vA = a.speed ?? 8;
+  const vB = b.speed ?? 14;
+  const gap = s0A - s0B;
+  if (gap <= 0 || vB <= vA) return { da: 0, db: 0, tMeet: 0, meetS: s0A };
+  const tMeet = gap / (vB - vA);
+  const meetS = s0A + vA * tMeet;
+  return {
+    da: Math.round((meetS - s0A) * 100) / 100,
+    db: Math.round((meetS - s0B) * 100) / 100,
+    tMeet,
+    meetS
+  };
+}
+
 /** 根据 starter 配置生成 Blockly XML（块自动串联） */
-function buildStarterXml(s) {
+function buildStarterXml(s, sceneConfig) {
   if (!s) return null;
 
   function numShadow(v) {
@@ -643,12 +765,46 @@ function buildStarterXml(s) {
   function blockWait(v) {
     return `<block type="motion_wait"><value name="T">${numShadow(v)}</value>`;
   }
+  function blockForwardRobot(robot, v) {
+    return `<block type="motion_forward_robot"><field name="ROBOT">${robot}</field><value name="D">${numShadow(v)}</value>`;
+  }
+  function blockSpeedRobot(robot, v) {
+    return `<block type="motion_speed_robot"><field name="ROBOT">${robot}</field><value name="S">${numShadow(v)}</value>`;
+  }
+  function blockParallelMove(a, b) {
+    return `<block type="control_parallel_move"><value name="DA">${numShadow(a)}</value><value name="DB">${numShadow(b)}</value>`;
+  }
   function blockRepeat(n, inner) {
     return `<block type="control_repeat"><value name="N">${numShadow(n)}</value><statement name="DO">${inner}</statement>`;
   }
 
   const steps = [];
-  if (s.repeat && s.forward != null && s.turn != null) {
+  if (s.travelParallel) {
+    let a = s.travelParallel.find(j => (j.robot || 'A') === 'A')?.cm;
+    let b = s.travelParallel.find(j => (j.robot || 'B') === 'B')?.cm;
+    if (s.autoMeet !== false && sceneConfig) {
+      if (sceneConfig.travelSubtype === 'chase') {
+        const d = travelChaseDistances(sceneConfig);
+        a = d.da; b = d.db;
+      } else if (sceneConfig.travelSubtype === 'meet') {
+        const d = travelMeetDistances(sceneConfig);
+        a = d.da; b = d.db;
+      }
+    }
+    steps.push(blockParallelMove(a ?? 0, b ?? 0));
+  } else if (s.travelDelayStart) {
+    const d = s.travelDelayStart;
+    if (d.speedA != null) steps.push(blockSpeedRobot('A', d.speedA));
+    if (d.speedB != null) steps.push(blockSpeedRobot('B', d.speedB));
+    if (d.waitSec != null) steps.push(blockWait(d.waitSec));
+    let da = d.da;
+    let db = d.db;
+    if (d.autoMeet !== false && sceneConfig?.travelSubtype === 'meet') {
+      const m = travelMeetDistances(sceneConfig);
+      da = m.da; db = m.db;
+    }
+    if (da != null || db != null) steps.push(blockParallelMove(da || 0, db || 0));
+  } else if (s.repeat && s.forward != null && s.turn != null) {
     if (s.speed != null) steps.push(blockSpeed(s.speed));
     if (s.repeat === 4 && s.turn === 90) {
       [0, 90, 180, 270].forEach(deg => steps.push(blockMove2d(deg, s.forward)));
@@ -684,13 +840,18 @@ function buildStarterXml(s) {
 
   if (!steps.length) return null;
 
-  let chain = steps.map(b => b + '</block>').join('<next>');
-  chain = chain.replace(/<\/block><next>/g, '</block><next>');
+  function chainBlocks(parts, idx) {
+    const cur = parts[idx] + '</block>';
+    if (idx >= parts.length - 1) return cur;
+    return cur.replace('</block>', `<next>${chainBlocks(parts, idx + 1)}</next></block>`);
+  }
 
-  return `<xml><block type="event_start" x="40" y="40"><next>${chain}</next></block></xml>`;
+  return `<xml><block type="event_start" x="40" y="40"><next>${chainBlocks(steps, 0)}</next></block></xml>`;
 }
 
 window.CURRICULUM = CURRICULUM;
 window.SCENE = SCENE;
 window.buildStarterXml = buildStarterXml;
+window.travelMeetDistances = travelMeetDistances;
+window.travelChaseDistances = travelChaseDistances;
 window.DEFAULT_FORMULAS = DEFAULT_FORMULAS;

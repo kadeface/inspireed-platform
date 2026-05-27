@@ -91,7 +91,10 @@
         contestId: this.contestId,
         analysis: analysis,
         autoScore: autoScore,
-        elapsedSec: elapsedSec
+        elapsedSec: elapsedSec,
+        travelSubtype: analysis?.subtype || null,
+        meetTimeSec: analysis?.meetTimeSec ?? null,
+        finalDistanceCm: analysis?.finalDistanceCm ?? null
       });
       this.submitted = true;
       const btn = document.getElementById('btnContestSubmit');
