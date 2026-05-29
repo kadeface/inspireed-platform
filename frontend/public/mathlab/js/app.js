@@ -19,6 +19,7 @@
     viewport: { offsetX: 0, offsetY: 0, scale: 1 },
     taskMode: 'regular',
     travelSamples: [],
+    motionSamples: [],
     robots: [],
     lastAnalysis: null,
     scene: SCENE.PATH,
@@ -149,6 +150,48 @@
         ViewShell.refreshTrailPanel();
         ViewShell.refreshAnalysisUI(this.lastAnalysis);
       }
+      if (currentTask?.plotValidate && window.FunctionPlot) {
+        const v = currentTask.plotValidate;
+        const r = window.FunctionPlot.validateTrailAgainstExpr(
+          this.getPrimaryRobot().trail,
+          v.expr,
+          {
+            originX: this.state.startX,
+            originY: this.state.startY,
+            pxPerCm: this.getPxPerCm(),
+            toleranceCm: v.toleranceCm ?? 1
+          }
+        );
+        setStatus(
+          r.ok ? '✓ 轨迹符合 ' + v.expr : `轨迹偏差 ${r.maxErr.toFixed(1)} cm`,
+          r.ok ? 'ok' : 'err'
+        );
+      }
+      if (currentTask?.calcValidate && window.CalcGraph) {
+        const cv = currentTask.calcValidate;
+        const samples = this.motionSamples;
+        if (cv.type === 'slope' && samples.length >= 2) {
+          const p0 = { t: cv.t0, s: window.CalcGraph.interpolateS(samples, cv.t0) };
+          const p1 = { t: cv.t1, s: window.CalcGraph.interpolateS(samples, cv.t1) };
+          const slope = window.CalcGraph.slopeBetween(p0, p1);
+          const ok = slope != null && Math.abs(slope - cv.expected) <= (cv.tolerance ?? 1);
+          setStatus(
+            ok ? `✓ 斜率 ≈ ${cv.expected} cm/s` : `斜率 ${slope?.toFixed(1) ?? '—'} cm/s（期望 ${cv.expected}）`,
+            ok ? 'ok' : 'err'
+          );
+        } else if (cv.type === 'area') {
+          const area = window.CalcGraph.riemannSum(samples, {
+            t0: cv.t0,
+            t1: cv.t1,
+            n: cv.n ?? 10
+          });
+          const ok = Math.abs(area - cv.expected) <= (cv.tolerance ?? 5);
+          setStatus(
+            ok ? `✓ 矩形和 ≈ ${cv.expected} cm` : `面积和 ${area.toFixed(1)} cm（期望 ${cv.expected}）`,
+            ok ? 'ok' : 'err'
+          );
+        }
+      }
       return this.lastAnalysis;
     },
 
@@ -167,7 +210,9 @@
         r.stats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
       });
       this.travelSamples = [];
+      this.motionSamples = [];
       if (this.taskMode === 'travel') this.seedTravelSample();
+      else this.seedMotionSample();
       this.lastAnalysis = null;
       this.busy = false;
       runStats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
@@ -238,7 +283,8 @@
       let startX = GRID_STEP;
       let startY = midY;
 
-      if (this.scene === SCENE.GRID || (this.scene === SCENE.TRIG && config?.cols)) {
+      if (this.scene === SCENE.GRID || this.scene === SCENE.FUNCTION
+        || (this.scene === SCENE.TRIG && config?.cols)) {
         // 数对网格原点 (1,1) 落在背景网格交点
         startX = GRID_STEP;
         startY = snapGrid(h - GRID_STEP);
@@ -316,6 +362,26 @@
       if (this.travelSamples.length > 600) this.travelSamples.shift();
     },
 
+    seedMotionSample() {
+      if (this.taskMode === 'travel') return;
+      const v = this.state.speed ?? 10;
+      this.motionSamples = [{ t: 0, s: 0, v }];
+    },
+
+    sampleMotion(robotOrId) {
+      if (this.taskMode === 'travel') return;
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      const stats = robot.stats || runStats;
+      const t = stats.totalTime ?? robot.state.elapsed ?? 0;
+      const s = stats.totalDist ?? robot.state.dist ?? 0;
+      const v = robot.state.speed ?? 10;
+      const last = this.motionSamples[this.motionSamples.length - 1];
+      if (last && last.t === t && last.s === s && last.v === v) return;
+      this.motionSamples.push({ t, s, v });
+      if (this.motionSamples.length > 600) this.motionSamples.shift();
+    },
+
     async moveByDelta(dx, dy, cm, endAngle, robotOrId) {
       const robot = this.resolveRobot(robotOrId);
       if (!robot) return;
@@ -346,6 +412,7 @@
         s._lastTp = p;
         if (p > 0.01) robot.trail.push({ x: s.x, y: s.y });
         this.sampleTravel();
+        this.sampleMotion(robot);
         this.draw();
         this.updateTelemetry();
         if (typeof ViewShell !== 'undefined') {
@@ -360,6 +427,7 @@
       s._lastP = 0; s._lastTp = 0;
       stats.totalTime += dur / 1000;
       if (robot.id === 'A') runStats.totalTime = stats.totalTime;
+      this.sampleMotion(robot);
       this.draw();
       this.updateTelemetry();
     },
@@ -439,6 +507,7 @@
       if (!robot) return;
       robot.state.speed = v;
       if (robot.id === 'A') document.getElementById('inpSpeed').value = v;
+      this.sampleMotion(robot);
     },
 
     updateTelemetry() {
@@ -526,8 +595,8 @@
       this.drawTargetMatchHint(ctx);
       ctx.restore();
       this.drawAnalysisBadge();
-      if (this.scene === SCENE.TIME) this.drawClock();
-      this.drawTravelGraph();
+      if (this.scene === SCENE.TIME || this.scene === SCENE.CALC) this.drawClock();
+      this.drawMotionGraphs();
     },
 
     drawTargetMatchHint(ctx) {
@@ -764,6 +833,61 @@
       }
     },
 
+    drawReferenceLine(ref) {
+      const { ctx } = this;
+      const ox = this.state.startX;
+      const oy = this.state.startY;
+      const k = ref.k;
+      const len = (ref.lengthCm || 80) * PX_PER_CM;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(251,191,36,.55)';
+      ctx.setLineDash([8, 6]);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(ox + len, oy - k * len);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (ref.label) {
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = '11px Outfit, Noto Sans SC, sans-serif';
+        ctx.fillText(ref.label, ox + len * 0.6, oy - k * len * 0.6 - 6);
+      }
+      ctx.restore();
+    },
+
+    drawFunctionCurve(plot) {
+      if (!window.FunctionPlot?.samplePlot) return;
+      const { ctx } = this;
+      const ox = this.state.startX;
+      const oy = this.state.startY;
+      const px = this.getPxPerCm();
+      const pts = window.FunctionPlot.samplePlot(plot.expr, {
+        xMin: plot.xMin ?? 0,
+        xMax: plot.xMax ?? 10,
+        step: plot.step ?? 1
+      });
+      if (!pts.length) return;
+      ctx.save();
+      ctx.strokeStyle = plot.color || '#38bdf8';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const xPx = ox + p.x * px;
+        const yPx = oy - p.y * px;
+        if (i === 0) ctx.moveTo(xPx, yPx);
+        else ctx.lineTo(xPx, yPx);
+      });
+      ctx.stroke();
+      if (plot.label) {
+        const last = pts[pts.length - 1];
+        ctx.fillStyle = plot.color || '#38bdf8';
+        ctx.font = '11px Outfit, Noto Sans SC, sans-serif';
+        ctx.fillText(plot.label, ox + last.x * px + 4, oy - last.y * px - 6);
+      }
+      ctx.restore();
+    },
+
     /** 解析直角三角形边长（cm） */
     resolveTrigSides(tri) {
       const angle = tri.angle ?? 30;
@@ -945,6 +1069,18 @@
 
       if (this.scene === SCENE.GRID || (this.scene === SCENE.TRIG && cfg.cols)) {
         this.drawGridOverlay(cfg);
+        if (cfg.referenceLine?.k != null) {
+          this.drawReferenceLine(cfg.referenceLine);
+        }
+      }
+
+      if (this.scene === SCENE.FUNCTION) {
+        this.drawGridOverlay(cfg);
+        const plots = cfg.plots || (cfg.plot ? [cfg.plot] : []);
+        plots.forEach(p => this.drawFunctionCurve(p));
+        if (cfg.referenceLine?.k != null) {
+          this.drawReferenceLine(cfg.referenceLine);
+        }
       }
 
       if (tri) {
@@ -973,6 +1109,15 @@
         ctx.fillText('数据统计模式', 20, 32);
         ctx.fillText('运行后查看总距离', 20, 50);
         ctx.fillText('与平均/次数', 20, 66);
+      }
+
+      if (this.scene === SCENE.CALC) {
+        ctx.fillStyle = 'rgba(255,255,255,.08)';
+        ctx.fillRect(12, 12, 160, 52);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '11px sans-serif';
+        ctx.fillText('微积分图象模式', 20, 32);
+        ctx.fillText('s-t / v-t 联动', 20, 50);
       }
     },
 
@@ -1110,17 +1255,7 @@
       ctx.fillText(runStats.totalTime.toFixed(1) + 's', cx - 14, cy + r + 14);
     },
 
-    drawTravelGraph() {
-      const wrap = document.getElementById('travelGraphWrap');
-      const canvas = document.getElementById('travelGraphCanvas');
-      if (!wrap || !canvas) return;
-      const stCfg = this.sceneConfig?.stGraph || {};
-      const enabled = this.taskMode === 'travel' && stCfg.enabled !== false;
-      wrap.hidden = !enabled;
-      if (!enabled) return;
-      const ctx = canvas.getContext('2d');
-      const w = canvas.width;
-      const h = canvas.height;
+    _drawGraphPanelBg(ctx, w, h) {
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, w, h);
@@ -1138,38 +1273,187 @@
       ctx.moveTo(36, h - 28);
       ctx.lineTo(36, 12);
       ctx.stroke();
-      const lastSample = this.travelSamples.length ? this.travelSamples[this.travelSamples.length - 1] : null;
-      const tMax = stCfg.tMaxSec || Math.max(10, (lastSample?.t || 0) + 2);
-      const sVals = this.travelSamples.flatMap(p => [p.sA, p.sB].filter(v => v != null));
-      const sLo = Math.min(0, ...sVals);
-      const sHi = stCfg.sMaxCm || Math.max(100, ...sVals, 0) + 10;
-      const sSpan = Math.max(sHi - sLo, 1);
-      const mapX = t => 36 + (Math.max(0, t) / tMax) * (w - 48);
-      const mapY = s => (h - 28) - ((s - sLo) / sSpan) * (h - 40);
-      const drawLine = (key, color) => {
-        const pts = this.travelSamples;
-        if (!pts.length) return;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        pts.forEach((p, i) => {
-          const x = mapX(p.t || 0);
-          const y = mapY(p[key] || 0);
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-      };
-      drawLine('sA', '#22d3ee');
-      if (stCfg.showBoth !== false) drawLine('sB', '#f97316');
+    },
+
+    drawSecantLine(ctx, mapX, mapY, overlay, samples) {
+      if (!overlay || overlay.type !== 'secant' || !window.CalcGraph) return;
+      const t0 = overlay.t0 ?? 0;
+      const t1 = overlay.t1 ?? 1;
+      const s0 = window.CalcGraph.interpolateS(samples, t0);
+      const s1 = window.CalcGraph.interpolateS(samples, t1);
+      const x0 = mapX(t0);
+      const y0 = mapY(s0);
+      const x1 = mapX(t1);
+      const y1 = mapY(s1);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(251,191,36,.85)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = '10px sans-serif';
+      const slope = window.CalcGraph.slopeBetween({ t: t0, s: s0 }, { t: t1, s: s1 });
+      if (slope != null) {
+        ctx.fillText(`Δs/Δt≈${slope.toFixed(1)}`, (x0 + x1) / 2 - 24, (y0 + y1) / 2 - 6);
+      }
+      ctx.restore();
+    },
+
+    drawRiemannRects(ctx, mapX, mapY, overlay, samples, vMax) {
+      if (!overlay || overlay.type !== 'riemann' || !window.CalcGraph) return;
+      const t0 = overlay.t0 ?? 0;
+      const t1 = overlay.t1 ?? 10;
+      const n = overlay.n ?? 4;
+      const dt = (t1 - t0) / n;
+      const vSpan = Math.max(vMax, 1);
+      const baseY = mapY(0);
+      ctx.save();
+      for (let i = 0; i < n; i++) {
+        const t = t0 + i * dt;
+        const v = window.CalcGraph.interpolateV(samples, t);
+        const x0 = mapX(t);
+        const x1 = mapX(t + dt);
+        const yTop = mapY(v);
+        const hRect = baseY - yTop;
+        ctx.fillStyle = `rgba(56,189,248,${0.15 + (i % 2) * 0.08})`;
+        ctx.fillRect(x0, yTop, Math.max(1, x1 - x0), hRect);
+        ctx.strokeStyle = 'rgba(56,189,248,.55)';
+        ctx.strokeRect(x0, yTop, Math.max(1, x1 - x0), hRect);
+      }
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = '10px sans-serif';
+      const sum = window.CalcGraph.riemannSum(samples, { t0, t1, n });
+      ctx.fillText(`Σ≈${sum.toFixed(0)} cm`, mapX(t0) + 4, 22);
+      ctx.restore();
+    },
+
+    drawStGraphPanel() {
+      const stack = document.getElementById('graphStack');
+      const wrap = document.getElementById('travelGraphWrap');
+      const canvas = document.getElementById('travelGraphCanvas');
+      if (!wrap || !canvas) return false;
+      const stCfg = this.sceneConfig?.stGraph || {};
+      const travelMode = this.taskMode === 'travel' && stCfg.enabled !== false;
+      const motionMode = !travelMode && stCfg.enabled
+        && (this.scene === SCENE.CALC || this.scene === SCENE.TIME || this.scene === SCENE.FUNCTION);
+      const enabled = travelMode || motionMode;
+      wrap.hidden = !enabled;
+      if (!enabled) return false;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      this._drawGraphPanelBg(ctx, w, h);
+      const overlay = this.sceneConfig?.calcOverlay;
+      let tMax;
+      let mapX;
+      let mapY;
+      if (travelMode) {
+        const lastSample = this.travelSamples.length ? this.travelSamples[this.travelSamples.length - 1] : null;
+        tMax = stCfg.tMaxSec || Math.max(10, (lastSample?.t || 0) + 2);
+        const sVals = this.travelSamples.flatMap(p => [p.sA, p.sB].filter(v => v != null));
+        const sLo = Math.min(0, ...sVals);
+        const sHi = stCfg.sMaxCm || Math.max(100, ...sVals, 0) + 10;
+        const sSpan = Math.max(sHi - sLo, 1);
+        mapX = t => 36 + (Math.max(0, t) / tMax) * (w - 48);
+        mapY = s => (h - 28) - ((s - sLo) / sSpan) * (h - 40);
+        const drawLine = (key, color) => {
+          const pts = this.travelSamples;
+          if (!pts.length) return;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          pts.forEach((p, i) => {
+            const x = mapX(p.t || 0);
+            const y = mapY(p[key] || 0);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+        };
+        drawLine('sA', '#22d3ee');
+        if (stCfg.showBoth !== false) drawLine('sB', '#f97316');
+        ctx.fillStyle = '#22d3ee';
+        ctx.fillText('A', w - 68, 18);
+        ctx.fillStyle = '#f97316';
+        ctx.fillText('B', w - 48, 18);
+      } else {
+        const pts = this.motionSamples;
+        const last = pts.length ? pts[pts.length - 1] : null;
+        tMax = stCfg.tMaxSec || Math.max(10, (last?.t || 0) + 2);
+        const sLo = 0;
+        const sHi = stCfg.sMaxCm || Math.max(50, ...(pts.map(p => p.s)), 0) + 10;
+        const sSpan = Math.max(sHi - sLo, 1);
+        mapX = t => 36 + (Math.max(0, t) / tMax) * (w - 48);
+        mapY = s => (h - 28) - ((s - sLo) / sSpan) * (h - 40);
+        if (pts.length) {
+          ctx.strokeStyle = '#22d3ee';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          pts.forEach((p, i) => {
+            const x = mapX(p.t);
+            const y = mapY(p.s);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+        }
+        this.drawSecantLine(ctx, mapX, mapY, overlay, pts);
+      }
       ctx.fillStyle = '#cbd5e1';
       ctx.font = '11px sans-serif';
       ctx.fillText('t (s)', w - 34, h - 10);
       ctx.fillText('s (cm)', 6, 20);
-      ctx.fillStyle = '#22d3ee';
-      ctx.fillText('A', w - 68, 18);
-      ctx.fillStyle = '#f97316';
-      ctx.fillText('B', w - 48, 18);
+      return true;
+    },
+
+    drawVelocityGraph() {
+      const wrap = document.getElementById('velocityGraphWrap');
+      const canvas = document.getElementById('velocityGraphCanvas');
+      if (!wrap || !canvas) return false;
+      const vtCfg = this.sceneConfig?.vtGraph || {};
+      const enabled = vtCfg.enabled && (this.scene === SCENE.CALC || this.scene === SCENE.TIME);
+      wrap.hidden = !enabled;
+      if (!enabled) return false;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      this._drawGraphPanelBg(ctx, w, h);
+      const pts = this.motionSamples;
+      const last = pts.length ? pts[pts.length - 1] : null;
+      const tMax = vtCfg.tMaxSec || Math.max(10, (last?.t || 0) + 2);
+      const vMax = vtCfg.vMax || Math.max(15, ...(pts.map(p => p.v)), 0) + 2;
+      const mapX = t => 36 + (Math.max(0, t) / tMax) * (w - 48);
+      const mapY = v => (h - 28) - (Math.max(0, v) / vMax) * (h - 40);
+      if (pts.length) {
+        ctx.strokeStyle = '#f97316';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        pts.forEach((p, i) => {
+          const x = mapX(p.t);
+          const y = mapY(p.v);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+      const overlay = this.sceneConfig?.calcOverlay;
+      this.drawRiemannRects(ctx, mapX, mapY, overlay, pts, vMax);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('t (s)', w - 34, h - 10);
+      ctx.fillText('v (cm/s)', 6, 20);
+      return true;
+    },
+
+    drawMotionGraphs() {
+      const stOn = this.drawStGraphPanel();
+      const vtOn = this.drawVelocityGraph();
+      const stack = document.getElementById('graphStack');
+      if (stack) stack.hidden = !stOn && !vtOn;
     },
 
     drawWheel(ctx, lx, ly, radius, spin) {
@@ -1309,6 +1593,56 @@
         forward100: () => this.forward(100),
         forward10: () => this.forward(10),
         forward80: () => this.forward(80),
+        forward30: async () => {
+          await this.forward(10);
+          await this.forward(10);
+          await this.forward(10);
+        },
+        plotLinear: async () => {
+          const pts = [[0, 0], [10, 20], [20, 40], [30, 60]];
+          for (const [x, y] of pts) await this.gotoCm(x, y);
+        },
+        plotLinearSteep: async () => {
+          const pts = [[0, 0], [10, 30], [20, 60]];
+          for (const [x, y] of pts) await this.gotoCm(x, y);
+        },
+        plotLinearIntercept: async () => {
+          const pts = [[0, 30], [10, 50], [20, 70], [30, 90]];
+          for (const [x, y] of pts) await this.gotoCm(x, y);
+        },
+        plotParabola: async () => {
+          for (let x = -2; x <= 2; x++) await this.gotoCm(x * 10, x * x * 10);
+        },
+        plotParabolaShifted: async () => {
+          for (let x = 0; x <= 3; x++) await this.gotoCm(x * 10, ((x - 1) * (x - 1) + 2) * 10);
+        },
+        plotInverse: async () => {
+          for (const x of [2, 4, 5, 8]) await this.gotoCm(x * 10, (20 / x) * 10);
+        },
+        plotPiecewise: async () => {
+          const pts = [[0, 0], [20, 20], [30, 20], [50, 0]];
+          for (const [x, y] of pts) await this.gotoCm(x, y);
+        },
+        calcTwoSpeed: async () => {
+          this.setSpeed(5);
+          await this.forward(40);
+          this.setSpeed(15);
+          await this.forward(40);
+        },
+        calcPiecewiseSpeed: async () => {
+          this.setSpeed(5);
+          await this.forward(30);
+          this.setSpeed(10);
+          await this.forward(30);
+          this.setSpeed(15);
+          await this.forward(30);
+        },
+        calcFineSteps: async () => {
+          for (let i = 0; i < 6; i++) await this.forward(10);
+        },
+        calcSecantNarrow: async () => {
+          await this.forward(40);
+        },
         forward50: () => this.forward(50),
         turn90: () => this.turn(90),
         turn45: () => this.turn(45),
@@ -1762,9 +2096,15 @@
     document.getElementById('taskTitle').textContent = task.title;
     document.getElementById('taskTags').innerHTML = (task.tags || [])
       .map(t => `<span class="tag">${t}</span>`).join('');
+    const seriesIntro = task.series === 'funcGraph'
+      ? '<p class="series-intro">📈 专题：轮式机器人探秘函数图像 — 用轨迹认识函数图象。</p>'
+      : task.series === 'calculus'
+        ? '<p class="series-intro">∫ 专题：轮式机器人探秘微积分 — 用运动理解变化与累积。（建议先学函数图像 L3）</p>'
+        : '';
     let body = '';
     if (task.unit) body += `<h4>教材单元</h4><p>${task.unit}</p>`;
     if (task.focus) body += `<h4>探究主线</h4><p>${task.focus}</p>`;
+    if (seriesIntro) body += seriesIntro;
     if (task.goals?.length) {
       body += '<h4>教学目标</h4><ul>' + task.goals.map(g => `<li>${g}</li>`).join('') + '</ul>';
     }
@@ -1905,6 +2245,8 @@
   }
 
   window.loadTaskById = loadTaskById;
+  window.findMathlabTaskById = findTaskById;
+  window.getCurrentMathlabTask = () => currentTask;
 
   function applyTaskFromUrl() {
     const taskId = new URLSearchParams(window.location.search).get('task');

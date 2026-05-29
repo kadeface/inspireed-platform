@@ -62,9 +62,15 @@
         <div class="canvas-wrap" id="canvasWrap">
           <canvas id="canvas"></canvas>
           <span class="scale-hint" id="scaleHint">1 格 = 10 cm</span>
-          <div id="travelGraphWrap" class="travel-graph-wrap" hidden>
-            <div class="travel-graph-title">行程图 s-t（travel）</div>
-            <canvas id="travelGraphCanvas" width="320" height="150"></canvas>
+          <div id="graphStack" class="graph-stack" hidden>
+            <div id="travelGraphWrap" class="travel-graph-wrap" hidden>
+              <div class="travel-graph-title">路程图 s-t</div>
+              <canvas id="travelGraphCanvas" width="320" height="150"></canvas>
+            </div>
+            <div id="velocityGraphWrap" class="travel-graph-wrap" hidden>
+              <div class="travel-graph-title">速度图 v-t</div>
+              <canvas id="velocityGraphCanvas" width="320" height="150"></canvas>
+            </div>
           </div>
         </div>
         <div class="prop-popover" id="propPopover" hidden>
@@ -166,7 +172,13 @@
     </aside>
   </div>
 
-  <script src="js/curriculum.js?v=8"></script>
+  <script type="module">
+    import * as FunctionPlot from './js/function-plot.js?v=1';
+    import * as CalcGraph from './js/calc-graph.js?v=1';
+    window.FunctionPlot = FunctionPlot;
+    window.CalcGraph = CalcGraph;
+  </script>
+  <script src="js/curriculum.js?v=9"></script>
   <script src="js/scene-props.js?v=7"></script>
   <script src="js/trail-analysis.js?v=6"></script>
   <script src="js/robot.js?v=1"></script>
@@ -175,6 +187,6 @@
   <script src="js/annotations.js?v=6"></script>
   <script src="js/view-shell.js?v=6"></script>
   <script src="js/contest.js?v=1"></script>
-  <script src="js/app.js?v=13"></script>
+  <script src="js/app.js?v=14"></script>
 </body>
 </html>

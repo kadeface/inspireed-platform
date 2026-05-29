@@ -26,7 +26,7 @@ export const MATHLAB_SIMULATIONS: MathlabSimulation[] = [
     nameCn: '轮式机器人 · 数学融合互动教学',
     description: 'Blockly programming with a virtual wheeled robot for K–12 math tasks',
     descriptionCn:
-      '拖拽积木控制虚拟轮式机器人，在模拟中完成测距、转角、走图形、坐标导航、三角函数（sin/cos/tan）等 50+ 数学教学任务',
+      '拖拽积木控制虚拟轮式机器人，完成测距、坐标、函数图像（funcGraph）、微积分直觉（calculus）等 90+ 教学任务',
     embedUrl: '/mathlab/index.html',
     topics: ['数学', '机器人', 'Blockly', '几何', '三角函数', '编程'],
   },

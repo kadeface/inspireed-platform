@@ -25,7 +25,7 @@
             v-model="startTaskId"
             type="text"
             class="text-sm border border-teal-300 rounded px-2 py-1 w-28"
-            placeholder="p2t1"
+            placeholder="fg_l2_1"
           />
         </label>
         <label class="text-xs text-teal-900 flex flex-col gap-0.5">
