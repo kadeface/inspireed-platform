@@ -13,7 +13,9 @@ const SCENE = {
   CIRCLE: 'circle',           // 圆周/圆弧
   PATH: 'path',               // 通用路径（默认）
   DATA: 'data',               // 数据统计面板
-  TRIG: 'trig'                // 直角三角形叠加（邻边/对边/斜边、仰角/坡度）
+  TRIG: 'trig',               // 直角三角形叠加（邻边/对边/斜边、仰角/坡度）
+  FUNCTION: 'function',       // y=f(x) 曲线叠加、描点验证
+  CALC: 'calc'                // s-t / v-t 联动、割线、矩形和
 };
 
 const DEFAULT_FORMULAS = [
@@ -687,6 +689,472 @@ const CURRICULUM = {
         ]
       }
     }
+  },
+  funcGraph: {
+    name: '轮式机器人探秘函数图像',
+    grades: {
+      l0: {
+        name: 'L0 数轴与对应',
+        tasks: [
+          task('fg_l0_1', '数轴上的位置', '数轴与对应', SCENE.NUMBERLINE, {
+            series: 'funcGraph', level: 'L0',
+            tags: ['数轴', '位置'],
+            goals: ['在数轴上走到指定位置', '理解数与距离的一一对应'],
+            sceneConfig: { min: -5, max: 10, unitCm: 20 },
+            challenges: ['走到 +3', '走到 +7', '走到 -2'],
+            hint: '用「沿当前朝向前进/后退」配合数轴刻度。',
+            starter: { forward: 60, backward: 40 },
+            demo: 'numberline'
+          }),
+          task('fg_l0_2', '步长与数列', '数轴与对应', SCENE.DISTANCE, {
+            series: 'funcGraph', level: 'L0',
+            tags: ['数列', '重复'],
+            goals: ['每次走相同步长', '观察 5,10,15,20 的规律'],
+            challenges: ['每次走 5 cm，重复 4 次'],
+            starter: { repeat: 4, forward: 5 },
+            demo: 'forward10'
+          }),
+          task('fg_l0_3', '输入与输出', '数轴与对应', SCENE.DISTANCE, {
+            series: 'funcGraph', level: 'L0',
+            tags: ['对应关系'],
+            goals: ['走 x 格记录终点', '建立输入→输出直觉'],
+            challenges: ['走 10、20、30 cm，记录总距离'],
+            starter: { forward: 10, forward2: 10, forward3: 10 },
+            demo: 'forward30'
+          })
+        ]
+      },
+      l1: {
+        name: 'L1 数对与比例',
+        tasks: [
+          task('fg_l1_1', '数对定位', '数对与比例', SCENE.GRID, {
+            series: 'funcGraph', level: 'L1',
+            tags: ['坐标', '数对'],
+            goals: ['用 goto 走到 (2,3)、(4,6)', '理解横纵坐标'],
+            sceneConfig: { cols: 10, rows: 8, cellCm: 10 },
+            challenges: ['走到 (20,30) cm', '走到 (40,60) cm'],
+            starter: { goto: [{ x: 20, y: 30 }, { x: 40, y: 60 }] },
+            demo: 'grid32'
+          }),
+          task('fg_l1_2', '倍数关系', '数对与比例', SCENE.GRID, {
+            series: 'funcGraph', level: 'L1',
+            tags: ['正比例', '倍数'],
+            goals: ['走 (1,2)(2,4)(3,6) 对应点', '发现 y=2x 关系'],
+            sceneConfig: { cols: 10, rows: 10, cellCm: 10 },
+            challenges: ['依次走到 (10,20)(20,40)(30,60)'],
+            starter: {
+              goto: [{ x: 10, y: 20 }, { x: 20, y: 40 }, { x: 30, y: 60 }]
+            },
+            demo: 'grid43'
+          }),
+          task('fg_l1_3', '正比例初探', '数对与比例', SCENE.GRID, {
+            series: 'funcGraph', level: 'L1',
+            tags: ['y=2x'],
+            goals: ['验证轨迹是否满足 y=2x', '理解比例关系'],
+            sceneConfig: {
+              cols: 12, rows: 10, cellCm: 10,
+              referenceLine: { k: 2, label: 'y=2x' }
+            },
+            hint: '轨迹点应落在 y=2x 参考线附近。',
+            starter: {
+              goto: [{ x: 10, y: 20 }, { x: 20, y: 40 }, { x: 30, y: 60 }, { x: 40, y: 80 }]
+            },
+            demo: 'grid43'
+          })
+        ]
+      },
+      l2: {
+        name: 'L2 直线世界',
+        tasks: [
+          task('fg_l2_1', '描点成线', '正比例', SCENE.FUNCTION, {
+            series: 'funcGraph', level: 'L2',
+            tags: ['描点', '正比例'],
+            goals: ['在 x=0,1,2,3 处描点', '观察点连成直线'],
+            sceneConfig: {
+              cols: 10, rows: 10, cellCm: 10,
+              plot: { expr: '2*x', xMin: 0, xMax: 3, step: 1, color: '#38bdf8', label: 'y=2x' }
+            },
+            plotValidate: { expr: '2*x', toleranceCm: 1.5 },
+            starter: { goto: [{ x: 0, y: 0 }, { x: 10, y: 20 }, { x: 20, y: 40 }, { x: 30, y: 60 }] },
+            demo: 'plotLinear'
+          }),
+          task('fg_l2_2', '斜率 k 的意义', '正比例', SCENE.FUNCTION, {
+            series: 'funcGraph', level: 'L2',
+            tags: ['斜率', '对比'],
+            goals: ['比较 k=1 与 k=2 的图象', '理解斜率越大越陡'],
+            sceneConfig: {
+              cols: 10, rows: 10, cellCm: 10,
+              plots: [
+                { expr: 'x', xMin: 0, xMax: 4, step: 1, color: '#38bdf8', label: 'y=x' },
+                { expr: '2*x', xMin: 0, xMax: 4, step: 1, color: '#f97316', label: 'y=2x' }
+              ]
+            },
+            plotValidate: { expr: '2*x', toleranceCm: 1.5 },
+            starter: { goto: [{ x: 0, y: 0 }, { x: 10, y: 20 }, { x: 20, y: 40 }] },
+            hint: '先走 y=2x 上的点，再与 y=x 参考线对比。',
+            demo: 'plotLinear'
+          }),
+          task('fg_l2_3', '过原点的直线', '正比例', SCENE.FUNCTION, {
+            series: 'funcGraph', level: 'L2',
+            tags: ['y=kx'],
+            goals: ['走 y=0.5x 与 y=3x 上的点', '理解 k 改变倾斜程度'],
+            sceneConfig: {
+              cols: 12, rows: 10, cellCm: 10,
+              plots: [
+                { expr: '0.5*x', xMin: 0, xMax: 4, step: 1, color: '#94a3b8', label: 'y=0.5x' },
+                { expr: '3*x', xMin: 0, xMax: 3, step: 1, color: '#f97316', label: 'y=3x' }
+              ]
+            },
+            plotValidate: { expr: '3*x', toleranceCm: 1.5 },
+            starter: { goto: [{ x: 0, y: 0 }, { x: 10, y: 30 }, { x: 20, y: 60 }] },
+            demo: 'plotLinearSteep'
+          })
+        ]
+      },
+      l3: {
+        name: 'L3 一次函数',
+        tasks: [
+          task('fg_l3_1', '截距 b 的作用', '一次函数', SCENE.FUNCTION, {
+            series: 'funcGraph', level: 'L3',
+            tags: ['截距', 'y=2x+3'],
+            goals: ['走 y=2x+3 上的点', '观察直线不过原点'],
+            sceneConfig: {
+              cols: 12, rows: 10, cellCm: 10,
+              plot: { expr: '2*x+3', xMin: 0, xMax: 4, step: 1, color: '#38bdf8', label: 'y=2x+3' }
+            },
+            plotValidate: { expr: '2*x+3', toleranceCm: 1.5 },
+            starter: { goto: [{ x: 0, y: 30 }, { x: 10, y: 50 }, { x: 20, y: 70 }, { x: 30, y: 90 }] },
+            demo: 'plotLinearIntercept'
+          }),
+          task('fg_l3_2', '匀速 s-t 图', '一次函数', SCENE.TIME, {
+            series: 'funcGraph', level: 'L3',
+            focus: '函数图象专题：s=vt 是一次函数，s-t 图象为直线',
+            tags: ['s=vt', 's-t 图'],
+            goals: ['s=vt 函数模型', '匀速运动图象', '斜率=速度'],
+            formulas: [{ title: '一次函数', tex: '$$s = vt + s_0$$' }],
+            starter: { speed: 5, forward: 100 },
+            demo: 'linear'
+          }),
+          task('fg_l3_3', '追及与交点', '一次函数', SCENE.TIME, {
+            series: 'funcGraph', level: 'L3',
+            focus: '函数图象专题：追及问题对应两条 s-t 直线交点',
+            tags: ['追及', '交点'],
+            goals: ['追及问题建模', '速度差与时间', '从图象读交点'],
+            starter: { speed: 15, forward: 60 },
+            demo: 'chase'
+          })
+        ]
+      },
+      l4: {
+        name: 'L4 二次函数',
+        tasks: [
+          task('fg_l4_1', '抛物线描点', '二次函数', SCENE.FUNCTION, {
+            series: 'funcGraph', level: 'L4',
+            tags: ['抛物线', 'y=x²'],
+            goals: ['x=-2…2 描点 (x,x²)', '认识抛物线形状'],
+            sceneConfig: {
+              cols: 12, rows: 12, cellCm: 10,
+              plot: { expr: 'x*x', xMin: -2, xMax: 2, step: 1, color: '#a78bfa', label: 'y=x²' }
+            },
+            plotValidate: { expr: 'x*x', toleranceCm: 2 },
+            starter: { goto: [{ x: -20, y: 40 }, { x: -10, y: 10 }, { x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 40 }] },
+            demo: 'plotParabola'
+          }),
+          task('fg_l4_2', '参数 a 的影响', '二次函数', SCENE.FUNCTION, {
+            series: 'funcGraph', level: 'L4',
+            tags: ['参数 a'],
+            goals: ['对比 a=1、2、0.5 的开口', '理解 |a| 越大越窄'],
+            sceneConfig: {
+              cols: 12, rows: 12, cellCm: 10,
+              plots: [
+                { expr: 'x*x', xMin: -2, xMax: 2, step: 1, color: '#38bdf8', label: 'y=x²' },
+                { expr: '2*x*x', xMin: -2, xMax: 2, step: 1, color: '#f97316', label: 'y=2x²' },
+                { expr: '0.5*x*x', xMin: -2, xMax: 2, step: 1, color: '#94a3b8', label: 'y=0.5x²' }
+              ]
+            },
+            plotValidate: { expr: 'x*x', toleranceCm: 2 },
+            starter: { goto: [{ x: -20, y: 40 }, { x: 0, y: 0 }, { x: 20, y: 40 }] },
+            demo: 'plotParabola'
+          }),
+          task('fg_l4_3', '顶点与对称轴', '二次函数', SCENE.FUNCTION, {
+            series: 'funcGraph', level: 'L4',
+            tags: ['顶点', '平移'],
+            goals: ['走 y=(x-1)²+2 关键点', '认识顶点与对称轴'],
+            sceneConfig: {
+              cols: 12, rows: 12, cellCm: 10,
+              plot: { expr: '(x-1)*(x-1)+2', xMin: -1, xMax: 3, step: 1, color: '#f472b6', label: 'y=(x-1)²+2' }
+            },
+            plotValidate: { expr: '(x-1)*(x-1)+2', toleranceCm: 2 },
+            starter: { goto: [{ x: 0, y: 30 }, { x: 10, y: 20 }, { x: 20, y: 30 }, { x: 30, y: 50 }] },
+            demo: 'plotParabolaShifted'
+          })
+        ]
+      },
+      l5: {
+        name: 'L5 拓展',
+        tasks: [
+          task('fg_l5_1', '反比例 y=k/x', '反比例', SCENE.FUNCTION, {
+            series: 'funcGraph', level: 'L5',
+            tags: ['反比例', '双曲线'],
+            goals: ['描点理解 y=20/x', '观察两支曲线'],
+            sceneConfig: {
+              cols: 12, rows: 10, cellCm: 10,
+              plot: { expr: '20/x', xMin: 2, xMax: 8, step: 1, color: '#22d3ee', label: 'y=20/x' }
+            },
+            hint: 'x 取 2,4,5,8 等，分别计算 y=20÷x 再 goto。',
+            starter: { goto: [{ x: 20, y: 10 }, { x: 40, y: 5 }, { x: 50, y: 4 }] },
+            demo: 'plotInverse'
+          }),
+          task('fg_l5_2', '分段函数', '分段函数', SCENE.FUNCTION, {
+            series: 'funcGraph', level: 'L5',
+            tags: ['分段', '折线'],
+            goals: ['走折线路径', '理解分段定义'],
+            sceneConfig: { cols: 12, rows: 10, cellCm: 10 },
+            starter: {
+              goto: [{ x: 0, y: 0 }, { x: 20, y: 20 }, { x: 30, y: 20 }, { x: 50, y: 0 }]
+            },
+            hint: '每段用 goto 连接，整体是分段一次函数。',
+            demo: 'plotPiecewise'
+          })
+        ]
+      }
+    }
+  },
+  calculus: {
+    name: '轮式机器人探秘微积分',
+    grades: {
+      l0: {
+        name: 'L0 感受变化',
+        tasks: [
+          task('calc_l0_1', '谁走得更快', '感受变化', SCENE.TIME, {
+            series: 'calculus', level: 'L0',
+            tags: ['快慢', '对比'],
+            goals: ['同样时间比路程', '建立「变化」直觉'],
+            challenges: ['速度 10 走 5 秒 vs 速度 20 走 5 秒'],
+            starter: { speed: 10, forward: 50 },
+            demo: 'speedRace'
+          }),
+          task('calc_l0_2', '同样路程谁更久', '感受变化', SCENE.TIME, {
+            series: 'calculus', level: 'L0',
+            tags: ['时间', '对比'],
+            goals: ['固定 50 cm 比用时', '理解速度与时间反比'],
+            starter: { forward: 50 },
+            demo: 'forward50'
+          }),
+          task('calc_l0_3', '先快后慢', '感受变化', SCENE.TIME, {
+            series: 'calculus', level: 'L0',
+            tags: ['分段速度'],
+            goals: ['分段调速', '感受运动状态变化'],
+            starter: { speed: 20, forward: 30, speed2: 5, forward2: 30 },
+            demo: 'forward50'
+          })
+        ]
+      },
+      l1: {
+        name: 'L1 均匀变化',
+        tasks: [
+          task('calc_l1_1', '每段多走一点', '均匀变化', SCENE.DISTANCE, {
+            series: 'calculus', level: 'L0',
+            tags: ['递增'],
+            goals: ['段长 10→15→20', '观察变化规律'],
+            starter: { forward: 10, forward2: 15, forward3: 20 },
+            demo: 'forward10'
+          }),
+          task('calc_l1_2', '均匀加速初体验', '均匀变化', SCENE.TIME, {
+            series: 'calculus', level: 'L1',
+            tags: ['加速'],
+            goals: ['速度 5→10→15 各走一段', '建立阶梯速度图直觉'],
+            starter: { speed: 5, forward: 20, speed2: 10, forward2: 20, speed3: 15, forward3: 20 },
+            demo: 'forward50'
+          }),
+          task('calc_l1_3', '变化有没有规律', '均匀变化', SCENE.DATA, {
+            series: 'calculus', level: 'L1',
+            tags: ['数据'],
+            goals: ['多次运行记录距离', '用数据发现规律'],
+            starter: { repeat: 3, forward: 20 },
+            demo: 'forward10'
+          })
+        ]
+      },
+      l2: {
+        name: 'L2 斜率即速度',
+        tasks: [
+          task('calc_l2_1', 's-t 图的斜率', '斜率即速度', SCENE.TIME, {
+            series: 'calculus', level: 'L2',
+            focus: '微积分专题：s-t 直线斜率 = 速度（包装匀速一次函数）',
+            tags: ['s-t', '斜率', 's=vt'],
+            goals: ['s=vt 函数模型', '匀速运动图象', '斜率=速度'],
+            formulas: [{ title: '一次函数', tex: '$$s = vt$$' }],
+            sceneConfig: {
+              stGraph: { enabled: true, tMaxSec: 25, sMaxCm: 120 },
+              calcOverlay: { type: 'secant', t0: 0, t1: 5 }
+            },
+            starter: { speed: 5, forward: 100 },
+            demo: 'linear',
+            calcValidate: { type: 'slope', t0: 0, t1: 5, expected: 5, tolerance: 1 }
+          }),
+          task('calc_l2_2', '不同斜率不同快', '斜率即速度', SCENE.TIME, {
+            series: 'calculus', level: 'L2',
+            tags: ['斜率', '对比'],
+            goals: ['速度 5 与 15 的 s-t 线对比', '斜率越大走得越快'],
+            sceneConfig: {
+              stGraph: { enabled: true, tMaxSec: 20, sMaxCm: 90 },
+              calcOverlay: { type: 'secant', t0: 0, t1: 4 }
+            },
+            starter: { speed: 5, forward: 40, speed2: 15, forward2: 40 },
+            hint: '先慢后快，观察 s-t 图两段斜率差异。',
+            demo: 'calcTwoSpeed'
+          }),
+          task('calc_l2_3', '追及：速度差', '斜率即速度', SCENE.PATH, {
+            series: 'calculus', level: 'L2',
+            mode: 'travel',
+            travelSubtype: 'chase',
+            focus: '微积分专题：追及对应 s-t 交点（包装追及问题）',
+            tags: ['追及', '交点'],
+            goals: ['理解追及核心是速度差', '从 s-t 图读交点与追及时刻'],
+            formulas: [{ title: '追及', tex: '$$t=\\frac{\\Delta s}{v_2-v_1}$$' }],
+            sceneConfig: {
+              robots: [
+                { id: 'A', label: '慢车', xCm: 0, yCm: 0, speed: 8, color: '#22d3ee' },
+                { id: 'B', label: '快车', xCm: -40, yCm: 0, speed: 14, color: '#f97316' }
+              ],
+              trackLengthCm: 120,
+              trackAxisDeg: 0,
+              chaseValidate: { toleranceCm: 6 },
+              stGraph: { enabled: true, tMaxSec: 20, sMaxCm: 140, showBoth: true }
+            },
+            starter: { travelParallel: [], autoMeet: true },
+            demo: 'travelChase'
+          })
+        ]
+      },
+      l3: {
+        name: 'L3 非均匀变化',
+        tasks: [
+          task('calc_l3_1', '变速运动', '非均匀变化', SCENE.CALC, {
+            series: 'calculus', level: 'L3',
+            tags: ['变速', '分段'],
+            goals: ['分段变速走完全程', '观察 s-t 折线与 v-t 阶梯'],
+            sceneConfig: {
+              stGraph: { enabled: true, tMaxSec: 30, sMaxCm: 100 },
+              vtGraph: { enabled: true, tMaxSec: 30, vMax: 20 }
+            },
+            starter: { speed: 5, forward: 30, speed2: 10, forward2: 30, speed3: 15, forward3: 30 },
+            demo: 'calcPiecewiseSpeed'
+          }),
+          task('calc_l3_2', '分段走曲线', '非均匀变化', SCENE.CALC, {
+            series: 'calculus', level: 'L3',
+            tags: ['折线逼近'],
+            goals: ['用折线轨迹逼近抛物线', '理解分段 vs 光滑'],
+            sceneConfig: {
+              stGraph: { enabled: true, tMaxSec: 25, sMaxCm: 80 },
+              vtGraph: { enabled: true, tMaxSec: 25, vMax: 25 }
+            },
+            starter: {
+              goto: [{ x: -20, y: 40 }, { x: -10, y: 10 }, { x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 40 }]
+            },
+            demo: 'plotParabola'
+          }),
+          task('calc_l3_3', '分得越细越像', '非均匀变化', SCENE.CALC, {
+            series: 'calculus', level: 'L3',
+            tags: ['逼近'],
+            goals: ['步长 10→5→2 分段前进', '折线越来越像曲线'],
+            sceneConfig: {
+              stGraph: { enabled: true, tMaxSec: 35, sMaxCm: 60 },
+              vtGraph: { enabled: true, tMaxSec: 35, vMax: 20 }
+            },
+            starter: {
+              forward: 10, forward2: 10, forward3: 10, forward4: 10, forward5: 10, forward6: 10
+            },
+            hint: '用多段相同小步长前进，观察 s-t 折线变密。',
+            demo: 'calcFineSteps'
+          })
+        ]
+      },
+      l4: {
+        name: 'L4 瞬时变化',
+        tasks: [
+          task('calc_l4_1', '某一时刻多快', '瞬时变化', SCENE.CALC, {
+            series: 'calculus', level: 'L4',
+            tags: ['平均速度', '割线'],
+            goals: ['取一小段算平均速度', '理解割线斜率'],
+            sceneConfig: {
+              stGraph: { enabled: true, tMaxSec: 20, sMaxCm: 80 },
+              vtGraph: { enabled: true, tMaxSec: 20, vMax: 20 },
+              calcOverlay: { type: 'secant', t0: 2, t1: 6 }
+            },
+            starter: { speed: 10, forward: 60 },
+            calcValidate: { type: 'slope', t0: 2, t1: 6, expected: 10, tolerance: 1.5 }
+          }),
+          task('calc_l4_2', '割线变切线', '瞬时变化', SCENE.CALC, {
+            series: 'calculus', level: 'L4',
+            tags: ['割线', '切线'],
+            goals: ['缩小 Δt，观察割线斜率趋稳', '感受瞬时变化率'],
+            sceneConfig: {
+              stGraph: { enabled: true, tMaxSec: 15, sMaxCm: 50 },
+              calcOverlay: { type: 'secant', t0: 4, t1: 5 }
+            },
+            starter: { speed: 8, forward: 40 },
+            hint: '运行后对比 t0–t1 与更短区间的割线斜率。',
+            demo: 'calcSecantNarrow'
+          }),
+          task('calc_l4_3', '导数直觉', '瞬时变化', SCENE.FUNCTION, {
+            series: 'calculus', level: 'L4',
+            tags: ['抛物线', '顶点'],
+            goals: ['抛物线顶点处斜率为 0', '割线→切线直觉'],
+            sceneConfig: {
+              cols: 12, rows: 12, cellCm: 10,
+              plot: { expr: 'x*x', xMin: -2, xMax: 2, step: 1, color: '#a78bfa', label: 'y=x²' },
+              stGraph: { enabled: true, tMaxSec: 20, sMaxCm: 50 },
+              calcOverlay: { type: 'secant', t0: -0.5, t1: 0.5 }
+            },
+            starter: { goto: [{ x: -10, y: 10 }, { x: 0, y: 0 }, { x: 10, y: 10 }] },
+            demo: 'plotParabola'
+          })
+        ]
+      },
+      l5: {
+        name: 'L5 累积与面积',
+        tasks: [
+          task('calc_l5_1', 'v-t 与总路程', '累积与面积', SCENE.CALC, {
+            series: 'calculus', level: 'L5',
+            tags: ['v-t', '面积'],
+            goals: ['矩形面积 = 路程', '理解累积量'],
+            sceneConfig: {
+              stGraph: { enabled: true, tMaxSec: 12, sMaxCm: 120 },
+              vtGraph: { enabled: true, tMaxSec: 12, vMax: 15 },
+              calcOverlay: { type: 'riemann', t0: 0, t1: 10, n: 4 }
+            },
+            starter: { speed: 10, forward: 100 },
+            calcValidate: { type: 'area', t0: 0, t1: 10, n: 10, expected: 100, tolerance: 5 }
+          }),
+          task('calc_l5_2', '变速：矩形逼近', '累积与面积', SCENE.CALC, {
+            series: 'calculus', level: 'L5',
+            tags: ['黎曼和'],
+            goals: ['分段匀速，矩形求和', '分得越细越准'],
+            sceneConfig: {
+              stGraph: { enabled: true, tMaxSec: 25, sMaxCm: 100 },
+              vtGraph: { enabled: true, tMaxSec: 25, vMax: 20 },
+              calcOverlay: { type: 'riemann', t0: 0, t1: 10, n: 5 }
+            },
+            starter: { speed: 5, forward: 20, speed2: 10, forward2: 20, speed3: 15, forward3: 20 },
+            calcValidate: { type: 'area', t0: 0, t1: 8, n: 8, expected: 60, tolerance: 20 }
+          }),
+          task('calc_l5_3', '从 s 到 v 到面积', '累积与面积', SCENE.CALC, {
+            series: 'calculus', level: 'L5',
+            tags: ['联动', '综合'],
+            goals: ['s-t 斜率 ↔ v-t 面积', '串联变化与累积'],
+            sceneConfig: {
+              stGraph: { enabled: true, tMaxSec: 20, sMaxCm: 80 },
+              vtGraph: { enabled: true, tMaxSec: 20, vMax: 15 },
+              calcOverlay: { type: 'riemann', t0: 0, t1: 8, n: 4 }
+            },
+            starter: { speed: 8, forward: 64 },
+            demo: 'calcPiecewiseSpeed'
+          })
+        ]
+      }
+    }
   }
 };
 
@@ -822,14 +1290,20 @@ function buildStarterXml(s, sceneConfig) {
     (Array.isArray(s.goto) ? s.goto : [s.goto]).forEach(p => {
       steps.push(blockGoto(p.x ?? p[0] ?? 0, p.y ?? p[1] ?? 0));
     });
+  } else if (s.repeat != null && s.forward != null && s.turn == null) {
+    if (s.speed != null) steps.push(blockSpeed(s.speed));
+    const inner = `<block type="motion_forward"><value name="D">${numShadow(s.forward)}</value></block>`;
+    steps.push(blockRepeat(s.repeat, inner));
   } else {
     if (s.speed != null) steps.push(blockSpeed(s.speed));
     if (s.forward != null) steps.push(blockMove2d(0, s.forward));
     if (s.backward != null) steps.push(blockBackward(s.backward));
     if (s.wait != null) steps.push(blockWait(s.wait));
     if (s.turn != null) steps.push(blockTurnRight(s.turn));
+    if (s.speed2 != null) steps.push(blockSpeed(s.speed2));
     if (s.forward2 != null) steps.push(blockForward(s.forward2));
     if (s.turn2 != null) steps.push(blockTurnRight(s.turn2));
+    if (s.speed3 != null) steps.push(blockSpeed(s.speed3));
     if (s.forward3 != null) steps.push(blockForward(s.forward3));
     if (s.extraForward != null) steps.push(blockForward(s.extraForward));
     if (s.turns) {

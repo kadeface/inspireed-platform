@@ -1,6 +1,13 @@
 /**
  * MathLab 课堂竞赛类型
+ *
+ * taskId 为 curriculum.js 中的字符串 id（无固定枚举）；专题课示例见 MATHLAB_CONTEST_TOPIC_TASK_EXAMPLES。
  */
+
+/** 函数图像 / 微积分专题竞赛冒烟用 taskId */
+export const MATHLAB_CONTEST_TOPIC_TASK_EXAMPLES = ['fg_l2_1', 'calc_l2_3'] as const
+
+export type MathlabContestTopicTaskId = (typeof MATHLAB_CONTEST_TOPIC_TASK_EXAMPLES)[number]
 
 export type MathlabContestStatus = 'preparing' | 'running' | 'ended'
 
