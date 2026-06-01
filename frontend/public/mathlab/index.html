@@ -15,9 +15,10 @@
   </script>
   <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script src="https://unpkg.com/blockly@10.4.3/blockly.min.js"></script>
+  <script src="https://unpkg.com/blockly@10.4.3/msg/zh-hans.js"></script>
   <script src="https://unpkg.com/blockly@10.4.3/blocks_compressed.js"></script>
   <script src="https://unpkg.com/blockly@10.4.3/javascript_compressed.js"></script>
-  <link rel="stylesheet" href="css/shell.css?v=6">
+  <link rel="stylesheet" href="css/shell.css?v=7">
 </head>
 <body>
   <div class="app-shell" id="appShell">
@@ -170,6 +171,18 @@
         </div>
       </div>
     </aside>
+
+    <!-- 页内输入框（iframe 内可用，替代 window.prompt） -->
+    <div id="mlModal" class="ml-modal" hidden role="dialog" aria-modal="true" aria-labelledby="mlModalLabel">
+      <div class="ml-modal-card">
+        <label id="mlModalLabel" class="ml-modal-label" for="mlModalInput">输入</label>
+        <input type="text" id="mlModalInput" class="ml-modal-input" autocomplete="off" />
+        <div class="ml-modal-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="mlModalCancel">取消</button>
+          <button type="button" class="btn btn-run btn-sm" id="mlModalOk">确定</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module">
@@ -187,6 +200,6 @@
   <script src="js/annotations.js?v=6"></script>
   <script src="js/view-shell.js?v=6"></script>
   <script src="js/contest.js?v=1"></script>
-  <script src="js/app.js?v=14"></script>
+  <script src="js/app.js?v=17"></script>
 </body>
 </html>

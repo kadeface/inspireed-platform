@@ -1710,6 +1710,62 @@
   window.__robotB = makeRobotApi(sim, 'B');
   window.__parallel = jobs => sim.runParallel(jobs);
 
+  // ─── 页内 prompt（避免 iframe 中 window.prompt / 跨域 parent 访问） ───
+  const mlPrompt = {
+    _resolve: null,
+    _els: null,
+    ensure() {
+      if (this._els) return this._els;
+      const root = document.getElementById('mlModal');
+      const input = document.getElementById('mlModalInput');
+      const label = document.getElementById('mlModalLabel');
+      const btnOk = document.getElementById('mlModalOk');
+      const btnCancel = document.getElementById('mlModalCancel');
+      const finish = (value) => {
+        root.hidden = true;
+        const r = this._resolve;
+        this._resolve = null;
+        if (r) r(value);
+      };
+      btnOk.addEventListener('click', () => finish(input.value));
+      btnCancel.addEventListener('click', () => finish(null));
+      root.addEventListener('click', (e) => { if (e.target === root) finish(null); });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); finish(input.value); }
+        if (e.key === 'Escape') { e.preventDefault(); finish(null); }
+      });
+      this._els = { root, input, label };
+      return this._els;
+    },
+    show(title, defaultValue) {
+      const { root, input, label } = this.ensure();
+      return new Promise((resolve) => {
+        this._resolve = (raw) => {
+          if (raw == null) { resolve(null); return; }
+          const s = String(raw).replace(/[\s\xa0]+/g, ' ').trim();
+          resolve(s || null);
+        };
+        label.textContent = title || '请输入';
+        input.value = defaultValue != null ? String(defaultValue) : '';
+        root.hidden = false;
+        setTimeout(() => { input.focus(); input.select(); }, 0);
+      });
+    }
+  };
+
+  function installBlocklyDialogs() {
+    if (typeof Blockly === 'undefined' || !Blockly.dialog) return;
+    Blockly.dialog.setPrompt((message, defaultValue, callback) => {
+      mlPrompt.show(message, defaultValue).then((v) => callback(v));
+    });
+    Blockly.dialog.setConfirm((message, callback) => {
+      mlPrompt.show(message, '确定').then((v) => callback(v != null));
+    });
+    Blockly.dialog.setAlert((message, callback) => {
+      mlPrompt.show(message, '').then(() => { if (callback) callback(); });
+    });
+  }
+
   // ─── Blockly ───────────────────────────────────────────
   const blocklyApp = {
     workspace: null,
@@ -1785,6 +1841,25 @@
             { type: 'field_dropdown', name: 'FN', options: [['sin', 'SIN'], ['cos', 'COS'], ['tan', 'TAN']] }
           ], output: 'Number', colour: 290 }
       ]);
+    },
+
+    registerVariableCodeGenerators(J, gen) {
+      if (J.forBlock?.variables_get || J.variables_get) return;
+      const varName = block => {
+        const id = block.getFieldValue('VAR');
+        return J.nameDB_ ? J.nameDB_.getName(id, Blockly.Names.NameType.VARIABLE) : block.getField('VAR').getText();
+      };
+      gen('variables_get', block => [varName(block), J.ORDER_ATOMIC]);
+      gen('variables_set', block => {
+        const name = varName(block);
+        const val = J.valueToCode(block, 'VALUE', J.ORDER_ASSIGNMENT) || '0';
+        return `${name} = ${val};\n`;
+      });
+      gen('math_change', block => {
+        const name = varName(block);
+        const delta = J.valueToCode(block, 'DELTA', J.ORDER_ADDITION) || '1';
+        return `${name} = (typeof ${name} === 'number' ? ${name} : 0) + ${delta};\n`;
+      });
     },
 
     registerCodeGenerators() {
@@ -1873,12 +1948,31 @@
         const map = { SIN: 'Math.sin', COS: 'Math.cos', TAN: 'Math.tan' };
         return [`(${map[fn]}((${deg}) * Math.PI / 180))`, J.ORDER_ATOMIC];
       });
+      this.registerVariableCodeGenerators(J, gen);
       gen('ml_math_trig_special', b => {
         const angle = b.getFieldValue('ANGLE');
         const fn = b.getFieldValue('FN');
         const v = TRIG_SPECIAL[angle][fn];
         return [String(v), J.ORDER_ATOMIC];
       });
+    },
+
+    variableDeclarations() {
+      if (!this.workspace) return '';
+      const J = Blockly.JavaScript;
+      if (!J.nameDB_) return '';
+      let vars = [];
+      if (typeof Blockly.Variables?.allUsedVarModels === 'function') {
+        vars = Blockly.Variables.allUsedVarModels(this.workspace);
+      } else if (this.workspace.getVariableMap) {
+        vars = this.workspace.getVariableMap().getAllVariables();
+      }
+      if (!vars.length) return '';
+      const lines = vars.map(v => {
+        const name = J.nameDB_.getName(v.getId(), Blockly.Names.NameType.VARIABLE);
+        return `let ${name};`;
+      });
+      return lines.join('\n') + '\n';
     },
 
     chainFromStart() {
@@ -1901,7 +1995,7 @@
     },
 
     generate() {
-      return this.chainFromStart();
+      return this.variableDeclarations() + this.chainFromStart();
     },
 
     buildToolboxXml(mode) {
@@ -1942,6 +2036,7 @@
             <block type="motion_speed"><value name="S"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
             <block type="motion_wait"><value name="T"><shadow type="math_num"><field name="N">1</field></shadow></value></block>
           </category>
+          <category name="变量" custom="VARIABLE" colour="330"></category>
           <category name="逻辑" colour="210"><block type="robot_logic_compare"></block></category>
           <category name="数学" colour="230">
             <block type="math_num"></block>
@@ -1957,23 +2052,92 @@
         </xml>`;
     },
 
+    applyBlocklyLocale() {
+      if (!Blockly.Msg) return;
+      Object.assign(Blockly.Msg, {
+        NEW_VARIABLE: '创建变量…',
+        NEW_VARIABLE_TITLE: '新变量名称：',
+        RENAME_VARIABLE: '重命名变量…',
+        RENAME_VARIABLE_TITLE: '重命名为：',
+        DELETE_VARIABLE: '删除变量「%1」',
+        VARIABLES_DEFAULT_NAME: '变量',
+        VARIABLES_SET: '将 %1 设为 %2',
+        VARIABLES_GET_TOOLTIP: '返回该变量的值。',
+        MATH_CHANGE_TITLE: '将 %1 增加 %2'
+      });
+    },
+
+    async openCreateVariableDialog(targetWs) {
+      const title = Blockly.Msg.NEW_VARIABLE_TITLE || '新变量名称：';
+      const def = Blockly.Msg.VARIABLES_DEFAULT_NAME || '变量';
+      const name = await mlPrompt.show(title, def);
+      if (!name) return;
+      if (Blockly.Variables?.nameUsedWithAnyType?.(name, targetWs)) {
+        const msg = (Blockly.Msg.VARIABLE_ALREADY_EXISTS || '变量「%1」已存在').replace('%1', name);
+        await mlPrompt.show(msg, '');
+        return this.openCreateVariableDialog(targetWs);
+      }
+      targetWs.createVariable(name);
+      if (this.workspace && typeof this.workspace.refreshToolboxSelection === 'function') {
+        this.workspace.refreshToolboxSelection();
+      }
+    },
+
+    registerVariableButton(workspace, key) {
+      workspace.registerButtonCallback(key, (btn) => {
+        const target = btn.getTargetWorkspace ? btn.getTargetWorkspace() : workspace;
+        this.openCreateVariableDialog(target);
+      });
+    },
+
+    ensureVariableSupport() {
+      const ws = this.workspace;
+      if (!ws || !Blockly.Variables?.flyoutCategory) return;
+
+      const root = document.getElementById('appShell') || document.body;
+      if (typeof Blockly.common?.setParentContainer === 'function') {
+        Blockly.common.setParentContainer(root);
+      }
+
+      const baseFlyout = Blockly.Variables.flyoutCategory;
+      const self = this;
+      ws.registerToolboxCategoryCallback('VARIABLE', (flyoutWs) => {
+        const items = baseFlyout(flyoutWs);
+        self.registerVariableButton(flyoutWs, 'CREATE_VARIABLE');
+        self.registerVariableButton(ws, 'CREATE_VARIABLE');
+        return items;
+      });
+
+      this.registerVariableButton(ws, 'CREATE_VARIABLE');
+      this.registerVariableButton(ws, 'ML_CREATE_VARIABLE');
+
+      if (typeof ws.refreshToolboxSelection === 'function') {
+        ws.refreshToolboxSelection();
+      }
+    },
+
     setMode(mode) {
       if (!this.workspace) return;
       this.workspace.updateToolbox(this.buildToolboxXml(mode));
+      this.ensureVariableSupport();
     },
 
     init() {
+      installBlocklyDialogs();
+      this.applyBlocklyLocale();
       this.defineBlocklyTypes();
       this.workspace = Blockly.inject('blockly', {
         toolbox: this.buildToolboxXml('regular'),
         grid: { spacing: 20, length: 3, colour: '#d4dde8', snap: true },
         zoom: { controls: true, wheel: true, startScale: 1, maxScale: 2.5, minScale: 0.4 },
-        trashcan: true
+        trashcan: true,
+        collapse: true
       });
+      this.registerCodeGenerators();
       if (typeof Blockly.JavaScript.init === 'function') {
         Blockly.JavaScript.init(this.workspace);
       }
-      this.registerCodeGenerators();
+      this.ensureVariableSupport();
       window.__blocklyWorkspace = this.workspace;
       window.addEventListener('resize', () => Blockly.svgResize(this.workspace));
     },

@@ -453,6 +453,53 @@ body.contest-mode #btnContestSubmit {
 .dot.err { background: var(--danger); }
 @keyframes blink { 50% { opacity: .4; } }
 
+/* ── 页内对话框（iframe / 跨域嵌入安全） ── */
+.ml-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+  padding: 16px;
+}
+.ml-modal[hidden] { display: none !important; }
+.ml-modal-card {
+  width: min(100%, 320px);
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+.ml-modal-label {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.ml-modal-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+}
+.ml-modal-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-lt);
+}
+.ml-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* ── Drawers ── */
 .drawer-backdrop {
   position: fixed;
