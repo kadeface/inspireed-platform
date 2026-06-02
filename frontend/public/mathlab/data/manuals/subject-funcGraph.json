@@ -1,0 +1,999 @@
+{
+  "id": "subject-funcGraph",
+  "type": "subject",
+  "subjectKey": "funcGraph",
+  "title": "函数图像专题册",
+  "stageName": "轮式机器人探秘函数图像",
+  "taskCount": 17,
+  "sectionLabel": "层级",
+  "sections": [
+    {
+      "levelKey": "l0",
+      "levelName": "L0 数轴与对应",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "fg_l0_1",
+          "title": "数轴上的位置",
+          "unit": "数轴与对应",
+          "stageKey": "funcGraph",
+          "gradeKey": "l0",
+          "gradeName": "L0 数轴与对应",
+          "scene": "numberline",
+          "tags": [
+            "数轴",
+            "位置"
+          ],
+          "goals": [
+            "在数轴上走到指定位置",
+            "理解数与距离的一一对应"
+          ],
+          "focus": "",
+          "challenges": [
+            "走到 +3",
+            "走到 +7",
+            "走到 -2"
+          ],
+          "hint": "用「沿当前朝向前进/后退」配合数轴刻度。",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "min": -5,
+            "max": 10,
+            "unitCm": 20
+          },
+          "starter": {
+            "forward": 60,
+            "backward": 40
+          },
+          "demo": "numberline"
+        },
+        {
+          "id": "fg_l0_2",
+          "title": "步长与数列",
+          "unit": "数轴与对应",
+          "stageKey": "funcGraph",
+          "gradeKey": "l0",
+          "gradeName": "L0 数轴与对应",
+          "scene": "distance",
+          "tags": [
+            "数列",
+            "重复"
+          ],
+          "goals": [
+            "每次走相同步长",
+            "观察 5,10,15,20 的规律"
+          ],
+          "focus": "",
+          "challenges": [
+            "每次走 5 cm，重复 4 次"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "repeat": 4,
+            "forward": 5
+          },
+          "demo": "forward10"
+        },
+        {
+          "id": "fg_l0_3",
+          "title": "输入与输出",
+          "unit": "数轴与对应",
+          "stageKey": "funcGraph",
+          "gradeKey": "l0",
+          "gradeName": "L0 数轴与对应",
+          "scene": "distance",
+          "tags": [
+            "对应关系"
+          ],
+          "goals": [
+            "走 x 格记录终点",
+            "建立输入→输出直觉"
+          ],
+          "focus": "",
+          "challenges": [
+            "走 10、20、30 cm，记录总距离"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 10,
+            "forward2": 10,
+            "forward3": 10
+          },
+          "demo": "forward30"
+        }
+      ]
+    },
+    {
+      "levelKey": "l1",
+      "levelName": "L1 数对与比例",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "fg_l1_1",
+          "title": "数对定位",
+          "unit": "数对与比例",
+          "stageKey": "funcGraph",
+          "gradeKey": "l1",
+          "gradeName": "L1 数对与比例",
+          "scene": "grid",
+          "tags": [
+            "坐标",
+            "数对"
+          ],
+          "goals": [
+            "用 goto 走到 (2,3)、(4,6)",
+            "理解横纵坐标"
+          ],
+          "focus": "",
+          "challenges": [
+            "走到 (20,30) cm",
+            "走到 (40,60) cm"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 10,
+            "rows": 8,
+            "cellCm": 10
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 20,
+                "y": 30
+              },
+              {
+                "x": 40,
+                "y": 60
+              }
+            ]
+          },
+          "demo": "grid32"
+        },
+        {
+          "id": "fg_l1_2",
+          "title": "倍数关系",
+          "unit": "数对与比例",
+          "stageKey": "funcGraph",
+          "gradeKey": "l1",
+          "gradeName": "L1 数对与比例",
+          "scene": "grid",
+          "tags": [
+            "正比例",
+            "倍数"
+          ],
+          "goals": [
+            "走 (1,2)(2,4)(3,6) 对应点",
+            "发现 y=2x 关系"
+          ],
+          "focus": "",
+          "challenges": [
+            "依次走到 (10,20)(20,40)(30,60)"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 10,
+            "rows": 10,
+            "cellCm": 10
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 10,
+                "y": 20
+              },
+              {
+                "x": 20,
+                "y": 40
+              },
+              {
+                "x": 30,
+                "y": 60
+              }
+            ]
+          },
+          "demo": "grid43"
+        },
+        {
+          "id": "fg_l1_3",
+          "title": "正比例初探",
+          "unit": "数对与比例",
+          "stageKey": "funcGraph",
+          "gradeKey": "l1",
+          "gradeName": "L1 数对与比例",
+          "scene": "grid",
+          "tags": [
+            "y=2x"
+          ],
+          "goals": [
+            "验证轨迹是否满足 y=2x",
+            "理解比例关系"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "轨迹点应落在 y=2x 参考线附近。",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 10,
+            "cellCm": 10,
+            "referenceLine": {
+              "k": 2,
+              "label": "y=2x"
+            }
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 10,
+                "y": 20
+              },
+              {
+                "x": 20,
+                "y": 40
+              },
+              {
+                "x": 30,
+                "y": 60
+              },
+              {
+                "x": 40,
+                "y": 80
+              }
+            ]
+          },
+          "demo": "grid43"
+        }
+      ]
+    },
+    {
+      "levelKey": "l2",
+      "levelName": "L2 直线世界",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "fg_l2_1",
+          "title": "描点成线",
+          "unit": "正比例",
+          "stageKey": "funcGraph",
+          "gradeKey": "l2",
+          "gradeName": "L2 直线世界",
+          "scene": "function",
+          "tags": [
+            "描点",
+            "正比例"
+          ],
+          "goals": [
+            "在 x=0,1,2,3 处描点",
+            "观察点连成直线"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 10,
+            "rows": 10,
+            "cellCm": 10,
+            "plot": {
+              "expr": "2*x",
+              "xMin": 0,
+              "xMax": 3,
+              "step": 1,
+              "color": "#38bdf8",
+              "label": "y=2x"
+            }
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 10,
+                "y": 20
+              },
+              {
+                "x": 20,
+                "y": 40
+              },
+              {
+                "x": 30,
+                "y": 60
+              }
+            ]
+          },
+          "demo": "plotLinear"
+        },
+        {
+          "id": "fg_l2_2",
+          "title": "斜率 k 的意义",
+          "unit": "正比例",
+          "stageKey": "funcGraph",
+          "gradeKey": "l2",
+          "gradeName": "L2 直线世界",
+          "scene": "function",
+          "tags": [
+            "斜率",
+            "对比"
+          ],
+          "goals": [
+            "比较 k=1 与 k=2 的图象",
+            "理解斜率越大越陡"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "先走 y=2x 上的点，再与 y=x 参考线对比。",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 10,
+            "rows": 10,
+            "cellCm": 10,
+            "plots": [
+              {
+                "expr": "x",
+                "xMin": 0,
+                "xMax": 4,
+                "step": 1,
+                "color": "#38bdf8",
+                "label": "y=x"
+              },
+              {
+                "expr": "2*x",
+                "xMin": 0,
+                "xMax": 4,
+                "step": 1,
+                "color": "#f97316",
+                "label": "y=2x"
+              }
+            ]
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 10,
+                "y": 20
+              },
+              {
+                "x": 20,
+                "y": 40
+              }
+            ]
+          },
+          "demo": "plotLinear"
+        },
+        {
+          "id": "fg_l2_3",
+          "title": "过原点的直线",
+          "unit": "正比例",
+          "stageKey": "funcGraph",
+          "gradeKey": "l2",
+          "gradeName": "L2 直线世界",
+          "scene": "function",
+          "tags": [
+            "y=kx"
+          ],
+          "goals": [
+            "走 y=0.5x 与 y=3x 上的点",
+            "理解 k 改变倾斜程度"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 10,
+            "cellCm": 10,
+            "plots": [
+              {
+                "expr": "0.5*x",
+                "xMin": 0,
+                "xMax": 4,
+                "step": 1,
+                "color": "#94a3b8",
+                "label": "y=0.5x"
+              },
+              {
+                "expr": "3*x",
+                "xMin": 0,
+                "xMax": 3,
+                "step": 1,
+                "color": "#f97316",
+                "label": "y=3x"
+              }
+            ]
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 10,
+                "y": 30
+              },
+              {
+                "x": 20,
+                "y": 60
+              }
+            ]
+          },
+          "demo": "plotLinearSteep"
+        }
+      ]
+    },
+    {
+      "levelKey": "l3",
+      "levelName": "L3 一次函数",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "fg_l3_1",
+          "title": "截距 b 的作用",
+          "unit": "一次函数",
+          "stageKey": "funcGraph",
+          "gradeKey": "l3",
+          "gradeName": "L3 一次函数",
+          "scene": "function",
+          "tags": [
+            "截距",
+            "y=2x+3"
+          ],
+          "goals": [
+            "走 y=2x+3 上的点",
+            "观察直线不过原点"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 10,
+            "cellCm": 10,
+            "plot": {
+              "expr": "2*x+3",
+              "xMin": 0,
+              "xMax": 4,
+              "step": 1,
+              "color": "#38bdf8",
+              "label": "y=2x+3"
+            }
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 0,
+                "y": 30
+              },
+              {
+                "x": 10,
+                "y": 50
+              },
+              {
+                "x": 20,
+                "y": 70
+              },
+              {
+                "x": 30,
+                "y": 90
+              }
+            ]
+          },
+          "demo": "plotLinearIntercept"
+        },
+        {
+          "id": "fg_l3_2",
+          "title": "匀速 s-t 图",
+          "unit": "一次函数",
+          "stageKey": "funcGraph",
+          "gradeKey": "l3",
+          "gradeName": "L3 一次函数",
+          "scene": "time",
+          "tags": [
+            "s=vt",
+            "s-t 图"
+          ],
+          "goals": [
+            "s=vt 函数模型",
+            "匀速运动图象",
+            "斜率=速度"
+          ],
+          "focus": "函数图象专题：s=vt 是一次函数，s-t 图象为直线",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "一次函数",
+              "tex": "$$s = vt + s_0$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 5,
+            "forward": 100
+          },
+          "demo": "linear"
+        },
+        {
+          "id": "fg_l3_3",
+          "title": "追及与交点",
+          "unit": "一次函数",
+          "stageKey": "funcGraph",
+          "gradeKey": "l3",
+          "gradeName": "L3 一次函数",
+          "scene": "time",
+          "tags": [
+            "追及",
+            "交点"
+          ],
+          "goals": [
+            "追及问题建模",
+            "速度差与时间",
+            "从图象读交点"
+          ],
+          "focus": "函数图象专题：追及问题对应两条 s-t 直线交点",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 15,
+            "forward": 60
+          },
+          "demo": "chase"
+        }
+      ]
+    },
+    {
+      "levelKey": "l4",
+      "levelName": "L4 二次函数",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "fg_l4_1",
+          "title": "抛物线描点",
+          "unit": "二次函数",
+          "stageKey": "funcGraph",
+          "gradeKey": "l4",
+          "gradeName": "L4 二次函数",
+          "scene": "function",
+          "tags": [
+            "抛物线",
+            "y=x²"
+          ],
+          "goals": [
+            "x=-2…2 描点 (x,x²)",
+            "认识抛物线形状"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 12,
+            "cellCm": 10,
+            "plot": {
+              "expr": "x*x",
+              "xMin": -2,
+              "xMax": 2,
+              "step": 1,
+              "color": "#a78bfa",
+              "label": "y=x²"
+            }
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": -20,
+                "y": 40
+              },
+              {
+                "x": -10,
+                "y": 10
+              },
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 10,
+                "y": 10
+              },
+              {
+                "x": 20,
+                "y": 40
+              }
+            ]
+          },
+          "demo": "plotParabola"
+        },
+        {
+          "id": "fg_l4_2",
+          "title": "参数 a 的影响",
+          "unit": "二次函数",
+          "stageKey": "funcGraph",
+          "gradeKey": "l4",
+          "gradeName": "L4 二次函数",
+          "scene": "function",
+          "tags": [
+            "参数 a"
+          ],
+          "goals": [
+            "对比 a=1、2、0.5 的开口",
+            "理解 |a| 越大越窄"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 12,
+            "cellCm": 10,
+            "plots": [
+              {
+                "expr": "x*x",
+                "xMin": -2,
+                "xMax": 2,
+                "step": 1,
+                "color": "#38bdf8",
+                "label": "y=x²"
+              },
+              {
+                "expr": "2*x*x",
+                "xMin": -2,
+                "xMax": 2,
+                "step": 1,
+                "color": "#f97316",
+                "label": "y=2x²"
+              },
+              {
+                "expr": "0.5*x*x",
+                "xMin": -2,
+                "xMax": 2,
+                "step": 1,
+                "color": "#94a3b8",
+                "label": "y=0.5x²"
+              }
+            ]
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": -20,
+                "y": 40
+              },
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 20,
+                "y": 40
+              }
+            ]
+          },
+          "demo": "plotParabola"
+        },
+        {
+          "id": "fg_l4_3",
+          "title": "顶点与对称轴",
+          "unit": "二次函数",
+          "stageKey": "funcGraph",
+          "gradeKey": "l4",
+          "gradeName": "L4 二次函数",
+          "scene": "function",
+          "tags": [
+            "顶点",
+            "平移"
+          ],
+          "goals": [
+            "走 y=(x-1)²+2 关键点",
+            "认识顶点与对称轴"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 12,
+            "cellCm": 10,
+            "plot": {
+              "expr": "(x-1)*(x-1)+2",
+              "xMin": -1,
+              "xMax": 3,
+              "step": 1,
+              "color": "#f472b6",
+              "label": "y=(x-1)²+2"
+            }
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 0,
+                "y": 30
+              },
+              {
+                "x": 10,
+                "y": 20
+              },
+              {
+                "x": 20,
+                "y": 30
+              },
+              {
+                "x": 30,
+                "y": 50
+              }
+            ]
+          },
+          "demo": "plotParabolaShifted"
+        }
+      ]
+    },
+    {
+      "levelKey": "l5",
+      "levelName": "L5 拓展",
+      "taskCount": 2,
+      "tasks": [
+        {
+          "id": "fg_l5_1",
+          "title": "反比例 y=k/x",
+          "unit": "反比例",
+          "stageKey": "funcGraph",
+          "gradeKey": "l5",
+          "gradeName": "L5 拓展",
+          "scene": "function",
+          "tags": [
+            "反比例",
+            "双曲线"
+          ],
+          "goals": [
+            "描点理解 y=20/x",
+            "观察两支曲线"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "x 取 2,4,5,8 等，分别计算 y=20÷x 再 goto。",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 10,
+            "cellCm": 10,
+            "plot": {
+              "expr": "20/x",
+              "xMin": 2,
+              "xMax": 8,
+              "step": 1,
+              "color": "#22d3ee",
+              "label": "y=20/x"
+            }
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 20,
+                "y": 10
+              },
+              {
+                "x": 40,
+                "y": 5
+              },
+              {
+                "x": 50,
+                "y": 4
+              }
+            ]
+          },
+          "demo": "plotInverse"
+        },
+        {
+          "id": "fg_l5_2",
+          "title": "分段函数",
+          "unit": "分段函数",
+          "stageKey": "funcGraph",
+          "gradeKey": "l5",
+          "gradeName": "L5 拓展",
+          "scene": "function",
+          "tags": [
+            "分段",
+            "折线"
+          ],
+          "goals": [
+            "走折线路径",
+            "理解分段定义"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "每段用 goto 连接，整体是分段一次函数。",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 10,
+            "cellCm": 10
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 20,
+                "y": 20
+              },
+              {
+                "x": 30,
+                "y": 20
+              },
+              {
+                "x": 50,
+                "y": 0
+              }
+            ]
+          },
+          "demo": "plotPiecewise"
+        }
+      ]
+    }
+  ]
+}

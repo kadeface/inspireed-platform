@@ -130,6 +130,9 @@ html, body {
   font-size: .82rem;
   cursor: pointer;
   transition: background .12s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 .btn-sm { padding: 4px 10px; font-size: .75rem; }
 .btn-run { background: var(--success); color: #fff; }
@@ -146,6 +149,39 @@ html, body {
   display: flex;
   min-height: 0;
   overflow: hidden;
+}
+
+.manual-dock {
+  width: min(44vw, 560px);
+  min-width: 340px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.manual-dock-h {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.manual-dock iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #fff;
+}
+
+.app-shell.manual-dock-collapsed .manual-dock {
+  display: none;
 }
 
 .toolbar {
@@ -655,4 +691,8 @@ pre.code.show { display: block; }
   .topbar-brand h1 { display: none; }
   .task-summary { max-width: 120px; }
   .drawer-left { width: 92vw; }
+  .manual-dock {
+    min-width: 220px;
+    width: 100%;
+  }
 }

@@ -1,0 +1,1377 @@
+{
+  "id": "stage-junior",
+  "type": "stage",
+  "stageKey": "junior",
+  "title": "初中阶段学生活动实验手册",
+  "stageName": "初中阶段",
+  "taskCount": 31,
+  "sectionLabel": "年级",
+  "sections": [
+    {
+      "gradeKey": "7u",
+      "gradeName": "七年级上册",
+      "taskCount": 4,
+      "tasks": [
+        {
+          "id": "j7u1",
+          "title": "任务1：数轴定位与有理数运算",
+          "unit": "有理数",
+          "stageKey": "junior",
+          "gradeKey": "7u",
+          "gradeName": "七年级上册",
+          "scene": "numberline",
+          "tags": [
+            "数轴",
+            "有理数",
+            "加减"
+          ],
+          "goals": [
+            "数轴三要素",
+            "用前进/后退表示正负",
+            "验证 (+5)+(-3)=+2"
+          ],
+          "focus": "",
+          "challenges": [
+            "前进 100cm（+5 个单位）",
+            "再后退 60cm（-3 个单位），停在 +2"
+          ],
+          "hint": "数轴上 1 个单位 = 20cm。前进 100cm = +5，后退 60cm = -3，最终停在 +2。",
+          "formulas": [
+            {
+              "title": "数轴",
+              "tex": "原点 · 正方向 · 单位长度"
+            }
+          ],
+          "sceneConfig": {
+            "min": -10,
+            "max": 10,
+            "unitCm": 20
+          },
+          "starter": {
+            "forward": 100,
+            "backward": 60
+          },
+          "demo": "numberline"
+        },
+        {
+          "id": "j7u2",
+          "title": "任务2：行程方程解速度",
+          "unit": "一元一次方程",
+          "stageKey": "junior",
+          "gradeKey": "7u",
+          "gradeName": "七年级上册",
+          "scene": "time",
+          "tags": [
+            "方程",
+            "速度",
+            "S=vt"
+          ],
+          "goals": [
+            "列行程方程",
+            "已知 S、t 求 v",
+            "编程验证"
+          ],
+          "focus": "",
+          "challenges": [
+            "100cm 用 10 秒，求速度 10cm/s"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "行程",
+              "tex": "$$S = v \\times t$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 10,
+            "forward": 100
+          },
+          "demo": "forward100"
+        },
+        {
+          "id": "j7u3",
+          "title": "任务3：最短路径规划",
+          "unit": "几何初步",
+          "stageKey": "junior",
+          "gradeKey": "7u",
+          "gradeName": "七年级上册",
+          "scene": "path",
+          "tags": [
+            "最短路径",
+            "线段"
+          ],
+          "goals": [
+            "两点间线段最短",
+            "比较路径",
+            "优化选择"
+          ],
+          "focus": "",
+          "challenges": [
+            "直线走 100cm"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "最短路径",
+              "tex": "两点之间，线段最短"
+            },
+            {
+              "title": "比较",
+              "tex": "折线长 $\\ge$ 直线长"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 100
+          },
+          "demo": "forward100"
+        },
+        {
+          "id": "j7u4",
+          "title": "任务4：机器人场地设计",
+          "unit": "几何图形",
+          "stageKey": "junior",
+          "gradeKey": "7u",
+          "gradeName": "七年级上册",
+          "scene": "perimeter",
+          "tags": [
+            "设计",
+            "周长",
+            "面积"
+          ],
+          "goals": [
+            "设计矩形场地",
+            "计算周长与面积",
+            "编程走边界"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "周长",
+              "tex": "$$C = 2(a + b)$$"
+            },
+            {
+              "title": "面积",
+              "tex": "$$S = a \\times b$$"
+            }
+          ],
+          "sceneConfig": {
+            "rect": {
+              "w": 60,
+              "h": 40
+            }
+          },
+          "starter": {
+            "repeat": 2,
+            "forward": 60,
+            "turn": 90,
+            "forward2": 40,
+            "turn2": 90
+          },
+          "demo": "rect6040"
+        }
+      ]
+    },
+    {
+      "gradeKey": "7d",
+      "gradeName": "七年级下册",
+      "taskCount": 5,
+      "tasks": [
+        {
+          "id": "j7d5",
+          "title": "任务5：垂直转弯与平行巡线",
+          "unit": "相交线与平行线",
+          "stageKey": "junior",
+          "gradeKey": "7d",
+          "gradeName": "七年级下册",
+          "scene": "angle",
+          "tags": [
+            "垂直",
+            "平行",
+            "90°"
+          ],
+          "goals": [
+            "垂直=90°",
+            "平行线性质",
+            "直角转弯"
+          ],
+          "focus": "",
+          "challenges": [
+            "连续 4 次 90° 转弯",
+            "走完是否回到起始方向？"
+          ],
+          "hint": "重复 4 次：前进 → 右转 90°，四直角合为周角。",
+          "formulas": [
+            {
+              "title": "垂直",
+              "tex": "两直线相交成 $$90°$$"
+            },
+            {
+              "title": "周角",
+              "tex": "$$360° = 4 \\times 90°$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "repeat": 4,
+            "forward": 40,
+            "turn": 90
+          },
+          "demo": "square40"
+        },
+        {
+          "id": "j7d6",
+          "title": "任务6：平移路径图案设计",
+          "unit": "平移",
+          "stageKey": "junior",
+          "gradeKey": "7d",
+          "gradeName": "七年级下册",
+          "scene": "path",
+          "tags": [
+            "平移",
+            "图案"
+          ],
+          "goals": [
+            "平移性质",
+            "设计重复图案",
+            "坐标变化"
+          ],
+          "focus": "",
+          "challenges": [
+            "重复 3 次走 L 形路径",
+            "观察每次图案相同"
+          ],
+          "hint": "每次「前进 30 → 转 90° → 前进 20」构成相同 L 形，体现平移重复。",
+          "formulas": [
+            {
+              "title": "平移",
+              "tex": "形状、大小、方向不变"
+            },
+            {
+              "title": "坐标",
+              "tex": "$$ (x,y) \\to (x+a,\\, y+b) $$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "repeat": 3,
+            "forward": 30,
+            "turn": 90,
+            "forward2": 20
+          },
+          "demo": "pattern"
+        },
+        {
+          "id": "j7d7",
+          "title": "任务7：坐标系定位与导航",
+          "unit": "平面直角坐标系",
+          "stageKey": "junior",
+          "gradeKey": "7d",
+          "gradeName": "七年级下册",
+          "scene": "grid",
+          "tags": [
+            "坐标",
+            "象限",
+            "导航"
+          ],
+          "goals": [
+            "建立坐标系",
+            "用坐标定位",
+            "编程走到 (4,3)"
+          ],
+          "focus": "",
+          "challenges": [
+            "走到旗帜 (4,3)",
+            "读出终点坐标验证"
+          ],
+          "hint": "目标 (4,3) 即 x=40 cm，y=30 cm；用「移动到 x y」。",
+          "formulas": [
+            {
+              "title": "坐标",
+              "tex": "$$(x,\\, y)$$ 表示位置"
+            },
+            {
+              "title": "格距",
+              "tex": "$$1\\text{ 格} = 10\\text{ cm}$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 8,
+            "rows": 8,
+            "cellCm": 10,
+            "target": [
+              4,
+              3
+            ]
+          },
+          "starter": {
+            "goto": {
+              "x": 40,
+              "y": 30
+            }
+          },
+          "demo": "gridTarget43"
+        },
+        {
+          "id": "j7d8",
+          "title": "任务8：坐标平移与编队运动",
+          "unit": "坐标变换",
+          "stageKey": "junior",
+          "gradeKey": "7d",
+          "gradeName": "七年级下册",
+          "scene": "grid",
+          "tags": [
+            "平移",
+            "坐标",
+            "编队"
+          ],
+          "goals": [
+            "坐标平移规律",
+            "(x,y)→(x+a,y+b)",
+            "编队路径"
+          ],
+          "focus": "",
+          "challenges": [
+            "先平移 +40 cm（x 方向）",
+            "再平移 +30 cm（y 方向）"
+          ],
+          "hint": "两次「移动到」：先 (40,0) 再 (40,30)，对应 a=40、b=30。",
+          "formulas": [
+            {
+              "title": "平移",
+              "tex": "$$ (x,y) \\to (x+a,\\, y+b) $$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 8,
+            "rows": 8,
+            "cellCm": 10
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 40,
+                "y": 0
+              },
+              {
+                "x": 40,
+                "y": 30
+              }
+            ]
+          },
+          "demo": "translate"
+        },
+        {
+          "id": "j7d9",
+          "title": "任务9：速度与资源的方程求解",
+          "unit": "二元一次方程组",
+          "stageKey": "junior",
+          "gradeKey": "7d",
+          "gradeName": "七年级下册",
+          "scene": "time",
+          "tags": [
+            "方程组",
+            "速度",
+            "验证"
+          ],
+          "goals": [
+            "把相遇题抽象为方程组（如 v₁t=S₁，v₂t=S₂，S₁+S₂=S）",
+            "纸面求 S₁、S₂ 或 v₁、v₂",
+            "用分段速度/路程编程验证解（单轮模拟）"
+          ],
+          "focus": "本课重「列式→求解→代入验证」；双车相遇动画见行程专题 TV1",
+          "challenges": [
+            "全长 100 cm，t=4 s，v_甲=10、v_乙=15：求 S_甲、S_乙 并编程验证",
+            "运行后总路程是否等于 100 cm？",
+            "若 v_乙 改为 20，方程组的解如何变？"
+          ],
+          "hint": "先算 S_甲=10×4=40，S_乙=15×4=60；再「设速度→前进→改速度→再前进」。两车相向仿真请学「行程问题 · TV1」。",
+          "formulas": [
+            {
+              "title": "方程组",
+              "tex": "$$\\begin{cases} v_1 t = S_1 \\\\ v_2 t = S_2 \\\\ S_1 + S_2 = S \\end{cases}$$"
+            },
+            {
+              "title": "路程",
+              "tex": "$$S = v \\times t$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 10,
+            "forward": 40,
+            "speed2": 15,
+            "forward2": 60
+          },
+          "demo": "equationVerify"
+        }
+      ]
+    },
+    {
+      "gradeKey": "8u",
+      "gradeName": "八年级上册",
+      "taskCount": 4,
+      "tasks": [
+        {
+          "id": "j8u10",
+          "title": "任务10：三角形路径验证",
+          "unit": "三角形",
+          "stageKey": "junior",
+          "gradeKey": "8u",
+          "gradeName": "八年级上册",
+          "scene": "shape",
+          "tags": [
+            "三角形",
+            "三边关系"
+          ],
+          "goals": [
+            "走三角形验证三边",
+            "两边之和大于第三边"
+          ],
+          "focus": "",
+          "challenges": [
+            "走边长 50 cm 的等边三角形",
+            "总路程是否 150 cm？"
+          ],
+          "hint": "重复 3 次：前进 50 → 左转 120°。",
+          "formulas": [
+            {
+              "title": "三边关系",
+              "tex": "$$a + b > c$$"
+            },
+            {
+              "title": "周长",
+              "tex": "$$C = a + b + c$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "repeat": 3,
+            "forward": 50,
+            "turn": 120
+          },
+          "demo": "triangle50"
+        },
+        {
+          "id": "j8u11",
+          "title": "任务11：全等轨迹与距离测量",
+          "unit": "全等三角形",
+          "stageKey": "junior",
+          "gradeKey": "8u",
+          "gradeName": "八年级上册",
+          "scene": "path",
+          "tags": [
+            "全等",
+            "对应边"
+          ],
+          "goals": [
+            "走全等路径",
+            "对应边相等验证"
+          ],
+          "focus": "",
+          "challenges": [
+            "第一段 40+30，第二段 30+40",
+            "对应边是否相等？"
+          ],
+          "hint": "走矩形两条不同顺序的邻边，对应边应相等（40 对 40，30 对 30）。",
+          "formulas": [
+            {
+              "title": "全等",
+              "tex": "对应边相等"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 40,
+            "turn": 90,
+            "forward2": 30,
+            "turn2": 90,
+            "forward3": 40
+          },
+          "demo": "congruent"
+        },
+        {
+          "id": "j8u12",
+          "title": "任务12：对称路径运动",
+          "unit": "轴对称",
+          "stageKey": "junior",
+          "gradeKey": "8u",
+          "gradeName": "八年级上册",
+          "scene": "path",
+          "tags": [
+            "轴对称",
+            "对应点"
+          ],
+          "goals": [
+            "轴对称性质",
+            "走对称路径"
+          ],
+          "focus": "",
+          "challenges": [
+            "先走 60 cm 再转 90° 走 40 cm",
+            "观察路径关于转角对称"
+          ],
+          "hint": "L 形路径可看作沿对称轴的反射组合。",
+          "formulas": [
+            {
+              "title": "轴对称",
+              "tex": "对应点到对称轴距离相等"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 60,
+            "turn": 90,
+            "forward2": 40
+          },
+          "demo": "symmetry"
+        },
+        {
+          "id": "j8u13",
+          "title": "任务13：最短饮马路径",
+          "unit": "最短路径",
+          "stageKey": "junior",
+          "gradeKey": "8u",
+          "gradeName": "八年级上册",
+          "scene": "path",
+          "tags": [
+            "反射",
+            "最短"
+          ],
+          "goals": [
+            "饮马问题模型",
+            "对称转化最短路径"
+          ],
+          "focus": "",
+          "challenges": [
+            "转 45° 后走 50 cm",
+            "比较折线与直线距离"
+          ],
+          "hint": "45° 转折模拟饮马问题的对称转化；直线距离 ≈ 50√2 cm。",
+          "formulas": [
+            {
+              "title": "对称转化",
+              "tex": "反射后走直线最短"
+            },
+            {
+              "title": "最短",
+              "tex": "两点之间，线段最短"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 50,
+            "turn": 45,
+            "forward2": 50
+          },
+          "demo": "reflect"
+        }
+      ]
+    },
+    {
+      "gradeKey": "8d",
+      "gradeName": "八年级下册",
+      "taskCount": 7,
+      "tasks": [
+        {
+          "id": "j8d14",
+          "title": "任务14：距离测算与勾股定理",
+          "unit": "勾股定理",
+          "stageKey": "junior",
+          "gradeKey": "8d",
+          "gradeName": "八年级下册",
+          "scene": "trig",
+          "tags": [
+            "勾股定理",
+            "a²+b²=c²",
+            "3-4-5"
+          ],
+          "goals": [
+            "对照叠加层认识直角边 a、b 与斜边 c",
+            "沿 0°→90°→233° 走 30+40+50 cm 闭合路径",
+            "验证 30²+40²=50²"
+          ],
+          "focus": "叠加层为 3-4-5 直角三角形；机器人路径沿三边行走",
+          "challenges": [
+            "沿 a→b→c 走完全程",
+            "口算验证 900+1600=2500"
+          ],
+          "hint": "沿叠加层：向 0° 走 30（a）→ 向 90° 走 40（b）→ 向 233° 走 50（c）闭合。",
+          "formulas": [
+            {
+              "title": "勾股定理",
+              "tex": "$$a^2 + b^2 = c^2$$"
+            },
+            {
+              "title": "本课",
+              "tex": "$$30^2 + 40^2 = 50^2$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 10,
+            "rows": 8,
+            "cellCm": 10,
+            "shape": "triangle",
+            "sides": [
+              30,
+              40,
+              50
+            ],
+            "trigTriangle": {
+              "adjacent": 30,
+              "opposite": 40,
+              "mode": "pythagoras"
+            }
+          },
+          "starter": {
+            "move2d": [
+              {
+                "angle": 0,
+                "dist": 30
+              },
+              {
+                "angle": 90,
+                "dist": 40
+              },
+              {
+                "angle": 233.13,
+                "dist": 50
+              }
+            ]
+          },
+          "demo": "pythagoras"
+        },
+        {
+          "id": "j8d15",
+          "title": "任务15：圆柱面最短路径",
+          "unit": "展开图",
+          "stageKey": "junior",
+          "gradeKey": "8d",
+          "gradeName": "八年级下册",
+          "scene": "path",
+          "tags": [
+            "展开",
+            "最短路径"
+          ],
+          "goals": [
+            "圆柱侧面展开",
+            "最短路径转化"
+          ],
+          "focus": "",
+          "challenges": [
+            "走折线 80+50 cm",
+            "想象展开后直线更短"
+          ],
+          "hint": "本课为抽象模型：折线模拟侧面路径；展开后直线为最短。",
+          "formulas": [
+            {
+              "title": "侧面展开",
+              "tex": "圆柱侧面展开为矩形"
+            },
+            {
+              "title": "最短路径",
+              "tex": "展开后两点间线段最短"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 80,
+            "turn": 90,
+            "forward2": 50
+          },
+          "demo": "cylinder"
+        },
+        {
+          "id": "j8d16",
+          "title": "任务16：匀速运动的函数建模",
+          "unit": "一次函数",
+          "stageKey": "junior",
+          "gradeKey": "8d",
+          "gradeName": "八年级下册",
+          "scene": "time",
+          "tags": [
+            "一次函数",
+            "s=vt"
+          ],
+          "goals": [
+            "s=vt 函数模型",
+            "匀速运动图象",
+            "斜率=速度"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "一次函数",
+              "tex": "$$s = vt + s_0$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 5,
+            "forward": 100
+          },
+          "demo": "linear"
+        },
+        {
+          "id": "j8d17",
+          "title": "任务17：追及问题的图象分析",
+          "unit": "追及问题",
+          "stageKey": "junior",
+          "gradeKey": "8d",
+          "gradeName": "八年级下册",
+          "scene": "time",
+          "tags": [
+            "追及",
+            "函数图象",
+            "验证"
+          ],
+          "goals": [
+            "把追及题抽象为方程（Δs=(v₂-v₁)t）",
+            "纸面求 t、S₁、S₂",
+            "用分段速度/路程编程验证解（单轮模拟）"
+          ],
+          "focus": "本课重「列式→求解→代入验证」；双车追及动画见行程专题 TV3",
+          "challenges": [
+            "间距 40 cm，v_慢=8、v_快=14：求 t 与两车路程",
+            "运行后总路程是否等于 S_慢+S_快？"
+          ],
+          "hint": "先算 t=40÷(14-8)≈6.7 s，S_慢=8t≈54，S_快=14t≈94；再分段设速度前进。双车追及请学「行程问题 · TV3」。",
+          "formulas": [
+            {
+              "title": "追及",
+              "tex": "$$t = \\frac{\\Delta s}{v_2 - v_1}$$"
+            },
+            {
+              "title": "路程",
+              "tex": "$$S = v \\times t$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 8,
+            "forward": 54,
+            "speed2": 14,
+            "forward2": 94
+          },
+          "demo": "chaseVerify"
+        },
+        {
+          "id": "j8d18",
+          "title": "任务18：传感器数据统计分析",
+          "unit": "数据分析",
+          "stageKey": "junior",
+          "gradeKey": "8d",
+          "gradeName": "八年级下册",
+          "scene": "data",
+          "tags": [
+            "统计",
+            "分析"
+          ],
+          "goals": [
+            "多次测量",
+            "求平均与方差思想",
+            "数据可视化"
+          ],
+          "focus": "",
+          "challenges": [
+            "重复 5 次每次前进 30 cm",
+            "总距离 150 cm，平均每次 30 cm"
+          ],
+          "hint": "用「重复 5 次前进 30」模拟 5 次测量；运行后看总距离求平均。",
+          "formulas": [
+            {
+              "title": "平均数",
+              "tex": "$$\\bar{x} = \\frac{x_1 + x_2 + \\cdots + x_n}{n}$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "repeat": 5,
+            "forward": 30
+          },
+          "demo": "average"
+        },
+        {
+          "id": "j8d_trig1",
+          "title": "任务19：30°方向移动与 sin、cos",
+          "unit": "三角函数入门",
+          "stageKey": "junior",
+          "gradeKey": "8d",
+          "gradeName": "八年级下册",
+          "scene": "trig",
+          "tags": [
+            "sin",
+            "cos",
+            "特殊角",
+            "30°"
+          ],
+          "goals": [
+            "理解 sin30°=1/2、cos30°=√3/2",
+            "用「向角度移动」走 30° 方向",
+            "用三角积木计算竖直分量 sin30°×20"
+          ],
+          "focus": "平面角 0°=东、90°=北；位移 x=r·cosθ，y=r·sinθ",
+          "challenges": [
+            "向 30° 移动 20 cm",
+            "用 sin30°×20 验证竖直约 10 cm"
+          ],
+          "hint": "「向角度移动」填 30 与 20；或用 sin(30°)×20 算高度再编程。",
+          "formulas": [
+            {
+              "title": "30°",
+              "tex": "$$\\sin 30°=\\frac{1}{2},\\; \\cos 30°=\\frac{\\sqrt{3}}{2}$$"
+            },
+            {
+              "title": "位移分解",
+              "tex": "$$x=r\\cos\\theta,\\; y=r\\sin\\theta$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 8,
+            "cellCm": 10,
+            "trigTriangle": {
+              "angle": 30,
+              "hypotenuse": 20,
+              "mode": "coords"
+            }
+          },
+          "starter": {
+            "move2d": {
+              "angle": 30,
+              "dist": 20
+            }
+          },
+          "demo": "trig30"
+        },
+        {
+          "id": "j8d_trig2",
+          "title": "任务20：45°与 tan45°=1",
+          "unit": "三角函数入门",
+          "stageKey": "junior",
+          "gradeKey": "8d",
+          "gradeName": "八年级下册",
+          "scene": "trig",
+          "tags": [
+            "tan",
+            "45°",
+            "等腰直角三角形"
+          ],
+          "goals": [
+            "认识 tan45°=1",
+            "45° 方向水平与竖直分量相等",
+            "走等腰直角三角形路线"
+          ],
+          "focus": "",
+          "challenges": [
+            "向 45° 移动 28 cm",
+            "水平、竖直分量各约 20 cm"
+          ],
+          "hint": "tan45°=对边/邻边=1，故水平路程≈竖直路程。",
+          "formulas": [
+            {
+              "title": "45°",
+              "tex": "$$\\tan 45° = 1,\\; \\sin 45°=\\cos 45°=\\frac{\\sqrt{2}}{2}$$"
+            }
+          ],
+          "sceneConfig": {
+            "trigTriangle": {
+              "angle": 45,
+              "adjacent": 20,
+              "opposite": 20,
+              "mode": "standard"
+            }
+          },
+          "starter": {
+            "move2d": [
+              {
+                "angle": 45,
+                "dist": 28
+              },
+              {
+                "angle": 0,
+                "dist": 20
+              },
+              {
+                "angle": 90,
+                "dist": 20
+              }
+            ]
+          },
+          "demo": "trig45"
+        }
+      ]
+    },
+    {
+      "gradeKey": "9u",
+      "gradeName": "九年级上册",
+      "taskCount": 5,
+      "tasks": [
+        {
+          "id": "j9u19",
+          "title": "任务19：圆形巡检路径设计",
+          "unit": "圆",
+          "stageKey": "junior",
+          "gradeKey": "9u",
+          "gradeName": "九年级上册",
+          "scene": "circle",
+          "tags": [
+            "圆",
+            "巡检",
+            "周长"
+          ],
+          "goals": [
+            "圆形路径巡检",
+            "C=2πr 应用"
+          ],
+          "focus": "",
+          "challenges": [
+            "走 1/4 圆周（r=50 cm）",
+            "弧长约 78.5 cm"
+          ],
+          "hint": "1/4 圆周 L=πr/2≈78.5 cm（r=50）；可对照虚线圆验证。",
+          "formulas": [
+            {
+              "title": "周长",
+              "tex": "$$C = 2\\pi r$$"
+            },
+            {
+              "title": "弧长",
+              "tex": "$$L = \\frac{n\\pi r}{180}$$"
+            }
+          ],
+          "sceneConfig": {
+            "radius": 50
+          },
+          "starter": {
+            "forward": 78.5
+          },
+          "demo": "arcQuarter"
+        },
+        {
+          "id": "j9u20",
+          "title": "任务20：转弯圆弧半径计算",
+          "unit": "圆",
+          "stageKey": "junior",
+          "gradeKey": "9u",
+          "gradeName": "九年级上册",
+          "scene": "circle",
+          "tags": [
+            "弧长",
+            "半径"
+          ],
+          "goals": [
+            "弧长公式 L=nπr/180",
+            "转弯半径计算"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "弧长",
+              "tex": "$$L = \\frac{n\\pi r}{180}$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "turn": 90,
+            "forward": 40
+          },
+          "demo": "arc90"
+        },
+        {
+          "id": "j9u21",
+          "title": "任务21：抛物线轨迹模拟",
+          "unit": "二次函数",
+          "stageKey": "junior",
+          "gradeKey": "9u",
+          "gradeName": "九年级上册",
+          "scene": "path",
+          "tags": [
+            "抛物线",
+            "二次函数"
+          ],
+          "goals": [
+            "理解抛物线轨迹",
+            "分段模拟 y=ax²"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "二次函数",
+              "tex": "$$y = ax^2 + bx + c$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 20,
+            "turn": 30,
+            "forward2": 25,
+            "turn2": -30,
+            "forward3": 20
+          },
+          "demo": "parabola"
+        },
+        {
+          "id": "j9u22",
+          "title": "任务22：旋转后的坐标换算",
+          "unit": "旋转",
+          "stageKey": "junior",
+          "gradeKey": "9u",
+          "gradeName": "九年级上册",
+          "scene": "grid",
+          "tags": [
+            "旋转",
+            "坐标变换"
+          ],
+          "goals": [
+            "绕原点旋转",
+            "坐标变换规律"
+          ],
+          "focus": "",
+          "challenges": [
+            "(40,0) 绕原点转 90° 变为 (0,40)",
+            "用两次「移动到」验证"
+          ],
+          "hint": "先移动到 (40,0)，再移动到 (0,40)，对应旋转 90° 的坐标变换。",
+          "formulas": [
+            {
+              "title": "旋转 90°",
+              "tex": "$$ (x,y) \\to (-y,\\, x) $$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 8,
+            "rows": 8,
+            "cellCm": 10
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 40,
+                "y": 0
+              },
+              {
+                "x": 0,
+                "y": 40
+              }
+            ]
+          },
+          "demo": "rotate90"
+        },
+        {
+          "id": "j9u23",
+          "title": "任务23：随机运行的概率实验",
+          "unit": "概率",
+          "stageKey": "junior",
+          "gradeKey": "9u",
+          "gradeName": "九年级上册",
+          "scene": "data",
+          "tags": [
+            "概率",
+            "随机",
+            "频率"
+          ],
+          "goals": [
+            "随机转向实验",
+            "频率估计概率"
+          ],
+          "focus": "",
+          "challenges": [
+            "重复 4 次：前进 20 → 转 90°",
+            "多次运行记录转向次数"
+          ],
+          "hint": "固定程序多次运行，统计右转次数，用频率估计概率。",
+          "formulas": [
+            {
+              "title": "频率",
+              "tex": "频率 $\\approx$ 概率（试验次数足够大时）"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "repeat": 4,
+            "forward": 20,
+            "turn": 90
+          },
+          "demo": "random"
+        }
+      ]
+    },
+    {
+      "gradeKey": "9d",
+      "gradeName": "九年级下册",
+      "taskCount": 6,
+      "tasks": [
+        {
+          "id": "j9d24",
+          "title": "任务24：定程巡检的速度规划",
+          "unit": "函数应用",
+          "stageKey": "junior",
+          "gradeKey": "9d",
+          "gradeName": "九年级下册",
+          "scene": "time",
+          "tags": [
+            "规划",
+            "速度"
+          ],
+          "goals": [
+            "定路程变速度",
+            "时间规划"
+          ],
+          "focus": "",
+          "challenges": [
+            "三段各 30 cm，速度 5→10→15",
+            "比较各段用时"
+          ],
+          "hint": "同路程 30 cm，速度越大用时越短；用「设速度→前进」分三段。",
+          "formulas": [
+            {
+              "title": "行程",
+              "tex": "$$S = v \\times t$$"
+            },
+            {
+              "title": "定程",
+              "tex": "定 $S$ 则 $t = S / v$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 5,
+            "forward": 30,
+            "speed2": 10,
+            "forward2": 30,
+            "speed3": 15,
+            "forward3": 30
+          },
+          "demo": "calcPiecewiseSpeed"
+        },
+        {
+          "id": "j9d25",
+          "title": "任务25：视觉测距与相似",
+          "unit": "相似三角形",
+          "stageKey": "junior",
+          "gradeKey": "9d",
+          "gradeName": "九年级下册",
+          "scene": "path",
+          "tags": [
+            "相似",
+            "测距"
+          ],
+          "goals": [
+            "相似比测距",
+            "比例计算"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "相似比",
+              "tex": "对应边之比 $k$ 相等"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 60,
+            "turn": 90,
+            "forward2": 40
+          },
+          "demo": "similar"
+        },
+        {
+          "id": "j9d_trig1",
+          "title": "任务26：坐标与 sin、cos",
+          "unit": "锐角三角函数",
+          "stageKey": "junior",
+          "gradeKey": "9d",
+          "gradeName": "九年级下册",
+          "scene": "trig",
+          "tags": [
+            "sin",
+            "cos",
+            "坐标"
+          ],
+          "goals": [
+            "已知 r=20、θ=30°，求终点坐标",
+            "用 cosθ·r 与 sinθ·r 计算 x、y",
+            "编程移动到 (17.3, 10) 附近"
+          ],
+          "focus": "",
+          "challenges": [
+            "移动到 x≈17.3, y≈10",
+            "再向 90° 移动 10 cm"
+          ],
+          "hint": "用 cos(30°)×20、sin(30°)×20 积木算出坐标，再「移动到 x y」。",
+          "formulas": [
+            {
+              "title": "坐标",
+              "tex": "$$x=r\\cos\\theta,\\; y=r\\sin\\theta$$"
+            },
+            {
+              "title": "本课",
+              "tex": "$$x=20\\cos30°\\approx17.3,\\; y=20\\sin30°=10$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 8,
+            "cellCm": 10,
+            "trigTriangle": {
+              "angle": 30,
+              "hypotenuse": 20,
+              "mode": "coords"
+            }
+          },
+          "starter": {
+            "goto": {
+              "x": 17.3,
+              "y": 10
+            }
+          },
+          "demo": "trigGoto"
+        },
+        {
+          "id": "j9d_trig2",
+          "title": "任务27：仰角测高度",
+          "unit": "锐角三角函数",
+          "stageKey": "junior",
+          "gradeKey": "9d",
+          "gradeName": "九年级下册",
+          "scene": "trig",
+          "tags": [
+            "仰角",
+            "tan",
+            "测高"
+          ],
+          "goals": [
+            "仰角 α 时高度 h=l·tanα",
+            "沿仰角方向前进模拟视线",
+            "理解 tan 为对边/邻边"
+          ],
+          "focus": "",
+          "challenges": [
+            "沿 30° 移动 40 cm",
+            "水平 40 cm 时高度 tan30°×40≈23 cm"
+          ],
+          "hint": "用「向角度移动」模拟仰角；tan(30°)×水平距离 算高度。",
+          "formulas": [
+            {
+              "title": "仰角",
+              "tex": "$$h = l \\cdot \\tan\\alpha$$"
+            },
+            {
+              "title": "30°示例",
+              "tex": "$$h = 40 \\times \\tan 30° \\approx 23.1\\text{ cm}$$"
+            }
+          ],
+          "sceneConfig": {
+            "trigTriangle": {
+              "angle": 30,
+              "adjacent": 40,
+              "mode": "elevation"
+            }
+          },
+          "starter": {
+            "move2d": {
+              "angle": 30,
+              "dist": 40
+            }
+          },
+          "demo": "elevation30"
+        },
+        {
+          "id": "j9d26",
+          "title": "任务28：坡度与角度测量",
+          "unit": "锐角三角函数",
+          "stageKey": "junior",
+          "gradeKey": "9d",
+          "gradeName": "九年级下册",
+          "scene": "trig",
+          "tags": [
+            "坡度",
+            "tan",
+            "角度"
+          ],
+          "goals": [
+            "坡度 i=tanα",
+            "水平路程 l 与高度 h 的关系 h=l·tanα",
+            "编程走斜坡路线"
+          ],
+          "focus": "",
+          "challenges": [
+            "先转 15° 再走 80 cm",
+            "用 tan15°×80 估算爬升高度"
+          ],
+          "hint": "右转 15° 后前进；爬升≈tan(15°)×80≈21 cm。",
+          "formulas": [
+            {
+              "title": "坡度",
+              "tex": "$$i = \\tan\\alpha = \\frac{h}{l}$$"
+            }
+          ],
+          "sceneConfig": {
+            "trigTriangle": {
+              "angle": 15,
+              "adjacent": 80,
+              "mode": "slope"
+            }
+          },
+          "starter": {
+            "turn": 15,
+            "forward": 80
+          },
+          "demo": "slope"
+        },
+        {
+          "id": "j9d27",
+          "title": "任务29：综合感知与自主规划",
+          "unit": "综合应用",
+          "stageKey": "junior",
+          "gradeKey": "9d",
+          "gradeName": "九年级下册",
+          "scene": "path",
+          "tags": [
+            "综合",
+            "规划",
+            "项目"
+          ],
+          "goals": [
+            "综合数学与编程",
+            "自主规划路径",
+            "完成任务目标"
+          ],
+          "focus": "",
+          "challenges": [
+            "设计一条包含 2 次转弯的总长 150 cm 路径",
+            "示例：50+50+50，两次 90° 转弯"
+          ],
+          "hint": "先定总路程与各段长度，再排顺序：前进→转弯→前进→转弯→前进。",
+          "formulas": [
+            {
+              "title": "路径长",
+              "tex": "$$L = s_1 + s_2 + \\cdots + s_n$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 50,
+            "turn": 90,
+            "forward2": 50,
+            "turn2": 90,
+            "forward3": 50
+          },
+          "demo": "comprehensive"
+        }
+      ]
+    }
+  ]
+}

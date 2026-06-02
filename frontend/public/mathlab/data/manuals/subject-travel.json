@@ -1,0 +1,224 @@
+{
+  "id": "subject-travel",
+  "type": "subject",
+  "subjectKey": "travel",
+  "title": "行程问题专题册",
+  "stageName": "行程问题",
+  "taskCount": 3,
+  "sectionLabel": "层级",
+  "sections": [
+    {
+      "levelKey": "chase_basic",
+      "levelName": "L4 基础追及",
+      "taskCount": 1,
+      "tasks": [
+        {
+          "id": "tv_chase1",
+          "title": "TV3：同向追及",
+          "unit": "行程问题",
+          "stageKey": "travel",
+          "gradeKey": "chase_basic",
+          "gradeName": "L4 基础追及",
+          "scene": "path",
+          "tags": [
+            "追及",
+            "速度差"
+          ],
+          "goals": [
+            "理解追及核心是速度差",
+            "从 s-t 图读交点与追及时刻"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "追及",
+              "tex": "$$t=\\frac{\\Delta s}{v_2-v_1}$$"
+            }
+          ],
+          "sceneConfig": {
+            "robots": [
+              {
+                "id": "A",
+                "label": "慢车",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 8,
+                "color": "#22d3ee"
+              },
+              {
+                "id": "B",
+                "label": "快车",
+                "xCm": -40,
+                "yCm": 0,
+                "speed": 14,
+                "color": "#f97316"
+              }
+            ],
+            "trackLengthCm": 120,
+            "trackAxisDeg": 0,
+            "chaseValidate": {
+              "toleranceCm": 6
+            },
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 20,
+              "sMaxCm": 140,
+              "showBoth": true
+            }
+          },
+          "starter": {
+            "travelParallel": [],
+            "autoMeet": true
+          },
+          "demo": "travelChase"
+        }
+      ]
+    },
+    {
+      "levelKey": "meet_basic",
+      "levelName": "L1 基础相遇",
+      "taskCount": 1,
+      "tasks": [
+        {
+          "id": "tv_meet1",
+          "title": "TV1：两地相向而行（相遇）",
+          "unit": "行程问题",
+          "stageKey": "travel",
+          "gradeKey": "meet_basic",
+          "gradeName": "L1 基础相遇",
+          "scene": "path",
+          "tags": [
+            "行程",
+            "相遇",
+            "S=vt"
+          ],
+          "goals": [
+            "理解相向而行总路程守恒",
+            "用双车并行仿真观察交点",
+            "用 s-t 图读出相遇时刻"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "相遇",
+              "tex": "$$t=\\frac{S}{v_1+v_2}$$"
+            }
+          ],
+          "sceneConfig": {
+            "robots": [
+              {
+                "id": "A",
+                "label": "甲车",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 10,
+                "color": "#22d3ee"
+              },
+              {
+                "id": "B",
+                "label": "乙车",
+                "xCm": 100,
+                "yCm": 0,
+                "speed": 15,
+                "color": "#f97316",
+                "face": 180
+              }
+            ],
+            "trackLengthCm": 100,
+            "trackAxisDeg": 0,
+            "meetValidate": {
+              "toleranceCm": 5
+            },
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 10,
+              "sMaxCm": 120,
+              "showBoth": true
+            }
+          },
+          "starter": {
+            "travelParallel": [],
+            "autoMeet": true
+          },
+          "demo": "travelMeet"
+        }
+      ]
+    },
+    {
+      "levelKey": "meet_var",
+      "levelName": "L2 相遇变式",
+      "taskCount": 1,
+      "tasks": [
+        {
+          "id": "tv_meet3",
+          "title": "TV2：乙车延迟出发",
+          "unit": "行程问题",
+          "stageKey": "travel",
+          "gradeKey": "meet_var",
+          "gradeName": "L2 相遇变式",
+          "scene": "path",
+          "tags": [
+            "行程",
+            "延迟出发"
+          ],
+          "goals": [
+            "理解非同时起步的相遇",
+            "能用程序表示“先后出发”"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "分段",
+              "tex": "$$S=v_1t_1+v_2t_2$$"
+            }
+          ],
+          "sceneConfig": {
+            "robots": [
+              {
+                "id": "A",
+                "label": "甲车",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 12,
+                "color": "#22d3ee"
+              },
+              {
+                "id": "B",
+                "label": "乙车",
+                "xCm": 90,
+                "yCm": 0,
+                "speed": 18,
+                "color": "#f97316",
+                "face": 180
+              }
+            ],
+            "trackLengthCm": 90,
+            "trackAxisDeg": 0,
+            "meetValidate": {
+              "toleranceCm": 6
+            },
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 14,
+              "sMaxCm": 110,
+              "showBoth": true
+            }
+          },
+          "starter": {
+            "travelDelayStart": {
+              "waitSec": 2,
+              "autoMeet": true
+            }
+          },
+          "demo": "travelMeetDelay"
+        }
+      ]
+    }
+  ]
+}

@@ -18,7 +18,7 @@
   <script src="https://unpkg.com/blockly@10.4.3/msg/zh-hans.js"></script>
   <script src="https://unpkg.com/blockly@10.4.3/blocks_compressed.js"></script>
   <script src="https://unpkg.com/blockly@10.4.3/javascript_compressed.js"></script>
-  <link rel="stylesheet" href="css/shell.css?v=7">
+  <link rel="stylesheet" href="css/shell.css?v=8">
 </head>
 <body>
   <div class="app-shell" id="appShell">
@@ -29,6 +29,7 @@
         <p class="task-summary" id="taskSummary" title="">选择课程任务…</p>
       </div>
       <div class="topbar-actions">
+        <button type="button" class="btn btn-ghost" id="btnManualDock" title="切换实验手册">📘 实验手册</button>
         <button type="button" class="btn btn-ghost" id="btnDrawerCode" data-drawer="code">🧩 编程</button>
         <button type="button" class="btn btn-ghost" id="btnDrawerLesson" data-drawer="lesson">📚 课程</button>
         <div class="seg" role="group" aria-label="显示模式">
@@ -88,6 +89,13 @@
           <button type="button" class="btn btn-go btn-sm" id="btnStart">演示</button>
         </div>
       </main>
+      <aside class="manual-dock" id="manualDock" aria-label="实验手册">
+        <header class="manual-dock-h">
+          <strong>实验手册</strong>
+          <button type="button" class="btn btn-ghost btn-sm" id="btnManualDockClose">收起</button>
+        </header>
+        <iframe id="manualDockFrame" src="manuals.html?embed=1" title="MathLab 实验手册"></iframe>
+      </aside>
     </div>
 
     <div class="trail-panel" id="trailPanel" hidden>
@@ -201,6 +209,6 @@
   <script src="js/annotations.js?v=6"></script>
   <script src="js/view-shell.js?v=6"></script>
   <script src="js/contest.js?v=1"></script>
-  <script src="js/app.js?v=17"></script>
+  <script src="js/app.js?v=18"></script>
 </body>
 </html>

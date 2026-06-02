@@ -2629,6 +2629,37 @@
     if (taskId) loadTaskById(taskId);
   }
 
+  function initManualDock() {
+    const shell = document.getElementById('appShell');
+    const btnToggle = document.getElementById('btnManualDock');
+    const btnClose = document.getElementById('btnManualDockClose');
+    const frame = document.getElementById('manualDockFrame');
+    if (!shell || !btnToggle || !btnClose || !frame) return;
+
+    const setDockOpen = (open) => {
+      shell.classList.toggle('manual-dock-collapsed', !open);
+      btnToggle.textContent = open ? '📘 收起实验手册' : '📘 实验手册';
+    };
+
+    const initialOpen = window.innerWidth >= 1100;
+    setDockOpen(initialOpen);
+
+    btnToggle.addEventListener('click', () => {
+      const open = shell.classList.contains('manual-dock-collapsed');
+      setDockOpen(open);
+    });
+    btnClose.addEventListener('click', () => setDockOpen(false));
+
+    window.addEventListener('message', (evt) => {
+      const data = evt?.data;
+      if (!data || data.type !== 'load-task') return;
+      if (data.taskId && loadTaskById(data.taskId)) {
+        setDockOpen(true);
+        setStatus('已从手册加载任务：' + data.taskId, 'ok');
+      }
+    });
+  }
+
   function init() {
     sim.init();
     initPropUI();
@@ -2636,6 +2667,7 @@
     if (typeof ViewShell !== 'undefined') ViewShell.refreshAlgebraBar();
     fillSelectors();
     applyTaskFromUrl();
+    initManualDock();
     document.getElementById('btnRun').onclick = runProgram;
     document.getElementById('btnStop').onclick = requestStopProgram;
     bindRunKeyboardShortcuts();

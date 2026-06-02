@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MathLab · 学生活动实验手册</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <link rel="stylesheet" href="./css/manuals.css?v=2">
+</head>
+<body>
+  <div class="manual-app">
+    <header class="manual-header">
+      <div>
+        <span class="badge">MathLab</span>
+        <h1>学生活动实验手册</h1>
+        <p id="generatedAt">加载中...</p>
+      </div>
+      <div class="header-actions">
+        <a class="btn ghost" href="./index.html">返回仿真工作台</a>
+      </div>
+    </header>
+
+    <main class="manual-main">
+      <aside class="manual-sidebar">
+        <section>
+          <h2>学段主册</h2>
+          <ul id="stageList" class="volume-list"></ul>
+        </section>
+        <section>
+          <h2>专题册</h2>
+          <ul id="subjectList" class="volume-list"></ul>
+        </section>
+      </aside>
+
+      <section class="manual-content">
+        <article id="volumeSummary" class="card"></article>
+        <article id="volumeToc" class="card"></article>
+        <article id="volumeTasks" class="card"></article>
+      </section>
+    </main>
+  </div>
+
+  <script src="./js/manuals-page.js?v=2"></script>
+</body>
+</html>

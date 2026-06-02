@@ -1,0 +1,1057 @@
+{
+  "id": "stage-primary",
+  "type": "stage",
+  "stageKey": "primary",
+  "title": "小学阶段学生活动实验手册",
+  "stageName": "小学阶段",
+  "taskCount": 24,
+  "sectionLabel": "年级",
+  "sections": [
+    {
+      "gradeKey": "2",
+      "gradeName": "二年级",
+      "taskCount": 5,
+      "tasks": [
+        {
+          "id": "p2t1",
+          "title": "任务1：机器人测距员——长度单位的认识",
+          "unit": "长度单位",
+          "stageKey": "primary",
+          "gradeKey": "2",
+          "gradeName": "二年级",
+          "scene": "distance",
+          "tags": [
+            "厘米",
+            "米",
+            "单位换算"
+          ],
+          "goals": [
+            "建立 1cm、1m 的长度表象",
+            "理解 1米=100厘米",
+            "编程让机器人走指定距离并验证"
+          ],
+          "focus": "估算 → 测量 → 编程 → 验证",
+          "challenges": [
+            "让机器人走 100 cm（1米）",
+            "让机器人走 50 cm",
+            "让机器人走 120 cm"
+          ],
+          "hint": "使用「前进」积木，距离填厘米数。100cm=1米。",
+          "formulas": [
+            {
+              "title": "单位换算",
+              "tex": "$$1\\text{ m} = 100\\text{ cm}$$"
+            },
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi d \\approx 9.42\\text{ cm}$$（d=3）"
+            }
+          ],
+          "sceneConfig": {
+            "markers": [
+              30,
+              50,
+              100,
+              120
+            ],
+            "unit": "cm"
+          },
+          "starter": {
+            "forward": 100
+          },
+          "demo": "forward100"
+        },
+        {
+          "id": "p2t2",
+          "title": "任务2：机器人转转转——角的初步认识",
+          "unit": "角的初步认识",
+          "stageKey": "primary",
+          "gradeKey": "2",
+          "gradeName": "二年级",
+          "scene": "angle",
+          "tags": [
+            "直角",
+            "锐角",
+            "钝角"
+          ],
+          "goals": [
+            "认识角的顶点与边",
+            "辨认直角、锐角、钝角",
+            "编程转出指定角度"
+          ],
+          "focus": "角的大小看张口，与边长短无关",
+          "challenges": [
+            "右转 90°（直角）",
+            "右转 45°（锐角）",
+            "右转 120°（钝角）"
+          ],
+          "hint": "用「右转/左转」积木输入角度，90° 为直角。",
+          "formulas": [
+            {
+              "title": "角分类",
+              "tex": "锐角 $<90°$ · 直角 $=90°$ · 钝角 $>90°$"
+            }
+          ],
+          "sceneConfig": {
+            "showCross": true
+          },
+          "starter": {
+            "turns": [
+              {
+                "dir": "right",
+                "deg": 90
+              }
+            ]
+          },
+          "demo": "turn90"
+        },
+        {
+          "id": "p2t3",
+          "title": "任务3：机器人时钟——认识时间",
+          "unit": "认识时间",
+          "stageKey": "primary",
+          "gradeKey": "2",
+          "gradeName": "二年级",
+          "scene": "time",
+          "tags": [
+            "时",
+            "分",
+            "钟面"
+          ],
+          "goals": [
+            "认识钟面与指针",
+            "理解时、分的关系",
+            "用等待积木模拟时间流逝"
+          ],
+          "focus": "1时=60分，分针走1格=5分",
+          "challenges": [
+            "等待 3 秒（模拟分针走一小格）",
+            "等待 5 秒",
+            "前进+等待组合动作"
+          ],
+          "hint": "「等待」积木的单位是秒，可配合前进模拟指针运动。",
+          "formulas": [
+            {
+              "title": "时间",
+              "tex": "$$1\\text{时} = 60\\text{分}$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "wait": 3,
+            "forward": 30
+          },
+          "demo": "waitDemo"
+        },
+        {
+          "id": "p2t4",
+          "title": "任务4：机器人走图形——图形的运动（一）",
+          "unit": "图形的运动",
+          "stageKey": "primary",
+          "gradeKey": "2",
+          "gradeName": "二年级",
+          "scene": "shape",
+          "tags": [
+            "平移",
+            "旋转",
+            "正方形"
+          ],
+          "goals": [
+            "理解平移与旋转",
+            "让机器人走正方形路线",
+            "认识封闭图形"
+          ],
+          "focus": "走图形 = 平移 + 旋转的组合",
+          "challenges": [
+            "走边长 40cm 的正方形",
+            "走边长 30cm 的正方形"
+          ],
+          "hint": "重复 4 次：前进 → 右转 90°。",
+          "formulas": [
+            {
+              "title": "正方形周长",
+              "tex": "$$C = 4a$$"
+            },
+            {
+              "title": "走图形",
+              "tex": "平移 + 旋转"
+            }
+          ],
+          "sceneConfig": {
+            "shape": "square",
+            "side": 40
+          },
+          "starter": {
+            "repeat": 4,
+            "forward": 40,
+            "turn": 90
+          },
+          "demo": "square40"
+        },
+        {
+          "id": "p2t5",
+          "title": "任务5：机器人分糖果——有余数的除法",
+          "unit": "有余数的除法",
+          "stageKey": "primary",
+          "gradeKey": "2",
+          "gradeName": "二年级",
+          "scene": "data",
+          "tags": [
+            "除法",
+            "余数",
+            "分配"
+          ],
+          "goals": [
+            "理解除法与余数含义",
+            "17÷5=3…2 的分组模型",
+            "每份 3 颗余 2 颗"
+          ],
+          "focus": "总数 = 每份×份数 + 余数",
+          "challenges": [
+            "编程：重复 3 次每次前进 20cm（分3份）",
+            "再走 20cm 表示余数部分"
+          ],
+          "hint": "用「重复 3 次前进」模拟每份，最后一次单独前进表示余数。",
+          "formulas": [
+            {
+              "title": "有余数除法",
+              "tex": "$$a = b \\times q + r \\quad (0 \\le r < b)$$"
+            },
+            {
+              "title": "本课实例",
+              "tex": "$$17 = 5 \\times 3 + 2$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "repeat": 3,
+            "forward": 20,
+            "extraForward": 20
+          },
+          "demo": "division17"
+        }
+      ]
+    },
+    {
+      "gradeKey": "3",
+      "gradeName": "三年级",
+      "taskCount": 5,
+      "tasks": [
+        {
+          "id": "p3t6",
+          "title": "任务6：机器人赛跑——时、分、秒",
+          "unit": "时、分、秒",
+          "stageKey": "primary",
+          "gradeKey": "3",
+          "gradeName": "三年级",
+          "scene": "time",
+          "tags": [
+            "秒",
+            "时间换算",
+            "速度"
+          ],
+          "goals": [
+            "掌握时、分、秒换算",
+            "比较不同速度到达同一距离的时间",
+            "理解 S=vt 雏形"
+          ],
+          "focus": "",
+          "challenges": [
+            "速度 10 走 50cm",
+            "速度 20 走 50cm（比较时间）"
+          ],
+          "hint": "先「设置速度」，再「前进」，观察用时差异。",
+          "formulas": [
+            {
+              "title": "时间",
+              "tex": "$$1\\text{分}=60\\text{秒}$$"
+            },
+            {
+              "title": "路程",
+              "tex": "$$S = v \\times t$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 10,
+            "forward": 50
+          },
+          "demo": "speedRace"
+        },
+        {
+          "id": "p3t7",
+          "title": "任务7：机器人精准测距——毫米、分米、千米",
+          "unit": "测量",
+          "stageKey": "primary",
+          "gradeKey": "3",
+          "gradeName": "三年级",
+          "scene": "distance",
+          "tags": [
+            "毫米",
+            "分米",
+            "千米"
+          ],
+          "goals": [
+            "认识 mm、dm、km",
+            "单位换算",
+            "精准控制距离"
+          ],
+          "focus": "",
+          "challenges": [
+            "走 10cm（1分米）",
+            "走 100cm（1米）"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "换算",
+              "tex": "$$1\\text{dm}=10\\text{cm},\\;1\\text{m}=10\\text{dm}$$"
+            },
+            {
+              "title": "千米",
+              "tex": "$$1\\text{km}=1000\\text{m}$$"
+            }
+          ],
+          "sceneConfig": {
+            "markers": [
+              10,
+              100
+            ]
+          },
+          "starter": {
+            "forward": 10
+          },
+          "demo": "forward10"
+        },
+        {
+          "id": "p3t8",
+          "title": "任务8：机器人走周长——长方形和正方形",
+          "unit": "长方形和正方形",
+          "stageKey": "primary",
+          "gradeKey": "3",
+          "gradeName": "三年级",
+          "scene": "perimeter",
+          "tags": [
+            "周长",
+            "长方形",
+            "正方形"
+          ],
+          "goals": [
+            "理解周长含义",
+            "验证正方形 C=4a、长方形 C=2(a+b)"
+          ],
+          "focus": "",
+          "challenges": [
+            "走正方形周长 a=30cm（总 120cm）",
+            "走长方形 40×20cm 周长"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "正方形",
+              "tex": "$$C = 4a$$"
+            },
+            {
+              "title": "长方形",
+              "tex": "$$C = 2(a+b)$$"
+            }
+          ],
+          "sceneConfig": {
+            "rect": {
+              "w": 40,
+              "h": 20
+            },
+            "square": {
+              "side": 30
+            }
+          },
+          "starter": {
+            "repeat": 4,
+            "forward": 30,
+            "turn": 90
+          },
+          "demo": "square30"
+        },
+        {
+          "id": "p3t9",
+          "title": "任务9：机器人导航员——位置与方向（一）",
+          "unit": "位置与方向",
+          "stageKey": "primary",
+          "gradeKey": "3",
+          "gradeName": "三年级",
+          "scene": "path",
+          "tags": [
+            "东",
+            "南",
+            "西",
+            "北"
+          ],
+          "goals": [
+            "认识四个主方向",
+            "按方向指令走路线",
+            "描述行走路径"
+          ],
+          "focus": "",
+          "challenges": [
+            "向东走 50cm",
+            "右转后向南走 30cm"
+          ],
+          "hint": "默认朝右（东），右转 90° 朝南。",
+          "formulas": [
+            {
+              "title": "方向",
+              "tex": "东 · 南 · 西 · 北"
+            },
+            {
+              "title": "换向",
+              "tex": "右转 $$90°$$ 换下一个主方向"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 50,
+            "turn": 90,
+            "forward2": 30
+          },
+          "demo": "compass"
+        },
+        {
+          "id": "p3t10",
+          "title": "任务10：机器人量面积——面积",
+          "unit": "面积",
+          "stageKey": "primary",
+          "gradeKey": "3",
+          "gradeName": "三年级",
+          "scene": "grid",
+          "tags": [
+            "面积",
+            "平方厘米",
+            "数格子"
+          ],
+          "goals": [
+            "理解面积是面的大小",
+            "用单位正方形数面积",
+            "长方形面积=长×宽"
+          ],
+          "focus": "",
+          "challenges": [
+            "沿 3×2 格矩形走一圈",
+            "走 4×3 区域边界"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "长方形面积",
+              "tex": "$$S = a \\times b$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 8,
+            "rows": 5,
+            "cellCm": 10
+          },
+          "starter": {
+            "repeat": 2,
+            "forward": 30,
+            "turn": 90,
+            "forward2": 20
+          },
+          "demo": "areaRect"
+        }
+      ]
+    },
+    {
+      "gradeKey": "4",
+      "gradeName": "四年级",
+      "taskCount": 6,
+      "tasks": [
+        {
+          "id": "p4t11",
+          "title": "任务11：机器人转角度——角的度量",
+          "unit": "角的度量",
+          "stageKey": "primary",
+          "gradeKey": "4",
+          "gradeName": "四年级",
+          "scene": "angle",
+          "tags": [
+            "度",
+            "量角",
+            "旋转"
+          ],
+          "goals": [
+            "认识 1°",
+            "用量角器概念验证转角",
+            "精确转出 30°、45°、120°"
+          ],
+          "focus": "",
+          "challenges": [
+            "转 30°",
+            "转 45°",
+            "转 120°"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "周角",
+              "tex": "$$1\\text{周角}=360°$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "turns": [
+              {
+                "dir": "right",
+                "deg": 45
+              }
+            ]
+          },
+          "demo": "turn45"
+        },
+        {
+          "id": "p4t12",
+          "title": "任务12：机器人走平行——平行四边形和梯形",
+          "unit": "平行四边形和梯形",
+          "stageKey": "primary",
+          "gradeKey": "4",
+          "gradeName": "四年级",
+          "scene": "shape",
+          "tags": [
+            "平行",
+            "梯形",
+            "四边形"
+          ],
+          "goals": [
+            "认识平行四边形、梯形",
+            "走平行四边形路径",
+            "理解对边平行"
+          ],
+          "focus": "",
+          "challenges": [
+            "走平行四边形周长路径",
+            "四段路程 50+30 对应相邻两边"
+          ],
+          "hint": "前进 50 → 转 60° → 前进 30 → 转 120°，对应平行四边形相邻两边。",
+          "formulas": [
+            {
+              "title": "平行",
+              "tex": "平行四边形对边平行且相等"
+            },
+            {
+              "title": "周长",
+              "tex": "$$C = 各边之和$$"
+            }
+          ],
+          "sceneConfig": {
+            "shape": "parallelogram",
+            "top": 50,
+            "side": 30,
+            "slant": 20
+          },
+          "starter": {
+            "forward": 50,
+            "turn": 60,
+            "forward2": 30,
+            "turn2": 120
+          },
+          "demo": "parallelogram"
+        },
+        {
+          "id": "p4t13",
+          "title": "任务13：机器人最短路线——优化思想",
+          "unit": "优化",
+          "stageKey": "primary",
+          "gradeKey": "4",
+          "gradeName": "四年级",
+          "scene": "path",
+          "tags": [
+            "最短路径",
+            "优化"
+          ],
+          "goals": [
+            "比较不同路径长度",
+            "理解两点间线段最短",
+            "选择更优路线"
+          ],
+          "focus": "",
+          "challenges": [
+            "走直线 80cm",
+            "对比折线路径（需更长）"
+          ],
+          "hint": "先走直线 80 cm；再设计折线，比较总路程。",
+          "formulas": [
+            {
+              "title": "最短路径",
+              "tex": "两点之间，线段最短"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 80
+          },
+          "demo": "forward80"
+        },
+        {
+          "id": "p4t14",
+          "title": "任务14：机器人画三角形——三角形",
+          "unit": "三角形",
+          "stageKey": "primary",
+          "gradeKey": "4",
+          "gradeName": "四年级",
+          "scene": "shape",
+          "tags": [
+            "三角形",
+            "内角",
+            "稳定性"
+          ],
+          "goals": [
+            "走三角形路线",
+            "计算三边之和",
+            "认识三角形稳定性"
+          ],
+          "focus": "",
+          "challenges": [
+            "走等边三角形 a=40cm"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "等边三角形",
+              "tex": "$$C = 3a$$"
+            }
+          ],
+          "sceneConfig": {
+            "shape": "triangle",
+            "sides": [
+              40,
+              40,
+              40
+            ]
+          },
+          "starter": {
+            "repeat": 3,
+            "forward": 40,
+            "turn": 120
+          },
+          "demo": "triangle"
+        },
+        {
+          "id": "p4t15",
+          "title": "任务15：机器人走对称——图形的运动（二）",
+          "unit": "图形的运动（二）",
+          "stageKey": "primary",
+          "gradeKey": "4",
+          "gradeName": "四年级",
+          "scene": "path",
+          "tags": [
+            "轴对称",
+            "镜像",
+            "对称"
+          ],
+          "goals": [
+            "理解轴对称",
+            "走对称路径",
+            "镜像运动"
+          ],
+          "focus": "",
+          "challenges": [
+            "走 L 形后沿对称轴返回",
+            "前进 50 + 转 90° + 前进 30"
+          ],
+          "hint": "L 形路径可看作沿对称轴的反射组合。",
+          "formulas": [
+            {
+              "title": "轴对称",
+              "tex": "对应点到对称轴距离相等"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 50,
+            "turn": 90,
+            "forward2": 30
+          },
+          "demo": "symmetry"
+        },
+        {
+          "id": "p4t16",
+          "title": "任务16：机器人数据采集员——平均数与条形统计图",
+          "unit": "平均数与统计图",
+          "stageKey": "primary",
+          "gradeKey": "4",
+          "gradeName": "四年级",
+          "scene": "data",
+          "tags": [
+            "平均数",
+            "统计",
+            "数据"
+          ],
+          "goals": [
+            "收集多次行进距离",
+            "求平均数",
+            "理解数据波动"
+          ],
+          "focus": "",
+          "challenges": [
+            "走 3 次各 30cm 记录总距离",
+            "计算平均每次距离"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "平均数",
+              "tex": "$$\\bar{x} = \\frac{x_1+x_2+\\cdots+x_n}{n}$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "repeat": 3,
+            "forward": 30
+          },
+          "demo": "average"
+        }
+      ]
+    },
+    {
+      "gradeKey": "5",
+      "gradeName": "五年级",
+      "taskCount": 4,
+      "tasks": [
+        {
+          "id": "p5t17",
+          "title": "任务17：机器人定位棋——位置（数对）",
+          "unit": "位置",
+          "stageKey": "primary",
+          "gradeKey": "5",
+          "gradeName": "五年级",
+          "scene": "grid",
+          "tags": [
+            "数对",
+            "列",
+            "行",
+            "平移"
+          ],
+          "goals": [
+            "用数对 (列,行) 表示位置",
+            "从 (1,1) 走到 (3,2)",
+            "理解平移与数对变化"
+          ],
+          "focus": "",
+          "challenges": [
+            "从起点走到 (3,2)：右 2 格、上 1 格",
+            "走到 (4,3)"
+          ],
+          "hint": "目标 (3,2) 即 x=20 cm，y=10 cm；用「移动到 x y」。",
+          "formulas": [
+            {
+              "title": "平移",
+              "tex": "右移 $+\\Delta列$，上移 $+\\Delta行$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 6,
+            "rows": 6,
+            "cellCm": 10,
+            "target": [
+              3,
+              2
+            ]
+          },
+          "starter": {
+            "goto": {
+              "x": 20,
+              "y": 10
+            }
+          },
+          "demo": "gridTarget32"
+        },
+        {
+          "id": "p5t18",
+          "title": "任务18：机器人走多边形——多边形的面积",
+          "unit": "多边形的面积",
+          "stageKey": "primary",
+          "gradeKey": "5",
+          "gradeName": "五年级",
+          "scene": "shape",
+          "tags": [
+            "多边形",
+            "面积",
+            "分割"
+          ],
+          "goals": [
+            "走多边形边界",
+            "理解面积与周长区别",
+            "分割求面积思想"
+          ],
+          "focus": "",
+          "challenges": [
+            "走正六边形，边长 25cm",
+            "总路程 25×6=150 cm"
+          ],
+          "hint": "重复 6 次：前进 25 → 左转 60°。",
+          "formulas": [
+            {
+              "title": "正六边形",
+              "tex": "$$C = 6a$$"
+            }
+          ],
+          "sceneConfig": {
+            "shape": "hexagon",
+            "side": 25
+          },
+          "starter": {
+            "repeat": 6,
+            "forward": 25,
+            "turn": 60
+          },
+          "demo": "hexagon"
+        },
+        {
+          "id": "p5t19",
+          "title": "任务19：机器人种树——植树问题",
+          "unit": "植树问题",
+          "stageKey": "primary",
+          "gradeKey": "5",
+          "gradeName": "五年级",
+          "scene": "distance",
+          "tags": [
+            "植树",
+            "间隔",
+            "两端都种"
+          ],
+          "goals": [
+            "理解间隔数与棵数关系",
+            "两端都种：棵数=间隔+1",
+            "编程等距停顿"
+          ],
+          "focus": "",
+          "challenges": [
+            "100cm 每隔 20cm 停一次（共 6 棵）"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "两端都种",
+              "tex": "$$棵数 = 间隔数 + 1$$"
+            }
+          ],
+          "sceneConfig": {
+            "markers": [
+              20,
+              40,
+              60,
+              80,
+              100
+            ],
+            "plant": true
+          },
+          "starter": {
+            "repeat": 5,
+            "forward": 20,
+            "wait": 0.5
+          },
+          "demo": "planting"
+        },
+        {
+          "id": "p5t20",
+          "title": "任务20：机器人编程解方程——简易方程",
+          "unit": "简易方程",
+          "stageKey": "primary",
+          "gradeKey": "5",
+          "gradeName": "五年级",
+          "scene": "path",
+          "tags": [
+            "方程",
+            "未知数",
+            "逆向"
+          ],
+          "goals": [
+            "列简单方程",
+            "x+5=12 求 x",
+            "逆向编程验证"
+          ],
+          "focus": "",
+          "challenges": [
+            "走 70cm 验证 x=7（每单位 10cm）"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "方程",
+              "tex": "$$x + 5 = 12 \\Rightarrow x = 7$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 70
+          },
+          "demo": "equation"
+        }
+      ]
+    },
+    {
+      "gradeKey": "6",
+      "gradeName": "六年级",
+      "taskCount": 4,
+      "tasks": [
+        {
+          "id": "p6t23",
+          "title": "任务23：机器人画圆——圆",
+          "unit": "圆",
+          "stageKey": "primary",
+          "gradeKey": "6",
+          "gradeName": "六年级",
+          "scene": "circle",
+          "tags": [
+            "圆",
+            "圆周率",
+            "周长"
+          ],
+          "goals": [
+            "理解圆的周长 C=2πr",
+            "走圆周一段弧",
+            "体会 π 的意义"
+          ],
+          "focus": "",
+          "challenges": [
+            "前进 π×d ≈ 一圈（d=3 时约 9.4cm）",
+            "走 1/4 圆周"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "周长",
+              "tex": "$$C = 2\\pi r = \\pi d$$"
+            },
+            {
+              "title": "面积",
+              "tex": "$$S = \\pi r^2$$"
+            }
+          ],
+          "sceneConfig": {
+            "radius": 40
+          },
+          "starter": {
+            "forward": 9.42
+          },
+          "demo": "oneLap"
+        },
+        {
+          "id": "p6t24",
+          "title": "任务24：机器人导航2.0——位置与方向（二）",
+          "unit": "位置与方向（二）",
+          "stageKey": "primary",
+          "gradeKey": "6",
+          "gradeName": "六年级",
+          "scene": "path",
+          "tags": [
+            "北偏东",
+            "角度方向",
+            "导航"
+          ],
+          "goals": [
+            "用角度描述方向",
+            "北偏东 30° 行走",
+            "综合导航"
+          ],
+          "focus": "",
+          "challenges": [
+            "转 30° 后走 60cm"
+          ],
+          "hint": "右转 30° 后前进 60 cm，模拟北偏东方向行走。",
+          "formulas": [
+            {
+              "title": "方向角",
+              "tex": "北偏东 $$30°$$"
+            },
+            {
+              "title": "导航",
+              "tex": "先转向，再沿该方向前进"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "turn": 30,
+            "forward": 60
+          },
+          "demo": "nav30"
+        },
+        {
+          "id": "p6t25",
+          "title": "任务25：机器人齿轮比——比",
+          "unit": "比",
+          "stageKey": "primary",
+          "gradeKey": "6",
+          "gradeName": "六年级",
+          "scene": "data",
+          "tags": [
+            "比",
+            "齿轮",
+            "比例"
+          ],
+          "goals": [
+            "理解比的意义",
+            "齿轮 2:1 转速关系",
+            "路程与圈数成比"
+          ],
+          "focus": "",
+          "challenges": [
+            "大轮走 1 圈，小轮走 2 圈（2:1）"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "比",
+              "tex": "$$a:b = \\frac{a}{b}$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 18.84,
+            "forward2": 9.42
+          },
+          "demo": "gearRatio"
+        },
+        {
+          "id": "p6t26",
+          "title": "任务26：机器人比例尺地图——比例",
+          "unit": "比例",
+          "stageKey": "primary",
+          "gradeKey": "6",
+          "gradeName": "六年级",
+          "scene": "grid",
+          "tags": [
+            "比例尺",
+            "地图",
+            "缩放"
+          ],
+          "goals": [
+            "理解比例尺 1:100",
+            "图上 1cm 代表实际 100cm",
+            "按比例行走"
+          ],
+          "focus": "",
+          "challenges": [
+            "地图 3 格 = 实际 300cm，走 150cm"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "比例尺",
+              "tex": "$$1:100 = \\frac{1\\text{cm}}{100\\text{cm}}$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 10,
+            "rows": 6,
+            "cellCm": 10,
+            "scale": 100
+          },
+          "starter": {
+            "forward": 150
+          },
+          "demo": "scaleMap"
+        }
+      ]
+    }
+  ]
+}

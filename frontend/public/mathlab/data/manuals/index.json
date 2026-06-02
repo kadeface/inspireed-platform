@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-06-02T06:42:16.874Z",
+  "stageVolumes": [
+    {
+      "id": "stage-primary",
+      "title": "小学阶段学生活动实验手册",
+      "stageName": "小学阶段",
+      "taskCount": 24,
+      "sectionCount": 5,
+      "path": "./stage-primary.json"
+    },
+    {
+      "id": "stage-junior",
+      "title": "初中阶段学生活动实验手册",
+      "stageName": "初中阶段",
+      "taskCount": 31,
+      "sectionCount": 6,
+      "path": "./stage-junior.json"
+    }
+  ],
+  "subjectVolumes": [
+    {
+      "id": "subject-travel",
+      "title": "行程问题专题册",
+      "stageName": "行程问题",
+      "taskCount": 3,
+      "sectionCount": 3,
+      "path": "./subject-travel.json"
+    },
+    {
+      "id": "subject-funcGraph",
+      "title": "函数图像专题册",
+      "stageName": "轮式机器人探秘函数图像",
+      "taskCount": 17,
+      "sectionCount": 6,
+      "path": "./subject-funcGraph.json"
+    },
+    {
+      "id": "subject-calculus",
+      "title": "微积分专题册",
+      "stageName": "轮式机器人探秘微积分",
+      "taskCount": 18,
+      "sectionCount": 6,
+      "path": "./subject-calculus.json"
+    }
+  ]
+}

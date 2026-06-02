@@ -1,0 +1,927 @@
+{
+  "id": "subject-calculus",
+  "type": "subject",
+  "subjectKey": "calculus",
+  "title": "微积分专题册",
+  "stageName": "轮式机器人探秘微积分",
+  "taskCount": 18,
+  "sectionLabel": "层级",
+  "sections": [
+    {
+      "levelKey": "l0",
+      "levelName": "L0 感受变化",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "calc_l0_1",
+          "title": "谁走得更快",
+          "unit": "感受变化",
+          "stageKey": "calculus",
+          "gradeKey": "l0",
+          "gradeName": "L0 感受变化",
+          "scene": "time",
+          "tags": [
+            "快慢",
+            "对比"
+          ],
+          "goals": [
+            "同样时间比路程",
+            "建立「变化」直觉"
+          ],
+          "focus": "",
+          "challenges": [
+            "速度 10 走 5 秒 vs 速度 20 走 5 秒"
+          ],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 10,
+            "forward": 50
+          },
+          "demo": "speedRace"
+        },
+        {
+          "id": "calc_l0_2",
+          "title": "同样路程谁更久",
+          "unit": "感受变化",
+          "stageKey": "calculus",
+          "gradeKey": "l0",
+          "gradeName": "L0 感受变化",
+          "scene": "time",
+          "tags": [
+            "时间",
+            "对比"
+          ],
+          "goals": [
+            "固定 50 cm 比用时",
+            "理解速度与时间反比"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 50
+          },
+          "demo": "forward50"
+        },
+        {
+          "id": "calc_l0_3",
+          "title": "先快后慢",
+          "unit": "感受变化",
+          "stageKey": "calculus",
+          "gradeKey": "l0",
+          "gradeName": "L0 感受变化",
+          "scene": "time",
+          "tags": [
+            "分段速度"
+          ],
+          "goals": [
+            "分段调速",
+            "感受运动状态变化"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 20,
+            "forward": 30,
+            "speed2": 5,
+            "forward2": 30
+          },
+          "demo": "forward50"
+        }
+      ]
+    },
+    {
+      "levelKey": "l1",
+      "levelName": "L1 均匀变化",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "calc_l1_1",
+          "title": "每段多走一点",
+          "unit": "均匀变化",
+          "stageKey": "calculus",
+          "gradeKey": "l1",
+          "gradeName": "L1 均匀变化",
+          "scene": "distance",
+          "tags": [
+            "递增"
+          ],
+          "goals": [
+            "段长 10→15→20",
+            "观察变化规律"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "forward": 10,
+            "forward2": 15,
+            "forward3": 20
+          },
+          "demo": "forward10"
+        },
+        {
+          "id": "calc_l1_2",
+          "title": "均匀加速初体验",
+          "unit": "均匀变化",
+          "stageKey": "calculus",
+          "gradeKey": "l1",
+          "gradeName": "L1 均匀变化",
+          "scene": "time",
+          "tags": [
+            "加速"
+          ],
+          "goals": [
+            "速度 5→10→15 各走一段",
+            "建立阶梯速度图直觉"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "speed": 5,
+            "forward": 20,
+            "speed2": 10,
+            "forward2": 20,
+            "speed3": 15,
+            "forward3": 20
+          },
+          "demo": "forward50"
+        },
+        {
+          "id": "calc_l1_3",
+          "title": "变化有没有规律",
+          "unit": "均匀变化",
+          "stageKey": "calculus",
+          "gradeKey": "l1",
+          "gradeName": "L1 均匀变化",
+          "scene": "data",
+          "tags": [
+            "数据"
+          ],
+          "goals": [
+            "多次运行记录距离",
+            "用数据发现规律"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {},
+          "starter": {
+            "repeat": 3,
+            "forward": 20
+          },
+          "demo": "forward10"
+        }
+      ]
+    },
+    {
+      "levelKey": "l2",
+      "levelName": "L2 斜率即速度",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "calc_l2_1",
+          "title": "s-t 图的斜率",
+          "unit": "斜率即速度",
+          "stageKey": "calculus",
+          "gradeKey": "l2",
+          "gradeName": "L2 斜率即速度",
+          "scene": "time",
+          "tags": [
+            "s-t",
+            "斜率",
+            "s=vt"
+          ],
+          "goals": [
+            "s=vt 函数模型",
+            "匀速运动图象",
+            "斜率=速度"
+          ],
+          "focus": "微积分专题：s-t 直线斜率 = 速度（包装匀速一次函数）",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "一次函数",
+              "tex": "$$s = vt$$"
+            }
+          ],
+          "sceneConfig": {
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 25,
+              "sMaxCm": 120
+            },
+            "calcOverlay": {
+              "type": "secant",
+              "t0": 0,
+              "t1": 5
+            }
+          },
+          "starter": {
+            "speed": 5,
+            "forward": 100
+          },
+          "demo": "linear"
+        },
+        {
+          "id": "calc_l2_2",
+          "title": "不同斜率不同快",
+          "unit": "斜率即速度",
+          "stageKey": "calculus",
+          "gradeKey": "l2",
+          "gradeName": "L2 斜率即速度",
+          "scene": "time",
+          "tags": [
+            "斜率",
+            "对比"
+          ],
+          "goals": [
+            "速度 5 与 15 的 s-t 线对比",
+            "斜率越大走得越快"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "先慢后快，观察 s-t 图两段斜率差异。",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 20,
+              "sMaxCm": 90
+            },
+            "calcOverlay": {
+              "type": "secant",
+              "t0": 0,
+              "t1": 4
+            }
+          },
+          "starter": {
+            "speed": 5,
+            "forward": 40,
+            "speed2": 15,
+            "forward2": 40
+          },
+          "demo": "calcTwoSpeed"
+        },
+        {
+          "id": "calc_l2_3",
+          "title": "追及：速度差",
+          "unit": "斜率即速度",
+          "stageKey": "calculus",
+          "gradeKey": "l2",
+          "gradeName": "L2 斜率即速度",
+          "scene": "path",
+          "tags": [
+            "追及",
+            "交点"
+          ],
+          "goals": [
+            "理解追及核心是速度差",
+            "从 s-t 图读交点与追及时刻"
+          ],
+          "focus": "微积分专题：追及对应 s-t 交点（包装追及问题）",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "追及",
+              "tex": "$$t=\\frac{\\Delta s}{v_2-v_1}$$"
+            }
+          ],
+          "sceneConfig": {
+            "robots": [
+              {
+                "id": "A",
+                "label": "慢车",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 8,
+                "color": "#22d3ee"
+              },
+              {
+                "id": "B",
+                "label": "快车",
+                "xCm": -40,
+                "yCm": 0,
+                "speed": 14,
+                "color": "#f97316"
+              }
+            ],
+            "trackLengthCm": 120,
+            "trackAxisDeg": 0,
+            "chaseValidate": {
+              "toleranceCm": 6
+            },
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 20,
+              "sMaxCm": 140,
+              "showBoth": true
+            }
+          },
+          "starter": {
+            "travelParallel": [],
+            "autoMeet": true
+          },
+          "demo": "travelChase"
+        }
+      ]
+    },
+    {
+      "levelKey": "l3",
+      "levelName": "L3 非均匀变化",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "calc_l3_1",
+          "title": "变速运动",
+          "unit": "非均匀变化",
+          "stageKey": "calculus",
+          "gradeKey": "l3",
+          "gradeName": "L3 非均匀变化",
+          "scene": "calc",
+          "tags": [
+            "变速",
+            "分段"
+          ],
+          "goals": [
+            "分段变速走完全程",
+            "观察 s-t 折线与 v-t 阶梯"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 30,
+              "sMaxCm": 100
+            },
+            "vtGraph": {
+              "enabled": true,
+              "tMaxSec": 30,
+              "vMax": 20
+            }
+          },
+          "starter": {
+            "speed": 5,
+            "forward": 30,
+            "speed2": 10,
+            "forward2": 30,
+            "speed3": 15,
+            "forward3": 30
+          },
+          "demo": "calcPiecewiseSpeed"
+        },
+        {
+          "id": "calc_l3_2",
+          "title": "分段走曲线",
+          "unit": "非均匀变化",
+          "stageKey": "calculus",
+          "gradeKey": "l3",
+          "gradeName": "L3 非均匀变化",
+          "scene": "calc",
+          "tags": [
+            "折线逼近"
+          ],
+          "goals": [
+            "用折线轨迹逼近抛物线",
+            "理解分段 vs 光滑"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 25,
+              "sMaxCm": 80
+            },
+            "vtGraph": {
+              "enabled": true,
+              "tMaxSec": 25,
+              "vMax": 25
+            }
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": -20,
+                "y": 40
+              },
+              {
+                "x": -10,
+                "y": 10
+              },
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 10,
+                "y": 10
+              },
+              {
+                "x": 20,
+                "y": 40
+              }
+            ]
+          },
+          "demo": "plotParabola"
+        },
+        {
+          "id": "calc_l3_3",
+          "title": "分得越细越像",
+          "unit": "非均匀变化",
+          "stageKey": "calculus",
+          "gradeKey": "l3",
+          "gradeName": "L3 非均匀变化",
+          "scene": "calc",
+          "tags": [
+            "逼近"
+          ],
+          "goals": [
+            "步长 10→5→2 分段前进",
+            "折线越来越像曲线"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "用多段相同小步长前进，观察 s-t 折线变密。",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 35,
+              "sMaxCm": 60
+            },
+            "vtGraph": {
+              "enabled": true,
+              "tMaxSec": 35,
+              "vMax": 20
+            }
+          },
+          "starter": {
+            "forward": 10,
+            "forward2": 10,
+            "forward3": 10,
+            "forward4": 10,
+            "forward5": 10,
+            "forward6": 10
+          },
+          "demo": "calcFineSteps"
+        }
+      ]
+    },
+    {
+      "levelKey": "l4",
+      "levelName": "L4 瞬时变化",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "calc_l4_1",
+          "title": "某一时刻多快",
+          "unit": "瞬时变化",
+          "stageKey": "calculus",
+          "gradeKey": "l4",
+          "gradeName": "L4 瞬时变化",
+          "scene": "calc",
+          "tags": [
+            "平均速度",
+            "割线"
+          ],
+          "goals": [
+            "取一小段算平均速度",
+            "理解割线斜率"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 20,
+              "sMaxCm": 80
+            },
+            "vtGraph": {
+              "enabled": true,
+              "tMaxSec": 20,
+              "vMax": 20
+            },
+            "calcOverlay": {
+              "type": "secant",
+              "t0": 2,
+              "t1": 6
+            }
+          },
+          "starter": {
+            "speed": 10,
+            "forward": 60
+          },
+          "demo": null
+        },
+        {
+          "id": "calc_l4_2",
+          "title": "割线变切线",
+          "unit": "瞬时变化",
+          "stageKey": "calculus",
+          "gradeKey": "l4",
+          "gradeName": "L4 瞬时变化",
+          "scene": "calc",
+          "tags": [
+            "割线",
+            "切线"
+          ],
+          "goals": [
+            "缩小 Δt，观察割线斜率趋稳",
+            "感受瞬时变化率"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "运行后对比 t0–t1 与更短区间的割线斜率。",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 15,
+              "sMaxCm": 50
+            },
+            "calcOverlay": {
+              "type": "secant",
+              "t0": 4,
+              "t1": 5
+            }
+          },
+          "starter": {
+            "speed": 8,
+            "forward": 40
+          },
+          "demo": "calcSecantNarrow"
+        },
+        {
+          "id": "calc_l4_3",
+          "title": "导数直觉",
+          "unit": "瞬时变化",
+          "stageKey": "calculus",
+          "gradeKey": "l4",
+          "gradeName": "L4 瞬时变化",
+          "scene": "function",
+          "tags": [
+            "抛物线",
+            "顶点"
+          ],
+          "goals": [
+            "抛物线顶点处斜率为 0",
+            "割线→切线直觉"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 12,
+            "cellCm": 10,
+            "plot": {
+              "expr": "x*x",
+              "xMin": -2,
+              "xMax": 2,
+              "step": 1,
+              "color": "#a78bfa",
+              "label": "y=x²"
+            },
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 20,
+              "sMaxCm": 50
+            },
+            "calcOverlay": {
+              "type": "secant",
+              "t0": -0.5,
+              "t1": 0.5
+            }
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": -10,
+                "y": 10
+              },
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 10,
+                "y": 10
+              }
+            ]
+          },
+          "demo": "plotParabola"
+        }
+      ]
+    },
+    {
+      "levelKey": "l5",
+      "levelName": "L5 累积与面积",
+      "taskCount": 3,
+      "tasks": [
+        {
+          "id": "calc_l5_1",
+          "title": "v-t 与总路程",
+          "unit": "累积与面积",
+          "stageKey": "calculus",
+          "gradeKey": "l5",
+          "gradeName": "L5 累积与面积",
+          "scene": "calc",
+          "tags": [
+            "v-t",
+            "面积"
+          ],
+          "goals": [
+            "矩形面积 = 路程",
+            "理解累积量"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 12,
+              "sMaxCm": 120
+            },
+            "vtGraph": {
+              "enabled": true,
+              "tMaxSec": 12,
+              "vMax": 15
+            },
+            "calcOverlay": {
+              "type": "riemann",
+              "t0": 0,
+              "t1": 10,
+              "n": 4
+            }
+          },
+          "starter": {
+            "speed": 10,
+            "forward": 100
+          },
+          "demo": null
+        },
+        {
+          "id": "calc_l5_2",
+          "title": "变速：矩形逼近",
+          "unit": "累积与面积",
+          "stageKey": "calculus",
+          "gradeKey": "l5",
+          "gradeName": "L5 累积与面积",
+          "scene": "calc",
+          "tags": [
+            "黎曼和"
+          ],
+          "goals": [
+            "分段匀速，矩形求和",
+            "分得越细越准"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 25,
+              "sMaxCm": 100
+            },
+            "vtGraph": {
+              "enabled": true,
+              "tMaxSec": 25,
+              "vMax": 20
+            },
+            "calcOverlay": {
+              "type": "riemann",
+              "t0": 0,
+              "t1": 10,
+              "n": 5
+            }
+          },
+          "starter": {
+            "speed": 5,
+            "forward": 20,
+            "speed2": 10,
+            "forward2": 20,
+            "speed3": 15,
+            "forward3": 20
+          },
+          "demo": null
+        },
+        {
+          "id": "calc_l5_3",
+          "title": "从 s 到 v 到面积",
+          "unit": "累积与面积",
+          "stageKey": "calculus",
+          "gradeKey": "l5",
+          "gradeName": "L5 累积与面积",
+          "scene": "calc",
+          "tags": [
+            "联动",
+            "综合"
+          ],
+          "goals": [
+            "s-t 斜率 ↔ v-t 面积",
+            "串联变化与累积"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 20,
+              "sMaxCm": 80
+            },
+            "vtGraph": {
+              "enabled": true,
+              "tMaxSec": 20,
+              "vMax": 15
+            },
+            "calcOverlay": {
+              "type": "riemann",
+              "t0": 0,
+              "t1": 8,
+              "n": 4
+            }
+          },
+          "starter": {
+            "speed": 8,
+            "forward": 64
+          },
+          "demo": "calcPiecewiseSpeed"
+        }
+      ]
+    }
+  ]
+}
