@@ -133,6 +133,8 @@ html, body {
 }
 .btn-sm { padding: 4px 10px; font-size: .75rem; }
 .btn-run { background: var(--success); color: #fff; }
+.btn-stop { background: var(--danger); color: #fff; border: none; }
+.btn-stop:disabled { opacity: .45; cursor: not-allowed; }
 .btn-go { background: var(--primary); color: #fff; }
 .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
 .btn-warn { background: var(--warning); color: #422006; }

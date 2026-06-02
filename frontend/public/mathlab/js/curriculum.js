@@ -86,6 +86,10 @@ const CURRICULUM = {
             tags: ['平移', '旋转', '正方形'],
             goals: ['理解平移与旋转', '让机器人走正方形路线', '认识封闭图形'],
             focus: '走图形 = 平移 + 旋转的组合',
+            formulas: [
+              { title: '正方形周长', tex: '$$C = 4a$$' },
+              { title: '走图形', tex: '平移 + 旋转' }
+            ],
             challenges: ['走边长 40cm 的正方形', '走边长 30cm 的正方形'],
             sceneConfig: { shape: 'square', side: 40 },
             hint: '重复 4 次：前进 → 右转 90°。',
@@ -149,6 +153,10 @@ const CURRICULUM = {
           task('p3t9', '任务9：机器人导航员——位置与方向（一）', '位置与方向', SCENE.PATH, {
             tags: ['东', '南', '西', '北'],
             goals: ['认识四个主方向', '按方向指令走路线', '描述行走路径'],
+            formulas: [
+              { title: '方向', tex: '东 · 南 · 西 · 北' },
+              { title: '换向', tex: '右转 $$90°$$ 换下一个主方向' }
+            ],
             challenges: ['向东走 50cm', '右转后向南走 30cm'],
             hint: '默认朝右（东），右转 90° 朝南。',
             starter: { forward: 50, turn: 90, forward2: 30 },
@@ -179,15 +187,24 @@ const CURRICULUM = {
           task('p4t12', '任务12：机器人走平行——平行四边形和梯形', '平行四边形和梯形', SCENE.SHAPE, {
             tags: ['平行', '梯形', '四边形'],
             goals: ['认识平行四边形、梯形', '走平行四边形路径', '理解对边平行'],
+            formulas: [
+              { title: '平行', tex: '平行四边形对边平行且相等' },
+              { title: '周长', tex: '$$C = 各边之和$$' }
+            ],
             sceneConfig: { shape: 'parallelogram', top: 50, side: 30, slant: 20 },
-            challenges: ['走平行四边形周长路径'],
+            challenges: ['走平行四边形周长路径', '四段路程 50+30 对应相邻两边'],
+            hint: '前进 50 → 转 60° → 前进 30 → 转 120°，对应平行四边形相邻两边。',
             starter: { forward: 50, turn: 60, forward2: 30, turn2: 120 },
             demo: 'parallelogram'
           }),
           task('p4t13', '任务13：机器人最短路线——优化思想', '优化', SCENE.PATH, {
             tags: ['最短路径', '优化'],
             goals: ['比较不同路径长度', '理解两点间线段最短', '选择更优路线'],
+            formulas: [
+              { title: '最短路径', tex: '两点之间，线段最短' }
+            ],
             challenges: ['走直线 80cm', '对比折线路径（需更长）'],
+            hint: '先走直线 80 cm；再设计折线，比较总路程。',
             starter: { forward: 80 },
             demo: 'forward80'
           }),
@@ -203,7 +220,11 @@ const CURRICULUM = {
           task('p4t15', '任务15：机器人走对称——图形的运动（二）', '图形的运动（二）', SCENE.PATH, {
             tags: ['轴对称', '镜像', '对称'],
             goals: ['理解轴对称', '走对称路径', '镜像运动'],
-            challenges: ['走 L 形后沿对称轴返回'],
+            formulas: [
+              { title: '轴对称', tex: '对应点到对称轴距离相等' }
+            ],
+            challenges: ['走 L 形后沿对称轴返回', '前进 50 + 转 90° + 前进 30'],
+            hint: 'L 形路径可看作沿对称轴的反射组合。',
             starter: { forward: 50, turn: 90, forward2: 30 },
             demo: 'symmetry'
           }),
@@ -226,15 +247,19 @@ const CURRICULUM = {
             formulas: [{ title: '平移', tex: '右移 $+\\Delta列$，上移 $+\\Delta行$' }],
             sceneConfig: { cols: 6, rows: 6, cellCm: 10, target: [3, 2] },
             challenges: ['从起点走到 (3,2)：右 2 格、上 1 格', '走到 (4,3)'],
-            hint: '每格 10cm。先前进 20cm（2列），左转 90°，再前进 10cm（1行）。',
-            starter: { forward: 20, turn: 90, forward2: 10 },
-            demo: 'grid32'
+            hint: '目标 (3,2) 即 x=20 cm，y=10 cm；用「移动到 x y」。',
+            starter: { goto: { x: 20, y: 10 } },
+            demo: 'gridTarget32'
           }),
           task('p5t18', '任务18：机器人走多边形——多边形的面积', '多边形的面积', SCENE.SHAPE, {
             tags: ['多边形', '面积', '分割'],
             goals: ['走多边形边界', '理解面积与周长区别', '分割求面积思想'],
+            formulas: [
+              { title: '正六边形', tex: '$$C = 6a$$' }
+            ],
             sceneConfig: { shape: 'hexagon', side: 25 },
-            challenges: ['走正六边形，边长 25cm'],
+            challenges: ['走正六边形，边长 25cm', '总路程 25×6=150 cm'],
+            hint: '重复 6 次：前进 25 → 左转 60°。',
             starter: { repeat: 6, forward: 25, turn: 60 },
             demo: 'hexagon'
           }),
@@ -275,7 +300,12 @@ const CURRICULUM = {
           task('p6t24', '任务24：机器人导航2.0——位置与方向（二）', '位置与方向（二）', SCENE.PATH, {
             tags: ['北偏东', '角度方向', '导航'],
             goals: ['用角度描述方向', '北偏东 30° 行走', '综合导航'],
+            formulas: [
+              { title: '方向角', tex: '北偏东 $$30°$$' },
+              { title: '导航', tex: '先转向，再沿该方向前进' }
+            ],
             challenges: ['转 30° 后走 60cm'],
+            hint: '右转 30° 后前进 60 cm，模拟北偏东方向行走。',
             starter: { turn: 30, forward: 60 },
             demo: 'nav30'
           }),
@@ -327,6 +357,10 @@ const CURRICULUM = {
           task('j7u3', '任务3：最短路径规划', '几何初步', SCENE.PATH, {
             tags: ['最短路径', '线段'],
             goals: ['两点间线段最短', '比较路径', '优化选择'],
+            formulas: [
+              { title: '最短路径', tex: '两点之间，线段最短' },
+              { title: '比较', tex: '折线长 $\\ge$ 直线长' }
+            ],
             challenges: ['直线走 100cm'],
             starter: { forward: 100 },
             demo: 'forward100'
@@ -334,6 +368,10 @@ const CURRICULUM = {
           task('j7u4', '任务4：机器人场地设计', '几何图形', SCENE.PERIMETER, {
             tags: ['设计', '周长', '面积'],
             goals: ['设计矩形场地', '计算周长与面积', '编程走边界'],
+            formulas: [
+              { title: '周长', tex: '$$C = 2(a + b)$$' },
+              { title: '面积', tex: '$$S = a \\times b$$' }
+            ],
             sceneConfig: { rect: { w: 60, h: 40 } },
             starter: { repeat: 2, forward: 60, turn: 90, forward2: 40, turn2: 90 },
             demo: 'rect6040'
@@ -346,36 +384,72 @@ const CURRICULUM = {
           task('j7d5', '任务5：垂直转弯与平行巡线', '相交线与平行线', SCENE.ANGLE, {
             tags: ['垂直', '平行', '90°'],
             goals: ['垂直=90°', '平行线性质', '直角转弯'],
-            challenges: ['连续 4 次 90° 转弯'],
+            formulas: [
+              { title: '垂直', tex: '两直线相交成 $$90°$$' },
+              { title: '周角', tex: '$$360° = 4 \\times 90°$$' }
+            ],
+            challenges: ['连续 4 次 90° 转弯', '走完是否回到起始方向？'],
+            hint: '重复 4 次：前进 → 右转 90°，四直角合为周角。',
             starter: { repeat: 4, forward: 40, turn: 90 },
             demo: 'square40'
           }),
           task('j7d6', '任务6：平移路径图案设计', '平移', SCENE.PATH, {
             tags: ['平移', '图案'],
             goals: ['平移性质', '设计重复图案', '坐标变化'],
+            formulas: [
+              { title: '平移', tex: '形状、大小、方向不变' },
+              { title: '坐标', tex: '$$ (x,y) \\to (x+a,\\, y+b) $$' }
+            ],
+            challenges: ['重复 3 次走 L 形路径', '观察每次图案相同'],
+            hint: '每次「前进 30 → 转 90° → 前进 20」构成相同 L 形，体现平移重复。',
             starter: { repeat: 3, forward: 30, turn: 90, forward2: 20 },
             demo: 'pattern'
           }),
           task('j7d7', '任务7：坐标系定位与导航', '平面直角坐标系', SCENE.GRID, {
             tags: ['坐标', '象限', '导航'],
             goals: ['建立坐标系', '用坐标定位', '编程走到 (4,3)'],
+            formulas: [
+              { title: '坐标', tex: '$$(x,\\, y)$$ 表示位置' },
+              { title: '格距', tex: '$$1\\text{ 格} = 10\\text{ cm}$$' }
+            ],
             sceneConfig: { cols: 8, rows: 8, cellCm: 10, target: [4, 3] },
-            starter: { forward: 30, turn: 90, forward2: 20 },
-            demo: 'grid43'
+            challenges: ['走到旗帜 (4,3)', '读出终点坐标验证'],
+            hint: '目标 (4,3) 即 x=40 cm，y=30 cm；用「移动到 x y」。',
+            starter: { goto: { x: 40, y: 30 } },
+            demo: 'gridTarget43'
           }),
           task('j7d8', '任务8：坐标平移与编队运动', '坐标变换', SCENE.GRID, {
             tags: ['平移', '坐标', '编队'],
             goals: ['坐标平移规律', '(x,y)→(x+a,y+b)', '编队路径'],
+            formulas: [
+              { title: '平移', tex: '$$ (x,y) \\to (x+a,\\, y+b) $$' }
+            ],
             sceneConfig: { cols: 8, rows: 8, cellCm: 10 },
-            starter: { forward: 40, turn: 90, forward2: 30 },
+            challenges: ['先平移 +40 cm（x 方向）', '再平移 +30 cm（y 方向）'],
+            hint: '两次「移动到」：先 (40,0) 再 (40,30)，对应 a=40、b=30。',
+            starter: { goto: [{ x: 40, y: 0 }, { x: 40, y: 30 }] },
             demo: 'translate'
           }),
           task('j7d9', '任务9：速度与资源的方程求解', '二元一次方程组', SCENE.TIME, {
-            tags: ['方程组', '速度'],
-            goals: ['列方程组', '相遇问题', '编程模拟'],
-            formulas: [{ title: '相遇', tex: '$$S_1 + S_2 = S_{总}$$' }],
-            starter: { forward: 50, turn: 180, forward2: 30 },
-            demo: 'meet'
+            tags: ['方程组', '速度', '验证'],
+            goals: [
+              '把相遇题抽象为方程组（如 v₁t=S₁，v₂t=S₂，S₁+S₂=S）',
+              '纸面求 S₁、S₂ 或 v₁、v₂',
+              '用分段速度/路程编程验证解（单轮模拟）'
+            ],
+            focus: '本课重「列式→求解→代入验证」；双车相遇动画见行程专题 TV1',
+            formulas: [
+              { title: '方程组', tex: '$$\\begin{cases} v_1 t = S_1 \\\\ v_2 t = S_2 \\\\ S_1 + S_2 = S \\end{cases}$$' },
+              { title: '路程', tex: '$$S = v \\times t$$' }
+            ],
+            challenges: [
+              '全长 100 cm，t=4 s，v_甲=10、v_乙=15：求 S_甲、S_乙 并编程验证',
+              '运行后总路程是否等于 100 cm？',
+              '若 v_乙 改为 20，方程组的解如何变？'
+            ],
+            hint: '先算 S_甲=10×4=40，S_乙=15×4=60；再「设速度→前进→改速度→再前进」。两车相向仿真请学「行程问题 · TV1」。',
+            starter: { speed: 10, forward: 40, speed2: 15, forward2: 60 },
+            demo: 'equationVerify'
           })
         ]
       },
@@ -385,24 +459,46 @@ const CURRICULUM = {
           task('j8u10', '任务10：三角形路径验证', '三角形', SCENE.SHAPE, {
             tags: ['三角形', '三边关系'],
             goals: ['走三角形验证三边', '两边之和大于第三边'],
+            formulas: [
+              { title: '三边关系', tex: '$$a + b > c$$' },
+              { title: '周长', tex: '$$C = a + b + c$$' }
+            ],
+            challenges: ['走边长 50 cm 的等边三角形', '总路程是否 150 cm？'],
+            hint: '重复 3 次：前进 50 → 左转 120°。',
             starter: { repeat: 3, forward: 50, turn: 120 },
             demo: 'triangle50'
           }),
           task('j8u11', '任务11：全等轨迹与距离测量', '全等三角形', SCENE.PATH, {
             tags: ['全等', '对应边'],
             goals: ['走全等路径', '对应边相等验证'],
+            formulas: [
+              { title: '全等', tex: '对应边相等' }
+            ],
+            challenges: ['第一段 40+30，第二段 30+40', '对应边是否相等？'],
+            hint: '走矩形两条不同顺序的邻边，对应边应相等（40 对 40，30 对 30）。',
             starter: { forward: 40, turn: 90, forward2: 30, turn2: 90, forward3: 40 },
             demo: 'congruent'
           }),
           task('j8u12', '任务12：对称路径运动', '轴对称', SCENE.PATH, {
             tags: ['轴对称', '对应点'],
             goals: ['轴对称性质', '走对称路径'],
+            formulas: [
+              { title: '轴对称', tex: '对应点到对称轴距离相等' }
+            ],
+            challenges: ['先走 60 cm 再转 90° 走 40 cm', '观察路径关于转角对称'],
+            hint: 'L 形路径可看作沿对称轴的反射组合。',
             starter: { forward: 60, turn: 90, forward2: 40 },
             demo: 'symmetry'
           }),
           task('j8u13', '任务13：最短饮马路径', '最短路径', SCENE.PATH, {
             tags: ['反射', '最短'],
             goals: ['饮马问题模型', '对称转化最短路径'],
+            formulas: [
+              { title: '对称转化', tex: '反射后走直线最短' },
+              { title: '最短', tex: '两点之间，线段最短' }
+            ],
+            challenges: ['转 45° 后走 50 cm', '比较折线与直线距离'],
+            hint: '45° 转折模拟饮马问题的对称转化；直线距离 ≈ 50√2 cm。',
             starter: { forward: 50, turn: 45, forward2: 50 },
             demo: 'reflect'
           })
@@ -442,6 +538,12 @@ const CURRICULUM = {
           task('j8d15', '任务15：圆柱面最短路径', '展开图', SCENE.PATH, {
             tags: ['展开', '最短路径'],
             goals: ['圆柱侧面展开', '最短路径转化'],
+            formulas: [
+              { title: '侧面展开', tex: '圆柱侧面展开为矩形' },
+              { title: '最短路径', tex: '展开后两点间线段最短' }
+            ],
+            challenges: ['走折线 80+50 cm', '想象展开后直线更短'],
+            hint: '本课为抽象模型：折线模拟侧面路径；展开后直线为最短。',
             starter: { forward: 80, turn: 90, forward2: 50 },
             demo: 'cylinder'
           }),
@@ -453,14 +555,33 @@ const CURRICULUM = {
             demo: 'linear'
           }),
           task('j8d17', '任务17：追及问题的图象分析', '追及问题', SCENE.TIME, {
-            tags: ['追及', '函数图象'],
-            goals: ['追及问题建模', '速度差与时间'],
-            starter: { speed: 15, forward: 60 },
-            demo: 'chase'
+            tags: ['追及', '函数图象', '验证'],
+            goals: [
+              '把追及题抽象为方程（Δs=(v₂-v₁)t）',
+              '纸面求 t、S₁、S₂',
+              '用分段速度/路程编程验证解（单轮模拟）'
+            ],
+            focus: '本课重「列式→求解→代入验证」；双车追及动画见行程专题 TV3',
+            formulas: [
+              { title: '追及', tex: '$$t = \\frac{\\Delta s}{v_2 - v_1}$$' },
+              { title: '路程', tex: '$$S = v \\times t$$' }
+            ],
+            challenges: [
+              '间距 40 cm，v_慢=8、v_快=14：求 t 与两车路程',
+              '运行后总路程是否等于 S_慢+S_快？'
+            ],
+            hint: '先算 t=40÷(14-8)≈6.7 s，S_慢=8t≈54，S_快=14t≈94；再分段设速度前进。双车追及请学「行程问题 · TV3」。',
+            starter: { speed: 8, forward: 54, speed2: 14, forward2: 94 },
+            demo: 'chaseVerify'
           }),
           task('j8d18', '任务18：传感器数据统计分析', '数据分析', SCENE.DATA, {
             tags: ['统计', '分析'],
             goals: ['多次测量', '求平均与方差思想', '数据可视化'],
+            formulas: [
+              { title: '平均数', tex: '$$\\bar{x} = \\frac{x_1 + x_2 + \\cdots + x_n}{n}$$' }
+            ],
+            challenges: ['重复 5 次每次前进 30 cm', '总距离 150 cm，平均每次 30 cm'],
+            hint: '用「重复 5 次前进 30」模拟 5 次测量；运行后看总距离求平均。',
             starter: { repeat: 5, forward: 30 },
             demo: 'average'
           }),
@@ -507,8 +628,14 @@ const CURRICULUM = {
           task('j9u19', '任务19：圆形巡检路径设计', '圆', SCENE.CIRCLE, {
             tags: ['圆', '巡检', '周长'],
             goals: ['圆形路径巡检', 'C=2πr 应用'],
+            formulas: [
+              { title: '周长', tex: '$$C = 2\\pi r$$' },
+              { title: '弧长', tex: '$$L = \\frac{n\\pi r}{180}$$' }
+            ],
             sceneConfig: { radius: 50 },
-            starter: { forward: 31.4 },
+            challenges: ['走 1/4 圆周（r=50 cm）', '弧长约 78.5 cm'],
+            hint: '1/4 圆周 L=πr/2≈78.5 cm（r=50）；可对照虚线圆验证。',
+            starter: { forward: 78.5 },
             demo: 'arcQuarter'
           }),
           task('j9u20', '任务20：转弯圆弧半径计算', '圆', SCENE.CIRCLE, {
@@ -528,12 +655,23 @@ const CURRICULUM = {
           task('j9u22', '任务22：旋转后的坐标换算', '旋转', SCENE.GRID, {
             tags: ['旋转', '坐标变换'],
             goals: ['绕原点旋转', '坐标变换规律'],
-            starter: { turn: 90, forward: 40 },
+            formulas: [
+              { title: '旋转 90°', tex: '$$ (x,y) \\to (-y,\\, x) $$' }
+            ],
+            sceneConfig: { cols: 8, rows: 8, cellCm: 10 },
+            challenges: ['(40,0) 绕原点转 90° 变为 (0,40)', '用两次「移动到」验证'],
+            hint: '先移动到 (40,0)，再移动到 (0,40)，对应旋转 90° 的坐标变换。',
+            starter: { goto: [{ x: 40, y: 0 }, { x: 0, y: 40 }] },
             demo: 'rotate90'
           }),
           task('j9u23', '任务23：随机运行的概率实验', '概率', SCENE.DATA, {
             tags: ['概率', '随机', '频率'],
             goals: ['随机转向实验', '频率估计概率'],
+            formulas: [
+              { title: '频率', tex: '频率 $\\approx$ 概率（试验次数足够大时）' }
+            ],
+            challenges: ['重复 4 次：前进 20 → 转 90°', '多次运行记录转向次数'],
+            hint: '固定程序多次运行，统计右转次数，用频率估计概率。',
             starter: { repeat: 4, forward: 20, turn: 90 },
             demo: 'random'
           })
@@ -545,8 +683,14 @@ const CURRICULUM = {
           task('j9d24', '任务24：定程巡检的速度规划', '函数应用', SCENE.TIME, {
             tags: ['规划', '速度'],
             goals: ['定路程变速度', '时间规划'],
-            starter: { forward: 100, speed: 8 },
-            demo: 'forward100'
+            formulas: [
+              { title: '行程', tex: '$$S = v \\times t$$' },
+              { title: '定程', tex: '定 $S$ 则 $t = S / v$' }
+            ],
+            challenges: ['三段各 30 cm，速度 5→10→15', '比较各段用时'],
+            hint: '同路程 30 cm，速度越大用时越短；用「设速度→前进」分三段。',
+            starter: { speed: 5, forward: 30, speed2: 10, forward2: 30, speed3: 15, forward3: 30 },
+            demo: 'calcPiecewiseSpeed'
           }),
           task('j9d25', '任务25：视觉测距与相似', '相似三角形', SCENE.PATH, {
             tags: ['相似', '测距'],
@@ -605,7 +749,11 @@ const CURRICULUM = {
           task('j9d27', '任务29：综合感知与自主规划', '综合应用', SCENE.PATH, {
             tags: ['综合', '规划', '项目'],
             goals: ['综合数学与编程', '自主规划路径', '完成任务目标'],
-            challenges: ['设计一条包含 2 次转弯的总长 150cm 路径'],
+            formulas: [
+              { title: '路径长', tex: '$$L = s_1 + s_2 + \\cdots + s_n$$' }
+            ],
+            challenges: ['设计一条包含 2 次转弯的总长 150 cm 路径', '示例：50+50+50，两次 90° 转弯'],
+            hint: '先定总路程与各段长度，再排顺序：前进→转弯→前进→转弯→前进。',
             starter: { forward: 50, turn: 90, forward2: 50, turn2: 90, forward3: 50 },
             demo: 'comprehensive'
           })

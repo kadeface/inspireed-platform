@@ -14,7 +14,7 @@
 
   // ─── 机器人模拟器 ───────────────────────────────────────
   const sim = {
-    canvas: null, ctx: null, showGrid: true, showAxes: true, busy: false,
+    canvas: null, ctx: null, showGrid: true, showAxes: true, busy: false, runAbort: false,
     renderMode: 'car',
     viewport: { offsetX: 0, offsetY: 0, scale: 1 },
     taskMode: 'regular',
@@ -215,6 +215,7 @@
       else this.seedMotionSample();
       this.lastAnalysis = null;
       this.busy = false;
+      this.runAbort = false;
       runStats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
       this.draw();
       this.updateTelemetry();
@@ -310,7 +311,40 @@
       return span * idealUnitPx > available ? available / span : idealUnitPx;
     },
 
-    wait(ms) { return new Promise(res => setTimeout(res, ms)); },
+    abortError() {
+      const e = new Error('程序已停止');
+      e.code = 'PROGRAM_STOPPED';
+      return e;
+    },
+
+    checkAborted() {
+      if (this.runAbort) throw this.abortError();
+    },
+
+    beginRun() {
+      this.runAbort = false;
+    },
+
+    requestStop() {
+      this.runAbort = true;
+    },
+
+    haltProgram() {
+      this.requestStop();
+      throw this.abortError();
+    },
+
+    async wait(ms) {
+      const step = 40;
+      let left = Math.max(0, ms || 0);
+      while (left > 0) {
+        this.checkAborted();
+        const slice = Math.min(step, left);
+        await new Promise(res => setTimeout(res, slice));
+        left -= slice;
+      }
+      this.checkAborted();
+    },
 
     async runParallel(jobs) {
       if (typeof MotionScheduler === 'undefined') return;
@@ -383,6 +417,7 @@
     },
 
     async moveByDelta(dx, dy, cm, endAngle, robotOrId) {
+      this.checkAborted();
       const robot = this.resolveRobot(robotOrId);
       if (!robot) return;
       const s = robot.state;
@@ -420,6 +455,7 @@
           if (panel && !panel.hidden) ViewShell.refreshTrailPanel();
         }
         if (p >= 1) break;
+        this.checkAborted();
         await this.wait(16);
       }
       if (endAngle != null) s.angle = endAngle;
@@ -430,6 +466,7 @@
       this.sampleMotion(robot);
       this.draw();
       this.updateTelemetry();
+      this.checkAborted();
     },
 
     /** 二维：沿坐标系角度移动（绝对方向，非车头朝向） */
@@ -479,6 +516,7 @@
     async backward(cm, robotOrId) { return this.forward(-(cm || 0), robotOrId); },
 
     async turn(deg, robotOrId) {
+      this.checkAborted();
       const robot = this.resolveRobot(robotOrId);
       if (!robot) return;
       const s = robot.state;
@@ -495,11 +533,13 @@
         this.sampleTravel();
         this.draw();
         if (p >= 1) break;
+        this.checkAborted();
         await this.wait(16);
       }
       s.elapsed += dur / 1000;
       stats.totalTime += dur / 1000;
       if (robot.id === 'A') runStats.totalTime = stats.totalTime;
+      this.checkAborted();
     },
 
     setSpeed(v, robotOrId) {
@@ -1629,6 +1669,12 @@
           this.setSpeed(15);
           await this.forward(40);
         },
+        equationVerify: async () => {
+          this.setSpeed(10);
+          await this.forward(40);
+          this.setSpeed(15);
+          await this.forward(60);
+        },
         calcPiecewiseSpeed: async () => {
           this.setSpeed(5);
           await this.forward(30);
@@ -1653,7 +1699,119 @@
         division17: async () => { for (let i = 0; i < 3; i++) await this.forward(20); await this.forward(20); },
         speedRace: async () => { this.setSpeed(10); await this.forward(50); this.reset(); this.setSpeed(20); await this.forward(50); },
         grid32: async () => { await this.forward(20); await this.turn(90); await this.forward(10); },
+        gridTarget32: async () => { await this.gotoCm(20, 10); },
         grid43: async () => { await this.forward(30); await this.turn(90); await this.forward(20); },
+        compass: async () => {
+          await this.forward(50);
+          await this.turn(90);
+          await this.forward(30);
+        },
+        areaRect: async () => {
+          for (let i = 0; i < 2; i++) {
+            await this.forward(30);
+            await this.turn(90);
+            await this.forward(20);
+          }
+        },
+        parallelogram: async () => {
+          await this.forward(50);
+          await this.turn(60);
+          await this.forward(30);
+          await this.turn(120);
+        },
+        equation: async () => { await this.forward(70); },
+        nav30: async () => {
+          await this.turn(30);
+          await this.forward(60);
+        },
+        gearRatio: async () => {
+          await this.forward(18.84);
+          await this.forward(9.42);
+        },
+        scaleMap: async () => { await this.forward(150); },
+        gridTarget43: async () => { await this.gotoCm(40, 30); },
+        pattern: async () => {
+          for (let i = 0; i < 3; i++) {
+            await this.forward(30);
+            await this.turn(90);
+            await this.forward(20);
+          }
+        },
+        translate: async () => {
+          await this.gotoCm(40, 0);
+          await this.gotoCm(40, 30);
+        },
+        triangle50: async () => {
+          for (let i = 0; i < 3; i++) {
+            await this.forward(50);
+            await this.turn(120);
+          }
+        },
+        congruent: async () => {
+          await this.forward(40);
+          await this.turn(90);
+          await this.forward(30);
+          await this.turn(90);
+          await this.forward(40);
+        },
+        symmetry: async () => {
+          await this.forward(60);
+          await this.turn(90);
+          await this.forward(40);
+        },
+        reflect: async () => {
+          await this.forward(50);
+          await this.turn(45);
+          await this.forward(50);
+        },
+        cylinder: async () => {
+          await this.forward(80);
+          await this.turn(90);
+          await this.forward(50);
+        },
+        linear: async () => {
+          this.setSpeed(5);
+          await this.forward(100);
+        },
+        chaseVerify: async () => {
+          this.setSpeed(8);
+          await this.forward(54);
+          this.setSpeed(14);
+          await this.forward(94);
+        },
+        average: async () => {
+          for (let i = 0; i < 5; i++) await this.forward(30);
+        },
+        arcQuarter: async () => {
+          const r = this.sceneConfig?.radius || 50;
+          await this.forward(Math.PI * r / 2);
+        },
+        arc90: async () => {
+          await this.turn(90);
+          await this.forward(40);
+        },
+        parabola: async () => {
+          await this.forward(20);
+          await this.turn(30);
+          await this.forward(25);
+          await this.turn(-30);
+          await this.forward(20);
+        },
+        rotate90: async () => {
+          await this.gotoCm(40, 0);
+          await this.gotoCm(0, 40);
+        },
+        random: async () => {
+          for (let i = 0; i < 4; i++) {
+            await this.forward(20);
+            await this.turn(90);
+          }
+        },
+        similar: async () => {
+          await this.forward(60);
+          await this.turn(90);
+          await this.forward(40);
+        },
         numberline: async () => { await this.forward(100); await this.backward(60); },
         triangle: async () => { for (let i = 0; i < 3; i++) { await this.forward(40); await this.turn(120); } },
         hexagon: async () => { for (let i = 0; i < 6; i++) { await this.forward(25); await this.turn(60); } },
@@ -1795,6 +1953,7 @@
           previousStatement: true, nextStatement: true, colour: 120 },
         { type: 'motion_wait', message0: '等待 %1 秒', args0: [{ type: 'input_value', name: 'T', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 60 },
+        { type: 'motion_stop', message0: '停止程序', previousStatement: true, nextStatement: true, colour: 60 },
         { type: 'motion_forward_robot', message0: '小车 %1 前进 %2 厘米', args0: [
             { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
             { type: 'input_value', name: 'D', check: 'Number' }
@@ -1828,7 +1987,7 @@
         { type: 'math_op', message0: '%1 %2 %3',
           args0: [
             { type: 'input_value', name: 'A', check: 'Number' },
-            { type: 'field_dropdown', name: 'OP', options: [['+', 'ADD'], ['-', 'MINUS'], ['×', 'MUL'], ['÷', 'DIV']] },
+            { type: 'field_dropdown', name: 'OP', options: [['+', 'ADD'], ['-', 'MINUS'], ['×', 'MUL'], ['÷', 'DIV'], ['%', 'MOD']] },
             { type: 'input_value', name: 'B', check: 'Number' }
           ], output: 'Number', colour: 230 },
         { type: 'math_pi', message0: 'π', output: 'Number', colour: 230 },
@@ -1885,6 +2044,7 @@
       gen('motion_turn_left', b => `await __robot.turnLeft(${J.valueToCode(b, 'A', J.ORDER_NONE) || 0});\n`);
       gen('motion_speed', b => `__robot.setSpeed(${J.valueToCode(b, 'S', J.ORDER_NONE) || 10});\n`);
       gen('motion_wait', b => `await __robot.wait(${J.valueToCode(b, 'T', J.ORDER_NONE) || 1});\n`);
+      gen('motion_stop', () => `__robot.stop();\n`);
       gen('motion_forward_robot', b => {
         const robot = b.getFieldValue('ROBOT') || 'A';
         return `await __robot${robot}.forward(${J.valueToCode(b, 'D', J.ORDER_NONE) || 0});\n`;
@@ -1933,8 +2093,12 @@
       gen('math_op', b => {
         const a = J.valueToCode(b, 'A', J.ORDER_NONE) || 0;
         const bb = J.valueToCode(b, 'B', J.ORDER_NONE) || 0;
+        const op = b.getFieldValue('OP');
+        if (op === 'MOD') {
+          return [`((${bb}) ? ((${a}) % (${bb})) : 0)`, J.ORDER_ATOMIC];
+        }
         const map = { ADD: '+', MINUS: '-', MUL: '*', DIV: '/' };
-        return [`(${a} ${map[b.getFieldValue('OP')]} ${bb})`, J.ORDER_ATOMIC];
+        return [`(${a} ${map[op]} ${bb})`, J.ORDER_ATOMIC];
       });
       gen('math_pi', () => ['Math.PI', J.ORDER_ATOMIC]);
       const TRIG_SPECIAL = {
@@ -2035,6 +2199,7 @@
             <block type="control_if"></block>
             <block type="motion_speed"><value name="S"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
             <block type="motion_wait"><value name="T"><shadow type="math_num"><field name="N">1</field></shadow></value></block>
+            <block type="motion_stop"></block>
           </category>
           <category name="变量" custom="VARIABLE" colour="330"></category>
           <category name="逻辑" colour="210"><block type="robot_logic_compare"></block></category>
@@ -2333,6 +2498,39 @@
     renderTask(grade.tasks[0]);
   }
 
+  function isProgramStopped(err) {
+    return err && (err.code === 'PROGRAM_STOPPED' || err.message === '程序已停止');
+  }
+
+  function updateRunControls() {
+    const running = sim.busy;
+    const btnRun = document.getElementById('btnRun');
+    const btnStop = document.getElementById('btnStop');
+    const btnReset = document.getElementById('btnReset');
+    const btnStart = document.getElementById('btnStart');
+    if (btnRun) btnRun.disabled = running;
+    if (btnStop) btnStop.disabled = !running;
+    if (btnReset) btnReset.disabled = running;
+    if (btnStart) btnStart.disabled = running;
+  }
+
+  function requestStopProgram() {
+    if (!sim.busy) return;
+    sim.requestStop();
+    setStatus('正在停止…', 'busy');
+  }
+
+  function bindRunKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const modal = document.getElementById('mlModal');
+      if (modal && !modal.hidden) return;
+      if (!sim.busy) return;
+      requestStopProgram();
+      e.preventDefault();
+    });
+  }
+
   async function runProgram() {
     if (sim.busy) { setStatus('运行中，请稍候', 'busy'); return; }
     sim.reset();
@@ -2351,14 +2549,23 @@
     }
     try {
       sim.busy = true;
+      sim.beginRun();
+      updateRunControls();
       setStatus('程序运行中…', 'busy');
       await new Function('return (async () => {\n' + code + '\n})();')();
-      setStatus('运行完成 — 总距离 ' + runStats.totalDist.toFixed(1) + ' cm', 'ok');
+      if (!sim.runAbort) {
+        setStatus('运行完成 — 总距离 ' + runStats.totalDist.toFixed(1) + ' cm', 'ok');
+      }
     } catch (e) {
-      setStatus('错误: ' + e.message, 'err');
-      console.error(e);
+      if (isProgramStopped(e)) setStatus('程序已停止', 'ok');
+      else {
+        setStatus('错误: ' + e.message, 'err');
+        console.error(e);
+      }
     } finally {
       sim.busy = false;
+      sim.runAbort = false;
+      updateRunControls();
       sim.runAnalysis();
     }
   }
@@ -2373,14 +2580,19 @@
     else sim.state.speed = speed;
     try {
       sim.busy = true;
+      sim.beginRun();
+      updateRunControls();
       setStatus('演示运行中…', 'busy');
       if (currentTask?.demo) await sim.runDemo(currentTask.demo);
       else await sim.runDemo('oneLap');
-      setStatus('演示完成', 'ok');
+      if (!sim.runAbort) setStatus('演示完成', 'ok');
     } catch (e) {
-      setStatus('失败: ' + e.message, 'err');
+      if (isProgramStopped(e)) setStatus('程序已停止', 'ok');
+      else setStatus('失败: ' + e.message, 'err');
     } finally {
       sim.busy = false;
+      sim.runAbort = false;
+      updateRunControls();
       sim.runAnalysis();
     }
   }
@@ -2425,8 +2637,11 @@
     fillSelectors();
     applyTaskFromUrl();
     document.getElementById('btnRun').onclick = runProgram;
+    document.getElementById('btnStop').onclick = requestStopProgram;
+    bindRunKeyboardShortcuts();
     document.getElementById('btnStart').onclick = startDemo;
-    document.getElementById('btnReset').onclick = () => { sim.reset(); setStatus('已重置'); };
+    document.getElementById('btnReset').onclick = () => { sim.reset(); updateRunControls(); setStatus('已重置'); };
+    updateRunControls();
     document.getElementById('btnLoadStarter').onclick = () => {
       if (currentTask) blocklyApp.loadStarter(currentTask);
       setStatus('已加载示例程序');

@@ -36,7 +36,7 @@
       turnRight: deg => sim.turn(deg, id),
       setSpeed: v => sim.setSpeed(v, id),
       wait: sec => sim.wait((sec || 0) * 1000, id),
-      stop: () => {}
+      stop: () => sim.haltProgram()
     };
   }
 
