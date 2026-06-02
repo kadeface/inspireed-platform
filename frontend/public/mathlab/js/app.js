@@ -1939,7 +1939,7 @@
             { type: 'input_value', name: 'X', check: 'Number' },
             { type: 'input_value', name: 'Y', check: 'Number' }
           ], previousStatement: true, nextStatement: true, colour: 160 },
-        { type: 'motion_face_angle', message0: '面向角度 %1 °', args0: [{ type: 'input_value', name: 'ANGLE', check: 'Number' }],
+        { type: 'motion_face_angle', message0: '转到角度 %1 °', args0: [{ type: 'input_value', name: 'ANGLE', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 160 },
         { type: 'motion_forward', message0: '沿当前朝向前进 %1 厘米', args0: [{ type: 'input_value', name: 'D', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 45 },
@@ -1998,7 +1998,26 @@
         { type: 'ml_math_trig_special', message0: '特殊角 %1 的 %2', args0: [
             { type: 'field_dropdown', name: 'ANGLE', options: [['30°', '30'], ['45°', '45'], ['60°', '60']] },
             { type: 'field_dropdown', name: 'FN', options: [['sin', 'SIN'], ['cos', 'COS'], ['tan', 'TAN']] }
-          ], output: 'Number', colour: 290 }
+          ], output: 'Number', colour: 290 },
+        { type: 'array_create_empty', message0: '将数组 %1 设为空数组', args0: [
+            { type: 'field_variable', name: 'VAR', variable: '列表' }
+          ], previousStatement: true, nextStatement: true, colour: 300 },
+        { type: 'array_push', message0: '向数组 %1 追加 %2', args0: [
+            { type: 'field_variable', name: 'VAR', variable: '列表' },
+            { type: 'input_value', name: 'VALUE' }
+          ], previousStatement: true, nextStatement: true, colour: 300 },
+        { type: 'array_set_index', message0: '将数组 %1 第 %2 项设为 %3', args0: [
+            { type: 'field_variable', name: 'VAR', variable: '列表' },
+            { type: 'input_value', name: 'INDEX', check: 'Number' },
+            { type: 'input_value', name: 'VALUE' }
+          ], previousStatement: true, nextStatement: true, colour: 300 },
+        { type: 'array_get_index', message0: '数组 %1 第 %2 项', args0: [
+            { type: 'field_variable', name: 'VAR', variable: '列表' },
+            { type: 'input_value', name: 'INDEX', check: 'Number' }
+          ], output: null, colour: 300 },
+        { type: 'array_length', message0: '数组 %1 长度', args0: [
+            { type: 'field_variable', name: 'VAR', variable: '列表' }
+          ], output: 'Number', colour: 300 }
       ]);
     },
 
@@ -2112,6 +2131,34 @@
         const map = { SIN: 'Math.sin', COS: 'Math.cos', TAN: 'Math.tan' };
         return [`(${map[fn]}((${deg}) * Math.PI / 180))`, J.ORDER_ATOMIC];
       });
+      const arrayVarName = block => {
+        const id = block.getFieldValue('VAR');
+        return J.nameDB_ ? J.nameDB_.getName(id, Blockly.Names.NameType.VARIABLE) : block.getField('VAR').getText();
+      };
+      gen('array_create_empty', b => {
+        const name = arrayVarName(b);
+        return `${name} = [];\n`;
+      });
+      gen('array_push', b => {
+        const name = arrayVarName(b);
+        const val = J.valueToCode(b, 'VALUE', J.ORDER_NONE) || '0';
+        return `if (!Array.isArray(${name})) ${name} = [];\n${name}.push(${val});\n`;
+      });
+      gen('array_set_index', b => {
+        const name = arrayVarName(b);
+        const idx = J.valueToCode(b, 'INDEX', J.ORDER_NONE) || '0';
+        const val = J.valueToCode(b, 'VALUE', J.ORDER_NONE) || '0';
+        return `if (!Array.isArray(${name})) ${name} = [];\n${name}[${idx}] = ${val};\n`;
+      });
+      gen('array_get_index', b => {
+        const name = arrayVarName(b);
+        const idx = J.valueToCode(b, 'INDEX', J.ORDER_NONE) || '0';
+        return [`(Array.isArray(${name}) ? ${name}[${idx}] : undefined)`, J.ORDER_ATOMIC];
+      });
+      gen('array_length', b => {
+        const name = arrayVarName(b);
+        return [`(Array.isArray(${name}) ? ${name}.length : 0)`, J.ORDER_ATOMIC];
+      });
       this.registerVariableCodeGenerators(J, gen);
       gen('ml_math_trig_special', b => {
         const angle = b.getFieldValue('ANGLE');
@@ -2164,19 +2211,23 @@
 
     buildToolboxXml(mode) {
       const travelExtra = mode === 'travel'
-        ? `<category name="双车运动" colour="20">
+        ? `
             <block type="motion_forward_robot"><value name="D"><shadow type="math_num"><field name="N">30</field></shadow></value></block>
             <block type="motion_turn_robot"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
             <block type="motion_speed_robot"><value name="S"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
             <block type="control_parallel_move">
               <value name="DA"><shadow type="math_num"><field name="N">40</field></shadow></value>
               <value name="DB"><shadow type="math_num"><field name="N">20</field></shadow></value>
-            </block>
-          </category>`
+            </block>`
         : '';
       return `<xml>
-          <category name="事件" colour="120"><block type="event_start"></block></category>
-          <category name="二维运动" colour="160">
+          <category name="程序入口" colour="120"><block type="event_start"></block></category>
+          <category name="运动控制" colour="160">
+            <block type="motion_turn_right"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
+            <block type="motion_turn_left"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
+            <block type="motion_forward"><value name="D"><shadow type="math_num"><field name="N">30</field></shadow></value></block>
+            <block type="motion_backward"><value name="D"><shadow type="math_num"><field name="N">20</field></shadow></value></block>
+            <block type="motion_speed"><value name="S"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
             <block type="motion_move_2d">
               <value name="ANGLE"><shadow type="math_num"><field name="N">0</field></shadow></value>
               <value name="D"><shadow type="math_num"><field name="N">50</field></shadow></value>
@@ -2186,29 +2237,30 @@
               <value name="Y"><shadow type="math_num"><field name="N">0</field></shadow></value>
             </block>
             <block type="motion_face_angle"><value name="ANGLE"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
+            ${travelExtra}
           </category>
-          <category name="机器人运动" colour="45">
-            <block type="motion_forward"><value name="D"><shadow type="math_num"><field name="N">30</field></shadow></value></block>
-            <block type="motion_backward"><value name="D"><shadow type="math_num"><field name="N">20</field></shadow></value></block>
-            <block type="motion_turn_right"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
-            <block type="motion_turn_left"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
-          </category>
-          ${travelExtra}
-          <category name="控制" colour="65">
+          <category name="流程控制" colour="65">
             <block type="control_repeat"><value name="N"><shadow type="math_num"><field name="N">4</field></shadow></value></block>
             <block type="control_if"></block>
-            <block type="motion_speed"><value name="S"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
             <block type="motion_wait"><value name="T"><shadow type="math_num"><field name="N">1</field></shadow></value></block>
             <block type="motion_stop"></block>
           </category>
           <category name="变量" custom="VARIABLE" colour="330"></category>
-          <category name="逻辑" colour="210"><block type="robot_logic_compare"></block></category>
-          <category name="数学" colour="230">
+          <category name="数组" colour="300">
+            <block type="array_create_empty"></block>
+            <block type="array_push"><value name="VALUE"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
+            <block type="array_set_index">
+              <value name="INDEX"><shadow type="math_num"><field name="N">0</field></shadow></value>
+              <value name="VALUE"><shadow type="math_num"><field name="N">20</field></shadow></value>
+            </block>
+            <block type="array_get_index"><value name="INDEX"><shadow type="math_num"><field name="N">0</field></shadow></value></block>
+            <block type="array_length"></block>
+          </category>
+          <category name="逻辑判断" colour="210"><block type="robot_logic_compare"></block></category>
+          <category name="数学与三角" colour="230">
             <block type="math_num"></block>
             <block type="math_op"></block>
             <block type="math_pi"></block>
-          </category>
-          <category name="三角函数" colour="290">
             <block type="ml_math_trig">
               <value name="DEG"><shadow type="math_num"><field name="N">30</field></shadow></value>
             </block>
