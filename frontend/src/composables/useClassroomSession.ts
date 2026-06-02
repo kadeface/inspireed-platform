@@ -18,10 +18,6 @@ import { createLogger } from '../utils/logger'
 import { normalizeSessionStatus, isSessionActive } from '../utils/sessionStatus'
 import { useMathlabContest } from '@/composables/useMathlabContest'
 import { handleWhiteboardWsMessage } from '@/composables/useWhiteboard'
-import { handleWhiteboardWsMessage } from '@/composables/useWhiteboard'
-import { handleWhiteboardWsMessage } from '@/composables/useWhiteboard'
-import { handleWhiteboardWsMessage } from '@/composables/useWhiteboard'
-import { handleWhiteboardWsMessage } from '@/composables/useWhiteboard'
 
 const log = createLogger('ClassroomSession')
 
