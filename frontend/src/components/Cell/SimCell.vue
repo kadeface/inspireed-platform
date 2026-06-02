@@ -486,7 +486,7 @@
       <!-- Mathlab Simulation -->
       <div v-if="cell.content.type === 'mathlab' && mathlabSimulationUrl" class="sim-display">
         <div
-          v-if="activeContest?.status === 'running' && !editable"
+          v-if="activeContest?.status === 'running' && !editable && !readOnly"
           class="mb-2 px-3 py-2 rounded-lg bg-teal-50 border border-teal-200 text-sm text-teal-900 flex flex-wrap items-center gap-2"
         >
           <span class="font-semibold">🏁 课堂竞赛进行中</span>
@@ -579,10 +579,13 @@ interface Props {
   cell: SimCellType
   editable?: boolean
   sessionId?: number
+  /** 访客观摩等只读场景：不进入竞赛模式、不提交成绩 */
+  readOnly?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  editable: false
+  editable: false,
+  readOnly: false,
 })
 
 const emit = defineEmits<{
@@ -658,11 +661,12 @@ const mathlabIframeKey = ref(0)
 
 const mathlabSimulationUrl = computed(() => {
   if (!props.cell.content.mathlabSim) return undefined
-  const running = activeContest.value?.status === 'running'
+  const running =
+    !props.readOnly && activeContest.value?.status === 'running'
   return getMathlabEmbedUrl(props.cell.content.mathlabSim, {
     taskId: running ? activeContest.value!.taskId : props.cell.content.mathlabTask,
     mode: running ? 'contest' : undefined,
-    sessionId: props.sessionId,
+    sessionId: props.readOnly ? undefined : props.sessionId,
     contestId: running ? activeContest.value!.id : undefined,
   })
 })
@@ -678,15 +682,17 @@ const contestEndsLabel = computed(() => {
 
 useMathlabContestBridge({
   iframeRef: mathlabIframeRef,
-  contestId: computed(() =>
-    activeContest.value?.status === 'running' ? activeContest.value.id : undefined
-  ),
+  contestId: computed(() => {
+    if (props.readOnly) return undefined
+    return activeContest.value?.status === 'running' ? activeContest.value.id : undefined
+  }),
   passThreshold: computed(() => activeContest.value?.passThreshold ?? 85),
 })
 
 watch(
   () => activeContest.value?.taskId,
   (taskId, old) => {
+    if (props.readOnly) return
     if (!taskId || taskId === old) return
     if (activeContest.value?.status !== 'running') return
     mathlabIframeKey.value += 1

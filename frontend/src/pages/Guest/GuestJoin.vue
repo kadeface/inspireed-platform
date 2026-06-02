@@ -321,6 +321,18 @@
                 :cell="guestImageCell(cell)"
               />
 
+              <!-- SIM cell：与学生端一致只读展示仿真 -->
+              <div v-else-if="cell.cell_type === 'SIM'" class="space-y-2">
+                <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  访客可观摩仿真演示，无法参与课堂竞赛或提交成绩。
+                </div>
+                <SimCell
+                  :cell="guestSimCell(cell)"
+                  :editable="false"
+                  read-only
+                />
+              </div>
+
               <!-- INTERACTIVE cell -->
               <div v-else-if="cell.cell_type === 'INTERACTIVE'" class="space-y-2 text-sm text-gray-700">
                 <p v-if="cell.content?.description" class="text-gray-600">{{ cell.content.description }}</p>
@@ -511,12 +523,18 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BrowserCell from '@/components/Cell/BrowserCell.vue'
 import ImageCell from '@/components/Cell/ImageCell.vue'
+import SimCell from '@/components/Cell/SimCell.vue'
 import { useLessonExternalReturn } from '@/composables/useLessonExternalReturn'
 import classroomSessionService, {
   normalizeClassSessionStatus,
 } from '@/services/classroomSession'
 import api from '@/services/api'
-import { CellType, type BrowserCell as BrowserCellModel, type ImageCell as ImageCellModel } from '@/types/cell'
+import {
+  CellType,
+  type BrowserCell as BrowserCellModel,
+  type ImageCell as ImageCellModel,
+  type SimCell as SimCellModel,
+} from '@/types/cell'
 import { markdownToHtml } from '@/utils/lessonEditorHelpers'
 import { appendInteractiveViewToUrl } from '@/utils/interactiveView'
 import {
@@ -558,6 +576,21 @@ function guestImageCell(cell: Record<string, unknown>): ImageCellModel {
     title: cell.title as string | undefined,
     content,
     config: cell.config as ImageCellModel['config'],
+  }
+}
+
+function guestSimCell(cell: Record<string, unknown>): SimCellModel {
+  const raw = cell.content as SimCellModel['content'] | undefined
+  const content: SimCellModel['content'] = raw
+    ? { ...raw, config: raw.config ?? {} }
+    : { type: 'iframe', config: {} }
+  return {
+    id: cell.id as number,
+    type: CellType.SIM,
+    order: typeof cell.order === 'number' ? cell.order : 0,
+    editable: false,
+    title: cell.title as string | undefined,
+    content,
   }
 }
 
