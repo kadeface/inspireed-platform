@@ -38,6 +38,7 @@ from app.api.v1 import (
     library_assets,
     project_cells,
     public_curriculum,
+    public_site,
     questions,
     researcher_curriculum,
     review_channel,
@@ -72,6 +73,9 @@ api_router.include_router(users.router, prefix="/users", tags=["用户"])
 api_router.include_router(curriculum.router, prefix="/curriculum", tags=["课程体系"])
 api_router.include_router(
     public_curriculum_router, prefix="/public/curriculum", tags=["公开-课程体系"]
+)
+api_router.include_router(
+    public_site.router, prefix="/public/site", tags=["公开-站点统计"]
 )
 api_router.include_router(chapters.router, prefix="/chapters", tags=["章节"])
 api_router.include_router(resources.router, prefix="/resources", tags=["资源"])

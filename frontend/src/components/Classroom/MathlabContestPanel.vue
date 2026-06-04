@@ -88,10 +88,11 @@
         </button>
       </div>
 
-      <div v-if="leaderboard?.submissions?.length" class="max-h-40 overflow-y-auto">
+      <div v-if="leaderboard?.submissions?.length" class="max-h-52 overflow-y-auto">
         <table class="w-full text-xs border-collapse">
           <thead>
             <tr class="text-left text-teal-800 border-b border-teal-200">
+              <th class="py-1 pr-2 w-6"></th>
               <th class="py-1 pr-2">#</th>
               <th class="py-1 pr-2">学生</th>
               <th class="py-1 pr-2 text-right">分</th>
@@ -99,27 +100,44 @@
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="row in leaderboard.submissions"
-              :key="row.id"
-              class="border-b border-teal-100/80"
-            >
-              <td class="py-1 pr-2">{{ row.rank }}</td>
-              <td class="py-1 pr-2 truncate max-w-[6rem]" :title="row.studentName">
-                {{ row.studentName || row.studentId }}
-              </td>
-              <td class="py-1 pr-2 text-right">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  class="w-12 text-right border rounded px-0.5"
-                  :value="row.finalScore"
-                  @change="(e) => handleScoreChange(row, e)"
-                />
-              </td>
-              <td class="py-1">{{ row.passed ? '✓' : '—' }}</td>
-            </tr>
+            <template v-for="row in leaderboard.submissions" :key="row.id">
+              <tr
+                class="border-b border-teal-100/80 cursor-pointer hover:bg-teal-100/40"
+                @click="toggleExpanded(row.id)"
+              >
+                <td class="py-1 pr-1 text-teal-600">
+                  {{ expandedSubmissionId === row.id ? '▼' : '▶' }}
+                </td>
+                <td class="py-1 pr-2">{{ row.rank }}</td>
+                <td class="py-1 pr-2 truncate max-w-[6rem]" :title="row.studentName">
+                  {{ row.studentName || row.studentId }}
+                </td>
+                <td class="py-1 pr-2 text-right" @click.stop>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    class="w-12 text-right border rounded px-0.5"
+                    :value="row.finalScore"
+                    @change="(e) => handleScoreChange(row, e)"
+                  />
+                </td>
+                <td class="py-1">{{ row.passed ? '✓' : '—' }}</td>
+              </tr>
+              <tr
+                v-if="expandedSubmissionId === row.id"
+                class="border-b border-teal-100/80 bg-white/60"
+              >
+                <td colspan="5" class="py-2 px-2 text-[11px] text-teal-900 leading-relaxed">
+                  <div v-if="payloadSummary(row.payload).length" class="grid gap-1 sm:grid-cols-2">
+                    <p v-for="(line, idx) in payloadSummary(row.payload)" :key="idx">
+                      {{ line }}
+                    </p>
+                  </div>
+                  <p v-else class="text-teal-700">暂无分析摘要</p>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -175,6 +193,34 @@ const cellId = computed(() => {
 const startTaskId = ref('')
 const startTimeLimit = ref<number | undefined>(undefined)
 const changeTaskId = ref('')
+const expandedSubmissionId = ref<number | null>(null)
+
+function toggleExpanded(submissionId: number) {
+  expandedSubmissionId.value =
+    expandedSubmissionId.value === submissionId ? null : submissionId
+}
+
+function payloadSummary(payload: Record<string, unknown> | undefined): string[] {
+  if (!payload || typeof payload !== 'object') return []
+  const lines: string[] = []
+  const match = payload.matchPercent
+  if (match != null) lines.push(`吻合度：${match}%`)
+  if (payload.arcLengthCm != null) lines.push(`弧长：${Number(payload.arcLengthCm).toFixed(1)} cm`)
+  if (payload.perimeterCm != null) lines.push(`周长目标：${Number(payload.perimeterCm).toFixed(1)} cm`)
+  if (payload.closeGapCm != null) lines.push(`闭合间隙：${Number(payload.closeGapCm).toFixed(1)} cm`)
+  const param = payload.parametricSummary ?? payload.parametric
+  if (param) lines.push(`参数摘要：${String(param)}`)
+  if (payload.meetTimeSec != null) lines.push(`相遇时间：${payload.meetTimeSec} s`)
+  if (payload.finalDistanceCm != null) lines.push(`最终距离：${payload.finalDistanceCm} cm`)
+  const sample = payload.trailSample
+  if (Array.isArray(sample)) lines.push(`轨迹采样：${sample.length} 点`)
+  if (payload.taskId) lines.push(`任务：${payload.taskId}`)
+  if (payload.message && typeof payload.message === 'string') {
+    const plain = payload.message.replace(/<[^>]+>/g, '')
+    if (plain.trim()) lines.push(plain.trim())
+  }
+  return lines
+}
 
 watch(
   defaultTaskId,

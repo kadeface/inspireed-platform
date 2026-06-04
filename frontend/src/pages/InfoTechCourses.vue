@@ -190,31 +190,7 @@
     </div>
     </main>
 
-    <!-- Footer：与 Login 一致 + 开发者信息 -->
-    <footer class="border-t border-slate-800 bg-slate-900 py-12 text-white">
-      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div class="flex flex-col items-center justify-between gap-8 md:flex-row">
-          <div class="flex items-center space-x-3">
-            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500">
-              <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-            </div>
-            <span class="text-xl font-bold tracking-tight">InspireEd</span>
-          </div>
-          <div class="text-sm text-slate-400">© 2025 InspireEd. Evidence-based Learning & Teaching Platform.</div>
-        </div>
-        <address class="mt-6 not-italic border-t border-slate-700/60 pt-6 text-center text-sm text-slate-400 md:text-left">
-          开发者：广东省开平市教师发展中心 廖作东 · 邮箱
-          <a
-            href="mailto:382241106@qq.com"
-            aria-label="发送邮件至 382241106@qq.com"
-            class="inline-flex cursor-pointer items-center gap-1.5 text-slate-300 underline decoration-slate-500/60 decoration-1 underline-offset-2 transition-colors duration-200 hover:text-emerald-400 hover:decoration-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 focus-visible:decoration-emerald-400"
-          >
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-            382241106@qq.com
-          </a>
-        </address>
-      </div>
-    </footer>
+    <PublicSiteFooter />
   </div>
 </template>
 
@@ -222,6 +198,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import publicCurriculumService from '@/services/publicCurriculum'
+import PublicSiteFooter from '@/components/Common/PublicSiteFooter.vue'
 import type { Course, Subject } from '@/types/curriculum'
 import {
   defaultCourseDescription,

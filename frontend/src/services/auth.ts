@@ -1,13 +1,19 @@
 import { api } from './api'
-import type { LoginRequest, RegisterRequest, TokenResponse, User } from '../types/user'
+import type {
+  LoginRequest,
+  RegisterRegionOption,
+  RegisterRequest,
+  RegisterSchoolOption,
+  TokenResponse,
+  User,
+} from '../types/user'
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<TokenResponse> {
     const formData = new FormData()
     formData.append('username', credentials.username)
     formData.append('password', credentials.password)
-    
-    // 不要手动设置Content-Type，让浏览器自动设置multipart/form-data with boundary
+
     return api.post<TokenResponse>('/auth/login', formData)
   },
 
@@ -15,8 +21,17 @@ export const authService = {
     return api.post<User>('/auth/register', userData)
   },
 
+  async getRegisterSchools(search?: string): Promise<RegisterSchoolOption[]> {
+    return api.get<RegisterSchoolOption[]>('/auth/register/schools', {
+      params: search ? { search } : undefined,
+    })
+  },
+
+  async getRegisterRegions(): Promise<RegisterRegionOption[]> {
+    return api.get<RegisterRegionOption[]>('/auth/register/regions')
+  },
+
   async getCurrentUser(): Promise<User> {
     return api.get<User>('/auth/me')
   },
 }
-

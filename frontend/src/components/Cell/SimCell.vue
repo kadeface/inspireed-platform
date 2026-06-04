@@ -493,6 +493,19 @@
           <span>任务 {{ activeContest.taskId }}</span>
           <span v-if="contestEndsLabel" class="text-teal-700">{{ contestEndsLabel }}</span>
         </div>
+        <div
+          v-if="contestSubmitBanner"
+          class="mb-2 px-3 py-2 rounded-lg border text-sm flex flex-wrap items-center gap-2"
+          :class="contestSubmitBanner.passed
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+            : 'bg-amber-50 border-amber-200 text-amber-900'"
+          role="status"
+        >
+          <span class="font-semibold">✓ 成绩已提交</span>
+          <span>第 {{ contestSubmitBanner.rank }} 名</span>
+          <span>· {{ contestSubmitBanner.score }} 分</span>
+          <span>· {{ contestSubmitBanner.passed ? '达标' : '未达标' }}</span>
+        </div>
         <iframe
           ref="mathlabIframeRef"
           :key="mathlabIframeKey"
@@ -573,7 +586,9 @@ import {
   getMathlabEmbedUrl,
   type MathlabSimulation
 } from '../../data/mathlab-simulations'
-import { useMathlabContestState, useMathlabContestBridge } from '@/composables/useMathlabContest'
+import { useMathlabContestState, useMathlabContestBridge, refreshMathlabContestLeaderboard } from '@/composables/useMathlabContest'
+import { useUserStore } from '@/store/user'
+import type { MathlabContestSubmission } from '@/types/mathlabContest'
 
 interface Props {
   cell: SimCellType
@@ -656,8 +671,34 @@ const displayDescription = computed(() => {
 })
 
 const { activeContest } = useMathlabContestState()
+const userStore = useUserStore()
 const mathlabIframeRef = ref<HTMLIFrameElement | null>(null)
 const mathlabIframeKey = ref(0)
+
+const contestSubmitBanner = ref<{
+  rank: number
+  score: number
+  passed: boolean
+} | null>(null)
+
+async function handleContestSubmitted(_submission: MathlabContestSubmission) {
+  const contest = activeContest.value
+  const userId = userStore.user?.id
+  if (!contest?.id || !userId) return
+  try {
+    const board = await refreshMathlabContestLeaderboard(contest.id)
+    const mine = board.submissions.find((s) => s.studentId === userId)
+    if (mine?.rank != null) {
+      contestSubmitBanner.value = {
+        rank: mine.rank,
+        score: mine.finalScore,
+        passed: mine.passed,
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load contest rank after submit', err)
+  }
+}
 
 const mathlabSimulationUrl = computed(() => {
   if (!props.cell.content.mathlabSim) return undefined
@@ -687,7 +728,15 @@ useMathlabContestBridge({
     return activeContest.value?.status === 'running' ? activeContest.value.id : undefined
   }),
   passThreshold: computed(() => activeContest.value?.passThreshold ?? 85),
+  onSubmitted: handleContestSubmitted,
 })
+
+watch(
+  () => activeContest.value?.id,
+  () => {
+    contestSubmitBanner.value = null
+  }
+)
 
 watch(
   () => activeContest.value?.taskId,

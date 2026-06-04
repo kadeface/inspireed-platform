@@ -53,7 +53,22 @@ export interface RegisterRequest {
   username: string
   password: string
   full_name?: string
-  role: UserRole
+  role: UserRole.TEACHER
+  school_id?: number
+  school_name?: string
+  region_id?: number
+}
+
+export interface RegisterSchoolOption {
+  id: number
+  name: string
+  region_name?: string | null
+}
+
+export interface RegisterRegionOption {
+  id: number
+  name: string
+  level: number
 }
 
 export interface TokenResponse {

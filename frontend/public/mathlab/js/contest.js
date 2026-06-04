@@ -66,6 +66,40 @@
       return base;
     },
 
+    _sampleTrail(sim, maxPoints) {
+      maxPoints = maxPoints || 60;
+      const robot = sim.getPrimaryRobot && sim.getPrimaryRobot();
+      const trail = (robot && robot.trail) || sim.trail || [];
+      if (!trail.length) return [];
+      const indices = [];
+      if (trail.length <= maxPoints) {
+        for (let i = 0; i < trail.length; i++) indices.push(i);
+      } else {
+        const step = (trail.length - 1) / (maxPoints - 1);
+        for (let i = 0; i < maxPoints; i++) {
+          indices.push(Math.min(trail.length - 1, Math.round(i * step)));
+        }
+      }
+      const toCm =
+        typeof TrailAnalysis !== 'undefined' && TrailAnalysis.toCm
+          ? function (x, y) {
+              return TrailAnalysis.toCm(sim, x, y);
+            }
+          : function (x, y) {
+              const ox = sim.state.startX;
+              const oy = sim.state.startY;
+              const px = sim.getPxPerCm ? sim.getPxPerCm() : 5;
+              return { x: (x - ox) / px, y: (oy - y) / px };
+            };
+      return indices.map(function (i) {
+        const c = toCm(trail[i].x, trail[i].y);
+        return {
+          x: Math.round(c.x * 10) / 10,
+          y: Math.round(c.y * 10) / 10
+        };
+      });
+    },
+
     init() {
       if (!this.active) return;
       document.body.classList.add('contest-mode');
@@ -148,9 +182,14 @@
       const task = typeof getCurrentMathlabTask === 'function' ? getCurrentMathlabTask() : null;
       const autoScore = this._computeAutoScore(sim, analysis);
       const elapsedSec = sim.state && sim.state.elapsed != null ? sim.state.elapsed : undefined;
+      const enrichedAnalysis = Object.assign({}, analysis, {
+        trailSample: this._sampleTrail(sim, 60),
+        parametricSummary: analysis.parametricSummary || analysis.parametric || null,
+        taskId: task?.id || this.taskId
+      });
       this._postToParent('contest:submit', {
         contestId: this.contestId,
-        analysis: analysis,
+        analysis: enrichedAnalysis,
         autoScore: autoScore,
         autoPassed: autoScore >= 85,
         elapsedSec: elapsedSec,

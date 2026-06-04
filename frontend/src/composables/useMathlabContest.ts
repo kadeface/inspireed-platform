@@ -4,7 +4,11 @@
 
 import { ref, computed, onUnmounted, type Ref } from 'vue'
 import { mathlabContestService } from '@/services/mathlabContest'
-import type { MathlabContest, MathlabContestLeaderboard } from '@/types/mathlabContest'
+import type {
+  MathlabContest,
+  MathlabContestLeaderboard,
+  MathlabContestSubmission,
+} from '@/types/mathlabContest'
 import type { WebSocketMessage } from '@/services/websocket'
 
 const activeContest = ref<MathlabContest | null>(null)
@@ -14,6 +18,12 @@ const error = ref<string | null>(null)
 
 export function useMathlabContestState() {
   return { activeContest, leaderboard, loading, error }
+}
+
+/** 刷新指定竞赛排行榜（供 SimCell 提交后拉取排名） */
+export async function refreshMathlabContestLeaderboard(contestId: number) {
+  leaderboard.value = await mathlabContestService.getLeaderboard(contestId)
+  return leaderboard.value
 }
 
 export function useMathlabContest(sessionId: Ref<number | undefined>) {
@@ -103,24 +113,43 @@ export function useMathlabContestBridge(options: {
   iframeRef: Ref<HTMLIFrameElement | null | undefined>
   contestId: Ref<number | undefined>
   passThreshold: Ref<number>
-  onSubmitted?: () => void
+  onSubmitted?: (submission: MathlabContestSubmission) => void
 }) {
   function onMessage(event: MessageEvent) {
     const msg = event.data
     if (!msg || msg.source !== 'mathlab' || msg.type !== 'contest:submit') return
     const cid = options.contestId.value
     if (!cid) return
-    const analysis = msg.data?.analysis || {}
-    const autoScore = Number(analysis.matchPercent ?? analysis.autoScore ?? 0)
+    const msgData = (msg.data || {}) as Record<string, unknown>
+    const analysis = (msgData.analysis || {}) as Record<string, unknown>
+    const autoScore = Number(
+      msgData.autoScore ?? analysis.matchPercent ?? analysis.autoScore ?? 0
+    )
     const threshold = options.passThreshold.value
+    const autoPassed =
+      autoScore >= threshold ||
+      Boolean(msgData.autoPassed ?? analysis.autoPassed)
+    const payload: Record<string, unknown> = {
+      ...analysis,
+      taskId: msgData.taskId ?? analysis.taskId,
+      travelSubtype: msgData.travelSubtype ?? analysis.subtype ?? null,
+      meetTimeSec: msgData.meetTimeSec ?? analysis.meetTimeSec ?? null,
+      finalDistanceCm: msgData.finalDistanceCm ?? analysis.finalDistanceCm ?? null,
+      parametricSummary:
+        analysis.parametricSummary ?? analysis.parametric ?? null,
+    }
+    if (Array.isArray(analysis.trailSample)) {
+      payload.trailSample = analysis.trailSample
+    }
     mathlabContestService
       .submit(cid, {
         autoScore,
-        autoPassed: autoScore >= threshold || Boolean(analysis.autoPassed),
-        elapsedSec: msg.data?.elapsedSec,
-        payload: analysis,
+        autoPassed,
+        elapsedSec:
+          msgData.elapsedSec != null ? Number(msgData.elapsedSec) : undefined,
+        payload,
       })
-      .then(() => options.onSubmitted?.())
+      .then((submission) => options.onSubmitted?.(submission))
       .catch((err) => console.error('MathLab contest submit failed', err))
   }
 

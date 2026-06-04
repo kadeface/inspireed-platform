@@ -381,14 +381,24 @@
           <div class="w-full max-w-md bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8 md:p-10 border border-white/50 relative z-10">
             <div class="text-center mb-8">
               <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">
-                {{ isLogin ? '欢迎回来' : '创建账户' }}
+                {{ isLogin ? '欢迎回来' : '创建教师账户' }}
               </h2>
               <p class="text-slate-500 mt-2 text-sm">
-                {{ isLogin ? '登录到您的 InspireEd 账户' : '注册新账户开始学习之旅' }}
+                {{ isLogin ? '登录到您的 InspireEd 账户' : '注册教师账户，开始备课与授课' }}
               </p>
             </div>
 
             <form class="space-y-5" @submit.prevent="handleSubmit">
+              <div v-if="!isLogin" class="space-y-1">
+                <label class="block text-sm font-medium text-slate-700 ml-1">姓名</label>
+                <input
+                  v-model="form.full_name"
+                  type="text"
+                  class="block w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 focus:bg-white transition-all duration-200 outline-none"
+                  placeholder="请输入姓名（可选）"
+                />
+              </div>
+
               <div v-if="!isLogin" class="space-y-1">
                 <label class="block text-sm font-medium text-slate-700 ml-1">邮箱地址</label>
                 <input
@@ -398,6 +408,76 @@
                   class="block w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 focus:bg-white transition-all duration-200 outline-none"
                   placeholder="your@email.com"
                 />
+              </div>
+
+              <div v-if="!isLogin" class="space-y-3">
+                <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer ml-1">
+                  <input
+                    v-model="useCustomSchool"
+                    type="checkbox"
+                    class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                    @change="handleCustomSchoolToggle"
+                  />
+                  我的学校不在列表中
+                </label>
+
+                <div v-if="!useCustomSchool" class="space-y-1 relative">
+                  <label class="block text-sm font-medium text-slate-700 ml-1">学校</label>
+                  <input
+                    v-model="schoolSearch"
+                    type="text"
+                    autocomplete="off"
+                    class="block w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 focus:bg-white transition-all duration-200 outline-none"
+                    placeholder="搜索并选择学校"
+                    @focus="showSchoolDropdown = true"
+                    @input="handleSchoolSearchInput"
+                  />
+                  <div
+                    v-if="showSchoolDropdown && schoolOptions.length > 0"
+                    class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg"
+                  >
+                    <button
+                      v-for="school in schoolOptions"
+                      :key="school.id"
+                      type="button"
+                      class="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-emerald-50 transition-colors"
+                      @mousedown.prevent="selectSchool(school)"
+                    >
+                      <span class="font-medium">{{ school.name }}</span>
+                      <span v-if="school.region_name" class="text-slate-400 ml-2">{{ school.region_name }}</span>
+                    </button>
+                  </div>
+                  <p v-if="selectedSchool" class="text-xs text-emerald-600 ml-1">
+                    已选择：{{ selectedSchool.name }}
+                    <span v-if="selectedSchool.region_name">（{{ selectedSchool.region_name }}）</span>
+                  </p>
+                </div>
+
+                <div v-else class="space-y-3">
+                  <div class="space-y-1">
+                    <label class="block text-sm font-medium text-slate-700 ml-1">学校名称</label>
+                    <input
+                      v-model="form.custom_school_name"
+                      type="text"
+                      required
+                      class="block w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 focus:bg-white transition-all duration-200 outline-none"
+                      placeholder="请输入学校名称"
+                    />
+                  </div>
+                  <div class="space-y-1">
+                    <label class="block text-sm font-medium text-slate-700 ml-1">所属区域</label>
+                    <select
+                      v-model="form.region_id"
+                      required
+                      class="block w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 focus:bg-white transition-all duration-200 outline-none"
+                    >
+                      <option :value="null" disabled>请选择区域</option>
+                      <option v-for="region in regionOptions" :key="region.id" :value="region.id">
+                        {{ region.name }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
               <div class="space-y-1">
@@ -473,31 +553,7 @@
       </transition>
     </main>
 
-    <!-- Footer + 开发者信息 -->
-    <footer class="border-t border-slate-800 bg-slate-900 py-12 text-white">
-      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div class="flex flex-col items-center justify-between gap-8 md:flex-row">
-          <div class="flex items-center space-x-3">
-            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500">
-              <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-            </div>
-            <span class="text-xl font-bold tracking-tight">InspireEd</span>
-          </div>
-          <div class="text-sm text-slate-400">© 2025 InspireEd. Evidence-based Learning & Teaching Platform.</div>
-        </div>
-        <address class="mt-6 not-italic border-t border-slate-700/60 pt-6 text-center text-sm text-slate-400 md:text-left">
-          开发者：广东省开平市教师发展中心 廖作东 · 邮箱
-          <a
-            href="mailto:382241106@qq.com"
-            aria-label="发送邮件至 382241106@qq.com"
-            class="inline-flex cursor-pointer items-center gap-1.5 text-slate-300 underline decoration-slate-500/60 decoration-1 underline-offset-2 transition-colors duration-200 hover:text-emerald-400 hover:decoration-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 focus-visible:decoration-emerald-400"
-          >
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-            382241106@qq.com
-          </a>
-        </address>
-      </div>
-    </footer>
+    <PublicSiteFooter />
   </div>
 </template>
 
@@ -507,7 +563,9 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '../store/user'
 import { authService } from '../services/auth'
 import { UserRole } from '../types/user'
+import type { RegisterRegionOption, RegisterSchoolOption } from '../types/user'
 import { libraryService } from '../services/library'
+import PublicSiteFooter from '@/components/Common/PublicSiteFooter.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -522,21 +580,94 @@ const htmlResourceCount = ref<number | null>(null)
 const lessonCount = ref<number | null>(null)
 const isScrolled = ref(false)
 
+const useCustomSchool = ref(false)
+const schoolSearch = ref('')
+const schoolOptions = ref<RegisterSchoolOption[]>([])
+const selectedSchool = ref<RegisterSchoolOption | null>(null)
+const regionOptions = ref<RegisterRegionOption[]>([])
+const showSchoolDropdown = ref(false)
+let schoolSearchTimer: ReturnType<typeof setTimeout> | null = null
+
 const form = ref({
   email: '',
   username: '',
   password: '',
+  full_name: '',
+  custom_school_name: '',
+  region_id: null as number | null,
 })
+
+function resetRegisterFields() {
+  useCustomSchool.value = false
+  schoolSearch.value = ''
+  schoolOptions.value = []
+  selectedSchool.value = null
+  showSchoolDropdown.value = false
+  form.value.full_name = ''
+  form.value.custom_school_name = ''
+  form.value.region_id = null
+}
+
+async function loadRegisterRegions() {
+  try {
+    regionOptions.value = await authService.getRegisterRegions()
+  } catch (err) {
+    console.error('Failed to load regions:', err)
+  }
+}
+
+async function loadRegisterSchools(search?: string) {
+  try {
+    schoolOptions.value = await authService.getRegisterSchools(search)
+  } catch (err) {
+    console.error('Failed to load schools:', err)
+  }
+}
+
+function handleSchoolSearchInput() {
+  selectedSchool.value = null
+  if (schoolSearchTimer) {
+    clearTimeout(schoolSearchTimer)
+  }
+  schoolSearchTimer = setTimeout(() => {
+    loadRegisterSchools(schoolSearch.value.trim() || undefined)
+    showSchoolDropdown.value = true
+  }, 300)
+}
+
+function selectSchool(school: RegisterSchoolOption) {
+  selectedSchool.value = school
+  schoolSearch.value = school.name
+  showSchoolDropdown.value = false
+}
+
+function handleCustomSchoolToggle() {
+  selectedSchool.value = null
+  schoolSearch.value = ''
+  form.value.custom_school_name = ''
+  form.value.region_id = null
+  if (!useCustomSchool.value) {
+    loadRegisterSchools()
+  }
+}
+
+function handleDocumentClick() {
+  showSchoolDropdown.value = false
+}
 
 // Handle Scroll for Header Glass Effect
 function handleScroll() {
   isScrolled.value = window.scrollY > 20
 }
 
-function toggleMode() {
+async function toggleMode() {
   isLogin.value = !isLogin.value
   error.value = ''
   showPassword.value = false
+  if (!isLogin.value) {
+    resetRegisterFields()
+    await Promise.all([loadRegisterRegions(), loadRegisterSchools()])
+  }
 }
 
 async function handleSubmit() {
@@ -586,16 +717,39 @@ async function handleSubmit() {
 
       await router.push(targetPath)
     } else {
-      // 注册
+      if (useCustomSchool.value) {
+        if (!form.value.custom_school_name.trim()) {
+          error.value = '请填写学校名称'
+          return
+        }
+        if (!form.value.region_id) {
+          error.value = '请选择所属区域'
+          return
+        }
+      } else if (!selectedSchool.value) {
+        error.value = '请从列表中选择学校'
+        return
+      }
+
       await authService.register({
         email: form.value.email,
         username: form.value.username,
         password: form.value.password,
-        role: UserRole.STUDENT,
+        full_name: form.value.full_name.trim() || undefined,
+        role: UserRole.TEACHER,
+        ...(useCustomSchool.value
+          ? {
+              school_name: form.value.custom_school_name.trim(),
+              region_id: form.value.region_id ?? undefined,
+            }
+          : {
+              school_id: selectedSchool.value!.id,
+            }),
       })
 
       error.value = '注册成功！请登录'
       isLogin.value = true
+      resetRegisterFields()
     }
   } catch (err: any) {
     console.error('Login error:', err)
@@ -629,10 +783,15 @@ async function loadResourceStatistics() {
 onMounted(() => {
   loadResourceStatistics()
   window.addEventListener('scroll', handleScroll)
+  document.addEventListener('click', handleDocumentClick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  document.removeEventListener('click', handleDocumentClick)
+  if (schoolSearchTimer) {
+    clearTimeout(schoolSearchTimer)
+  }
 })
 </script>
 
