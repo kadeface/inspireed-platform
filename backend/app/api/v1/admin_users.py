@@ -324,6 +324,22 @@ async def _validate_scope_ids(
     return resolved
 
 
+def _apply_account_status_filter(query: Any, account_status: Optional[str]) -> Any:
+    """按账号状态筛选：pending / inactive / active"""
+    if not account_status:
+        return query
+    if account_status == "pending":
+        return query.where(User.is_active == False, User.last_login.is_(None))  # noqa: E712
+    if account_status == "inactive":
+        return query.where(User.is_active == False, User.last_login.is_not(None))  # noqa: E712
+    if account_status == "active":
+        return query.where(User.is_active == True)  # noqa: E712
+    raise HTTPException(
+        status_code=400,
+        detail="account_status 仅支持 pending、inactive、active",
+    )
+
+
 # ==================== Endpoints ====================
 
 
@@ -338,6 +354,9 @@ async def get_users(
     school_id: Optional[int] = Query(None, description="学校筛选"),
     grade_id: Optional[int] = Query(None, description="年级筛选"),
     classroom_id: Optional[int] = Query(None, description="班级筛选"),
+    account_status: Optional[str] = Query(
+        None, description="账号状态：pending（待审核）/ inactive（已停用）/ active（正常）"
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_or_staff),
 ) -> Any:
@@ -369,6 +388,8 @@ async def get_users(
     if classroom_id is not None:
         query = query.where(User.classroom_id == classroom_id)
 
+    query = _apply_account_status_filter(query, account_status)
+
     query = _scope_users_query_for_org_staff(query, current_user)
     if query is None:
         return UserListResponse(
@@ -396,6 +417,25 @@ async def get_users(
         size=size,
         total_pages=total_pages,
     )
+
+
+@router.get("/pending-teachers/count")
+async def get_pending_teachers_count(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+) -> Any:
+    """待审核教师数量（自注册且从未登录）"""
+    query = select(func.count()).select_from(User).where(
+        User.role == UserRole.TEACHER,
+        User.is_active == False,  # noqa: E712
+        User.last_login.is_(None),
+    )
+    query = _scope_users_query_for_org_staff(query, current_user)
+    if query is None:
+        return {"count": 0}
+
+    result = await db.execute(query)
+    return {"count": result.scalar() or 0}
 
 
 @router.get("/{user_id}", response_model=UserResponse)

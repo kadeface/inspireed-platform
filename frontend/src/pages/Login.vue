@@ -381,14 +381,39 @@
           <div class="w-full max-w-md bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8 md:p-10 border border-white/50 relative z-10">
             <div class="text-center mb-8">
               <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">
-                {{ isLogin ? '欢迎回来' : '创建教师账户' }}
+                {{ registerSuccess ? '申请已提交' : isLogin ? '欢迎回来' : '创建教师账户' }}
               </h2>
               <p class="text-slate-500 mt-2 text-sm">
-                {{ isLogin ? '登录到您的 InspireEd 账户' : '注册教师账户，开始备课与授课' }}
+                {{
+                  registerSuccess
+                    ? '平台管理员审核通过后即可登录'
+                    : isLogin
+                      ? '登录到您的 InspireEd 账户'
+                      : '注册教师账户，开始备课与授课'
+                }}
               </p>
             </div>
 
-            <form class="space-y-5" @submit.prevent="handleSubmit">
+            <div
+              v-if="registerSuccess"
+              class="space-y-6 text-center"
+            >
+              <div class="flex items-start p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-700">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>注册申请已提交，平台管理员审核通过后即可登录，请耐心等待。</span>
+              </div>
+              <button
+                type="button"
+                @click="goToLoginAfterRegister"
+                class="w-full py-3.5 px-4 rounded-xl text-white font-bold text-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200 shadow-lg shadow-emerald-500/30"
+              >
+                返回登录
+              </button>
+            </div>
+
+            <form v-else class="space-y-5" @submit.prevent="handleSubmit">
               <div v-if="!isLogin" class="space-y-1">
                 <label class="block text-sm font-medium text-slate-700 ml-1">姓名</label>
                 <input
@@ -575,6 +600,7 @@ const currentSystem = ref<'learning' | 'evaluation'>('learning')
 const isLogin = ref(true)
 const loading = ref(false)
 const error = ref('')
+const registerSuccess = ref(false)
 const showPassword = ref(false)
 const htmlResourceCount = ref<number | null>(null)
 const lessonCount = ref<number | null>(null)
@@ -663,11 +689,18 @@ function handleScroll() {
 async function toggleMode() {
   isLogin.value = !isLogin.value
   error.value = ''
+  registerSuccess.value = false
   showPassword.value = false
   if (!isLogin.value) {
     resetRegisterFields()
     await Promise.all([loadRegisterRegions(), loadRegisterSchools()])
   }
+}
+
+function goToLoginAfterRegister() {
+  registerSuccess.value = false
+  isLogin.value = true
+  error.value = ''
 }
 
 async function handleSubmit() {
@@ -689,7 +722,7 @@ async function handleSubmit() {
 
       // 检查用户是否激活
       if (!user.is_active) {
-        error.value = '用户未激活，请联系管理员'
+        error.value = '账号审核中或未激活，请联系平台管理员'
         userStore.logout()
         return
       }
@@ -747,8 +780,8 @@ async function handleSubmit() {
             }),
       })
 
-      error.value = '注册成功！请登录'
-      isLogin.value = true
+      registerSuccess.value = true
+      error.value = ''
       resetRegisterFields()
     }
   } catch (err: any) {

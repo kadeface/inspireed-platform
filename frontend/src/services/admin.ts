@@ -535,10 +535,18 @@ export const adminService = {
       school_id?: number
       grade_id?: number
       classroom_id?: number
+      account_status?: 'pending' | 'inactive' | 'active'
     } = {}
   ): Promise<UserListResponse> {
     // 集合根路径须带尾部 /，否则 FastAPI 可能 307 到 /admin/users/，重定向后浏览器不携带 Authorization → 401 Not authenticated
     return await api.get('/admin/users/', { params })
+  },
+
+  /**
+   * 待审核教师数量
+   */
+  async getPendingTeachersCount(): Promise<{ count: number }> {
+    return await api.get('/admin/users/pending-teachers/count')
   },
 
   /**

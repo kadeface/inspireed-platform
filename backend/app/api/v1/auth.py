@@ -30,6 +30,8 @@ from app.services.school_import_service import SchoolImportService
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
+INACTIVE_USER_MESSAGE = "账号审核中或未激活，请联系平台管理员"
+
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
@@ -66,7 +68,7 @@ async def get_current_user(
         raise credentials_exception
 
     if not cast(bool, user.is_active):
-        raise HTTPException(status_code=400, detail="用户未激活")
+        raise HTTPException(status_code=400, detail=INACTIVE_USER_MESSAGE)
 
     # 预先填充组织信息，方便序列化
     user.region_name = user.region.name if user.region else None  # type: ignore[attr-defined]
@@ -81,7 +83,7 @@ async def get_current_active_user(
 ) -> User:
     """获取当前活跃用户"""
     if not cast(bool, current_user.is_active):
-        raise HTTPException(status_code=400, detail="用户未激活")
+        raise HTTPException(status_code=400, detail=INACTIVE_USER_MESSAGE)
     return current_user
 
 
@@ -245,6 +247,7 @@ async def register(
         role=UserRole.TEACHER,
         school_id=resolved_school_id,
         region_id=resolved_region_id,
+        is_active=False,
     )
     db.add(user)
     await db.commit()
@@ -294,10 +297,7 @@ async def login(
 
         is_active = cast(bool, user.is_active)
         if not is_active:
-            raise HTTPException(
-                status_code=400,
-                detail=f"用户未激活，请联系管理员。用户ID: {user.id}, 用户名: {user.username}, 角色: {user.role}",
-            )
+            raise HTTPException(status_code=400, detail=INACTIVE_USER_MESSAGE)
 
         try:
             user.last_login = datetime.utcnow()  # type: ignore[assignment]

@@ -7,6 +7,23 @@
       </p>
     </div>
 
+    <!-- 待审核提醒 -->
+    <div
+      v-if="pendingCount > 0"
+      class="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between"
+    >
+      <p class="text-sm text-amber-800">
+        有 <strong>{{ pendingCount }}</strong> 位教师待审核
+      </p>
+      <button
+        type="button"
+        @click="showPendingTeachers"
+        class="px-3 py-1.5 text-sm font-medium text-amber-800 bg-amber-100 rounded-lg hover:bg-amber-200 transition-colors"
+      >
+        查看待审核
+      </button>
+    </div>
+
     <!-- 筛选和操作栏 -->
     <div class="bg-white rounded-lg shadow p-4">
       <div class="flex flex-wrap items-center gap-4 mb-4">
@@ -40,6 +57,17 @@
           placeholder="搜索姓名、邮箱、工号..."
           class="px-3 py-2 border rounded-lg w-64"
         />
+
+        <select
+          v-model="filters.account_status"
+          @change="handleAccountStatusChange"
+          class="px-3 py-2 border rounded-lg"
+        >
+          <option :value="undefined">全部状态</option>
+          <option value="pending">待审核</option>
+          <option value="inactive">已停用</option>
+          <option value="active">正常</option>
+        </select>
 
         <button
           @click="() => loadTeachers()"
@@ -83,6 +111,13 @@
           class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           编辑资料
+        </button>
+        <button
+          @click="batchApproveTeachers"
+          :disabled="selectedPendingCount === 0"
+          class="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          批量通过审核
         </button>
         <button
           @click="batchDeleteTeachers"
@@ -182,11 +217,23 @@
               {{ teacher.school_name || '-' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm">
-              <span v-if="teacher.is_active" class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                激活
+              <span
+                v-if="teacher.is_active"
+                class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"
+              >
+                正常
               </span>
-              <span v-else class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                停用
+              <span
+                v-else-if="isTeacherPending(teacher)"
+                class="px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800"
+              >
+                待审核
+              </span>
+              <span
+                v-else
+                class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"
+              >
+                已停用
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -203,7 +250,7 @@
                 @click="toggleTeacherStatus(teacher)"
                 :class="teacher.is_active ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'"
               >
-                {{ teacher.is_active ? '停用' : '激活' }}
+                {{ teacher.is_active ? '停用' : isTeacherPending(teacher) ? '通过审核' : '激活' }}
               </button>
               <button
                 @click="resetPassword(teacher)"
@@ -463,6 +510,7 @@ const saving = ref(false)
 const importing = ref(false)
 const selectedTeachers = ref<number[]>([])
 const showBatchDeleteByFilterDialog = ref(false)
+const pendingCount = ref(0)
 
 // 分页
 const currentPage = ref(1)
@@ -474,9 +522,16 @@ const filters = ref<{
   region_id?: number
   school_id?: number
   search?: string
+  account_status?: 'pending' | 'inactive' | 'active'
 }>({})
 
 // 计算属性
+const selectedPendingCount = computed(() => {
+  return selectedTeachers.value.filter((id) => {
+    const teacher = teachers.value.find((t) => t.id === id)
+    return teacher && isTeacherPending(teacher)
+  }).length
+})
 const filteredSchools = computed(() => {
   if (filters.value.region_id) {
     return allSchools.value.filter(s => s.region_id === filters.value.region_id)
@@ -557,10 +612,13 @@ const loadTeachers = async (page?: number) => {
       size: pageSize.value,
       role: 'teacher',
       search: filters.value.search,
-      school_id: filters.value.school_id  // 使用后端筛选而不是前端过滤
+      region_id: filters.value.region_id,
+      school_id: filters.value.school_id,
+      account_status: filters.value.account_status,
     })
     teachers.value = response.users
-    total.value = response.total  // 使用后端返回的总数
+    total.value = response.total
+    await loadPendingCount()
   } catch (error: unknown) {
     const d = (error as { response?: { data?: { detail?: unknown } } })?.response?.data
       ?.detail
@@ -570,6 +628,15 @@ const loadTeachers = async (page?: number) => {
     console.error(error)
   } finally {
     loading.value = false
+  }
+}
+
+const loadPendingCount = async () => {
+  try {
+    const result = await adminService.getPendingTeachersCount()
+    pendingCount.value = result.count
+  } catch (error) {
+    console.error('加载待审核数量失败:', error)
   }
 }
 
@@ -601,6 +668,21 @@ const handleRegionChange = () => {
 const handleSchoolChange = () => {
   currentPage.value = 1
   loadTeachers()
+}
+
+const handleAccountStatusChange = () => {
+  currentPage.value = 1
+  loadTeachers()
+}
+
+const showPendingTeachers = () => {
+  filters.value.account_status = 'pending'
+  currentPage.value = 1
+  loadTeachers()
+}
+
+const isTeacherPending = (teacher: User) => {
+  return !teacher.is_active && !teacher.last_login
 }
 
 // 教师操作
@@ -691,12 +773,44 @@ const saveTeacher = async () => {
 }
 
 const toggleTeacherStatus = async (teacher: User) => {
+  const wasPending = isTeacherPending(teacher)
   try {
     await adminService.toggleUserStatus(teacher.id)
-    ElMessage.success(teacher.is_active ? '已停用' : '已激活')
+    ElMessage.success(
+      teacher.is_active ? '已停用' : wasPending ? '已通过审核' : '已激活'
+    )
     loadTeachers()
   } catch (error) {
     ElMessage.error('操作失败')
+  }
+}
+
+const batchApproveTeachers = async () => {
+  const pendingIds = selectedTeachers.value.filter((id) => {
+    const teacher = teachers.value.find((t) => t.id === id)
+    return teacher && isTeacherPending(teacher)
+  })
+  if (pendingIds.length === 0) {
+    ElMessage.warning('请选择待审核的教师')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要通过 ${pendingIds.length} 位教师的注册审核吗？`,
+      '批量通过审核',
+      { type: 'warning' }
+    )
+    for (const id of pendingIds) {
+      await adminService.toggleUserStatus(id)
+    }
+    ElMessage.success(`已通过 ${pendingIds.length} 位教师的审核`)
+    selectedTeachers.value = []
+    loadTeachers()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('批量通过审核失败')
+    }
   }
 }
 
