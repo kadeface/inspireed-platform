@@ -784,7 +784,8 @@ const CURRICULUM = {
               stGraph: { enabled: true, tMaxSec: 10, sMaxCm: 120, showBoth: true }
             },
             starter: { travelParallel: [], autoMeet: true },
-            demo: 'travelMeet'
+            demo: 'travelMeet',
+            hint: '使用「双车并行」入口：A 槽写甲车前进、B 槽写乙车前进，运行后观察 s-t 图两线同时上升。'
           })
         ]
       },
@@ -808,7 +809,8 @@ const CURRICULUM = {
               stGraph: { enabled: true, tMaxSec: 14, sMaxCm: 110, showBoth: true }
             },
             starter: { travelDelayStart: { waitSec: 2, autoMeet: true } },
-            demo: 'travelMeetDelay'
+            demo: 'travelMeetDelay',
+            hint: 'A 槽写甲车立即前进；B 槽先「等待 2 秒」再写乙车前进，模拟延迟出发。'
           })
         ]
       },
@@ -832,7 +834,8 @@ const CURRICULUM = {
               stGraph: { enabled: true, tMaxSec: 20, sMaxCm: 140, showBoth: true }
             },
             starter: { travelParallel: [], autoMeet: true },
-            demo: 'travelChase'
+            demo: 'travelChase',
+            hint: '双车同向追及：A 槽写慢车前进、B 槽写快车前进，从 s-t 图读交点时刻。'
           })
         ]
       }
@@ -1063,6 +1066,169 @@ const CURRICULUM = {
             },
             hint: '每段用 goto 连接，整体是分段一次函数。',
             demo: 'plotPiecewise'
+          }),
+          task('fg_l5_3', '延伸阅读：曲线巡逻与路径规划', '拓展', SCENE.FUNCTION, {
+            series: 'funcGraph', level: 'L5',
+            focus: '双车沿函数曲线拦截/伴随属于路径规划问题，已独立为专题课程',
+            tags: ['路径规划', '双车'],
+            goals: [
+              '知道路径规划专题与函数图像专题的分工',
+              '在「轮式机器人路径规划」中可自定义 y=f(x) 并实验'
+            ],
+            sceneConfig: {
+              cols: 12, rows: 10, cellCm: 10,
+              plot: { expr: '2*x', xMin: 0, xMax: 4, step: 1, color: '#38bdf8', label: 'y=2x' }
+            },
+            hint: '课程抽屉 → 学段选「轮式机器人路径规划」→ 从 L1 开始；自由实验见 L4 实验室。',
+            starter: { goto: [{ x: 0, y: 0 }, { x: 20, y: 40 }] },
+            demo: 'plotLinear'
+          })
+        ]
+      }
+    }
+  },
+  pathPlan: {
+    name: '轮式机器人路径规划',
+    grades: {
+      l1: {
+        name: 'L1 曲线巡逻',
+        tasks: [
+          task('pp_l1_1', '认识巡逻与拦截', '路径规划', SCENE.FUNCTION, {
+            series: 'pathPlan', level: 'L1',
+            mode: 'curveTravel',
+            travelSubtype: 'meet',
+            focus: '路径规划 = 在已知曲线（y=f(x)）上安排两车运动，使相遇或伴随成立',
+            tags: ['巡逻', '拦截', '路径规划'],
+            goals: [
+              '甲车沿 y=f(x) 循环巡逻（演示中先至交汇点，再继续绕圈）',
+              '乙车从起点直线驶向交汇点（不必与甲走同一条曲线）',
+              '理解拦截 = 同时到达同一点，而非两条相同轨迹'
+            ],
+            formulas: [
+              { title: '相遇', tex: '$$s_A(t)=s_{\\text{曲}}(t),\\quad |OB|=v_B t,\\quad P_A(t)=P_B(t)$$' }
+            ],
+            sceneConfig: {
+              cols: 12, rows: 10, cellCm: 10,
+              userPlot: { editable: true },
+              plot: { expr: '2*x', xMin: 0, xMax: 4, step: 1, pathStep: 0.5, color: '#38bdf8', label: 'y=2x' },
+              robots: [
+                { id: 'A', label: '巡逻车', role: 'patrol', xCm: 0, yCm: 0, speed: 10, color: '#22d3ee' },
+                { id: 'B', label: '拦截车', role: 'chaser', xCm: 0, yCm: 0, speed: 12, color: '#f97316' }
+              ],
+              patrol: { loop: true, cycles: 2, arcMeetFraction: 0.55 },
+              curveMeetValidate: { toleranceCm: 4 },
+              stGraph: { enabled: true, tMaxSec: 18, sMaxCm: 110, showBoth: true }
+            },
+            hint: '点「演示」：A 沿曲线到交汇点后继续循环；B 直线到交汇点。B 槽可用「等待直到与 A 相距小于 5 cm」替代固定秒数等待（不要复制 A 的全部 goto）。',
+            starter: { curveTravelRun: true },
+            demo: 'curveTravelMeet'
+          })
+        ]
+      },
+      l2: {
+        name: 'L2 一次与二次曲线',
+        tasks: [
+          task('pp_l2_1', '一次函数曲线拦截', '一次函数', SCENE.FUNCTION, {
+            series: 'pathPlan', level: 'L2',
+            mode: 'curveTravel',
+            travelSubtype: 'meet',
+            tags: ['一次函数', '拦截', 'y=kx+b'],
+            goals: ['在直线型曲线上循环巡逻', '从原点规划拦截', '对比 s-t 图上两车路程'],
+            sceneConfig: {
+              cols: 12, rows: 10, cellCm: 10,
+              userPlot: { editable: true },
+              plot: { expr: '2*x', xMin: 0, xMax: 4, step: 1, pathStep: 0.5, color: '#38bdf8', label: 'y=2x' },
+              robots: [
+                { id: 'A', label: '巡逻车', role: 'patrol', xCm: 0, yCm: 0, speed: 10, color: '#22d3ee' },
+                { id: 'B', label: '拦截车', role: 'chaser', xCm: 0, yCm: 0, speed: 12, color: '#f97316' }
+              ],
+              patrol: { loop: true, cycles: 1, arcMeetFraction: 0.55 },
+              curveMeetValidate: { toleranceCm: 4 },
+              stGraph: { enabled: true, tMaxSec: 18, sMaxCm: 110, showBoth: true }
+            },
+            starter: { curveTravelRun: true },
+            demo: 'curveTravelMeet'
+          }),
+          task('pp_l2_2', '抛物线曲线拦截', '二次函数', SCENE.FUNCTION, {
+            series: 'pathPlan', level: 'L2',
+            mode: 'curveTravel',
+            travelSubtype: 'meet',
+            tags: ['抛物线', '拦截'],
+            goals: ['曲率更大时弧长更长', '体会拦截时间更难对齐', '可改用自定义 y=ax²+bx+c'],
+            sceneConfig: {
+              cols: 12, rows: 12, cellCm: 10,
+              userPlot: { editable: true },
+              plot: { expr: 'x*x', xMin: 0, xMax: 2.5, step: 0.5, pathStep: 0.25, color: '#a78bfa', label: 'y=x²' },
+              robots: [
+                { id: 'A', label: '巡逻车', role: 'patrol', xCm: 0, yCm: 0, speed: 8, color: '#22d3ee' },
+                { id: 'B', label: '拦截车', role: 'chaser', xCm: 0, yCm: 0, speed: 11, color: '#f97316' }
+              ],
+              patrol: { loop: true, cycles: 1, arcMeetFraction: 0.5 },
+              curveMeetValidate: { toleranceCm: 5 },
+              stGraph: { enabled: true, tMaxSec: 20, sMaxCm: 80, showBoth: true }
+            },
+            starter: { curveTravelRun: true },
+            demo: 'curveTravelMeet'
+          })
+        ]
+      },
+      l3: {
+        name: 'L3 伴随行走',
+        tasks: [
+          task('pp_l3_1', '拦截后伴随', '伴随', SCENE.FUNCTION, {
+            series: 'pathPlan', level: 'L3',
+            mode: 'curveTravel',
+            travelSubtype: 'companion',
+            tags: ['伴随', '巡逻'],
+            goals: ['先相遇再沿同曲线近距离跟随', '观察轨迹重叠段'],
+            formulas: [{ title: '伴随', tex: '$$|P_A(t)-P_B(t)| \\le \\varepsilon$$' }],
+            sceneConfig: {
+              cols: 12, rows: 10, cellCm: 10,
+              userPlot: { editable: true },
+              plot: { expr: '2*x', xMin: 0, xMax: 3, step: 1, pathStep: 0.5, color: '#38bdf8', label: 'y=2x' },
+              robots: [
+                { id: 'A', label: '巡逻车', role: 'patrol', xCm: 0, yCm: 0, speed: 9, color: '#22d3ee' },
+                { id: 'B', label: '伴随车', role: 'chaser', xCm: 0, yCm: 0, speed: 9, color: '#f97316' }
+              ],
+              patrol: { loop: true, cycles: 1, arcMeetFraction: 0.45 },
+              companion: { lagSec: 0.6 },
+              companionValidate: { toleranceCm: 3.5, minOverlapSec: 2 },
+              stGraph: { enabled: true, tMaxSec: 22, sMaxCm: 100, showBoth: true }
+            },
+            starter: { curveTravelRun: true, curveTravelSubtype: 'companion' },
+            demo: 'curveTravelCompanion'
+          })
+        ]
+      },
+      l4: {
+        name: 'L4 自定义实验室',
+        tasks: [
+          task('pp_l4_1', '自定义曲线实验室', '自由实验', SCENE.FUNCTION, {
+            series: 'pathPlan', level: 'L4',
+            mode: 'curveTravel',
+            travelSubtype: 'meet',
+            focus: '教师/学生自行设定巡逻曲线，探索拦截能否成立',
+            tags: ['自定义', '实验室', 'y=f(x)'],
+            goals: [
+              '设定任意 y=f(x) 与定义域',
+              '调整两车速度后编程或演示',
+              '记录交汇条件是否满足'
+            ],
+            sceneConfig: {
+              cols: 12, rows: 12, cellCm: 10,
+              userPlot: { editable: true },
+              plot: { expr: '2*x+3', xMin: 0, xMax: 3, step: 1, pathStep: 0.4, color: '#22d3ee', label: 'y=2x+3' },
+              robots: [
+                { id: 'A', label: '巡逻车', role: 'patrol', xCm: 0, yCm: 30, speed: 10, color: '#22d3ee' },
+                { id: 'B', label: '拦截车', role: 'chaser', xCm: 0, yCm: 0, speed: 12, color: '#f97316' }
+              ],
+              patrol: { loop: true, cycles: 1, arcMeetFraction: 0.5 },
+              curveMeetValidate: { toleranceCm: 5 },
+              stGraph: { enabled: true, tMaxSec: 25, sMaxCm: 120, showBoth: true }
+            },
+            hint: '可设 B 起点：例如曲线 y=2x+3 时把 B 放在 (0,0)、A 放在 (0,30)；或 B 从原点拦截曲线上的点。',
+            starter: { curveTravelRun: true },
+            demo: 'curveTravelMeet'
           })
         ]
       }
@@ -1350,8 +1516,9 @@ function travelChaseDistances(cfg) {
 }
 
 /** 根据 starter 配置生成 Blockly XML（块自动串联） */
-function buildStarterXml(s, sceneConfig) {
+function buildStarterXml(s, sceneConfig, taskMeta) {
   if (!s) return null;
+  const travelSubtype = taskMeta?.travelSubtype || sceneConfig?.travelSubtype;
 
   function numShadow(v) {
     return `<shadow type="math_num"><field name="N">${v}</field></shadow>`;
@@ -1381,45 +1548,76 @@ function buildStarterXml(s, sceneConfig) {
   function blockWait(v) {
     return `<block type="motion_wait"><value name="T">${numShadow(v)}</value>`;
   }
+  function blockWaitRobot(robot, v) {
+    return `<block type="motion_wait_robot"><field name="ROBOT">${robot}</field><value name="T">${numShadow(v)}</value>`;
+  }
   function blockForwardRobot(robot, v) {
     return `<block type="motion_forward_robot"><field name="ROBOT">${robot}</field><value name="D">${numShadow(v)}</value>`;
   }
   function blockSpeedRobot(robot, v) {
     return `<block type="motion_speed_robot"><field name="ROBOT">${robot}</field><value name="S">${numShadow(v)}</value>`;
   }
-  function blockParallelMove(a, b) {
-    return `<block type="control_parallel_move"><value name="DA">${numShadow(a)}</value><value name="DB">${numShadow(b)}</value>`;
+  function blockGotoRobot(robot, x, y) {
+    return `<block type="motion_goto_robot"><field name="ROBOT">${robot}</field><value name="X">${numShadow(x)}</value><value name="Y">${numShadow(y)}</value>`;
   }
   function blockRepeat(n, inner) {
     return `<block type="control_repeat"><value name="N">${numShadow(n)}</value><statement name="DO">${inner}</statement>`;
   }
+  function buildDualStarterXml(stackASteps, stackBSteps) {
+    function stmtSlot(name, steps) {
+      if (!steps.length) return '';
+      return `<statement name="${name}">${chainBlocks(steps, 0)}</statement>`;
+    }
+    return `<xml><block type="event_start_dual" x="40" y="40">${stmtSlot('STACK_A', stackASteps)}${stmtSlot('STACK_B', stackBSteps)}</block></xml>`;
+  }
+  function chainBlocks(parts, idx) {
+    const cur = parts[idx] + '</block>';
+    if (idx >= parts.length - 1) return cur;
+    return cur.replace('</block>', `<next>${chainBlocks(parts, idx + 1)}</next></block>`);
+  }
 
   const steps = [];
-  if (s.travelParallel) {
+  if (s.curveTravelRun) {
+    const patrol = sceneConfig?.robots?.find(r => r.role === 'patrol' || r.id === 'A');
+    const chaser = sceneConfig?.robots?.find(r => r.role === 'chaser' || r.id === 'B');
+    const stackA = [];
+    const stackB = [];
+    if (patrol?.speed != null) stackA.push(blockSpeedRobot(patrol?.id || 'A', patrol.speed));
+    if (chaser?.speed != null) stackB.push(blockSpeedRobot(chaser?.id || 'B', chaser.speed));
+    stackA.push('<block type="curve_travel_run"></block>');
+    return buildDualStarterXml(stackA, stackB);
+  } else if (s.travelParallel) {
     let a = s.travelParallel.find(j => (j.robot || 'A') === 'A')?.cm;
     let b = s.travelParallel.find(j => (j.robot || 'B') === 'B')?.cm;
     if (s.autoMeet !== false && sceneConfig) {
-      if (sceneConfig.travelSubtype === 'chase') {
+      if (travelSubtype === 'chase') {
         const d = travelChaseDistances(sceneConfig);
         a = d.da; b = d.db;
-      } else if (sceneConfig.travelSubtype === 'meet') {
+      } else if (travelSubtype === 'meet') {
         const d = travelMeetDistances(sceneConfig);
         a = d.da; b = d.db;
       }
     }
-    steps.push(blockParallelMove(a ?? 0, b ?? 0));
+    return buildDualStarterXml(
+      [blockForwardRobot('A', a ?? 0)],
+      [blockForwardRobot('B', b ?? 0)]
+    );
   } else if (s.travelDelayStart) {
     const d = s.travelDelayStart;
-    if (d.speedA != null) steps.push(blockSpeedRobot('A', d.speedA));
-    if (d.speedB != null) steps.push(blockSpeedRobot('B', d.speedB));
-    if (d.waitSec != null) steps.push(blockWait(d.waitSec));
+    const stackA = [];
+    const stackB = [];
+    if (d.speedA != null) stackA.push(blockSpeedRobot('A', d.speedA));
+    if (d.speedB != null) stackB.push(blockSpeedRobot('B', d.speedB));
     let da = d.da;
     let db = d.db;
-    if (d.autoMeet !== false && sceneConfig?.travelSubtype === 'meet') {
+    if (d.autoMeet !== false && travelSubtype === 'meet') {
       const m = travelMeetDistances(sceneConfig);
       da = m.da; db = m.db;
     }
-    if (da != null || db != null) steps.push(blockParallelMove(da || 0, db || 0));
+    if (da != null) stackA.push(blockForwardRobot('A', da));
+    if (d.waitSec != null) stackB.push(blockWaitRobot('B', d.waitSec));
+    if (db != null) stackB.push(blockForwardRobot('B', db));
+    return buildDualStarterXml(stackA, stackB);
   } else if (s.repeat && s.forward != null && s.turn != null) {
     if (s.speed != null) steps.push(blockSpeed(s.speed));
     if (s.repeat === 4 && s.turn === 90) {
@@ -1462,12 +1660,6 @@ function buildStarterXml(s, sceneConfig) {
 
   if (!steps.length) return null;
 
-  function chainBlocks(parts, idx) {
-    const cur = parts[idx] + '</block>';
-    if (idx >= parts.length - 1) return cur;
-    return cur.replace('</block>', `<next>${chainBlocks(parts, idx + 1)}</next></block>`);
-  }
-
   return `<xml><block type="event_start" x="40" y="40"><next>${chainBlocks(steps, 0)}</next></block></xml>`;
 }
 
@@ -1476,4 +1668,7 @@ window.SCENE = SCENE;
 window.buildStarterXml = buildStarterXml;
 window.travelMeetDistances = travelMeetDistances;
 window.travelChaseDistances = travelChaseDistances;
+window.curveTravelPlanForTask = (cfg, sub) => (
+  typeof window.CurveTravel !== 'undefined' ? window.CurveTravel.planForTask(cfg, sub) : null
+);
 window.DEFAULT_FORMULAS = DEFAULT_FORMULAS;

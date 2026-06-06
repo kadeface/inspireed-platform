@@ -1,0 +1,468 @@
+{
+  "id": "subject-pathPlan",
+  "type": "subject",
+  "subjectKey": "pathPlan",
+  "title": "路径规划专题册",
+  "stageName": "轮式机器人路径规划",
+  "taskCount": 5,
+  "sectionLabel": "层级",
+  "sections": [
+    {
+      "levelKey": "l1",
+      "levelName": "L1 曲线巡逻",
+      "taskCount": 1,
+      "tasks": [
+        {
+          "id": "pp_l1_1",
+          "title": "认识巡逻与拦截",
+          "unit": "路径规划",
+          "stageKey": "pathPlan",
+          "gradeKey": "l1",
+          "gradeName": "L1 曲线巡逻",
+          "scene": "function",
+          "tags": [
+            "巡逻",
+            "拦截",
+            "路径规划"
+          ],
+          "goals": [
+            "甲车沿 y=f(x) 循环巡逻（演示中先至交汇点，再继续绕圈）",
+            "乙车从起点直线驶向交汇点（不必与甲走同一条曲线）",
+            "理解拦截 = 同时到达同一点，而非两条相同轨迹"
+          ],
+          "focus": "路径规划 = 在已知曲线（y=f(x)）上安排两车运动，使相遇或伴随成立",
+          "challenges": [],
+          "hint": "点「演示」：A 沿曲线到交汇点后继续循环；B 直线到交汇点。B 槽可用「等待直到与 A 相距小于 5 cm」替代固定秒数等待（不要复制 A 的全部 goto）。",
+          "formulas": [
+            {
+              "title": "相遇",
+              "tex": "$$s_A(t)=s_{\\text{曲}}(t),\\quad |OB|=v_B t,\\quad P_A(t)=P_B(t)$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 10,
+            "cellCm": 10,
+            "userPlot": {
+              "editable": true
+            },
+            "plot": {
+              "expr": "2*x",
+              "xMin": 0,
+              "xMax": 4,
+              "step": 1,
+              "pathStep": 0.5,
+              "color": "#38bdf8",
+              "label": "y=2x"
+            },
+            "robots": [
+              {
+                "id": "A",
+                "label": "巡逻车",
+                "role": "patrol",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 10,
+                "color": "#22d3ee"
+              },
+              {
+                "id": "B",
+                "label": "拦截车",
+                "role": "chaser",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 12,
+                "color": "#f97316"
+              }
+            ],
+            "patrol": {
+              "loop": true,
+              "cycles": 2,
+              "arcMeetFraction": 0.55
+            },
+            "curveMeetValidate": {
+              "toleranceCm": 4
+            },
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 18,
+              "sMaxCm": 110,
+              "showBoth": true
+            }
+          },
+          "starter": {
+            "curveTravelRun": true
+          },
+          "demo": "curveTravelMeet"
+        }
+      ]
+    },
+    {
+      "levelKey": "l2",
+      "levelName": "L2 一次与二次曲线",
+      "taskCount": 2,
+      "tasks": [
+        {
+          "id": "pp_l2_1",
+          "title": "一次函数曲线拦截",
+          "unit": "一次函数",
+          "stageKey": "pathPlan",
+          "gradeKey": "l2",
+          "gradeName": "L2 一次与二次曲线",
+          "scene": "function",
+          "tags": [
+            "一次函数",
+            "拦截",
+            "y=kx+b"
+          ],
+          "goals": [
+            "在直线型曲线上循环巡逻",
+            "从原点规划拦截",
+            "对比 s-t 图上两车路程"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 10,
+            "cellCm": 10,
+            "userPlot": {
+              "editable": true
+            },
+            "plot": {
+              "expr": "2*x",
+              "xMin": 0,
+              "xMax": 4,
+              "step": 1,
+              "pathStep": 0.5,
+              "color": "#38bdf8",
+              "label": "y=2x"
+            },
+            "robots": [
+              {
+                "id": "A",
+                "label": "巡逻车",
+                "role": "patrol",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 10,
+                "color": "#22d3ee"
+              },
+              {
+                "id": "B",
+                "label": "拦截车",
+                "role": "chaser",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 12,
+                "color": "#f97316"
+              }
+            ],
+            "patrol": {
+              "loop": true,
+              "cycles": 1,
+              "arcMeetFraction": 0.55
+            },
+            "curveMeetValidate": {
+              "toleranceCm": 4
+            },
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 18,
+              "sMaxCm": 110,
+              "showBoth": true
+            }
+          },
+          "starter": {
+            "curveTravelRun": true
+          },
+          "demo": "curveTravelMeet"
+        },
+        {
+          "id": "pp_l2_2",
+          "title": "抛物线曲线拦截",
+          "unit": "二次函数",
+          "stageKey": "pathPlan",
+          "gradeKey": "l2",
+          "gradeName": "L2 一次与二次曲线",
+          "scene": "function",
+          "tags": [
+            "抛物线",
+            "拦截"
+          ],
+          "goals": [
+            "曲率更大时弧长更长",
+            "体会拦截时间更难对齐",
+            "可改用自定义 y=ax²+bx+c"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 12,
+            "cellCm": 10,
+            "userPlot": {
+              "editable": true
+            },
+            "plot": {
+              "expr": "x*x",
+              "xMin": 0,
+              "xMax": 2.5,
+              "step": 0.5,
+              "pathStep": 0.25,
+              "color": "#a78bfa",
+              "label": "y=x²"
+            },
+            "robots": [
+              {
+                "id": "A",
+                "label": "巡逻车",
+                "role": "patrol",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 8,
+                "color": "#22d3ee"
+              },
+              {
+                "id": "B",
+                "label": "拦截车",
+                "role": "chaser",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 11,
+                "color": "#f97316"
+              }
+            ],
+            "patrol": {
+              "loop": true,
+              "cycles": 1,
+              "arcMeetFraction": 0.5
+            },
+            "curveMeetValidate": {
+              "toleranceCm": 5
+            },
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 20,
+              "sMaxCm": 80,
+              "showBoth": true
+            }
+          },
+          "starter": {
+            "curveTravelRun": true
+          },
+          "demo": "curveTravelMeet"
+        }
+      ]
+    },
+    {
+      "levelKey": "l3",
+      "levelName": "L3 伴随行走",
+      "taskCount": 1,
+      "tasks": [
+        {
+          "id": "pp_l3_1",
+          "title": "拦截后伴随",
+          "unit": "伴随",
+          "stageKey": "pathPlan",
+          "gradeKey": "l3",
+          "gradeName": "L3 伴随行走",
+          "scene": "function",
+          "tags": [
+            "伴随",
+            "巡逻"
+          ],
+          "goals": [
+            "先相遇再沿同曲线近距离跟随",
+            "观察轨迹重叠段"
+          ],
+          "focus": "",
+          "challenges": [],
+          "hint": "",
+          "formulas": [
+            {
+              "title": "伴随",
+              "tex": "$$|P_A(t)-P_B(t)| \\le \\varepsilon$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 10,
+            "cellCm": 10,
+            "userPlot": {
+              "editable": true
+            },
+            "plot": {
+              "expr": "2*x",
+              "xMin": 0,
+              "xMax": 3,
+              "step": 1,
+              "pathStep": 0.5,
+              "color": "#38bdf8",
+              "label": "y=2x"
+            },
+            "robots": [
+              {
+                "id": "A",
+                "label": "巡逻车",
+                "role": "patrol",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 9,
+                "color": "#22d3ee"
+              },
+              {
+                "id": "B",
+                "label": "伴随车",
+                "role": "chaser",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 9,
+                "color": "#f97316"
+              }
+            ],
+            "patrol": {
+              "loop": true,
+              "cycles": 1,
+              "arcMeetFraction": 0.45
+            },
+            "companion": {
+              "lagSec": 0.6
+            },
+            "companionValidate": {
+              "toleranceCm": 3.5,
+              "minOverlapSec": 2
+            },
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 22,
+              "sMaxCm": 100,
+              "showBoth": true
+            }
+          },
+          "starter": {
+            "curveTravelRun": true,
+            "curveTravelSubtype": "companion"
+          },
+          "demo": "curveTravelCompanion"
+        }
+      ]
+    },
+    {
+      "levelKey": "l4",
+      "levelName": "L4 自定义实验室",
+      "taskCount": 1,
+      "tasks": [
+        {
+          "id": "pp_l4_1",
+          "title": "自定义曲线实验室",
+          "unit": "自由实验",
+          "stageKey": "pathPlan",
+          "gradeKey": "l4",
+          "gradeName": "L4 自定义实验室",
+          "scene": "function",
+          "tags": [
+            "自定义",
+            "实验室",
+            "y=f(x)"
+          ],
+          "goals": [
+            "设定任意 y=f(x) 与定义域",
+            "调整两车速度后编程或演示",
+            "记录交汇条件是否满足"
+          ],
+          "focus": "教师/学生自行设定巡逻曲线，探索拦截能否成立",
+          "challenges": [],
+          "hint": "可设 B 起点：例如曲线 y=2x+3 时把 B 放在 (0,0)、A 放在 (0,30)；或 B 从原点拦截曲线上的点。",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 12,
+            "cellCm": 10,
+            "userPlot": {
+              "editable": true
+            },
+            "plot": {
+              "expr": "2*x+3",
+              "xMin": 0,
+              "xMax": 3,
+              "step": 1,
+              "pathStep": 0.4,
+              "color": "#22d3ee",
+              "label": "y=2x+3"
+            },
+            "robots": [
+              {
+                "id": "A",
+                "label": "巡逻车",
+                "role": "patrol",
+                "xCm": 0,
+                "yCm": 30,
+                "speed": 10,
+                "color": "#22d3ee"
+              },
+              {
+                "id": "B",
+                "label": "拦截车",
+                "role": "chaser",
+                "xCm": 0,
+                "yCm": 0,
+                "speed": 12,
+                "color": "#f97316"
+              }
+            ],
+            "patrol": {
+              "loop": true,
+              "cycles": 1,
+              "arcMeetFraction": 0.5
+            },
+            "curveMeetValidate": {
+              "toleranceCm": 5
+            },
+            "stGraph": {
+              "enabled": true,
+              "tMaxSec": 25,
+              "sMaxCm": 120,
+              "showBoth": true
+            }
+          },
+          "starter": {
+            "curveTravelRun": true
+          },
+          "demo": "curveTravelMeet"
+        }
+      ]
+    }
+  ]
+}

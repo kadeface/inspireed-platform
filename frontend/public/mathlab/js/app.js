@@ -72,6 +72,7 @@
       ];
       this.getPrimaryRobot().trail = [{ x: GRID_STEP, y: GRID_STEP * 4 }];
       window.__simRef = this;
+      if (typeof MotionClock !== 'undefined') MotionClock.attach(this);
       document.getElementById('inpSpeed').addEventListener('input', e => {
         const v = parseFloat(e.target.value) || 10;
         if (this.taskMode === 'travel') {
@@ -138,7 +139,9 @@
     },
 
     runAnalysis() {
-      if (this.taskMode === 'travel' && typeof TravelValidation !== 'undefined') {
+      if (this.taskMode === 'curveTravel' && typeof CurveTravelValidation !== 'undefined') {
+        this.lastAnalysis = CurveTravelValidation.analyze(this, currentTask);
+      } else if (this.taskMode === 'travel' && typeof TravelValidation !== 'undefined') {
         this.lastAnalysis = TravelValidation.analyze(this, currentTask);
       } else if (typeof TrailAnalysis !== 'undefined') {
         this.lastAnalysis = TrailAnalysis.analyze(this);
@@ -211,23 +214,24 @@
       });
       this.travelSamples = [];
       this.motionSamples = [];
-      if (this.taskMode === 'travel') this.seedTravelSample();
+      if (this.taskMode === 'travel' || this.taskMode === 'curveTravel') this.seedTravelSample();
       else this.seedMotionSample();
       this.lastAnalysis = null;
       this.busy = false;
       this.runAbort = false;
       runStats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
+      this.cancelActiveMotions();
       this.draw();
       this.updateTelemetry();
     },
 
     setTaskMode(mode, config) {
-      this.taskMode = mode === 'travel' ? 'travel' : 'regular';
+      this.taskMode = (mode === 'travel' || mode === 'curveTravel') ? mode : 'regular';
       this.sceneConfig = config || {};
     },
 
     initRobots(startX, startY) {
-      if (this.taskMode !== 'travel') {
+      if (this.taskMode !== 'travel' && this.taskMode !== 'curveTravel') {
         const a = this.getRobot('A') || createRobot('A', { x: startX, y: startY, startX, startY, speed: 10, color: '#14b8a6' });
         a.state.startX = startX;
         a.state.startY = startY;
@@ -258,12 +262,52 @@
         });
         robot.initialAngle = robot.state.angle;
         robot.trackS0Cm = def.s0Cm != null ? def.s0Cm : (def.xCm || 0);
+        robot._pxPerCm = px;
+        robot.role = def.role || (def.id === 'A' ? 'patrol' : 'chaser');
         return robot;
       });
     },
 
+    /** 按 sceneConfig.robots 的 xCm/yCm 重置双车位置（应用自定义 B 起点等） */
+    reloadRobotsFromConfig() {
+      if (this.taskMode !== 'travel' && this.taskMode !== 'curveTravel') return;
+      const ox = this.trackOriginX;
+      const oy = this.trackOriginY;
+      if (ox == null || oy == null) return;
+      const px = this.getPxPerCm();
+      const defs = this.sceneConfig?.robots || [];
+      defs.forEach(def => {
+        const r = this.getRobot(def.id);
+        if (!r) return;
+        const x = ox + (def.xCm || 0) * px;
+        const y = oy - (def.yCm || 0) * px;
+        r.state.x = x;
+        r.state.y = y;
+        r.state.startX = x;
+        r.state.startY = y;
+        r.state.dist = 0;
+        r.state.elapsed = 0;
+        r.trail = [{ x, y }];
+        r.stats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
+      });
+      this.travelSamples = [];
+      this.motionSamples = [];
+      if (this.taskMode === 'travel' || this.taskMode === 'curveTravel') this.seedTravelSample();
+      this.lastAnalysis = null;
+      this.draw();
+      this.updateTelemetry();
+    },
+
     /** 沿赛道轴的绝对位置 s（cm），原点为场景 trackOrigin，非各车自身起点 */
     trackPositionCm(robot) {
+      if (this.taskMode === 'curveTravel' && typeof CurveTravel !== 'undefined') {
+        const cfg = this.sceneConfig || {};
+        const px = this.getPxPerCm();
+        if (robot.role === 'patrol' || robot.id === 'A') {
+          return CurveTravel.patrolArcCm(robot, cfg, px);
+        }
+        return CurveTravel.chaserDistCm(robot, px);
+      }
       const cfg = this.sceneConfig || {};
       const axisDeg = cfg.trackAxisDeg || 0;
       const rad = axisDeg * Math.PI / 180;
@@ -327,6 +371,7 @@
 
     requestStop() {
       this.runAbort = true;
+      this.cancelActiveMotions();
     },
 
     haltProgram() {
@@ -334,21 +379,148 @@
       throw this.abortError();
     },
 
-    async wait(ms) {
-      const step = 40;
-      let left = Math.max(0, ms || 0);
-      while (left > 0) {
-        this.checkAborted();
-        const slice = Math.min(step, left);
-        await new Promise(res => setTimeout(res, slice));
-        left -= slice;
+    syncPrimaryStats(robot) {
+      if (!robot || robot.id !== 'A') return;
+      const stats = robot.stats;
+      if (!stats) return;
+      runStats.totalDist = stats.totalDist;
+      runStats.totalTime = stats.totalTime;
+      runStats.turns = stats.turns;
+    },
+
+    cancelActiveMotions() {
+      if (typeof MotionClock !== 'undefined') MotionClock.cancelAll();
+    },
+
+    async wait(ms, robotOrId) {
+      this.checkAborted();
+      if (typeof MotionClock === 'undefined') {
+        await new Promise(res => setTimeout(res, Math.max(0, ms || 0)));
+        return;
       }
+      await MotionClock.runWait(this, ms, robotOrId);
+      this.checkAborted();
+    },
+
+    /** 两车世界坐标直线距离（cm） */
+    robotDistanceCm(robotOrIdA, robotOrIdB) {
+      const a = this.resolveRobot(robotOrIdA);
+      const b = this.resolveRobot(robotOrIdB);
+      if (!a || !b) return Infinity;
+      const px = this.getPxPerCm();
+      return Math.hypot(a.state.x - b.state.x, a.state.y - b.state.y) / px;
+    },
+
+    /** 等待直到与另一车相距 < epsilonCm（仅阻塞本车程序，对方可继续运动） */
+    async waitUntilRobotsNear(robotOrId, otherOrId, epsilonCm) {
+      this.checkAborted();
+      const robot = this.resolveRobot(robotOrId);
+      const other = this.resolveRobot(otherOrId);
+      if (!robot || !other || robot.id === other.id) return;
+      if (this.robotDistanceCm(robot, other) <= Math.max(0.1, Number(epsilonCm) || 5)) return;
+      if (typeof MotionClock === 'undefined') return;
+      await MotionClock.runWaitUntilNear(this, robot, other, epsilonCm);
       this.checkAborted();
     },
 
     async runParallel(jobs) {
       if (typeof MotionScheduler === 'undefined') return;
       await MotionScheduler.run(this, jobs);
+    },
+
+    async runRobotsParallel(fnA, fnB) {
+      this.beginRun();
+      await Promise.all([
+        typeof fnA === 'function' ? fnA() : Promise.resolve(),
+        typeof fnB === 'function' ? fnB() : Promise.resolve()
+      ]);
+    },
+
+    async runJobChain(jobs) {
+      if (!Array.isArray(jobs)) return;
+      for (const job of jobs) {
+        if (typeof MotionScheduler !== 'undefined') {
+          await MotionScheduler.runJob(this, job);
+        }
+      }
+    },
+
+    async runCurveTravelPlan(subtype) {
+      if (typeof CurveTravel === 'undefined') return;
+      const sub = subtype || 'meet';
+      const cfg = this.sceneConfig || {};
+      const meetPlan = CurveTravel.planMeet(cfg);
+      if (!meetPlan) return;
+      const toMeet = meetPlan.patrolJobsToMeet || meetPlan.patrolJobs;
+      const afterMeet = meetPlan.patrolJobsLoop || [];
+
+      if (sub === 'companion') {
+        const full = CurveTravel.planCompanion(cfg);
+        const meetLen = meetPlan.chaserJobs.length;
+        const afterChaser = full.chaserJobs.slice(meetLen);
+        await this.runRobotsParallel(
+          () => this.runJobChain(toMeet),
+          () => this.runJobChain(meetPlan.chaserJobs)
+        );
+        await this.runRobotsParallel(
+          () => this.runJobChain(afterMeet),
+          () => this.runJobChain(afterChaser)
+        );
+        return;
+      }
+
+      await this.runRobotsParallel(
+        () => this.runJobChain(toMeet),
+        () => this.runJobChain(meetPlan.chaserJobs)
+      );
+      if (afterMeet.length) await this.runJobChain(afterMeet);
+    },
+
+    drawCurveMeetMarker(cfg) {
+      if (typeof CurveTravel === 'undefined') return;
+      const sub = currentTask?.travelSubtype || 'meet';
+      const plan = CurveTravel.planForTask(cfg, sub);
+      const { ctx } = this;
+      const ox = this.trackOriginX ?? this.state.startX;
+      const oy = this.trackOriginY ?? this.state.startY;
+      const px = this.getPxPerCm();
+      const scale = this.viewport.scale;
+      ctx.save();
+
+      const b0 = plan?.chaserStart || CurveTravel.chaserStartCm(cfg);
+      const bx = ox + b0.x * px;
+      const by = oy - b0.y * px;
+      ctx.fillStyle = 'rgba(249,115,22,.35)';
+      ctx.strokeStyle = 'rgba(249,115,22,.95)';
+      ctx.lineWidth = 2 / scale;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(ox, oy);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(bx, by, 8 / scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#fdba74';
+      ctx.font = `${10 / scale}px Outfit, Noto Sans SC, sans-serif`;
+      ctx.fillText('B 起点', bx + 10 / scale, by + 4 / scale);
+
+      if (plan?.meet) {
+        const mx = ox + plan.meet.x * px;
+        const my = oy - plan.meet.y * px;
+        ctx.strokeStyle = 'rgba(251,191,36,.9)';
+        ctx.fillStyle = 'rgba(251,191,36,.25)';
+        ctx.beginPath();
+        ctx.arc(mx, my, 10 / scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#fde68a';
+        ctx.font = `${11 / scale}px Outfit, Noto Sans SC, sans-serif`;
+        ctx.fillText('交汇', mx + 12 / scale, my - 8 / scale);
+      }
+      ctx.restore();
     },
 
     getPxPerCm() {
@@ -375,7 +547,7 @@
     },
 
     seedTravelSample() {
-      if (this.taskMode !== 'travel') return;
+      if (this.taskMode !== 'travel' && this.taskMode !== 'curveTravel') return;
       const a = this.getRobot('A');
       const b = this.getRobot('B');
       if (!a || !b) return;
@@ -383,7 +555,7 @@
     },
 
     sampleTravel() {
-      if (this.taskMode !== 'travel') return;
+      if (this.taskMode !== 'travel' && this.taskMode !== 'curveTravel') return;
       const a = this.getRobot('A');
       const b = this.getRobot('B');
       if (!a || !b) return;
@@ -421,8 +593,6 @@
       const robot = this.resolveRobot(robotOrId);
       if (!robot) return;
       const s = robot.state;
-      const stats = robot.stats || runStats;
-      // 先原地转向再直线前进，避免边移边转造成轨迹/车头“打滑”观感
       if (endAngle != null) {
         let delta = endAngle - s.angle;
         while (delta > Math.PI) delta -= Math.PI * 2;
@@ -431,41 +601,8 @@
         if (Math.abs(turnDeg) > 0.5) await this.turn(turnDeg, robot);
         else s.angle = endAngle;
       }
-      const x0 = s.x, y0 = s.y;
-      const dur = Math.max(200, (Math.abs(cm) / s.speed) * 1000);
-      const t0 = performance.now();
-      stats.totalDist += Math.abs(cm);
-      if (robot.id === 'A') runStats.totalDist = stats.totalDist;
-      while (true) {
-        const p = Math.min(1, (performance.now() - t0) / dur);
-        s.x = x0 + dx * p;
-        s.y = y0 + dy * p;
-        s.dist += Math.abs(cm) * (p - (s._lastP || 0));
-        s._lastP = p;
-        s.wheelAngle += Math.abs(cm) * this.getPxPerCm() * 0.06 * Math.sign(cm || 1);
-        s.elapsed += dur * (p - (s._lastTp || 0)) / 1000;
-        s._lastTp = p;
-        if (p > 0.01) robot.trail.push({ x: s.x, y: s.y });
-        this.sampleTravel();
-        this.sampleMotion(robot);
-        this.draw();
-        this.updateTelemetry();
-        if (typeof ViewShell !== 'undefined') {
-          const panel = document.getElementById('trailPanel');
-          if (panel && !panel.hidden) ViewShell.refreshTrailPanel();
-        }
-        if (p >= 1) break;
-        this.checkAborted();
-        await this.wait(16);
-      }
-      if (endAngle != null) s.angle = endAngle;
-      s.dist = stats.totalDist;
-      s._lastP = 0; s._lastTp = 0;
-      stats.totalTime += dur / 1000;
-      if (robot.id === 'A') runStats.totalTime = stats.totalTime;
-      this.sampleMotion(robot);
-      this.draw();
-      this.updateTelemetry();
+      if (typeof MotionClock === 'undefined') return;
+      await MotionClock.runTranslate(this, robot, { dx, dy, cm, endAngle });
       this.checkAborted();
     },
 
@@ -519,26 +656,8 @@
       this.checkAborted();
       const robot = this.resolveRobot(robotOrId);
       if (!robot) return;
-      const s = robot.state;
-      const stats = robot.stats || runStats;
-      const target = s.angle + deg * Math.PI / 180;
-      const a0 = s.angle;
-      const dur = Math.min(1200, Math.abs(deg) * 8);
-      const t0 = performance.now();
-      stats.turns.push(deg);
-      if (robot.id === 'A') runStats.turns = stats.turns;
-      while (true) {
-        const p = Math.min(1, (performance.now() - t0) / dur);
-        s.angle = a0 + (target - a0) * p;
-        this.sampleTravel();
-        this.draw();
-        if (p >= 1) break;
-        this.checkAborted();
-        await this.wait(16);
-      }
-      s.elapsed += dur / 1000;
-      stats.totalTime += dur / 1000;
-      if (robot.id === 'A') runStats.totalTime = stats.totalTime;
+      if (typeof MotionClock === 'undefined') return;
+      await MotionClock.runRotate(this, robot, deg);
       this.checkAborted();
     },
 
@@ -551,16 +670,16 @@
     },
 
     updateTelemetry() {
-      if (this.taskMode === 'travel') {
-        const a = this.getRobot('A');
-        const b = this.getRobot('B');
-        const aDist = a?.stats?.totalDist || 0;
-        const bDist = b?.stats?.totalDist || 0;
+      if (this.taskMode === 'travel' || this.taskMode === 'curveTravel') {
         if (typeof ViewShell !== 'undefined') {
           ViewShell.refreshAlgebraBar();
-          let extra = `A ${aDist.toFixed(1)} cm · B ${bDist.toFixed(1)} cm`;
-          if (this.lastAnalysis?.message) extra += ` · ${this.lastAnalysis.message}`;
-          ViewShell.setAlgebraExtra(extra);
+          if (this.lastAnalysis?.message) {
+            const el = document.getElementById('algExtra');
+            const msg = this.lastAnalysis.message;
+            if (el && !el.textContent.includes(msg)) {
+              ViewShell.setAlgebraExtra(`${el.innerHTML} · ${msg}`);
+            }
+          }
         }
         return;
       }
@@ -1121,6 +1240,9 @@
         if (cfg.referenceLine?.k != null) {
           this.drawReferenceLine(cfg.referenceLine);
         }
+        if (this.taskMode === 'curveTravel' && typeof CurveTravel !== 'undefined') {
+          this.drawCurveMeetMarker(cfg);
+        }
       }
 
       if (tri) {
@@ -1377,7 +1499,7 @@
       const canvas = document.getElementById('travelGraphCanvas');
       if (!wrap || !canvas) return false;
       const stCfg = this.sceneConfig?.stGraph || {};
-      const travelMode = this.taskMode === 'travel' && stCfg.enabled !== false;
+      const travelMode = (this.taskMode === 'travel' || this.taskMode === 'curveTravel') && stCfg.enabled !== false;
       const motionMode = !travelMode && stCfg.enabled
         && (this.scene === SCENE.CALC || this.scene === SCENE.TIME || this.scene === SCENE.FUNCTION);
       const enabled = travelMode || motionMode;
@@ -1826,31 +1948,37 @@
           const d = typeof travelMeetDistances === 'function'
             ? travelMeetDistances(this.sceneConfig)
             : { da: 40, db: 60 };
-          await this.runParallel([
-            { robot: 'A', action: 'forward', cm: d.da },
-            { robot: 'B', action: 'forward', cm: d.db }
-          ]);
+          await this.runRobotsParallel(
+            () => this.forward(d.da, 'A'),
+            () => this.forward(d.db, 'B')
+          );
         },
         travelMeetDelay: async () => {
           const waitSec = currentTask?.starter?.travelDelayStart?.waitSec ?? 2;
-          await this.wait(waitSec * 1000);
           const d = typeof travelMeetDistances === 'function'
             ? travelMeetDistances(this.sceneConfig)
             : { da: 36, db: 54 };
-          await this.runParallel([
-            { robot: 'A', action: 'forward', cm: d.da },
-            { robot: 'B', action: 'forward', cm: d.db }
-          ]);
+          await this.runRobotsParallel(
+            () => this.forward(d.da, 'A'),
+            async () => {
+              await this.wait(waitSec * 1000);
+              await this.forward(d.db, 'B');
+            }
+          );
         },
         travelChase: async () => {
           const d = typeof travelChaseDistances === 'function'
             ? travelChaseDistances(this.sceneConfig)
             : { da: 54, db: 94 };
-          await this.runParallel([
-            { robot: 'A', action: 'forward', cm: d.da },
-            { robot: 'B', action: 'forward', cm: d.db }
-          ]);
+          await this.runRobotsParallel(
+            () => this.forward(d.da, 'A'),
+            () => this.forward(d.db, 'B')
+          );
         },
+        curveTravelMeet: () => this.runCurveTravelPlan(currentTask?.travelSubtype || 'meet'),
+        curveTravelMeetLinear: () => this.runCurveTravelPlan('meet'),
+        curveTravelMeetParabola: () => this.runCurveTravelPlan('meet'),
+        curveTravelCompanion: () => this.runCurveTravelPlan('companion'),
         pythagoras: async () => {
           await this.movePolar(0, 30);
           await this.movePolar(90, 40);
@@ -1867,6 +1995,8 @@
   window.__robotA = makeRobotApi(sim, 'A');
   window.__robotB = makeRobotApi(sim, 'B');
   window.__parallel = jobs => sim.runParallel(jobs);
+  window.__runRobotsParallel = (fnA, fnB) => sim.runRobotsParallel(fnA, fnB);
+  window.__curveTravelRun = subtype => sim.runCurveTravelPlan(subtype || currentTask?.travelSubtype || 'meet');
 
   // ─── 页内 prompt（避免 iframe 中 window.prompt / 跨域 parent 访问） ───
   const mlPrompt = {
@@ -1931,6 +2061,10 @@
     defineBlocklyTypes() {
       Blockly.defineBlocksWithJsonArray([
         { type: 'event_start', message0: '当程序开始时', nextStatement: true, colour: 120, hat: 'cap' },
+        { type: 'event_start_dual', message0: '当程序开始时（双车并行）',
+          message1: 'A 程序 %1', args1: [{ type: 'input_statement', name: 'STACK_A' }],
+          message2: 'B 程序 %2', args2: [{ type: 'input_statement', name: 'STACK_B' }],
+          colour: 120, hat: 'cap' },
         { type: 'motion_move_2d', message0: '向角度 %1 ° 移动 %2 厘米', args0: [
             { type: 'input_value', name: 'ANGLE', check: 'Number' },
             { type: 'input_value', name: 'D', check: 'Number' }
@@ -1966,10 +2100,26 @@
             { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
             { type: 'input_value', name: 'S', check: 'Number' }
           ], previousStatement: true, nextStatement: true, colour: 120 },
+        { type: 'motion_goto_robot', message0: '小车 %1 移动到 x %2  y %3 厘米', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'input_value', name: 'X', check: 'Number' },
+            { type: 'input_value', name: 'Y', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_wait_robot', message0: '小车 %1 等待 %2 秒', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'input_value', name: 'T', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 60 },
+        { type: 'motion_wait_until_near', message0: '小车 %1 等待直到与 %2 相距小于 %3 cm', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'field_dropdown', name: 'OTHER', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'input_value', name: 'EPS', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 20 },
         { type: 'control_parallel_move', message0: '同时执行 A前进 %1 cm 与 B前进 %2 cm', args0: [
             { type: 'input_value', name: 'DA', check: 'Number' },
             { type: 'input_value', name: 'DB', check: 'Number' }
           ], previousStatement: true, nextStatement: true, colour: 20 },
+        { type: 'curve_travel_run', message0: '曲线拦截演示（A 巡逻 + B 直线交汇）',
+          previousStatement: true, nextStatement: true, colour: 20 },
         { type: 'control_repeat', message0: '重复 %1 次', args0: [{ type: 'input_value', name: 'N', check: 'Number' }],
           message1: '%1', args1: [{ type: 'input_statement', name: 'DO' }],
           previousStatement: true, nextStatement: true, colour: 65 },
@@ -2046,6 +2196,11 @@
       const gen = (type, fn) => { J.forBlock[type] = fn; J[type] = fn; };
 
       gen('event_start', () => '');
+      gen('event_start_dual', b => {
+        const codeA = J.statementToCode(b, 'STACK_A') || '';
+        const codeB = J.statementToCode(b, 'STACK_B') || '';
+        return `await __runRobotsParallel(async () => {\n${codeA}}, async () => {\n${codeB}});\n`;
+      });
       gen('motion_move_2d', b => {
         const a = J.valueToCode(b, 'ANGLE', J.ORDER_NONE) || 0;
         const d = J.valueToCode(b, 'D', J.ORDER_NONE) || 0;
@@ -2076,10 +2231,43 @@
         const robot = b.getFieldValue('ROBOT') || 'A';
         return `__robot${robot}.setSpeed(${J.valueToCode(b, 'S', J.ORDER_NONE) || 10});\n`;
       });
+      gen('motion_goto_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        const x = J.valueToCode(b, 'X', J.ORDER_NONE) || 0;
+        const y = J.valueToCode(b, 'Y', J.ORDER_NONE) || 0;
+        return `await __robot${robot}.goto(${x}, ${y});\n`;
+      });
+      gen('motion_wait_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        return `await __robot${robot}.wait(${J.valueToCode(b, 'T', J.ORDER_NONE) || 1});\n`;
+      });
+      gen('motion_wait_until_near', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        const other = b.getFieldValue('OTHER') || 'B';
+        const eps = J.valueToCode(b, 'EPS', J.ORDER_NONE) || 5;
+        return `await __robot${robot}.waitUntilNear('${other}', ${eps});\n`;
+      });
       gen('control_parallel_move', b => {
         const da = J.valueToCode(b, 'DA', J.ORDER_NONE) || 0;
         const db = J.valueToCode(b, 'DB', J.ORDER_NONE) || 0;
         return `await __parallel([{ robot: 'A', action: 'forward', cm: ${da} }, { robot: 'B', action: 'forward', cm: ${db} }]);\n`;
+      });
+      gen('curve_travel_run', () => {
+        const sub = currentTask?.travelSubtype || 'meet';
+        const sim = window.__mathlabSim;
+        const cfg = sim?.sceneConfig || currentTask?.sceneConfig || {};
+        const plot = cfg.plot || {};
+        const expr = plot.expr || '?';
+        let code = `// 巡逻曲线: y = ${expr}, x ∈ [${plot.xMin ?? 0}, ${plot.xMax ?? '?'}] (cm 坐标)\n`;
+        code += `// A 沿曲线巡逻，B 直线驶向交汇点（非复制 A 的 goto 路径）\n`;
+        if (window.CurveTravel?.buildPolylineCm && plot.expr && expr !== '?') {
+          try {
+            const pts = window.CurveTravel.buildPolylineCm(plot, cfg);
+            const sample = pts.slice(0, 6).map(p => `(${Math.round(p.x * 10) / 10},${Math.round(p.y * 10) / 10})`);
+            code += `// 曲线顶点示例: ${sample.join(' → ')}${pts.length > 6 ? ' …' : ''}\n`;
+          } catch (e) { /* ignore */ }
+        }
+        return code + `await __curveTravelRun('${sub}');\n`;
       });
       const statementChain = (parent, inputName) => {
         let inner = '';
@@ -2190,6 +2378,11 @@
       if (!this.workspace) return '';
       const J = Blockly.JavaScript;
       if (!J.isInitialized) J.init(this.workspace);
+      const dualStarts = this.workspace.getBlocksByType('event_start_dual', false);
+      if (dualStarts.length) {
+        const chunk = J.blockToCode(dualStarts[0], true);
+        return typeof chunk === 'string' ? chunk : (chunk && chunk[0]) || '';
+      }
       const starts = this.workspace.getBlocksByType('event_start', false);
       if (!starts.length) return '';
       let code = '';
@@ -2210,18 +2403,33 @@
     },
 
     buildToolboxXml(mode) {
-      const travelExtra = mode === 'travel'
+      const isDual = mode === 'travel' || mode === 'curveTravel';
+      const entryBlock = isDual
+        ? '<block type="event_start_dual"></block>'
+        : '<block type="event_start"></block>';
+      const travelExtra = isDual
         ? `
             <block type="motion_forward_robot"><value name="D"><shadow type="math_num"><field name="N">30</field></shadow></value></block>
             <block type="motion_turn_robot"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
             <block type="motion_speed_robot"><value name="S"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
+            <block type="motion_goto_robot">
+              <value name="X"><shadow type="math_num"><field name="N">30</field></shadow></value>
+              <value name="Y"><shadow type="math_num"><field name="N">60</field></shadow></value>
+            </block>
+            <block type="motion_wait_robot"><value name="T"><shadow type="math_num"><field name="N">2</field></shadow></value></block>
+            <block type="motion_wait_until_near">
+              <field name="ROBOT">B</field>
+              <field name="OTHER">A</field>
+              <value name="EPS"><shadow type="math_num"><field name="N">5</field></shadow></value>
+            </block>
             <block type="control_parallel_move">
               <value name="DA"><shadow type="math_num"><field name="N">40</field></shadow></value>
               <value name="DB"><shadow type="math_num"><field name="N">20</field></shadow></value>
-            </block>`
+            </block>
+            <block type="curve_travel_run"></block>`
         : '';
       return `<xml>
-          <category name="程序入口" colour="120"><block type="event_start"></block></category>
+          <category name="程序入口" colour="120">${entryBlock}</category>
           <category name="运动控制" colour="160">
             <block type="motion_turn_right"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
             <block type="motion_turn_left"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
@@ -2361,7 +2569,10 @@
 
     loadStarter(task) {
       this.workspace.clear();
-      const xmlStr = buildStarterXml(task.starter, task.sceneConfig);
+      const cfg = (typeof window.__mathlabSim !== 'undefined' && window.__mathlabSim?.sceneConfig?.plot)
+        ? window.__mathlabSim.sceneConfig
+        : (task?.sceneConfig || {});
+      const xmlStr = buildStarterXml(task.starter, cfg, task);
       if (!xmlStr) return;
       const xml = Blockly.utils.xml.textToDom(xmlStr);
       Blockly.Xml.domToWorkspace(xml, this.workspace);
@@ -2479,9 +2690,11 @@
       .map(t => `<span class="tag">${t}</span>`).join('');
     const seriesIntro = task.series === 'funcGraph'
       ? '<p class="series-intro">📈 专题：轮式机器人探秘函数图像 — 用轨迹认识函数图象。</p>'
-      : task.series === 'calculus'
-        ? '<p class="series-intro">∫ 专题：轮式机器人探秘微积分 — 用运动理解变化与累积。（建议先学函数图像 L3）</p>'
-        : '';
+      : task.series === 'pathPlan'
+        ? '<p class="series-intro">🛤 专题：轮式机器人路径规划 — 沿 y=f(x) 巡逻、拦截相遇与伴随；底部可自定义函数曲线。</p>'
+        : task.series === 'calculus'
+          ? '<p class="series-intro">∫ 专题：轮式机器人探秘微积分 — 用运动理解变化与累积。（建议先学函数图像 L3）</p>'
+          : '';
     let body = '';
     if (task.unit) body += `<h4>教材单元</h4><p>${task.unit}</p>`;
     if (task.focus) body += `<h4>探究主线</h4><p>${task.focus}</p>`;
@@ -2506,7 +2719,11 @@
     }
 
     sim.setScene(task.scene, task.sceneConfig, task.mode);
-    blocklyApp.setMode(task.mode || 'regular');
+    const blocklyMode = task.mode === 'curveTravel' ? 'curveTravel' : (task.mode || 'regular');
+    blocklyApp.setMode(blocklyMode);
+    if (typeof PlotConfig !== 'undefined') {
+      PlotConfig.onTaskLoaded(task);
+    }
     sim.lastAnalysis = null;
     loadTaskProps();
     blocklyApp.loadStarter(task);
@@ -2585,16 +2802,31 @@
 
   async function runProgram() {
     if (sim.busy) { setStatus('运行中，请稍候', 'busy'); return; }
+    if (typeof PlotConfig !== 'undefined' && PlotConfig.isEditableTask(currentTask)) {
+      PlotConfig.applyFromInputs();
+    }
     sim.reset();
     const code = blocklyApp.generate();
     document.getElementById('codeOut').textContent = code || '（无代码）';
     document.getElementById('codeOut').classList.add('show');
-    if (!code || !/__robot\.|__robotA\.|__robotB\.|__parallel/.test(code)) {
-      setStatus('请把运动积木接在「当程序开始时」下方', 'err');
+    const hasDualStart = blocklyApp.workspace?.getBlocksByType('event_start_dual', false).length > 0;
+    const codeOk = /__robot\.|__robotA\.|__robotB\.|__parallel|__curveTravelRun|__runRobotsParallel|waitUntilNear/.test(code);
+    if (!code || !codeOk) {
+      setStatus(
+        hasDualStart ? '请把运动积木接在「双车并行」的 A/B 程序槽中' : '请把运动积木接在「当程序开始时」下方',
+        'err'
+      );
       return;
     }
+    if (hasDualStart) {
+      const stripped = code.replace(/__robotA\./g, '').replace(/__robotB\./g, '');
+      if (/__robot\./.test(stripped)) {
+        setStatus('双车模式请使用「小车 A/B」积木，不要用默认单车积木', 'err');
+        return;
+      }
+    }
     const speed = parseFloat(document.getElementById('inpSpeed').value) || 10;
-    if (sim.taskMode === 'travel') {
+    if (sim.taskMode === 'travel' || sim.taskMode === 'curveTravel') {
       sim.robots.forEach(r => { r.state.speed = speed; });
     } else {
       sim.state.speed = speed;
@@ -2606,7 +2838,13 @@
       setStatus('程序运行中…', 'busy');
       await new Function('return (async () => {\n' + code + '\n})();')();
       if (!sim.runAbort) {
-        setStatus('运行完成 — 总距离 ' + runStats.totalDist.toFixed(1) + ' cm', 'ok');
+        if (sim.taskMode === 'travel' || sim.taskMode === 'curveTravel') {
+          const aDist = sim.getRobot('A')?.stats?.totalDist ?? 0;
+          const bDist = sim.getRobot('B')?.stats?.totalDist ?? 0;
+          setStatus(`运行完成 — A ${aDist.toFixed(1)} cm · B ${bDist.toFixed(1)} cm`, 'ok');
+        } else {
+          setStatus('运行完成 — 总距离 ' + runStats.totalDist.toFixed(1) + ' cm', 'ok');
+        }
       }
     } catch (e) {
       if (isProgramStopped(e)) setStatus('程序已停止', 'ok');
@@ -2625,11 +2863,17 @@
   async function startDemo() {
     if (sim.busy) return;
     const code = blocklyApp.generate();
-    if (code && /__robot\.|__robotA\.|__robotB\.|__parallel/.test(code)) { await runProgram(); return; }
+    if (code && /__robot\.|__robotA\.|__robotB\.|__parallel|__curveTravelRun|__runRobotsParallel|waitUntilNear/.test(code)) { await runProgram(); return; }
+    if (typeof PlotConfig !== 'undefined' && PlotConfig.isEditableTask(currentTask)) {
+      PlotConfig.applyFromInputs();
+    }
     sim.reset();
     const speed = parseFloat(document.getElementById('inpSpeed').value) || 10;
-    if (sim.taskMode === 'travel') sim.robots.forEach(r => { r.state.speed = speed; });
-    else sim.state.speed = speed;
+    if (sim.taskMode === 'travel' || sim.taskMode === 'curveTravel') {
+      sim.robots.forEach(r => { r.state.speed = speed; });
+    } else {
+      sim.state.speed = speed;
+    }
     try {
       sim.busy = true;
       sim.beginRun();
@@ -2649,10 +2893,17 @@
     }
   }
 
+  const TASK_ID_ALIASES = {
+    fg_l5_3: 'pp_l2_1',
+    fg_l5_4: 'pp_l2_2',
+    fg_l5_5: 'pp_l3_1'
+  };
+
   function findTaskById(taskId) {
+    const resolved = TASK_ID_ALIASES[taskId] || taskId;
     for (const [stageKey, stage] of Object.entries(CURRICULUM)) {
       for (const [gradeKey, grade] of Object.entries(stage.grades)) {
-        const index = grade.tasks.findIndex(t => t.id === taskId);
+        const index = grade.tasks.findIndex(t => t.id === resolved);
         if (index >= 0) return { stageKey, gradeKey, index, task: grade.tasks[index] };
       }
     }
@@ -2714,6 +2965,12 @@
 
   function init() {
     sim.init();
+    window.__mathlabSim = sim;
+    if (typeof PlotConfig !== 'undefined') {
+      PlotConfig.bind(sim, () => currentTask, {
+        reloadStarter: task => { if (task) blocklyApp.loadStarter(task); }
+      });
+    }
     initPropUI();
     blocklyApp.init();
     if (typeof ViewShell !== 'undefined') ViewShell.refreshAlgebraBar();

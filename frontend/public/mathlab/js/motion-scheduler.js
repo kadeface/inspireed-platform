@@ -1,4 +1,12 @@
-/* Lightweight parallel scheduler for travel mode */
+/*
+ * MotionScheduler — 单次动作列表的并行调度（如「同时 A/B 前进 N cm」）。
+ *
+ * 与上层并行的分工：
+ * - MotionScheduler.run(jobs) / __parallel(jobs)：一组离散 motion job 同时执行。
+ * - sim.runRobotsParallel(fnA, fnB)：两段完整 async 程序并行。
+ *
+ * 底层动画均由 MotionClock 统一 tick：所有 ActiveMotion 在同一 rAF 循环推进，每帧一次 draw。
+ */
 'use strict';
 
 (function () {

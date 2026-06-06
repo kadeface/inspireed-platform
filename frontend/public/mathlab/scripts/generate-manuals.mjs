@@ -9,7 +9,7 @@ const outputJsonDir = path.join(rootDir, 'data/manuals');
 const outputMdDir = path.join(rootDir, 'manuals');
 
 const stageOrder = ['primary', 'junior'];
-const subjectOrder = ['travel', 'funcGraph', 'calculus'];
+const subjectOrder = ['travel', 'funcGraph', 'pathPlan', 'calculus'];
 const gradeOrderByStage = {
   primary: ['2', '3', '4', '5', '6'],
   junior: ['7u', '7d', '8u', '8d', '9u', '9d']
@@ -23,7 +23,28 @@ const stageDisplayName = {
 const subjectDisplayName = {
   travel: '行程问题专题册',
   funcGraph: '函数图像专题册',
+  pathPlan: '路径规划专题册',
   calculus: '微积分专题册'
+};
+
+const subjectIntroNotes = {
+  travel: [
+    '',
+    '## 双车并行说明',
+    '',
+    '本专题任务使用 **「当程序开始时（双车并行）」** 入口：在 **A 程序** / **B 程序** 槽分别编写甲、乙两车逻辑，运行后同时执行。',
+    '简单相向/同向场景可用「同时 A/B 前进」积木；**延迟出发**请在 B 槽使用「等待」后再前进。',
+    ''
+  ],
+  pathPlan: [
+    '',
+    '## 双车并行说明',
+    '',
+    '路径规划任务同样使用双槽入口：A 槽可放「曲线拦截演示」或沿曲线 goto；B 槽可放等待 + 直线 goto 至交汇点。',
+    '**相距同步**：「小车 B 等待直到与 A 相距小于 ε cm」——仅阻塞 B，A 可继续沿曲线运动。',
+    '拦截的关键是 **同时到达同一点**，勿将 A 的全部 goto 复制给 B。',
+    ''
+  ]
 };
 
 function safeJson(value) {
@@ -159,6 +180,9 @@ function renderVolumeMarkdown(volume) {
     '- 使用方式：按目录选择章节，再逐项开展实验任务。',
     '- 任务编码：保留原始任务 ID，便于与 MathLab 页面联动。'
   ];
+  if (volume.type === 'subject' && subjectIntroNotes[volume.subjectKey]) {
+    intro.push(...subjectIntroNotes[volume.subjectKey]);
+  }
 
   const toc = ['## 目录'];
   volume.sections.forEach((section, idx) => {

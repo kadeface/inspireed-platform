@@ -117,13 +117,24 @@
       </div>
     </div>
 
+    <div class="plot-config-bar" id="plotConfigBar" hidden aria-label="路径规划设置">
+      <label>巡逻曲线 <input type="text" id="inpPlotExpr" value="2*x" spellcheck="false" title="y 关于 x 的表达式" /></label>
+      <label>x 从 <input type="number" id="inpPlotXMin" value="0" step="0.5" /> 到 <input type="number" id="inpPlotXMax" value="4" step="0.5" /></label>
+      <select id="selPlotPreset" title="常用曲线"></select>
+      <span class="plot-config-sep" aria-hidden="true"></span>
+      <label>B 起点 x <input type="number" id="inpChaserX" value="0" step="1" title="拦截车初始 x（cm）" /></label>
+      <label>y <input type="number" id="inpChaserY" value="0" step="1" title="拦截车初始 y（cm）" /></label>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnChaserOrigin" title="B 车回到坐标原点">B→原点</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnPlotApply">应用设置</button>
+    </div>
+
     <footer class="algebra-bar" id="algebraBar">
       <div class="alg-item"><span class="alg-k">x</span><span class="alg-v" id="algX">0</span><span class="alg-u">cm</span></div>
       <div class="alg-item"><span class="alg-k">y</span><span class="alg-v" id="algY">0</span><span class="alg-u">cm</span></div>
       <div class="alg-item"><span class="alg-k">θ</span><span class="alg-v" id="algTheta">0</span><span class="alg-u">°</span></div>
       <div class="alg-sep"></div>
-      <div class="alg-item"><span class="alg-k">S</span><span class="alg-v" id="algS">0</span><span class="alg-u">cm</span></div>
-      <div class="alg-item"><span class="alg-k">L</span><span class="alg-v" id="algL">0</span><span class="alg-u">cm</span></div>
+      <div class="alg-item"><span class="alg-k">S</span><span class="alg-v" id="algS" title="">0</span><span class="alg-u">cm</span></div>
+      <div class="alg-item"><span class="alg-k">L</span><span class="alg-v" id="algL" title="">0</span><span class="alg-u">cm</span></div>
       <div class="alg-item alg-wide" id="algExtra">就绪</div>
       <div class="alg-params">
         <label>轮径 <input type="number" id="inpDiameter" value="3" min="1" max="20" step="0.5"> cm</label>
@@ -200,15 +211,19 @@
     window.FunctionPlot = FunctionPlot;
     window.CalcGraph = CalcGraph;
   </script>
-  <script src="js/curriculum.js?v=9"></script>
+  <script src="js/curriculum.js?v=10"></script>
   <script src="js/scene-props.js?v=7"></script>
   <script src="js/trail-analysis.js?v=6"></script>
-  <script src="js/robot.js?v=1"></script>
-  <script src="js/motion-scheduler.js?v=1"></script>
+  <script src="js/robot.js?v=2"></script>
+  <script src="js/motion-clock.js?v=2"></script>
+  <script src="js/motion-scheduler.js?v=2"></script>
+  <script src="js/plot-config.js?v=3"></script>
+  <script src="js/curve-travel.js?v=3"></script>
   <script src="js/travel-validation.js?v=1"></script>
+  <script src="js/curve-travel-validation.js?v=1"></script>
   <script src="js/annotations.js?v=6"></script>
   <script src="js/view-shell.js?v=6"></script>
   <script src="js/contest.js?v=1"></script>
-  <script src="js/app.js?v=18"></script>
+  <script src="js/app.js?v=23"></script>
 </body>
 </html>

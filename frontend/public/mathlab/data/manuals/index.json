@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-02T06:42:16.874Z",
+  "generatedAt": "2026-06-04T23:52:39.853Z",
   "stageVolumes": [
     {
       "id": "stage-primary",
@@ -31,9 +31,17 @@
       "id": "subject-funcGraph",
       "title": "函数图像专题册",
       "stageName": "轮式机器人探秘函数图像",
-      "taskCount": 17,
+      "taskCount": 18,
       "sectionCount": 6,
       "path": "./subject-funcGraph.json"
+    },
+    {
+      "id": "subject-pathPlan",
+      "title": "路径规划专题册",
+      "stageName": "轮式机器人路径规划",
+      "taskCount": 5,
+      "sectionCount": 4,
+      "path": "./subject-pathPlan.json"
     },
     {
       "id": "subject-calculus",

@@ -30,7 +30,7 @@
           ],
           "focus": "",
           "challenges": [],
-          "hint": "",
+          "hint": "双车同向追及：A 槽写慢车前进、B 槽写快车前进，从 s-t 图读交点时刻。",
           "formulas": [
             {
               "title": "追及",
@@ -101,7 +101,7 @@
           ],
           "focus": "",
           "challenges": [],
-          "hint": "",
+          "hint": "使用「双车并行」入口：A 槽写甲车前进、B 槽写乙车前进，运行后观察 s-t 图两线同时上升。",
           "formulas": [
             {
               "title": "相遇",
@@ -171,7 +171,7 @@
           ],
           "focus": "",
           "challenges": [],
-          "hint": "",
+          "hint": "A 槽写甲车立即前进；B 槽先「等待 2 秒」再写乙车前进，模拟延迟出发。",
           "formulas": [
             {
               "title": "分段",

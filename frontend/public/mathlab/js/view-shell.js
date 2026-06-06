@@ -374,18 +374,70 @@ const ViewShell = {
   },
 
   refreshAlgebraBar() {
-    const s = this.sim?.state;
-    if (!s) return;
-    const ox = s.startX;
-    const oy = s.startY;
+    const sim = this.sim;
+    if (!sim) return;
+    const isDual = sim.taskMode === 'travel' || sim.taskMode === 'curveTravel';
     const PX = 5;
-    const xCm = ((s.x - ox) / PX).toFixed(1);
-    const yCm = ((oy - s.y) / PX).toFixed(1);
-    const deg = ((s.angle * 180 / Math.PI) % 360 + 360) % 360;
+    const ox = sim.trackOriginX ?? sim.state?.startX ?? 0;
+    const oy = sim.trackOriginY ?? sim.state?.startY ?? 0;
     const set = (id, v) => {
       const el = document.getElementById(id);
       if (el) el.textContent = v;
     };
+    const posCm = (robot) => {
+      if (!robot) return null;
+      const s = robot.state;
+      return {
+        x: ((s.x - ox) / PX).toFixed(1),
+        y: ((oy - s.y) / PX).toFixed(1),
+        deg: (((s.angle * 180 / Math.PI) % 360) + 360) % 360
+      };
+    };
+
+    if (isDual && sim.getRobot('B')) {
+      const a = sim.getRobot('A');
+      const b = sim.getRobot('B');
+      const pa = posCm(a);
+      const pb = posCm(b);
+      set('algX', pa?.x ?? '0');
+      set('algY', pa?.y ?? '0');
+      set('algTheta', pa ? pa.deg.toFixed(0) : '0');
+      const aDist = a?.stats?.totalDist ?? 0;
+      const bDist = b?.stats?.totalDist ?? 0;
+      const algS = document.getElementById('algS');
+      if (algS) {
+        algS.textContent = `${aDist.toFixed(1)} / ${bDist.toFixed(1)}`;
+        algS.title = 'A 路程 / B 路程 (cm)';
+      }
+      let lText = '—';
+      if (typeof TrailAnalysis !== 'undefined') {
+        const lA = a?.trail?.length > 1 ? TrailAnalysis.arcLengthCm(a.trail) : 0;
+        const lB = b?.trail?.length > 1 ? TrailAnalysis.arcLengthCm(b.trail) : 0;
+        lText = `${lA.toFixed(1)} / ${lB.toFixed(1)}`;
+      }
+      set('algL', lText);
+      const algBar = document.getElementById('algebraBar');
+      if (algBar) algBar.dataset.dual = '1';
+      if (pb) {
+        this.setAlgebraExtra(
+          `A (${pa?.x}, ${pa?.y}) · B (${pb.x}, ${pb.y}) · ` +
+          `S<sub>A</sub>=${aDist.toFixed(1)} S<sub>B</sub>=${bDist.toFixed(1)} cm`
+        );
+      }
+      this.refreshTrailPanel();
+      return;
+    }
+
+    const algBar = document.getElementById('algebraBar');
+    if (algBar) delete algBar.dataset.dual;
+    const algS = document.getElementById('algS');
+    if (algS) algS.removeAttribute('title');
+
+    const s = sim.state;
+    if (!s) return;
+    const xCm = ((s.x - ox) / PX).toFixed(1);
+    const yCm = ((oy - s.y) / PX).toFixed(1);
+    const deg = ((s.angle * 180 / Math.PI) % 360 + 360) % 360;
     set('algX', xCm);
     set('algY', yCm);
     set('algTheta', deg.toFixed(0));
@@ -393,9 +445,9 @@ const ViewShell = {
       set('algS', runStats.totalDist.toFixed(1));
     }
     if (typeof TrailAnalysis !== 'undefined') {
-      const L = this.sim.lastAnalysis
-        ? this.sim.lastAnalysis.arcLengthCm
-        : TrailAnalysis.arcLengthCm(this.sim.trail);
+      const L = sim.lastAnalysis
+        ? sim.lastAnalysis.arcLengthCm
+        : TrailAnalysis.arcLengthCm(sim.trail);
       set('algL', L.toFixed(1));
     }
     this.refreshTrailPanel();

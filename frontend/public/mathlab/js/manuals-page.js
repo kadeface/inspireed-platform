@@ -229,9 +229,24 @@
       steps.forEach((m) => chain.push(blockToken('向角度移动', `${m.angle ?? 0}°, ${m.dist ?? 0}cm`)));
     }
 
-    if (s.travelParallel) {
+    if ('travelParallel' in s) {
       chain.length = 0;
-      chain.push('<span class="ml-block ml-repeat">双车并行</span>');
+      chain.push('<span class="ml-block ml-dual">双车并行 · A 前进</span>');
+      chain.push('<span class="ml-block ml-dual">双车并行 · B 前进</span>');
+    }
+
+    if (s.travelDelayStart) {
+      const d = s.travelDelayStart;
+      chain.length = 0;
+      chain.push('<span class="ml-block ml-dual">A 程序 · 前进</span>');
+      if (d.waitSec != null) chain.push(blockToken('B 等待', `${d.waitSec} s`));
+      chain.push('<span class="ml-block ml-dual">B 程序 · 前进</span>');
+    }
+
+    if (s.curveTravelRun) {
+      chain.length = 0;
+      chain.push('<span class="ml-block ml-dual">A · 曲线拦截演示</span>');
+      chain.push('<span class="ml-block ml-dual">B · （可自定义 goto）</span>');
     }
 
     const flow = chain.length
@@ -253,8 +268,14 @@
       const m = Array.isArray(s.move2d) ? s.move2d[0] : s.move2d;
       concreteExamples.push(`示例：用“向角度移动”，角度 ${m.angle ?? 0}°，距离 ${m.dist ?? 0} cm。`);
     }
-    if (s.travelParallel) {
-      concreteExamples.push('示例：使用双车并行积木，让 A/B 两车按设定距离同步运动。');
+    if ('travelParallel' in s) {
+      concreteExamples.push('示例：在「双车并行」的 A/B 槽分别拖入「小车 A/B 前进」，两车同时运动。');
+    }
+    if (s.travelDelayStart) {
+      concreteExamples.push('示例：A 槽写前进，B 槽先等待再前进，表示延迟出发。');
+    }
+    if (s.curveTravelRun) {
+      concreteExamples.push('示例：A 槽使用「曲线拦截演示」；B 槽可写等待 + goto 至交汇点。');
     }
 
     return [
@@ -274,14 +295,31 @@
   function renderStarterCode(s) {
     if (!s) return '// 无 starter 示例';
 
-    if (s.travelParallel) {
-      const list = s.travelParallel || [];
-      const a = list.find((i) => (i.robot || 'A') === 'A')?.cm ?? 0;
-      const b = list.find((i) => (i.robot || 'B') === 'B')?.cm ?? 0;
+    if ('travelParallel' in s) {
       return [
-        'start();',
-        `parallelMove(${a}, ${b});`,
-        'stop();'
+        'await __runRobotsParallel(',
+        '  async () => { await __robotA.forward(dA); },',
+        '  async () => { await __robotB.forward(dB); }',
+        ');'
+      ].join('\n');
+    }
+
+    if (s.travelDelayStart) {
+      const w = s.travelDelayStart.waitSec ?? 2;
+      return [
+        'await __runRobotsParallel(',
+        '  async () => { await __robotA.forward(dA); },',
+        `  async () => { await __robotB.wait(${w}); await __robotB.forward(dB); }`,
+        ');'
+      ].join('\n');
+    }
+
+    if (s.curveTravelRun) {
+      return [
+        'await __runRobotsParallel(',
+        "  async () => { await __curveTravelRun('meet'); },",
+        '  async () => { /* B 槽自定义 */ }',
+        ');'
       ].join('\n');
     }
 

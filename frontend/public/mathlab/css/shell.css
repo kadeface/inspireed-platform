@@ -431,6 +431,8 @@ html, body {
   border-top: 1px solid #334155;
   overflow-x: auto;
 }
+.algebra-bar[data-dual="1"] .alg-item:nth-child(4) .alg-k::after { content: '(A/B)'; font-size: .65rem; color: #64748b; margin-left: 2px; }
+.algebra-bar[data-dual="1"] .alg-item:nth-child(5) .alg-k::after { content: '(A/B)'; font-size: .65rem; color: #64748b; margin-left: 2px; }
 .alg-item { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
 .alg-k { color: #94a3b8; font-weight: 600; }
 .alg-v { color: #5eead4; font-weight: 700; min-width: 2.5em; text-align: right; }
@@ -686,6 +688,47 @@ pre.code.show { display: block; }
   font-size: 12px;
   line-height: 1.5;
 }
+
+.plot-config-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.04);
+  font-size: .78rem;
+}
+.plot-config-bar[hidden] { display: none !important; }
+.plot-config-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.plot-config-bar input,
+.plot-config-bar select {
+  font: inherit;
+  font-size: .78rem;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+.plot-config-bar #inpPlotExpr { width: min(140px, 28vw); }
+.plot-config-bar #inpPlotXMin,
+.plot-config-bar #inpPlotXMax { width: 44px; }
+.plot-config-bar #selPlotPreset { max-width: 160px; }
+.plot-config-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.plot-config-bar #inpChaserX,
+.plot-config-bar #inpChaserY { width: 48px; }
 
 @media (max-width: 640px) {
   .topbar-brand h1 { display: none; }

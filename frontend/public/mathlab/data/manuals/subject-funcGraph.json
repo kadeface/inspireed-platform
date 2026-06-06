@@ -4,7 +4,7 @@
   "subjectKey": "funcGraph",
   "title": "函数图像专题册",
   "stageName": "轮式机器人探秘函数图像",
-  "taskCount": 17,
+  "taskCount": 18,
   "sectionLabel": "层级",
   "sections": [
     {
@@ -875,7 +875,7 @@
     {
       "levelKey": "l5",
       "levelName": "L5 拓展",
-      "taskCount": 2,
+      "taskCount": 3,
       "tasks": [
         {
           "id": "fg_l5_1",
@@ -992,6 +992,62 @@
             ]
           },
           "demo": "plotPiecewise"
+        },
+        {
+          "id": "fg_l5_3",
+          "title": "延伸阅读：曲线巡逻与路径规划",
+          "unit": "拓展",
+          "stageKey": "funcGraph",
+          "gradeKey": "l5",
+          "gradeName": "L5 拓展",
+          "scene": "function",
+          "tags": [
+            "路径规划",
+            "双车"
+          ],
+          "goals": [
+            "知道路径规划专题与函数图像专题的分工",
+            "在「轮式机器人路径规划」中可自定义 y=f(x) 并实验"
+          ],
+          "focus": "双车沿函数曲线拦截/伴随属于路径规划问题，已独立为专题课程",
+          "challenges": [],
+          "hint": "课程抽屉 → 学段选「轮式机器人路径规划」→ 从 L1 开始；自由实验见 L4 实验室。",
+          "formulas": [
+            {
+              "title": "轮子周长",
+              "tex": "$$C = \\pi \\times d$$"
+            },
+            {
+              "title": "行进距离",
+              "tex": "$$S = C \\times n$$"
+            }
+          ],
+          "sceneConfig": {
+            "cols": 12,
+            "rows": 10,
+            "cellCm": 10,
+            "plot": {
+              "expr": "2*x",
+              "xMin": 0,
+              "xMax": 4,
+              "step": 1,
+              "color": "#38bdf8",
+              "label": "y=2x"
+            }
+          },
+          "starter": {
+            "goto": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 20,
+                "y": 40
+              }
+            ]
+          },
+          "demo": "plotLinear"
         }
       ]
     }
