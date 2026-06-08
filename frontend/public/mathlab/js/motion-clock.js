@@ -34,7 +34,7 @@
         const px = simRef.getPxPerCm();
         s.wheelAngle += Math.abs(this.cm) * px * 0.06 * Math.sign(this.cm || 1) * (p - prevP);
         s.elapsed += this.dur * (p - prevP) / 1000;
-        if (p > 0.01 && p - prevP > 0.0001) robot.trail.push({ x: s.x, y: s.y });
+        if (p > 0.01 && p - prevP > 0.0001) simRef.pushTrailPoint(robot, s.x, s.y);
         simRef.sampleMotion(robot);
         simRef.syncPrimaryStats?.(robot);
         if (p >= 1) {

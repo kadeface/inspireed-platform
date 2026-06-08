@@ -20,6 +20,10 @@
         elapsed: 0
       },
       trail: [],
+      penDown: true,
+      trailBreakNext: false,
+      trailColor: o.color || '#14b8a6',
+      trailWidth: 2.5,
       stats: { totalDist: 0, totalTime: 0, turns: [], waits: 0 }
     };
   }
@@ -37,6 +41,10 @@
       setSpeed: v => sim.setSpeed(v, id),
       wait: sec => sim.wait((sec || 0) * 1000, id),
       waitUntilNear: (otherId, epsilonCm) => sim.waitUntilRobotsNear(id, otherId || (id === 'A' ? 'B' : 'A'), epsilonCm),
+      trailOn: () => sim.setPenDown(true, id),
+      trailOff: () => sim.setPenDown(false, id),
+      setTrailColor: color => sim.setTrailColor(color, id),
+      setTrailWidth: width => sim.setTrailWidth(width, id),
       stop: () => sim.haltProgram()
     };
   }

@@ -148,6 +148,9 @@ const ViewShell = {
 
     tbody.innerHTML = indices.map((idx, row) => {
       const p = raw[idx];
+      if (p.break) {
+        return '<tr class="trail-break"><td>' + (row + 1) + '</td><td colspan="2">↯ 新段起点</td></tr>';
+      }
       const x = ((p.x - ox) / PX).toFixed(1);
       const y = ((oy - p.y) / PX).toFixed(1);
       return '<tr><td>' + (row + 1) + '</td><td>' + x + '</td><td>' + y + '</td></tr>';

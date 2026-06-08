@@ -8,6 +8,7 @@ const TrailAnalysis = {
     if (!trail || trail.length < 2) return 0;
     let len = 0;
     for (let i = 1; i < trail.length; i++) {
+      if (trail[i].break) continue;
       len += Math.hypot(trail[i].x - trail[i - 1].x, trail[i].y - trail[i - 1].y);
     }
     return len / this.PX_PER_CM;

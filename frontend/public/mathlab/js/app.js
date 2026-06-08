@@ -70,7 +70,7 @@
           speed: 10
         })
       ];
-      this.getPrimaryRobot().trail = [{ x: GRID_STEP, y: GRID_STEP * 4 }];
+      this.seedTrailAt(this.getPrimaryRobot(), GRID_STEP, GRID_STEP * 4);
       window.__simRef = this;
       if (typeof MotionClock !== 'undefined') MotionClock.attach(this);
       document.getElementById('inpSpeed').addEventListener('input', e => {
@@ -110,9 +110,62 @@
       };
     },
 
+    resetRobotPen(r) {
+      r.penDown = true;
+      r.trailBreakNext = false;
+      r.trailColor = r.color;
+      r.trailWidth = 2.5;
+    },
+
+    setPenDown(on, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      const was = robot.penDown;
+      robot.penDown = !!on;
+      if (!was && robot.penDown) robot.trailBreakNext = true;
+    },
+
+    setTrailColor(color, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      robot.trailColor = color || robot.color;
+    },
+
+    setTrailWidth(width, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      const w = Number(width);
+      robot.trailWidth = Number.isFinite(w) ? Math.max(1, Math.min(12, w)) : 2.5;
+    },
+
+    pushTrailPoint(robot, x, y) {
+      if (!robot?.penDown) return;
+      const pt = {
+        x,
+        y,
+        color: robot.trailColor ?? robot.color,
+        width: robot.trailWidth ?? 2.5
+      };
+      if (robot.trailBreakNext) {
+        pt.break = true;
+        robot.trailBreakNext = false;
+      }
+      robot.trail.push(pt);
+    },
+
+    seedTrailAt(robot, x, y) {
+      robot.trail = [{
+        x,
+        y,
+        color: robot.trailColor ?? robot.color,
+        width: robot.trailWidth ?? 2.5
+      }];
+    },
+
     clearTrail() {
       this.robots.forEach(r => {
-        r.trail = [{ x: r.state.x, y: r.state.y }];
+        this.seedTrailAt(r, r.state.x, r.state.y);
+        this.resetRobotPen(r);
       });
       this.travelSamples = [];
       this.lastAnalysis = null;
@@ -209,8 +262,9 @@
         s.dist = 0;
         s.wheelAngle = 0;
         s.elapsed = 0;
-        r.trail = [{ x: s.x, y: s.y }];
         r.stats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
+        this.resetRobotPen(r);
+        this.seedTrailAt(r, s.x, s.y);
       });
       this.travelSamples = [];
       this.motionSamples = [];
@@ -287,8 +341,9 @@
         r.state.startY = y;
         r.state.dist = 0;
         r.state.elapsed = 0;
-        r.trail = [{ x, y }];
         r.stats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
+        this.resetRobotPen(r);
+        this.seedTrailAt(r, x, y);
       });
       this.travelSamples = [];
       this.motionSamples = [];
@@ -1361,23 +1416,52 @@
       if (tr.length < 2) return;
       const { ctx } = this;
       const isPoint = this.renderMode === 'point';
-      ctx.beginPath();
-      ctx.moveTo(tr[0].x, tr[0].y);
-      for (let i = 1; i < tr.length; i++) ctx.lineTo(tr[i].x, tr[i].y);
-      ctx.strokeStyle = isPoint ? '#38bdf8' : (robot?.color || '#f97316');
-      ctx.lineWidth = isPoint ? 3 : 2.5;
-      if (isPoint) ctx.setLineDash([6, 4]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      if (isPoint && tr.length <= 80) {
-        ctx.fillStyle = 'rgba(56,189,248,.85)';
-        tr.forEach((p, i) => {
-          if (i === 0 || i === tr.length - 1) return;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
-          ctx.fill();
-        });
+      const scale = this.viewport?.scale || 1;
+      const defaultColor = robot?.trailColor ?? robot?.color ?? '#f97316';
+      const defaultWidth = robot?.trailWidth ?? 2.5;
+
+      const strokeBatch = (batch) => {
+        if (batch.length < 2) return;
+        ctx.beginPath();
+        for (let i = 0; i < batch.length; i++) {
+          const p = batch[i];
+          if (p.x == null || p.y == null) continue;
+          if (i === 0 || p.break) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        const head = batch[0];
+        const color = head.color ?? defaultColor;
+        const width = head.width ?? defaultWidth;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = (isPoint ? Math.max(width, 2.5) : width) / scale;
+        if (isPoint) ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        if (isPoint && batch.length <= 80) {
+          ctx.fillStyle = color;
+          batch.forEach((p, i) => {
+            if (i === 0 || i === batch.length - 1 || p.x == null) return;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 2.5 / scale, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
+      };
+
+      let batch = [tr[0]];
+      for (let i = 1; i < tr.length; i++) {
+        const p = tr[i];
+        const prev = tr[i - 1];
+        const styleChange = (p.color ?? defaultColor) !== (prev.color ?? defaultColor)
+          || (p.width ?? defaultWidth) !== (prev.width ?? defaultWidth);
+        if (p.break || styleChange) {
+          strokeBatch(batch);
+          batch = [p];
+        } else {
+          batch.push(p);
+        }
       }
+      strokeBatch(batch);
     },
 
     drawPoint(r) {
@@ -2087,6 +2171,30 @@
           previousStatement: true, nextStatement: true, colour: 120 },
         { type: 'motion_wait', message0: '等待 %1 秒', args0: [{ type: 'input_value', name: 'T', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 60 },
+        { type: 'motion_trail_on', message0: '开始绘制轨迹',
+          previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_trail_off', message0: '停止绘制轨迹',
+          previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_trail_on_robot', message0: '小车 %1 开始绘制轨迹', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] }
+          ], previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_trail_off_robot', message0: '小车 %1 停止绘制轨迹', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] }
+          ], previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_trail_color', message0: '设置轨迹颜色 %1', args0: [
+            { type: 'field_colour', name: 'COLOR', colour: '#f97316' }
+          ], previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_trail_width', message0: '设置轨迹粗细 %1', args0: [
+            { type: 'input_value', name: 'W', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_trail_color_robot', message0: '小车 %1 设置轨迹颜色 %2', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'field_colour', name: 'COLOR', colour: '#f97316' }
+          ], previousStatement: true, nextStatement: true, colour: 160 },
+        { type: 'motion_trail_width_robot', message0: '小车 %1 设置轨迹粗细 %2', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'input_value', name: 'W', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 160 },
         { type: 'motion_stop', message0: '停止程序', previousStatement: true, nextStatement: true, colour: 60 },
         { type: 'motion_forward_robot', message0: '小车 %1 前进 %2 厘米', args0: [
             { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
@@ -2218,6 +2326,34 @@
       gen('motion_turn_left', b => `await __robot.turnLeft(${J.valueToCode(b, 'A', J.ORDER_NONE) || 0});\n`);
       gen('motion_speed', b => `__robot.setSpeed(${J.valueToCode(b, 'S', J.ORDER_NONE) || 10});\n`);
       gen('motion_wait', b => `await __robot.wait(${J.valueToCode(b, 'T', J.ORDER_NONE) || 1});\n`);
+      gen('motion_trail_on', () => `__simRef.setPenDown(true);\n`);
+      gen('motion_trail_off', () => `__simRef.setPenDown(false);\n`);
+      gen('motion_trail_on_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        return `__simRef.setPenDown(true, '${robot}');\n`;
+      });
+      gen('motion_trail_off_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        return `__simRef.setPenDown(false, '${robot}');\n`;
+      });
+      gen('motion_trail_color', b => {
+        const c = b.getFieldValue('COLOR') || '#f97316';
+        return `__simRef.setTrailColor('${c}');\n`;
+      });
+      gen('motion_trail_width', b => {
+        const w = J.valueToCode(b, 'W', J.ORDER_NONE) || 2.5;
+        return `__simRef.setTrailWidth(${w});\n`;
+      });
+      gen('motion_trail_color_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        const c = b.getFieldValue('COLOR') || '#f97316';
+        return `__simRef.setTrailColor('${c}', '${robot}');\n`;
+      });
+      gen('motion_trail_width_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        const w = J.valueToCode(b, 'W', J.ORDER_NONE) || 2.5;
+        return `__simRef.setTrailWidth(${w}, '${robot}');\n`;
+      });
       gen('motion_stop', () => `__robot.stop();\n`);
       gen('motion_forward_robot', b => {
         const robot = b.getFieldValue('ROBOT') || 'A';
@@ -2422,6 +2558,13 @@
               <field name="OTHER">A</field>
               <value name="EPS"><shadow type="math_num"><field name="N">5</field></shadow></value>
             </block>
+            <block type="motion_trail_on_robot"><field name="ROBOT">A</field></block>
+            <block type="motion_trail_off_robot"><field name="ROBOT">A</field></block>
+            <block type="motion_trail_color_robot"><field name="ROBOT">A</field><field name="COLOR">#14b8a6</field></block>
+            <block type="motion_trail_width_robot">
+              <field name="ROBOT">A</field>
+              <value name="W"><shadow type="math_num"><field name="N">3</field></shadow></value>
+            </block>
             <block type="control_parallel_move">
               <value name="DA"><shadow type="math_num"><field name="N">40</field></shadow></value>
               <value name="DB"><shadow type="math_num"><field name="N">20</field></shadow></value>
@@ -2445,6 +2588,10 @@
               <value name="Y"><shadow type="math_num"><field name="N">0</field></shadow></value>
             </block>
             <block type="motion_face_angle"><value name="ANGLE"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
+            <block type="motion_trail_on"></block>
+            <block type="motion_trail_off"></block>
+            <block type="motion_trail_color"><field name="COLOR">#f97316</field></block>
+            <block type="motion_trail_width"><value name="W"><shadow type="math_num"><field name="N">3</field></shadow></value></block>
             ${travelExtra}
           </category>
           <category name="流程控制" colour="65">
