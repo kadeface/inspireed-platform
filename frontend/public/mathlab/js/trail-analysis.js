@@ -4,22 +4,28 @@
 const TrailAnalysis = {
   PX_PER_CM: 5,
 
-  arcLengthCm(trail) {
+  pxPerCm(sim) {
+    return sim?.getPxPerCm ? sim.getPxPerCm() : this.PX_PER_CM;
+  },
+
+  arcLengthCm(trail, pxPerCm) {
     if (!trail || trail.length < 2) return 0;
+    const px = pxPerCm ?? this.PX_PER_CM;
     let len = 0;
     for (let i = 1; i < trail.length; i++) {
       if (trail[i].break) continue;
       len += Math.hypot(trail[i].x - trail[i - 1].x, trail[i].y - trail[i - 1].y);
     }
-    return len / this.PX_PER_CM;
+    return len / px;
   },
 
   toCm(sim, x, y) {
     const ox = sim.state.startX;
     const oy = sim.state.startY;
+    const px = this.pxPerCm(sim);
     return {
-      x: (x - ox) / this.PX_PER_CM,
-      y: (oy - y) / this.PX_PER_CM
+      x: (x - ox) / px,
+      y: (oy - y) / px
     };
   },
 
@@ -136,7 +142,8 @@ const TrailAnalysis = {
 
   analyze(sim) {
     const trail = sim.trail || [];
-    const arcCm = this.arcLengthCm(trail);
+    const px = this.pxPerCm(sim);
+    const arcCm = this.arcLengthCm(trail, px);
     const param = this.parametricSummary(sim, 6);
     const target = this.getTargetPolyline(sim);
 
@@ -160,7 +167,7 @@ const TrailAnalysis = {
       trail[trail.length - 1].x - trail[0].x,
       trail[trail.length - 1].y - trail[0].y
     );
-    base.closeGapCm = closePx / this.PX_PER_CM;
+    base.closeGapCm = closePx / px;
 
     if (!target) {
       base.message = 'L ≈ ' + arcCm.toFixed(1) + ' cm · 闭合间隙 ' + base.closeGapCm.toFixed(1) + ' cm';
@@ -175,7 +182,7 @@ const TrailAnalysis = {
 
     let sumDev = 0;
     sample.forEach(p => { sumDev += this.distToPolyline(p.x, p.y, target.points); });
-    base.meanDevCm = (sumDev / sample.length) / this.PX_PER_CM;
+    base.meanDevCm = (sumDev / sample.length) / px;
 
     const devScore = Math.max(0, 100 - base.meanDevCm * 15);
     const lenRatio = target.perimeterCm > 0 ? arcCm / target.perimeterCm : 1;

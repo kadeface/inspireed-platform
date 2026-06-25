@@ -1,5 +1,7 @@
 # mathlab · 轮式机器人数学融合互动教学
 
+> **用户说明书**：[MathLab 用户说明书](../../docs/MATHLAB_MANUAL.md)（界面操作、课程体系、课堂竞赛、FAQ）
+
 基于《轮式机器人数学融合教案（完整版）》开发的浏览器互动教学平台：拖拽 Blockly 积木控制虚拟机器人，在模拟中完成测距、转角、走图形、坐标导航、函数图象与微积分直觉等任务。
 
 ## 目录位置
@@ -60,6 +62,9 @@ node --test frontend/public/mathlab/tests/motion-clock.test.js
 index.html              # 主入口
 css/shell.css           # 样式（含 s-t / v-t 图表面板）
 js/curriculum.js        # 教案与专题任务数据、SCENE 常量
+manuals/                # 学生活动实验手册（MD，由脚本生成）
+  curriculum-merged.md  # 合并总册（99 课，完整字段镜像）
+scripts/generate-manuals.mjs  # curriculum.js → manuals/ + data/manuals/
 js/function-plot.js     # y=f(x) 采样与轨迹验证（ESM）
 js/calc-graph.js        # 斜率、黎曼和（ESM）
 js/motion-clock.js      # 统一运动时钟（ActiveMotion + rAF tick）
@@ -69,6 +74,8 @@ js/contest.js           # 课堂竞赛模式
 tests/                  # node --test 纯函数用例
 docs/                   # 教案文档与早期单文件版（归档）
 ```
+
+修改 `curriculum.js` 后，在 `frontend` 目录执行 `pnpm mathlab:manuals` 可重新生成合并总册与分册手册。
 
 ## 使用说明
 

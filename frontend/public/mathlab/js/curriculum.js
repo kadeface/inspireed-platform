@@ -338,13 +338,21 @@ const CURRICULUM = {
         tasks: [
           task('j7u1', '任务1：数轴定位与有理数运算', '有理数', SCENE.NUMBERLINE, {
             tags: ['数轴', '有理数', '加减'],
-            goals: ['数轴三要素', '用前进/后退表示正负', '验证 (+5)+(-3)=+2'],
+            goals: [
+              '数轴三要素：原点、正方向、单位长度',
+              '沿正方向前进表示正数',
+              '转 180° 后前进表示负数（车头与移动方向一致）',
+              '验证 (+5)+(-3)=+2'
+            ],
             formulas: [{ title: '数轴', tex: '原点 · 正方向 · 单位长度' }],
             sceneConfig: { min: -10, max: 10, unitCm: 20 },
-            challenges: ['前进 100cm（+5 个单位）', '再后退 60cm（-3 个单位），停在 +2'],
-            hint: '数轴上 1 个单位 = 20cm。前进 100cm = +5，后退 60cm = -3，最终停在 +2。',
-            starter: { forward: 100, backward: 60 },
-            demo: 'numberline'
+            challenges: [
+              '沿正方向前进 100cm（+5 个单位）',
+              '转 180° 后前进 60cm（-3 个单位），停在 +2'
+            ],
+            hint: '数轴上 1 个单位 = 20cm。先沿 → 前进 100cm（+5），再转 180° 朝 ← 前进 60cm（-3），最终停在 +2。',
+            starter: { forward: 100, turn: 180, forward2: 60 },
+            demo: 'numberlineRational'
           }),
           task('j7u2', '任务2：行程方程解速度', '一元一次方程', SCENE.TIME, {
             tags: ['方程', '速度', 'S=vt'],
@@ -849,12 +857,17 @@ const CURRICULUM = {
         tasks: [
           task('fg_l0_1', '数轴上的位置', '数轴与对应', SCENE.NUMBERLINE, {
             series: 'funcGraph', level: 'L0',
-            tags: ['数轴', '位置'],
-            goals: ['在数轴上走到指定位置', '理解数与距离的一一对应'],
+            tags: ['数轴', '位置', '正方向'],
+            goals: [
+              '认识原点、正方向（→）与单位长度',
+              '沿正方向前进表示向正半轴移动',
+              '转 180° 后前进表示向负半轴移动',
+              '理解数与位置的一一对应'
+            ],
             sceneConfig: { min: -5, max: 10, unitCm: 20 },
-            challenges: ['走到 +3', '走到 +7', '走到 -2'],
-            hint: '用「沿当前朝向前进/后退」配合数轴刻度。',
-            starter: { forward: 60, backward: 40 },
+            challenges: ['沿正方向走到 +3', '沿正方向走到 +7', '转 180° 后走到 -2'],
+            hint: '车头默认朝正方向 →。用「向角度 0° 移动」走正半轴；要走负半轴时「右转 180°」再「前进」，勿用后退（车头应与移动方向一致）。',
+            starter: { forward: 60, turn: 180, forward2: 40 },
             demo: 'numberline'
           }),
           task('fg_l0_2', '步长与数列', '数轴与对应', SCENE.DISTANCE, {
@@ -925,7 +938,8 @@ const CURRICULUM = {
               cols: 10, rows: 10, cellCm: 10,
               plot: { expr: '2*x', xMin: 0, xMax: 3, step: 1, color: '#38bdf8', label: 'y=2x' }
             },
-            plotValidate: { expr: '2*x', toleranceCm: 1.5 },
+            plotValidate: { expr: '2*x', toleranceCm: 1.5, mode: 'vertices' },
+            hint: '每个描点：停止绘制 → 移动到 (x,y) → 开始绘制；可切换 ● 点模式观察离散顶点。',
             starter: { goto: [{ x: 0, y: 0 }, { x: 10, y: 20 }, { x: 20, y: 40 }, { x: 30, y: 60 }] },
             demo: 'plotLinear'
           }),
@@ -940,9 +954,9 @@ const CURRICULUM = {
                 { expr: '2*x', xMin: 0, xMax: 4, step: 1, color: '#f97316', label: 'y=2x' }
               ]
             },
-            plotValidate: { expr: '2*x', toleranceCm: 1.5 },
+            plotValidate: { expr: '2*x', toleranceCm: 1.5, mode: 'vertices' },
             starter: { goto: [{ x: 0, y: 0 }, { x: 10, y: 20 }, { x: 20, y: 40 }] },
-            hint: '先走 y=2x 上的点，再与 y=x 参考线对比。',
+            hint: '描 y=2x 上的点：停止绘制 → goto → 开始绘制；再与 y=x 参考线对比。',
             demo: 'plotLinear'
           }),
           task('fg_l2_3', '过原点的直线', '正比例', SCENE.FUNCTION, {
@@ -956,8 +970,9 @@ const CURRICULUM = {
                 { expr: '3*x', xMin: 0, xMax: 3, step: 1, color: '#f97316', label: 'y=3x' }
               ]
             },
-            plotValidate: { expr: '3*x', toleranceCm: 1.5 },
+            plotValidate: { expr: '3*x', toleranceCm: 1.5, mode: 'vertices' },
             starter: { goto: [{ x: 0, y: 0 }, { x: 10, y: 30 }, { x: 20, y: 60 }] },
+            hint: '每个描点：停止绘制 → 移动到 (x,y) → 开始绘制。',
             demo: 'plotLinearSteep'
           })
         ]
@@ -973,7 +988,8 @@ const CURRICULUM = {
               cols: 12, rows: 10, cellCm: 10,
               plot: { expr: '2*x+3', xMin: 0, xMax: 4, step: 1, color: '#38bdf8', label: 'y=2x+3' }
             },
-            plotValidate: { expr: '2*x+3', toleranceCm: 1.5 },
+            plotValidate: { expr: '2*x+3', toleranceCm: 1.5, mode: 'vertices' },
+            hint: '每个描点：停止绘制 → 移动到 (x,y) → 开始绘制。',
             starter: { goto: [{ x: 0, y: 30 }, { x: 10, y: 50 }, { x: 20, y: 70 }, { x: 30, y: 90 }] },
             demo: 'plotLinearIntercept'
           }),
@@ -1007,7 +1023,8 @@ const CURRICULUM = {
               cols: 12, rows: 12, cellCm: 10,
               plot: { expr: 'x*x', xMin: -2, xMax: 2, step: 1, color: '#a78bfa', label: 'y=x²' }
             },
-            plotValidate: { expr: 'x*x', toleranceCm: 2 },
+            plotValidate: { expr: 'x*x', toleranceCm: 2, mode: 'vertices' },
+            hint: '每个描点：停止绘制 → 移动到 (x,y) → 开始绘制；勿用连续 goto 连线。',
             starter: { goto: [{ x: -20, y: 40 }, { x: -10, y: 10 }, { x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 40 }] },
             demo: 'plotParabola'
           }),
@@ -1023,7 +1040,8 @@ const CURRICULUM = {
                 { expr: '0.5*x*x', xMin: -2, xMax: 2, step: 1, color: '#94a3b8', label: 'y=0.5x²' }
               ]
             },
-            plotValidate: { expr: 'x*x', toleranceCm: 2 },
+            plotValidate: { expr: 'x*x', toleranceCm: 2, mode: 'vertices' },
+            hint: '每个描点：停止绘制 → 移动到 (x,y) → 开始绘制。',
             starter: { goto: [{ x: -20, y: 40 }, { x: 0, y: 0 }, { x: 20, y: 40 }] },
             demo: 'plotParabola'
           }),
@@ -1035,7 +1053,8 @@ const CURRICULUM = {
               cols: 12, rows: 12, cellCm: 10,
               plot: { expr: '(x-1)*(x-1)+2', xMin: -1, xMax: 3, step: 1, color: '#f472b6', label: 'y=(x-1)²+2' }
             },
-            plotValidate: { expr: '(x-1)*(x-1)+2', toleranceCm: 2 },
+            plotValidate: { expr: '(x-1)*(x-1)+2', toleranceCm: 2, mode: 'vertices' },
+            hint: '每个描点：停止绘制 → 移动到 (x,y) → 开始绘制。',
             starter: { goto: [{ x: 0, y: 30 }, { x: 10, y: 20 }, { x: 20, y: 30 }, { x: 30, y: 50 }] },
             demo: 'plotParabolaShifted'
           })
@@ -1052,7 +1071,7 @@ const CURRICULUM = {
               cols: 12, rows: 10, cellCm: 10,
               plot: { expr: '20/x', xMin: 2, xMax: 8, step: 1, color: '#22d3ee', label: 'y=20/x' }
             },
-            hint: 'x 取 2,4,5,8 等，分别计算 y=20÷x 再 goto。',
+            hint: 'x 取 2,4,5,8 等，算 y=20÷x；每点：停止绘制 → goto → 开始绘制。',
             starter: { goto: [{ x: 20, y: 10 }, { x: 40, y: 5 }, { x: 50, y: 4 }] },
             demo: 'plotInverse'
           }),
@@ -1064,7 +1083,7 @@ const CURRICULUM = {
             starter: {
               goto: [{ x: 0, y: 0 }, { x: 20, y: 20 }, { x: 30, y: 20 }, { x: 50, y: 0 }]
             },
-            hint: '每段用 goto 连接，整体是分段一次函数。',
+            hint: '每个顶点：停止绘制 → goto → 开始绘制；段间自动断开，形成分段折线。',
             demo: 'plotPiecewise'
           }),
           task('fg_l5_3', '延伸阅读：曲线巡逻与路径规划', '拓展', SCENE.FUNCTION, {
@@ -1530,6 +1549,12 @@ function buildStarterXml(s, sceneConfig, taskMeta) {
   function blockGoto(x, y) {
     return `<block type="motion_goto_xy"><value name="X">${numShadow(x)}</value><value name="Y">${numShadow(y)}</value>`;
   }
+  function blockTrailOff() {
+    return '<block type="motion_trail_off"></block>';
+  }
+  function blockTrailOn() {
+    return '<block type="motion_trail_on"></block>';
+  }
   function blockForward(v) {
     return `<block type="motion_forward"><value name="D">${numShadow(v)}</value>`;
   }
@@ -1633,8 +1658,19 @@ function buildStarterXml(s, sceneConfig, taskMeta) {
     });
   } else if (s.goto) {
     if (s.speed != null) steps.push(blockSpeed(s.speed));
-    (Array.isArray(s.goto) ? s.goto : [s.goto]).forEach(p => {
-      steps.push(blockGoto(p.x ?? p[0] ?? 0, p.y ?? p[1] ?? 0));
+    const discretePlot = s.discretePlot === true
+      || (taskMeta?.series === 'funcGraph' && taskMeta?.scene === SCENE.FUNCTION);
+    const points = Array.isArray(s.goto) ? s.goto : [s.goto];
+    points.forEach((p, i) => {
+      const x = p.x ?? p[0] ?? 0;
+      const y = p.y ?? p[1] ?? 0;
+      if (discretePlot) {
+        if (i > 0) steps.push(blockTrailOff());
+        steps.push(blockGoto(x, y));
+        steps.push(blockTrailOn());
+      } else {
+        steps.push(blockGoto(x, y));
+      }
     });
   } else if (s.repeat != null && s.forward != null && s.turn == null) {
     if (s.speed != null) steps.push(blockSpeed(s.speed));

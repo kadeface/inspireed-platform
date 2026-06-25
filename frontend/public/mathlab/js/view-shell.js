@@ -125,6 +125,10 @@ const ViewShell = {
     if (!panel.hidden) this.refreshTrailPanel();
   },
 
+  pxPerCm(sim) {
+    return sim?.getPxPerCm ? sim.getPxPerCm() : 5;
+  },
+
   refreshTrailPanel() {
     const sim = this.sim;
     const tbody = document.getElementById('trailTableBody');
@@ -133,7 +137,7 @@ const ViewShell = {
 
     const ox = sim.state.startX;
     const oy = sim.state.startY;
-    const PX = 5;
+    const PX = this.pxPerCm(sim);
     const raw = sim.trail || [];
     const maxRows = 40;
     let indices = [];
@@ -160,7 +164,7 @@ const ViewShell = {
 
     if (typeof TrailAnalysis !== 'undefined') {
       const analysis = sim.lastAnalysis || {
-        arcLengthCm: TrailAnalysis.arcLengthCm(raw),
+        arcLengthCm: TrailAnalysis.arcLengthCm(raw, PX),
         parametric: TrailAnalysis.parametricSummary(sim, 6),
         message: ''
       };
@@ -380,7 +384,7 @@ const ViewShell = {
     const sim = this.sim;
     if (!sim) return;
     const isDual = sim.taskMode === 'travel' || sim.taskMode === 'curveTravel';
-    const PX = 5;
+    const PX = this.pxPerCm(sim);
     const ox = sim.trackOriginX ?? sim.state?.startX ?? 0;
     const oy = sim.trackOriginY ?? sim.state?.startY ?? 0;
     const set = (id, v) => {
@@ -414,8 +418,8 @@ const ViewShell = {
       }
       let lText = '—';
       if (typeof TrailAnalysis !== 'undefined') {
-        const lA = a?.trail?.length > 1 ? TrailAnalysis.arcLengthCm(a.trail) : 0;
-        const lB = b?.trail?.length > 1 ? TrailAnalysis.arcLengthCm(b.trail) : 0;
+        const lA = a?.trail?.length > 1 ? TrailAnalysis.arcLengthCm(a.trail, PX) : 0;
+        const lB = b?.trail?.length > 1 ? TrailAnalysis.arcLengthCm(b.trail, PX) : 0;
         lText = `${lA.toFixed(1)} / ${lB.toFixed(1)}`;
       }
       set('algL', lText);
@@ -450,7 +454,7 @@ const ViewShell = {
     if (typeof TrailAnalysis !== 'undefined') {
       const L = sim.lastAnalysis
         ? sim.lastAnalysis.arcLengthCm
-        : TrailAnalysis.arcLengthCm(sim.trail);
+        : TrailAnalysis.arcLengthCm(sim.trail, PX);
       set('algL', L.toFixed(1));
     }
     this.refreshTrailPanel();

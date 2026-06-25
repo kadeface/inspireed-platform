@@ -2,8 +2,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
 
-const rootDir = path.resolve(process.cwd(), 'frontend/public/mathlab');
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const curriculumPath = path.join(rootDir, 'js/curriculum.js');
 const outputJsonDir = path.join(rootDir, 'data/manuals');
 const outputMdDir = path.join(rootDir, 'manuals');
@@ -84,6 +85,219 @@ function normalizeTask(stageKey, gradeKey, gradeName, task) {
     starter: task.starter || null,
     demo: task.demo || null
   };
+}
+
+function normalizeTaskFull(stageKey, gradeKey, gradeName, task) {
+  return { ...task, stageKey, gradeKey, gradeName };
+}
+
+function isEmptyValue(value) {
+  if (value == null) return true;
+  if (Array.isArray(value) && value.length === 0) return true;
+  if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+    return true;
+  }
+  return false;
+}
+
+function mdJsonBlock(label, value) {
+  if (isEmptyValue(value)) return [];
+  return [`- **\`${label}\`**：`, '```json', safeJson(value), '```', ''];
+}
+
+const MERGED_SCALAR_FIELDS = [
+  ['id', '任务 ID', true],
+  ['stageKey', '学段键', true],
+  ['gradeKey', '章节键', true],
+  ['gradeName', '章节名', false],
+  ['unit', '单元', false],
+  ['scene', '场景', true],
+  ['mode', 'mode', true],
+  ['travelSubtype', 'travelSubtype', true],
+  ['series', 'series', true],
+  ['level', 'level', true],
+  ['focus', '教学聚焦', false],
+  ['hint', '提示', false],
+  ['demo', 'demo', true]
+];
+
+const MERGED_ARRAY_FIELDS = [
+  ['tags', '标签'],
+  ['goals', '教学目标'],
+  ['challenges', '挑战任务']
+];
+
+const MERGED_OBJECT_FIELDS = ['sceneConfig', 'starter', 'plotValidate', 'calcValidate'];
+
+function renderTaskFullMarkdown(task, headingPrefix) {
+  const lines = [`${headingPrefix} ${task.title}`, ''];
+  const rendered = new Set(['title']);
+
+  for (const [key, label, code] of MERGED_SCALAR_FIELDS) {
+    rendered.add(key);
+    const value = task[key];
+    if (value == null || value === '') continue;
+    lines.push(code ? `- ${label}：\`${value}\`` : `- ${label}：${value}`);
+  }
+
+  for (const [key, label] of MERGED_ARRAY_FIELDS) {
+    rendered.add(key);
+    if (task[key]?.length) {
+      lines.push(`- ${label}：`);
+      lines.push(mdList(task[key]));
+    }
+  }
+
+  rendered.add('formulas');
+  if (task.formulas?.length) {
+    lines.push('- 数学公式：');
+    lines.push(mdFormulas(task.formulas));
+  }
+
+  for (const key of MERGED_OBJECT_FIELDS) {
+    rendered.add(key);
+    lines.push(...mdJsonBlock(key, task[key]));
+  }
+
+  for (const key of Object.keys(task).sort()) {
+    if (rendered.has(key)) continue;
+    const value = task[key];
+    if (isEmptyValue(value)) continue;
+    if (typeof value === 'object') {
+      lines.push(...mdJsonBlock(key, value));
+    } else {
+      lines.push(`- ${key}：${value}`);
+    }
+  }
+
+  lines.push('---', '');
+  return lines.join('\n');
+}
+
+function buildStageSectionsFull(curriculum, stageKey) {
+  const stage = curriculum[stageKey];
+  const grades = stage?.grades || {};
+  const gradeKeys = sortGradeKeys(stageKey, Object.keys(grades));
+  return gradeKeys.map((gradeKey) => {
+    const grade = grades[gradeKey];
+    const tasks = (grade.tasks || []).map((t) => normalizeTaskFull(stageKey, gradeKey, grade.name, t));
+    return {
+      gradeKey,
+      gradeName: grade.name,
+      taskCount: tasks.length,
+      tasks
+    };
+  });
+}
+
+function buildSubjectSectionsFull(curriculum, subjectKey) {
+  const subject = curriculum[subjectKey];
+  const grades = subject?.grades || {};
+  const levelKeys = sortLevelKeys(Object.keys(grades));
+  return levelKeys.map((levelKey) => {
+    const level = grades[levelKey];
+    const tasks = (level.tasks || []).map((t) => normalizeTaskFull(subjectKey, levelKey, level.name, t));
+    return {
+      levelKey,
+      levelName: level.name,
+      taskCount: tasks.length,
+      tasks
+    };
+  });
+}
+
+function buildMergedVolume(curriculum) {
+  const stageParts = stageOrder.map((stageKey) => {
+    const sections = buildStageSectionsFull(curriculum, stageKey);
+    return {
+      type: 'stage',
+      stageKey,
+      partTitle: stageDisplayName[stageKey] || curriculum[stageKey]?.name,
+      stageName: curriculum[stageKey]?.name,
+      sections,
+      taskCount: sections.reduce((sum, s) => sum + s.taskCount, 0)
+    };
+  });
+
+  const subjectParts = subjectOrder.map((subjectKey) => {
+    const sections = buildSubjectSectionsFull(curriculum, subjectKey);
+    return {
+      type: 'subject',
+      subjectKey,
+      partTitle: subjectDisplayName[subjectKey] || curriculum[subjectKey]?.name,
+      stageName: curriculum[subjectKey]?.name,
+      sections,
+      taskCount: sections.reduce((sum, s) => sum + s.taskCount, 0)
+    };
+  });
+
+  const taskCount = stageParts.reduce((sum, p) => sum + p.taskCount, 0)
+    + subjectParts.reduce((sum, p) => sum + p.taskCount, 0);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    sourceFile: 'js/curriculum.js',
+    taskCount,
+    stageParts,
+    subjectParts
+  };
+}
+
+const partOrdinal = ['一', '二', '三'];
+
+function renderMergedMarkdown(merged) {
+  const lines = [
+    '# 轮式机器人数学融合教案（合并版）',
+    '',
+    '## 元信息',
+    `- 生成时间：${merged.generatedAt}`,
+    `- 总任务数：${merged.taskCount}`,
+    `- 数据来源：\`${merged.sourceFile}\``,
+    '- 使用方式：按学段/专题查阅章节，任务 ID 可与 MathLab 页面联动（`?task=…`）。',
+    '',
+    '## 目录',
+    ''
+  ];
+
+  merged.stageParts.forEach((part, partIdx) => {
+    lines.push(`### 第${partOrdinal[partIdx]}部分 ${part.partTitle}`);
+    part.sections.forEach((section, idx) => {
+      lines.push(`- ${idx + 1}. ${section.gradeName}（${section.taskCount} 课）`);
+    });
+    lines.push('');
+  });
+
+  lines.push('### 第三部分 专题课程');
+  merged.subjectParts.forEach((part) => {
+    lines.push(`- ${part.stageName}（${part.taskCount} 课）`);
+  });
+  lines.push('');
+
+  merged.stageParts.forEach((part, partIdx) => {
+    lines.push('', `## 第${partOrdinal[partIdx]}部分 ${part.partTitle}`, '');
+    part.sections.forEach((section, chIdx) => {
+      lines.push(`### 第${chIdx + 1}章 ${section.gradeName}`, '');
+      section.tasks.forEach((task, tIdx) => {
+        lines.push(renderTaskFullMarkdown(task, `#### ${chIdx + 1}.${tIdx + 1}`));
+      });
+    });
+  });
+
+  lines.push('', '## 第三部分 专题课程', '');
+  merged.subjectParts.forEach((part) => {
+    lines.push(`### ${part.stageName}`, '');
+    if (subjectIntroNotes[part.subjectKey]) {
+      lines.push(...subjectIntroNotes[part.subjectKey]);
+    }
+    part.sections.forEach((section, chIdx) => {
+      lines.push(`#### 第${chIdx + 1}章 ${section.levelName}`, '');
+      section.tasks.forEach((task, tIdx) => {
+        lines.push(renderTaskFullMarkdown(task, `##### ${chIdx + 1}.${tIdx + 1}`));
+      });
+    });
+  });
+
+  return lines.join('\n');
 }
 
 function sortGradeKeys(stageKey, keys) {
@@ -261,10 +475,18 @@ async function main() {
   };
 
   await fs.writeFile(path.join(outputJsonDir, 'index.json'), safeJson(index), 'utf8');
+
+  const merged = buildMergedVolume(curriculum);
+  const mergedMdPath = path.join(outputMdDir, 'curriculum-merged.md');
+  await fs.writeFile(mergedMdPath, renderMergedMarkdown(merged), 'utf8');
+
   await fs.writeFile(path.join(outputMdDir, 'README.md'), [
     '# MathLab 学生活动实验手册索引',
     '',
     `生成时间：${index.generatedAt}`,
+    '',
+    '## 合并总册',
+    `- [轮式机器人数学融合教案（合并版）](./curriculum-merged.md)（${merged.taskCount} 课，完整字段镜像）`,
     '',
     '## 学段主册',
     ...index.stageVolumes.map((v) => `- ${v.title}（${v.taskCount} 课）`),
@@ -274,7 +496,7 @@ async function main() {
     ''
   ].join('\n'), 'utf8');
 
-  process.stdout.write(`Generated ${volumes.length} manuals.\n`);
+  process.stdout.write(`Generated ${volumes.length} manuals + merged curriculum (${merged.taskCount} tasks).\n`);
 }
 
 main().catch((err) => {

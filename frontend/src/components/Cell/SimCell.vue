@@ -45,6 +45,17 @@
           开源硬件仿真
         </button>
         <button
+          @click="simMode = 'tinkercad'"
+          :class="[
+            'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            simMode === 'tinkercad'
+              ? 'border-orange-600 text-orange-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          ]"
+        >
+          Tinkercad 3D设计仿真
+        </button>
+        <button
           @click="showCustomUrlMode = true"
           :class="[
             'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
@@ -101,7 +112,7 @@
     </div>
 
     <!-- Edit Mode - PhET Sim Selector -->
-    <div v-if="editable && simMode === 'phet' && !cell.content.phetSim && !cell.content.mathlabSim && !cell.content.url && !showCustomUrlMode" class="phet-selector p-4">
+    <div v-if="editable && simMode === 'phet' && !cell.content.phetSim && !cell.content.mathlabSim && !cell.content.tinkercadSim && !cell.content.url && !showCustomUrlMode" class="phet-selector p-4">
       <div class="selector-header mb-4 flex items-center justify-between">
         <div>
           <h3 class="text-lg font-semibold">{{ cell.title || '仿真演示' }}</h3>
@@ -174,7 +185,7 @@
     </div>
 
     <!-- Edit Mode - Hardware Sim Selector -->
-    <div v-if="editable && simMode === 'hardware' && !cell.content.hardwareSim && !cell.content.mathlabSim && !cell.content.url && !showCustomUrlMode" class="hardware-selector p-4">
+    <div v-if="editable && simMode === 'hardware' && !cell.content.hardwareSim && !cell.content.mathlabSim && !cell.content.tinkercadSim && !cell.content.url && !showCustomUrlMode" class="hardware-selector p-4">
       <div class="selector-header mb-4 flex items-center justify-between">
         <div>
           <h3 class="text-lg font-semibold">{{ cell.title || '仿真演示' }}</h3>
@@ -304,8 +315,61 @@
       </div>
     </div>
 
+    <!-- Edit Mode - Tinkercad 3D Sim Selector -->
+    <div v-if="editable && simMode === 'tinkercad' && !cell.content.tinkercadSim && !cell.content.mathlabSim && !cell.content.url && !showCustomUrlMode" class="tinkercad-selector p-4">
+      <div class="selector-header mb-4 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold">{{ cell.title || '仿真演示' }}</h3>
+          <p class="text-sm text-gray-600 mt-1">www.tinkercad.com · 在线 3D 建模与设计</p>
+        </div>
+        <div class="flex gap-2">
+          <button
+            @click="openTinkercadWebsite"
+            class="px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+          >
+            打开 Tinkercad →
+          </button>
+          <button
+            @click="simMode = null"
+            class="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            ← 返回
+          </button>
+        </div>
+      </div>
+
+      <div class="simulation-grid">
+        <div
+          v-for="sim in tinkercadSimulations"
+          :key="sim.id"
+          @click="selectTinkercadSimulation(sim)"
+          class="sim-card group cursor-pointer border-orange-200 hover:border-orange-500"
+        >
+          <div class="card-content">
+            <div class="flex items-center gap-2 mb-1">
+              <h4 class="font-semibold text-base">{{ sim.nameCn }}</h4>
+              <span class="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded">3D</span>
+            </div>
+            <p class="text-sm text-gray-600 line-clamp-2">{{ sim.descriptionCn }}</p>
+            <div class="tags mt-2">
+              <span
+                v-for="topic in sim.topics.slice(0, 4)"
+                :key="topic"
+                class="tag bg-orange-50 text-orange-700"
+              >
+                {{ topic }}
+              </span>
+            </div>
+          </div>
+          <div class="card-overlay group-hover:opacity-100 bg-orange-600">
+            <span class="text-white font-medium">点击嵌入</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Custom URL Mode -->
-    <div v-else-if="editable && !cell.content.phetSim && !cell.content.hardwareSim && !cell.content.mathlabSim && !cell.content.url && showCustomUrlMode" class="p-4">
+    <div v-else-if="editable && !cell.content.phetSim && !cell.content.hardwareSim && !cell.content.mathlabSim && !cell.content.tinkercadSim && !cell.content.url && showCustomUrlMode" class="p-4">
       <div class="custom-url-editor">
         <div class="flex items-center justify-between mb-4">
           <div>
@@ -388,14 +452,15 @@
     </div>
 
     <!-- Editor Mode - Selected Simulation -->
-    <div v-else-if="editable && (cell.content.phetSim || cell.content.hardwareSim || cell.content.mathlabSim || cell.content.url)" class="p-4">
+    <div v-else-if="editable && (cell.content.phetSim || cell.content.hardwareSim || cell.content.mathlabSim || cell.content.tinkercadSim || cell.content.url)" class="p-4">
       <div class="editor-header mb-4 flex items-center justify-between">
         <div>
-          <h3 class="text-lg font-semibold">{{ cell.title || selectedSimInfo?.nameCn || selectedHardwareSimInfo?.nameCn || selectedMathlabSimInfo?.nameCn || '仿真演示' }}</h3>
+          <h3 class="text-lg font-semibold">{{ cell.title || selectedSimInfo?.nameCn || selectedHardwareSimInfo?.nameCn || selectedMathlabSimInfo?.nameCn || selectedTinkercadSimInfo?.nameCn || '仿真演示' }}</h3>
           <p class="text-sm text-gray-600">
             {{ cell.content.phetSim ? selectedSimInfo?.descriptionCn : 
                cell.content.hardwareSim ? selectedHardwareSimInfo?.descriptionCn :
                cell.content.mathlabSim ? selectedMathlabSimInfo?.descriptionCn :
+               cell.content.tinkercadSim ? selectedTinkercadSimInfo?.descriptionCn :
                '自定义仿真URL' }}
           </p>
         </div>
@@ -540,6 +605,18 @@
         ></iframe>
       </div>
 
+      <!-- Tinkercad 3D Simulation -->
+      <div v-else-if="cell.content.type === 'tinkercad' && tinkercadSimulationUrl" class="sim-display">
+        <iframe
+          :src="tinkercadSimulationUrl"
+          :style="getIframeStyle(cell.content.config.width || 1000, cell.content.config.height || 700)"
+          frameborder="0"
+          allowfullscreen
+          class="sim-iframe rounded-lg shadow-lg"
+          title="Tinkercad 3D 设计仿真"
+        ></iframe>
+      </div>
+
       <!-- Generic Iframe -->
       <div v-else-if="cell.content.url" class="sim-display">
         <iframe
@@ -586,6 +663,13 @@ import {
   getMathlabEmbedUrl,
   type MathlabSimulation
 } from '../../data/mathlab-simulations'
+import {
+  TINKERCAD_SIMULATIONS,
+  TINKERCAD_DEFAULT_CONFIG,
+  getTinkercadSimulation,
+  getTinkercadEmbedUrl,
+  type TinkercadSimulation
+} from '../../data/tinkercad-simulations'
 import { useMathlabContestState, useMathlabContestBridge, refreshMathlabContestLeaderboard } from '@/composables/useMathlabContest'
 import { useUserStore } from '@/store/user'
 import type { MathlabContestSubmission } from '@/types/mathlabContest'
@@ -610,9 +694,10 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLElement | null>(null)
 const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)
 
-// Simulation mode: 'mathlab' | 'phet' | 'hardware' | null
-const simMode = ref<'mathlab' | 'phet' | 'hardware' | null>('mathlab')
+// Simulation mode: 'mathlab' | 'phet' | 'hardware' | 'tinkercad' | null
+const simMode = ref<'mathlab' | 'phet' | 'hardware' | 'tinkercad' | null>('mathlab')
 const mathlabSimulations = MATHLAB_SIMULATIONS
+const tinkercadSimulations = TINKERCAD_SIMULATIONS
 const selectedCategory = ref<string>('all')
 const selectedHardwareCategory = ref<string>('all')
 const selectedProgrammingType = ref<'all' | 'graphical' | 'code'>('all')
@@ -625,6 +710,7 @@ const hasSelectedSimulation = computed(() => {
     props.cell.content.phetSim ||
     props.cell.content.hardwareSim ||
     props.cell.content.mathlabSim ||
+    props.cell.content.tinkercadSim ||
     props.cell.content.url
   )
 })
@@ -663,9 +749,17 @@ const selectedMathlabSimInfo = computed(() => {
   return null
 })
 
+const selectedTinkercadSimInfo = computed(() => {
+  if (props.cell.content.tinkercadSim) {
+    return getTinkercadSimulation(props.cell.content.tinkercadSim)
+  }
+  return null
+})
+
 const displayDescription = computed(() => {
   if (props.cell.content.mathlabSim) return selectedMathlabSimInfo.value?.descriptionCn
   if (props.cell.content.hardwareSim) return selectedHardwareSimInfo.value?.descriptionCn
+  if (props.cell.content.tinkercadSim) return selectedTinkercadSimInfo.value?.descriptionCn
   if (props.cell.content.phetSim) return selectedSimInfo.value?.descriptionCn
   return undefined
 })
@@ -787,6 +881,11 @@ const hardwareSimulationUrl = computed(() => {
   return props.cell.content.url
 })
 
+const tinkercadSimulationUrl = computed(() => {
+  if (!props.cell.content.tinkercadSim) return undefined
+  return getTinkercadEmbedUrl(props.cell.content.tinkercadSim)
+})
+
 const localConfig = ref({ ...props.cell.content.config })
 
 // Watch for config changes
@@ -802,6 +901,8 @@ watch(() => props.cell.content, (newContent) => {
     simMode.value = 'phet'
   } else if (newContent.hardwareSim) {
     simMode.value = 'hardware'
+  } else if (newContent.tinkercadSim) {
+    simMode.value = 'tinkercad'
   }
 }, { immediate: true })
 
@@ -840,6 +941,9 @@ const editorSimulationUrl = computed(() => {
   }
   if (props.cell.content.hardwareSim) {
     return hardwareSimulationUrl.value
+  }
+  if (props.cell.content.tinkercadSim) {
+    return tinkercadSimulationUrl.value
   }
   if (props.cell.content.url && !props.cell.content.phetSim) {
     return props.cell.content.url
@@ -906,6 +1010,19 @@ function selectMathlabSimulation(sim: MathlabSimulation) {
   emit('update', updatedCell)
 }
 
+function selectTinkercadSimulation(sim: TinkercadSimulation) {
+  const updatedCell: SimCellType = {
+    ...props.cell,
+    title: props.cell.title || sim.nameCn,
+    content: {
+      type: 'tinkercad',
+      tinkercadSim: sim.id,
+      config: { ...TINKERCAD_DEFAULT_CONFIG }
+    }
+  }
+  emit('update', updatedCell)
+}
+
 function changeSimulation() {
   const updatedCell: SimCellType = {
     ...props.cell,
@@ -933,6 +1050,10 @@ function updateCell() {
 
 function openPhETWebsite() {
   window.open('https://phet.colorado.edu', '_blank')
+}
+
+function openTinkercadWebsite() {
+  window.open('https://www.tinkercad.com', '_blank')
 }
 
 function useCustomUrl() {

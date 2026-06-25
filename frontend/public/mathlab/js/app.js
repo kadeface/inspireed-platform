@@ -122,7 +122,18 @@
       if (!robot) return;
       const was = robot.penDown;
       robot.penDown = !!on;
-      if (!was && robot.penDown) robot.trailBreakNext = true;
+      if (!was && robot.penDown) {
+        robot.trailBreakNext = true;
+        this.pushTrailPoint(robot, robot.state.x, robot.state.y);
+      }
+    },
+
+    async plotDiscreteGoto(pts) {
+      for (const [x, y] of pts) {
+        await this.setPenDown(false);
+        await this.gotoCm(x, y);
+        await this.setPenDown(true);
+      }
     },
 
     setTrailColor(color, robotOrId) {
@@ -208,20 +219,29 @@
       }
       if (currentTask?.plotValidate && window.FunctionPlot) {
         const v = currentTask.plotValidate;
-        const r = window.FunctionPlot.validateTrailAgainstExpr(
-          this.getPrimaryRobot().trail,
-          v.expr,
-          {
-            originX: this.state.startX,
-            originY: this.state.startY,
-            pxPerCm: this.getPxPerCm(),
-            toleranceCm: v.toleranceCm ?? 1
-          }
-        );
-        setStatus(
-          r.ok ? '✓ 轨迹符合 ' + v.expr : `轨迹偏差 ${r.maxErr.toFixed(1)} cm`,
-          r.ok ? 'ok' : 'err'
-        );
+        const plotOpts = {
+          originX: this.state.startX,
+          originY: this.state.startY,
+          pxPerCm: this.getPxPerCm(),
+          toleranceCm: v.toleranceCm ?? 1
+        };
+        const trail = this.getPrimaryRobot().trail;
+        const r = v.mode === 'vertices' && window.FunctionPlot.validateTrailVertices
+          ? window.FunctionPlot.validateTrailVertices(trail, v.expr, plotOpts)
+          : window.FunctionPlot.validateTrailAgainstExpr(trail, v.expr, plotOpts);
+        if (v.mode === 'vertices') {
+          setStatus(
+            r.ok
+              ? `✓ ${r.vertexCount ?? '—'} 个描点符合 ${v.expr}`
+              : `描点 #${r.worstVertex ?? '?'} 偏差 ${r.maxErr.toFixed(1)} cm`,
+            r.ok ? 'ok' : 'err'
+          );
+        } else {
+          setStatus(
+            r.ok ? '✓ 轨迹符合 ' + v.expr : `轨迹偏差 ${r.maxErr.toFixed(1)} cm`,
+            r.ok ? 'ok' : 'err'
+          );
+        }
       }
       if (currentTask?.calcValidate && window.CalcGraph) {
         const cv = currentTask.calcValidate;
@@ -586,6 +606,15 @@
       return PX_PER_CM;
     },
 
+    /** 数轴场景：按刻度间距缩小小车，避免遮住刻度 */
+    getRobotDrawScale() {
+      if (this.scene !== SCENE.NUMBERLINE) return 1;
+      const unitPx = this.getNumberLineUnitPx();
+      const bodyLen = 40;
+      const targetLen = unitPx * 0.32;
+      return Math.min(1, Math.max(0.22, targetLen / bodyLen));
+    },
+
     /** 数学平面角度(°) → 画布位移：0°=+x，90°=+y（向上） */
     mathAngleToDelta(cm, angleDeg) {
       const rad = angleDeg * Math.PI / 180;
@@ -762,7 +791,7 @@
             extra += ' · 吻合 ' + this.lastAnalysis.matchPercent + '%';
           }
         } else if (typeof TrailAnalysis !== 'undefined' && this.trail.length > 1) {
-          extra += ' · L≈' + TrailAnalysis.arcLengthCm(this.trail).toFixed(1) + ' cm';
+          extra += ' · L≈' + TrailAnalysis.arcLengthCm(this.trail, this.getPxPerCm()).toFixed(1) + ' cm';
         }
         ViewShell.setAlgebraExtra(extra);
       }
@@ -1466,7 +1495,7 @@
 
     drawPoint(r) {
       const ctx = this.ctx;
-      const rad = 8;
+      const rad = 8 * this.getRobotDrawScale();
       ctx.save();
       ctx.translate(r.x, r.y);
       ctx.rotate(r.angle);
@@ -1750,10 +1779,12 @@
       const bodyW = 28;
       const wheelR = 7.5;
       const track = 17;
+      const drawScale = this.getRobotDrawScale();
 
       ctx.save();
       ctx.translate(r.x, r.y);
       ctx.rotate(r.angle);
+      if (drawScale !== 1) ctx.scale(drawScale, drawScale);
       ctx.shadowColor = 'rgba(0,0,0,0.45)';
       ctx.shadowBlur = 10;
       ctx.shadowOffsetY = 3;
@@ -1845,29 +1876,30 @@
           await this.forward(10);
         },
         plotLinear: async () => {
-          const pts = [[0, 0], [10, 20], [20, 40], [30, 60]];
-          for (const [x, y] of pts) await this.gotoCm(x, y);
+          await this.plotDiscreteGoto([[0, 0], [10, 20], [20, 40], [30, 60]]);
         },
         plotLinearSteep: async () => {
-          const pts = [[0, 0], [10, 30], [20, 60]];
-          for (const [x, y] of pts) await this.gotoCm(x, y);
+          await this.plotDiscreteGoto([[0, 0], [10, 30], [20, 60]]);
         },
         plotLinearIntercept: async () => {
-          const pts = [[0, 30], [10, 50], [20, 70], [30, 90]];
-          for (const [x, y] of pts) await this.gotoCm(x, y);
+          await this.plotDiscreteGoto([[0, 30], [10, 50], [20, 70], [30, 90]]);
         },
         plotParabola: async () => {
-          for (let x = -2; x <= 2; x++) await this.gotoCm(x * 10, x * x * 10);
+          const pts = [];
+          for (let x = -2; x <= 2; x++) pts.push([x * 10, x * x * 10]);
+          await this.plotDiscreteGoto(pts);
         },
         plotParabolaShifted: async () => {
-          for (let x = 0; x <= 3; x++) await this.gotoCm(x * 10, ((x - 1) * (x - 1) + 2) * 10);
+          const pts = [];
+          for (let x = 0; x <= 3; x++) pts.push([x * 10, ((x - 1) * (x - 1) + 2) * 10]);
+          await this.plotDiscreteGoto(pts);
         },
         plotInverse: async () => {
-          for (const x of [2, 4, 5, 8]) await this.gotoCm(x * 10, (20 / x) * 10);
+          const pts = [2, 4, 5, 8].map(x => [x * 10, (20 / x) * 10]);
+          await this.plotDiscreteGoto(pts);
         },
         plotPiecewise: async () => {
-          const pts = [[0, 0], [20, 20], [30, 20], [50, 0]];
-          for (const [x, y] of pts) await this.gotoCm(x, y);
+          await this.plotDiscreteGoto([[0, 0], [20, 20], [30, 20], [50, 0]]);
         },
         calcTwoSpeed: async () => {
           this.setSpeed(5);
@@ -2018,7 +2050,16 @@
           await this.turn(90);
           await this.forward(40);
         },
-        numberline: async () => { await this.forward(100); await this.backward(60); },
+        numberline: async () => {
+          await this.movePolar(0, 60);
+          await this.turn(180);
+          await this.forward(40);
+        },
+        numberlineRational: async () => {
+          await this.movePolar(0, 100);
+          await this.turn(180);
+          await this.forward(60);
+        },
         triangle: async () => { for (let i = 0; i < 3; i++) { await this.forward(40); await this.turn(120); } },
         hexagon: async () => { for (let i = 0; i < 6; i++) { await this.forward(25); await this.turn(60); } },
         planting: async () => { for (let i = 0; i < 5; i++) { await this.forward(20); await this.wait(500); } },

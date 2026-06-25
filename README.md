@@ -467,6 +467,9 @@ pnpm dev
 
 ## 📚 完整文档
 
+- **[InspireEd 教学系统用户说明书](docs/INSPIREED_MANUAL.md)** — 面向教师、学生、管理员的完整操作指南（推荐首选）
+- **[MathLab 用户说明书](docs/MATHLAB_MANUAL.md)** — 轮式机器人数学融合互动教学专题指南
+
 查看 [docs/README.md](docs/README.md) 获取完整的文档目录和分类索引。
 
 ### 快速链接

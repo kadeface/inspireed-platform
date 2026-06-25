@@ -27,16 +27,16 @@
 
       if (task?.plotValidate && window.FunctionPlot && sim.getPrimaryRobot) {
         const v = task.plotValidate;
-        const r = window.FunctionPlot.validateTrailAgainstExpr(
-          sim.getPrimaryRobot().trail,
-          v.expr,
-          {
-            originX: sim.state.startX,
-            originY: sim.state.startY,
-            pxPerCm: sim.getPxPerCm(),
-            toleranceCm: v.toleranceCm ?? 1
-          }
-        );
+        const plotOpts = {
+          originX: sim.state.startX,
+          originY: sim.state.startY,
+          pxPerCm: sim.getPxPerCm(),
+          toleranceCm: v.toleranceCm ?? 1
+        };
+        const trail = sim.getPrimaryRobot().trail;
+        const r = window.FunctionPlot.validatePlotTrail
+          ? window.FunctionPlot.validatePlotTrail(trail, v, plotOpts)
+          : window.FunctionPlot.validateTrailAgainstExpr(trail, v.expr, plotOpts);
         if (r.ok) return Math.max(base, 92);
         return Math.min(base, 55);
       }
