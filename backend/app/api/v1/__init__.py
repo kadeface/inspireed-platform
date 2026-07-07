@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     monitoring_reports,
     activities,
+    ai_settings,
     admin_dashboard,
     admin_organization,
     admin_rooms,
@@ -44,6 +45,7 @@ from app.api.v1 import (
     review_channel,
     resources,
     reviews,
+    self_study,
     scores,
     sections,
     semesters,
@@ -69,6 +71,9 @@ if public_curriculum_router is None:
 
 # 注册子路由
 api_router.include_router(auth.router, prefix="/auth", tags=["认证"])
+api_router.include_router(
+    ai_settings.router, prefix="/admin/ai-settings", tags=["管理员-AI配置"]
+)
 api_router.include_router(users.router, prefix="/users", tags=["用户"])
 api_router.include_router(curriculum.router, prefix="/curriculum", tags=["课程体系"])
 api_router.include_router(
@@ -112,6 +117,11 @@ api_router.include_router(
     student_ai_assistant.router,
     prefix="/student/assistant",
     tags=["学生-智能助手"],
+)
+api_router.include_router(
+    self_study.router,
+    prefix="/self-study",
+    tags=["学生-自学拍题"],
 )
 
 # 角色专用路由

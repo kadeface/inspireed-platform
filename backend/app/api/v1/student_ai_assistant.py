@@ -128,6 +128,7 @@ async def query_student_assistant(
         question=payload.question,
         context=context_text,
         lesson_title=lesson_title,
+        db=db,
     )
 
     insights, actions, follow_ups = _generate_student_feedback(payload)

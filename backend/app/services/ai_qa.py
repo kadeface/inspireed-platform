@@ -9,7 +9,9 @@ import time
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
+from app.services.ai_settings import ai_settings_service
 
 
 @dataclass
@@ -28,12 +30,6 @@ class AIQAService:
 
     def __init__(self):
         self.openai_api_key = getattr(settings, "OPENAI_API_KEY", None)
-        self.openai_base_url = getattr(
-            settings, "OPENAI_BASE_URL", "https://api.openai.com/v1"
-        )
-        self.default_model = getattr(settings, "DEFAULT_AI_MODEL", "gpt-3.5-turbo")
-        self.max_tokens = getattr(settings, "AI_MAX_TOKENS", 1000)
-        self.temperature = getattr(settings, "AI_TEMPERATURE", 0.7)
 
     async def ask_question(
         self,
@@ -43,6 +39,7 @@ class AIQAService:
         cell_content: Optional[Dict[str, Any]] = None,
         model: Optional[str] = None,
         agent_prompt: Optional[str] = None,
+        db: Optional[AsyncSession] = None,
     ) -> AIResponse:
         """
         向AI提问
@@ -58,18 +55,31 @@ class AIQAService:
             AIResponse: AI回答结果
         """
         start_time = time.time()
-        model = model or self.default_model
+        runtime_config = (
+            await ai_settings_service.get_runtime_config(db)
+            if db is not None
+            else ai_settings_service.build_defaults()
+        )
+        text_config = runtime_config.text
+        model = model or text_config.model
         # 确保 model 是字符串类型
         if not isinstance(model, str):
-            model = str(model) if model else self.default_model
+            model = str(model) if model else text_config.model
 
         try:
             # 构建提示词（返回系统提示词和用户消息）
             system_prompt, user_message = self._build_prompt(question, context, lesson_title, cell_content, agent_prompt)
 
             # 调用AI API（确保 model 是字符串）
-            final_model: str = str(model) if model else self.default_model
-            response = await self._call_openai(system_prompt, user_message, final_model)
+            final_model: str = str(model) if model else text_config.model
+            response = await self._call_openai(
+                system_prompt,
+                user_message,
+                final_model,
+                base_url=text_config.base_url,
+                max_tokens=text_config.max_tokens,
+                temperature=text_config.temperature,
+            )
 
             response_time = (time.time() - start_time) * 1000
 
@@ -98,7 +108,7 @@ class AIQAService:
             _log_print(f"   异常类型: {type(e).__name__}")
             _log_print(f"   异常信息: {str(e)}")
             _log_print(f"   完整堆栈:\n{traceback.format_exc()}")
-            _log_print(f"   诊断信息: API密钥已配置={bool(self.openai_api_key)}, Base URL={self.openai_base_url}, Model={model}")
+            _log_print(f"   诊断信息: API密钥已配置={bool(self.openai_api_key)}, Base URL={text_config.base_url}, Model={model}")
             
             response_time = (time.time() - start_time) * 1000
             try:
@@ -259,7 +269,16 @@ class AIQAService:
         
         return system_prompt, user_message
 
-    async def _call_openai(self, system_prompt: str, user_message: str, model: str) -> Dict[str, Any]:
+    async def _call_openai(
+        self,
+        system_prompt: str,
+        user_message: str,
+        model: str,
+        *,
+        base_url: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> Dict[str, Any]:
         """调用OpenAI API，失败时自动回退到模拟回答"""
         import sys
         import datetime
@@ -292,17 +311,17 @@ class AIQAService:
         data = {
             "model": model,
             "messages": messages,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
         }
         
         log_print(f"📡 [API CALL] System prompt length: {len(system_prompt)}, User message length: {len(user_message)}")
-        log_print(f"📡 [API CALL] Model: {model}, Base URL: {self.openai_base_url}")
+        log_print(f"📡 [API CALL] Model: {model}, Base URL: {base_url}")
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    f"{self.openai_base_url}/chat/completions", headers=headers, json=data
+                    f"{base_url}/chat/completions", headers=headers, json=data
                 )
 
                 if response.status_code == 200:
@@ -334,11 +353,10 @@ class AIQAService:
                     except:
                         error_body = "无法读取错误响应体"
                     
-                    error_msg = f"OpenAI API错误: {response.status_code}"
                     log_print(f"❌ [ERROR] AI服务调用失败，使用模拟回答")
                     log_print(f"   错误状态码: {response.status_code}")
                     log_print(f"   错误响应: {error_body[:500]}")
-                    log_print(f"   请求URL: {self.openai_base_url}/chat/completions")
+                    log_print(f"   请求URL: {base_url}/chat/completions")
                     log_print(f"   请求模型: {model}")
                     return await self._get_mock_response(user_message, system_prompt)
         except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError) as e:
@@ -372,7 +390,7 @@ class AIQAService:
             if 'response_status' in error_details:
                 log_print(f"   响应状态: {error_details['response_status']}")
             log_print(f"   完整堆栈:\n{traceback.format_exc()}")
-            log_print(f"   诊断信息: API密钥已配置={bool(self.openai_api_key)}, Base URL={self.openai_base_url}, Model={model}")
+            log_print(f"   诊断信息: API密钥已配置={bool(self.openai_api_key)}, Base URL={base_url}, Model={model}")
             return await self._get_mock_response(user_message, system_prompt)
         except Exception as e:
             # 其他异常，回退到模拟回答
@@ -387,7 +405,7 @@ class AIQAService:
             log_print(f"   错误信息: {error_details['error_message']}")
             log_print(f"   错误参数: {error_details['error_args']}")
             log_print(f"   完整堆栈:\n{traceback.format_exc()}")
-            log_print(f"   诊断信息: API密钥已配置={bool(self.openai_api_key)}, Base URL={self.openai_base_url}, Model={model}")
+            log_print(f"   诊断信息: API密钥已配置={bool(self.openai_api_key)}, Base URL={base_url}, Model={model}")
             return await self._get_mock_response(user_message, system_prompt)
 
     async def _get_mock_response(self, user_message: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:

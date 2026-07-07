@@ -99,6 +99,20 @@ from app.models.teacher import (
 )
 from app.models.teacher_position import TeacherPositionType
 from app.models.exam_room import ExamRoom, ExamRoomStudent, ExamProctor
+from app.models.system_setting import SystemSetting
+from app.models.self_study import (
+    SelfStudyMode,
+    SelfStudyReadabilityStatus,
+    SelfStudySessionPhase,
+    SelfStudyResultJudgment,
+    SelfStudyErrorType,
+    SelfStudySpeaker,
+    SelfStudyTurnKind,
+    SelfStudyHandoffStatus,
+    SelfStudySession,
+    SelfStudyTurn,
+    SelfStudyTeacherHandoff,
+)
 
 __all__ = [
     "User",
@@ -199,4 +213,16 @@ __all__ = [
     "ExamRoom",
     "ExamRoomStudent",
     "ExamProctor",
+    "SystemSetting",
+    "SelfStudyMode",
+    "SelfStudyReadabilityStatus",
+    "SelfStudySessionPhase",
+    "SelfStudyResultJudgment",
+    "SelfStudyErrorType",
+    "SelfStudySpeaker",
+    "SelfStudyTurnKind",
+    "SelfStudyHandoffStatus",
+    "SelfStudySession",
+    "SelfStudyTurn",
+    "SelfStudyTeacherHandoff",
 ]

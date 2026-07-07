@@ -395,6 +395,7 @@ async def ask_question(
                 context=f"Cell ID: {cell_id}",
                 lesson_title=cell.lesson.title if cell.lesson else None,
                 cell_content=cell_content_dict,
+                db=db,
             )
 
             answer = ai_response.answer

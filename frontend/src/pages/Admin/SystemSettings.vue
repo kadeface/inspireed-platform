@@ -71,6 +71,21 @@
           @click="activeTab = 'config'"
         />
       </el-col>
+
+      <el-col :xs="24" :sm="12" :md="8" :lg="6">
+        <AdminFunctionCard
+          title="AI 配置"
+          description="配置文本助手和个性化学习图像模型"
+          :icon="Cpu"
+          icon-color="#0F766E"
+          icon-bg-color="#F0FDFA"
+          text-color="#1E293B"
+          description-color="#64748B"
+          :active="activeTab === 'ai'"
+          custom-class="bg-white border border-slate-200"
+          @click="activeTab = 'ai'"
+        />
+      </el-col>
     </el-row>
 
     <!-- 管理员管理 -->
@@ -84,22 +99,26 @@
 
     <!-- 系统配置 -->
     <SystemConfigCard v-if="activeTab === 'config'" />
+
+    <!-- AI 配置 -->
+    <AiSettingsCard v-if="activeTab === 'ai'" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, User, Document, Lock, Setting } from '@element-plus/icons-vue'
+import { ArrowLeft, User, Document, Lock, Setting, Cpu } from '@element-plus/icons-vue'
 import AdminFunctionCard from '@/components/Admin/AdminFunctionCard.vue'
 import AdminManagementCard from './SystemSettings/AdminManagementCard.vue'
 import ResearcherManagementCard from './SystemSettings/ResearcherManagementCard.vue'
 import PermissionManagementCard from './SystemSettings/PermissionManagementCard.vue'
 import SystemConfigCard from './SystemSettings/SystemConfigCard.vue'
+import AiSettingsCard from './SystemSettings/AiSettingsCard.vue'
 
 // 标签页状态
 const router = useRouter()
-const activeTab = ref<'admins' | 'researchers' | 'permissions' | 'config'>('admins')
+const activeTab = ref<'admins' | 'researchers' | 'permissions' | 'config' | 'ai'>('admins')
 </script>
 
 <style scoped>

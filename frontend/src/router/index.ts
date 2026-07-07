@@ -168,6 +168,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'teacher', title: '创AI数据看板 - InspireEd' },
   },
   {
+    path: '/teacher/self-study/handoffs',
+    name: 'TeacherSelfStudyHandoffs',
+    component: () => import('../pages/Teacher/SelfStudyHandoffs.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '个性化学习待处理 - InspireEd' },
+  },
+  {
+    path: '/teacher/self-study/handoffs/:id',
+    name: 'TeacherSelfStudyHandoffDetail',
+    component: () => import('../pages/Teacher/SelfStudyHandoffDetail.vue'),
+    meta: { requiresAuth: true, role: 'teacher', title: '个性化学习处理详情 - InspireEd' },
+  },
+  {
     path: '/student',
     name: 'Student',
     component: () => import('../pages/Student/Dashboard.vue'),
@@ -190,6 +202,24 @@ const routes: RouteRecordRaw[] = [
     name: 'StudentProfile',
     component: () => import('../pages/Student/Profile.vue'),
     meta: { requiresAuth: true, role: 'student', title: '个人资料 - InspireEd' },
+  },
+  {
+    path: '/student/self-study',
+    name: 'StudentSelfStudy',
+    component: () => import('../pages/Student/SelfStudy.vue'),
+    meta: { requiresAuth: true, role: 'student', title: '个性化学习 - InspireEd' },
+  },
+  {
+    path: '/student/self-study/history',
+    name: 'StudentSelfStudyHistory',
+    component: () => import('../pages/Student/SelfStudyHistory.vue'),
+    meta: { requiresAuth: true, role: 'student', title: '我的学习记录 - InspireEd' },
+  },
+  {
+    path: '/student/self-study/session/:id',
+    name: 'StudentSelfStudySession',
+    component: () => import('../pages/Student/SelfStudy.vue'),
+    meta: { requiresAuth: true, role: 'student', title: '个性化学习会话 - InspireEd' },
   },
   {
     path: '/student/favorites',

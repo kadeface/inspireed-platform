@@ -219,6 +219,7 @@ async def query_teacher_assistant(
         context=context_text,
         lesson_title=lesson_title,
         agent_prompt=agent_prompt,
+        db=db,
     )
     logger.info(
         "AI response: model=%s confidence=%s answer_len=%d",
