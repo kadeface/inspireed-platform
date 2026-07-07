@@ -36,7 +36,8 @@ function task(id, title, unit, scene, extra) {
     hint: extra?.hint || '',
     sceneConfig: extra?.sceneConfig || {},
     starter: extra?.starter || null,
-    demo: extra?.demo || null
+    demo: extra?.demo || null,
+    toolboxLevel: extra?.toolboxLevel || null
   }, extra || {});
 }
 

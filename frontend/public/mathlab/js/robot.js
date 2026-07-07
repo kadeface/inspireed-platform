@@ -39,6 +39,7 @@
       turnLeft: deg => sim.turn(-(deg || 0), id),
       turnRight: deg => sim.turn(deg, id),
       setSpeed: v => sim.setSpeed(v, id),
+      driveSeconds: (v, t) => sim.driveSeconds(v, t, id),
       wait: sec => sim.wait((sec || 0) * 1000, id),
       waitUntilNear: (otherId, epsilonCm) => sim.waitUntilRobotsNear(id, otherId || (id === 'A' ? 'B' : 'A'), epsilonCm),
       trailOn: () => sim.setPenDown(true, id),

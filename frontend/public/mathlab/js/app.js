@@ -22,6 +22,7 @@
     motionSamples: [],
     robots: [],
     lastAnalysis: null,
+    lastDriveVT: null,
     scene: SCENE.PATH,
     sceneConfig: {},
 
@@ -291,6 +292,7 @@
       if (this.taskMode === 'travel' || this.taskMode === 'curveTravel') this.seedTravelSample();
       else this.seedMotionSample();
       this.lastAnalysis = null;
+      this.lastDriveVT = null;
       this.busy = false;
       this.runAbort = false;
       runStats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
@@ -753,6 +755,17 @@
       this.sampleMotion(robot);
     },
 
+    async driveSeconds(v, t, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      const speed = Number(v) || 0;
+      const seconds = Number(t) || 0;
+      const distance = speed * seconds;
+      this.setSpeed(speed, robot);
+      this.lastDriveVT = { v: speed, t: seconds, s: distance };
+      await this.forward(distance, robot);
+    },
+
     updateTelemetry() {
       if (this.taskMode === 'travel' || this.taskMode === 'curveTravel') {
         if (typeof ViewShell !== 'undefined') {
@@ -762,6 +775,14 @@
             const msg = this.lastAnalysis.message;
             if (el && !el.textContent.includes(msg)) {
               ViewShell.setAlgebraExtra(`${el.innerHTML} · ${msg}`);
+            }
+          }
+          if (this.lastDriveVT) {
+            const { v, t, s } = this.lastDriveVT;
+            const formula = `距离 = 速度 × 时间 = ${v} × ${t} = ${s.toFixed(1)} cm`;
+            const el = document.getElementById('algExtra');
+            if (el && !el.textContent.includes(formula)) {
+              ViewShell.setAlgebraExtra(`${el.innerHTML} · ${formula}`);
             }
           }
         }
@@ -777,6 +798,10 @@
         if (runStats.totalDist > 0) {
           html += ' · 均速：' + (runStats.totalDist / runStats.totalTime).toFixed(1) + ' cm/s';
         }
+      }
+      if (this.lastDriveVT) {
+        const { v, t, s } = this.lastDriveVT;
+        html += '<br>距离 = 速度 × 时间 = ' + v + ' × ' + t + ' = ' + s.toFixed(1) + ' cm';
       }
       if (runStats.turns.length) {
         html += '<br>累计转角：' + runStats.turns.map(t => t + '°').join('、');
@@ -2185,7 +2210,7 @@
 
     defineBlocklyTypes() {
       Blockly.defineBlocksWithJsonArray([
-        { type: 'event_start', message0: '当程序开始时', nextStatement: true, colour: 120, hat: 'cap' },
+        { type: 'event_start', message0: '启动时', nextStatement: true, colour: 120, hat: 'cap' },
         { type: 'event_start_dual', message0: '当程序开始时（双车并行）',
           message1: 'A 程序 %1', args1: [{ type: 'input_statement', name: 'STACK_A' }],
           message2: 'B 程序 %2', args2: [{ type: 'input_statement', name: 'STACK_B' }],
@@ -2200,21 +2225,21 @@
           ], previousStatement: true, nextStatement: true, colour: 160 },
         { type: 'motion_face_angle', message0: '转到角度 %1 °', args0: [{ type: 'input_value', name: 'ANGLE', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 160 },
-        { type: 'motion_forward', message0: '沿当前朝向前进 %1 厘米', args0: [{ type: 'input_value', name: 'D', check: 'Number' }],
+        { type: 'motion_forward', message0: '前进 %1 厘米', args0: [{ type: 'input_value', name: 'D', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 45 },
-        { type: 'motion_backward', message0: '沿当前朝向后退 %1 厘米', args0: [{ type: 'input_value', name: 'D', check: 'Number' }],
+        { type: 'motion_backward', message0: '后退 %1 厘米', args0: [{ type: 'input_value', name: 'D', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 45 },
-        { type: 'motion_turn_right', message0: '右转 %1 度', args0: [{ type: 'input_value', name: 'A', check: 'Number' }],
+        { type: 'motion_turn_right', message0: '向右转 %1 度', args0: [{ type: 'input_value', name: 'A', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 280 },
-        { type: 'motion_turn_left', message0: '左转 %1 度', args0: [{ type: 'input_value', name: 'A', check: 'Number' }],
+        { type: 'motion_turn_left', message0: '向左转 %1 度', args0: [{ type: 'input_value', name: 'A', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 280 },
-        { type: 'motion_speed', message0: '设置速度 %1', args0: [{ type: 'input_value', name: 'S', check: 'Number' }],
+        { type: 'motion_speed', message0: '将速度设为 %1 厘米/秒', args0: [{ type: 'input_value', name: 'S', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 120 },
         { type: 'motion_wait', message0: '等待 %1 秒', args0: [{ type: 'input_value', name: 'T', check: 'Number' }],
           previousStatement: true, nextStatement: true, colour: 60 },
-        { type: 'motion_trail_on', message0: '开始绘制轨迹',
+        { type: 'motion_trail_on', message0: '落笔（开始画线）',
           previousStatement: true, nextStatement: true, colour: 160 },
-        { type: 'motion_trail_off', message0: '停止绘制轨迹',
+        { type: 'motion_trail_off', message0: '停笔（停止画线）',
           previousStatement: true, nextStatement: true, colour: 160 },
         { type: 'motion_trail_on_robot', message0: '小车 %1 开始绘制轨迹', args0: [
             { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] }
@@ -2245,7 +2270,7 @@
             { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
             { type: 'input_value', name: 'A', check: 'Number' }
           ], previousStatement: true, nextStatement: true, colour: 280 },
-        { type: 'motion_speed_robot', message0: '小车 %1 速度设为 %2', args0: [
+        { type: 'motion_speed_robot', message0: '小车 %1 将速度设为 %2 厘米/秒', args0: [
             { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
             { type: 'input_value', name: 'S', check: 'Number' }
           ], previousStatement: true, nextStatement: true, colour: 120 },
@@ -2269,7 +2294,7 @@
           ], previousStatement: true, nextStatement: true, colour: 20 },
         { type: 'curve_travel_run', message0: '曲线拦截演示（A 巡逻 + B 直线交汇）',
           previousStatement: true, nextStatement: true, colour: 20 },
-        { type: 'control_repeat', message0: '重复 %1 次', args0: [{ type: 'input_value', name: 'N', check: 'Number' }],
+        { type: 'control_repeat', message0: '重复执行 %1 次', args0: [{ type: 'input_value', name: 'N', check: 'Number' }],
           message1: '%1', args1: [{ type: 'input_statement', name: 'DO' }],
           previousStatement: true, nextStatement: true, colour: 65 },
         { type: 'control_if', message0: '如果 %1 那么', args0: [{ type: 'input_value', name: 'COND', check: 'Boolean' }],
@@ -2316,7 +2341,16 @@
           ], output: null, colour: 300 },
         { type: 'array_length', message0: '数组 %1 长度', args0: [
             { type: 'field_variable', name: 'VAR', variable: '列表' }
-          ], output: 'Number', colour: 300 }
+          ], output: 'Number', colour: 300 },
+        { type: 'motion_drive_vt', message0: '以速度 %1 厘米/秒 行驶 %2 秒', args0: [
+            { type: 'input_value', name: 'V', check: 'Number' },
+            { type: 'input_value', name: 'T', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 120 },
+        { type: 'motion_drive_vt_robot', message0: '小车 %1 以速度 %2 厘米/秒 行驶 %3 秒', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'input_value', name: 'V', check: 'Number' },
+            { type: 'input_value', name: 'T', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 120 }
       ]);
     },
 
@@ -2366,6 +2400,17 @@
       gen('motion_turn_right', b => `await __robot.turnRight(${J.valueToCode(b, 'A', J.ORDER_NONE) || 0});\n`);
       gen('motion_turn_left', b => `await __robot.turnLeft(${J.valueToCode(b, 'A', J.ORDER_NONE) || 0});\n`);
       gen('motion_speed', b => `__robot.setSpeed(${J.valueToCode(b, 'S', J.ORDER_NONE) || 10});\n`);
+      gen('motion_drive_vt', b => {
+        const v = J.valueToCode(b, 'V', J.ORDER_NONE) || 0;
+        const t = J.valueToCode(b, 'T', J.ORDER_NONE) || 0;
+        return `await __robot.driveSeconds(${v}, ${t});\n`;
+      });
+      gen('motion_drive_vt_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        const v = J.valueToCode(b, 'V', J.ORDER_NONE) || 0;
+        const t = J.valueToCode(b, 'T', J.ORDER_NONE) || 0;
+        return `await __robot${robot}.driveSeconds(${v}, ${t});\n`;
+      });
       gen('motion_wait', b => `await __robot.wait(${J.valueToCode(b, 'T', J.ORDER_NONE) || 1});\n`);
       gen('motion_trail_on', () => `__simRef.setPenDown(true);\n`);
       gen('motion_trail_off', () => `__simRef.setPenDown(false);\n`);
@@ -2579,21 +2624,55 @@
       return this.variableDeclarations() + this.chainFromStart();
     },
 
-    buildToolboxXml(mode) {
+    resolveToolboxLevel(task, stageKey) {
+      if (typeof window.resolveToolboxLevel === 'function') {
+        return window.resolveToolboxLevel(task, stageKey);
+      }
+      if (task?.toolboxLevel === 'L1' || task?.toolboxLevel === 'L2') return task.toolboxLevel;
+      if (stageKey === 'primary' || stageKey === 'travel') return 'L1';
+      return 'L2';
+    },
+
+    buildToolboxXml(mode, level = 'L2') {
       const isDual = mode === 'travel' || mode === 'curveTravel';
+      const isL2 = level === 'L2';
       const entryBlock = isDual
         ? '<block type="event_start_dual"></block>'
         : '<block type="event_start"></block>';
-      const travelExtra = isDual
-        ? `
+
+      const singleMotion = `
+            <block type="motion_forward"><value name="D"><shadow type="math_num"><field name="N">30</field></shadow></value></block>
+            <block type="motion_backward"><value name="D"><shadow type="math_num"><field name="N">20</field></shadow></value></block>
+            <block type="motion_turn_right"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
+            <block type="motion_turn_left"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>`;
+
+      const dualMotion = `
             <block type="motion_forward_robot"><value name="D"><shadow type="math_num"><field name="N">30</field></shadow></value></block>
-            <block type="motion_turn_robot"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
+            <block type="motion_turn_robot"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>`;
+
+      const speedTimeSingle = `
+            <block type="motion_speed"><value name="S"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
+            <block type="motion_drive_vt">
+              <value name="V"><shadow type="math_num"><field name="N">10</field></shadow></value>
+              <value name="T"><shadow type="math_num"><field name="N">3</field></shadow></value>
+            </block>
+            <block type="motion_wait"><value name="T"><shadow type="math_num"><field name="N">1</field></shadow></value></block>`;
+
+      const speedTimeDual = `
             <block type="motion_speed_robot"><value name="S"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
+            <block type="motion_drive_vt_robot">
+              <field name="ROBOT">A</field>
+              <value name="V"><shadow type="math_num"><field name="N">10</field></shadow></value>
+              <value name="T"><shadow type="math_num"><field name="N">3</field></shadow></value>
+            </block>
+            <block type="motion_wait_robot"><value name="T"><shadow type="math_num"><field name="N">2</field></shadow></value></block>`;
+
+      const travelAdvanced = isDual
+        ? `
             <block type="motion_goto_robot">
               <value name="X"><shadow type="math_num"><field name="N">30</field></shadow></value>
               <value name="Y"><shadow type="math_num"><field name="N">60</field></shadow></value>
             </block>
-            <block type="motion_wait_robot"><value name="T"><shadow type="math_num"><field name="N">2</field></shadow></value></block>
             <block type="motion_wait_until_near">
               <field name="ROBOT">B</field>
               <field name="OTHER">A</field>
@@ -2612,14 +2691,9 @@
             </block>
             <block type="curve_travel_run"></block>`
         : '';
-      return `<xml>
-          <category name="程序入口" colour="120">${entryBlock}</category>
-          <category name="运动控制" colour="160">
-            <block type="motion_turn_right"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
-            <block type="motion_turn_left"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
-            <block type="motion_forward"><value name="D"><shadow type="math_num"><field name="N">30</field></shadow></value></block>
-            <block type="motion_backward"><value name="D"><shadow type="math_num"><field name="N">20</field></shadow></value></block>
-            <block type="motion_speed"><value name="S"><shadow type="math_num"><field name="N">10</field></shadow></value></block>
+
+      const l2Coords = (!isDual && isL2)
+        ? `
             <block type="motion_move_2d">
               <value name="ANGLE"><shadow type="math_num"><field name="N">0</field></shadow></value>
               <value name="D"><shadow type="math_num"><field name="N">50</field></shadow></value>
@@ -2628,18 +2702,27 @@
               <value name="X"><shadow type="math_num"><field name="N">50</field></shadow></value>
               <value name="Y"><shadow type="math_num"><field name="N">0</field></shadow></value>
             </block>
-            <block type="motion_face_angle"><value name="ANGLE"><shadow type="math_num"><field name="N">90</field></shadow></value></block>
+            <block type="motion_face_angle"><value name="ANGLE"><shadow type="math_num"><field name="N">90</field></shadow></value></block>`
+        : '';
+
+      const penBlocks = isDual
+        ? ''
+        : `
             <block type="motion_trail_on"></block>
             <block type="motion_trail_off"></block>
             <block type="motion_trail_color"><field name="COLOR">#f97316</field></block>
-            <block type="motion_trail_width"><value name="W"><shadow type="math_num"><field name="N">3</field></shadow></value></block>
-            ${travelExtra}
-          </category>
-          <category name="流程控制" colour="65">
-            <block type="control_repeat"><value name="N"><shadow type="math_num"><field name="N">4</field></shadow></value></block>
+            <block type="motion_trail_width"><value name="W"><shadow type="math_num"><field name="N">3</field></shadow></value></block>`;
+
+      const penCategory = isDual
+        ? ''
+        : `<category name="画笔" colour="160">${penBlocks}</category>`;
+
+      const l2Categories = isL2
+        ? `
+          ${!isDual ? `<category name="坐标与角度" colour="160">${l2Coords}</category>` : ''}
+          <category name="逻辑判断" colour="210">
             <block type="control_if"></block>
-            <block type="motion_wait"><value name="T"><shadow type="math_num"><field name="N">1</field></shadow></value></block>
-            <block type="motion_stop"></block>
+            <block type="robot_logic_compare"></block>
           </category>
           <category name="变量" custom="VARIABLE" colour="330"></category>
           <category name="数组" colour="300">
@@ -2652,7 +2735,6 @@
             <block type="array_get_index"><value name="INDEX"><shadow type="math_num"><field name="N">0</field></shadow></value></block>
             <block type="array_length"></block>
           </category>
-          <category name="逻辑判断" colour="210"><block type="robot_logic_compare"></block></category>
           <category name="数学与三角" colour="230">
             <block type="math_num"></block>
             <block type="math_op"></block>
@@ -2661,7 +2743,23 @@
               <value name="DEG"><shadow type="math_num"><field name="N">30</field></shadow></value>
             </block>
             <block type="ml_math_trig_special"></block>
+          </category>`
+        : `<category name="数字" colour="230">
+            <block type="math_num"></block>
+            <block type="math_op"></block>
+          </category>`;
+
+      return `<xml>
+          <category name="程序入口" colour="120">${entryBlock}</category>
+          <category name="小车动作" colour="160">${isDual ? dualMotion : singleMotion}</category>
+          <category name="速度与时间" colour="120">${isDual ? speedTimeDual : speedTimeSingle}</category>
+          <category name="重复与等待" colour="65">
+            <block type="control_repeat"><value name="N"><shadow type="math_num"><field name="N">4</field></shadow></value></block>
+            <block type="motion_stop"></block>
           </category>
+          ${penCategory}
+          ${isDual ? `<category name="双车协作" colour="20">${travelAdvanced}</category>` : ''}
+          ${l2Categories}
         </xml>`;
     },
 
@@ -2729,9 +2827,9 @@
       }
     },
 
-    setMode(mode) {
+    setMode(mode, level = 'L2') {
       if (!this.workspace) return;
-      this.workspace.updateToolbox(this.buildToolboxXml(mode));
+      this.workspace.updateToolbox(this.buildToolboxXml(mode, level));
       this.ensureVariableSupport();
     },
 
@@ -2740,7 +2838,7 @@
       this.applyBlocklyLocale();
       this.defineBlocklyTypes();
       this.workspace = Blockly.inject('blockly', {
-        toolbox: this.buildToolboxXml('regular'),
+        toolbox: this.buildToolboxXml('regular', 'L2'),
         grid: { spacing: 20, length: 3, colour: '#d4dde8', snap: true },
         zoom: { controls: true, wheel: true, startScale: 1, maxScale: 2.5, minScale: 0.4 },
         trashcan: true,
@@ -2908,7 +3006,9 @@
 
     sim.setScene(task.scene, task.sceneConfig, task.mode);
     const blocklyMode = task.mode === 'curveTravel' ? 'curveTravel' : (task.mode || 'regular');
-    blocklyApp.setMode(blocklyMode);
+    const stageKey = document.getElementById('selStage')?.value || 'junior';
+    const toolboxLevel = blocklyApp.resolveToolboxLevel(task, stageKey);
+    blocklyApp.setMode(blocklyMode, toolboxLevel);
     if (typeof PlotConfig !== 'undefined') {
       PlotConfig.onTaskLoaded(task);
     }
@@ -2998,10 +3098,10 @@
     document.getElementById('codeOut').textContent = code || '（无代码）';
     document.getElementById('codeOut').classList.add('show');
     const hasDualStart = blocklyApp.workspace?.getBlocksByType('event_start_dual', false).length > 0;
-    const codeOk = /__robot\.|__robotA\.|__robotB\.|__parallel|__curveTravelRun|__runRobotsParallel|waitUntilNear/.test(code);
+    const codeOk = /__robot\.|__robotA\.|__robotB\.|driveSeconds|__parallel|__curveTravelRun|__runRobotsParallel|waitUntilNear/.test(code);
     if (!code || !codeOk) {
       setStatus(
-        hasDualStart ? '请把运动积木接在「双车并行」的 A/B 程序槽中' : '请把运动积木接在「当程序开始时」下方',
+        hasDualStart ? '请把运动积木接在「双车并行」的 A/B 程序槽中' : '请把运动积木接在「启动时」下方',
         'err'
       );
       return;
@@ -3051,7 +3151,7 @@
   async function startDemo() {
     if (sim.busy) return;
     const code = blocklyApp.generate();
-    if (code && /__robot\.|__robotA\.|__robotB\.|__parallel|__curveTravelRun|__runRobotsParallel|waitUntilNear/.test(code)) { await runProgram(); return; }
+    if (code && /__robot\.|__robotA\.|__robotB\.|driveSeconds|__parallel|__curveTravelRun|__runRobotsParallel|waitUntilNear/.test(code)) { await runProgram(); return; }
     if (typeof PlotConfig !== 'undefined' && PlotConfig.isEditableTask(currentTask)) {
       PlotConfig.applyFromInputs();
     }
