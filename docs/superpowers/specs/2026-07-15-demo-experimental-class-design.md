@@ -66,7 +66,7 @@
 | User 绑定 | `school_id` / `grade_id` / `classroom_id` 指向演示组织 |
 | 成员关系 | `ClassroomMembership`，`role_in_class=student`，`is_primary_class=true` |
 
-邮箱：可用内部占位（如 `st01@demo.local`），须保证全局唯一，且不与真实用户冲突。
+邮箱：可用内部占位（如 `st01@demo.inspireed.internal`），须保证全局唯一，且不与真实用户冲突。
 
 ### 3.3 运维语义
 

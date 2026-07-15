@@ -13,7 +13,7 @@
 - School: name `DEMO School`, code `DEMO` (lookup key)
 - Class: name `Demo Class`, grade name `高一` (Grade catalog; typically `level=10`)
 - Accounts: usernames `st01`–`st60`, password `123456`, role `student`, display names `ST01`–`ST60`
-- Emails: `st{nn}@demo.inspireed.local` (unique placeholders)
+- Emails: `st{nn}@demo.inspireed.internal` (unique placeholders)
 - Admin-only management; school admins must not access demo-class APIs
 - Reset passwords only; do not wipe lesson/session history
 - Do not create a new user role
@@ -60,7 +60,7 @@
   - `DEMO_ACCOUNT_COUNT = 60`
   - `demo_username(n: int) -> str`  # 1 → "st01"
   - `demo_display_name(n: int) -> str`  # 1 → "ST01"
-  - `demo_email(n: int) -> str`  # 1 → "st01@demo.inspireed.local"
+  - `demo_email(n: int) -> str`  # 1 → "st01@demo.inspireed.internal"
   - `is_demo_username(username: str) -> bool`
   - `all_demo_usernames() -> list[str]`
 
@@ -93,7 +93,7 @@ class DemoClassHelpersTests(unittest.TestCase):
         self.assertEqual(demo_display_name(60), "ST60")
 
     def test_email(self) -> None:
-        self.assertEqual(demo_email(1), "st01@demo.inspireed.local")
+        self.assertEqual(demo_email(1), "st01@demo.inspireed.internal")
 
     def test_all_usernames_count_and_bounds(self) -> None:
         names = all_demo_usernames()
@@ -137,7 +137,7 @@ DEMO_REGION_NAME = "Demo Region"
 DEMO_GRADE_NAME = "高一"
 DEMO_PASSWORD = "123456"
 DEMO_ACCOUNT_COUNT = 60
-DEMO_EMAIL_DOMAIN = "demo.inspireed.local"
+DEMO_EMAIL_DOMAIN = "demo.inspireed.internal"
 
 
 def demo_username(n: int) -> str:
