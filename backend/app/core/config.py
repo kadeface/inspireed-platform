@@ -167,6 +167,12 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "storage"  # 上传文件存储目录
     MAX_UPLOAD_SIZE: int = 100 * 1024 * 1024  # 100MB
 
+    # 学生个人知识库（Obsidian 风格 vault，按 student_id 分目录）
+    KNOWLEDGE_BASE_ROOT: str = "storage/knowledge_base"
+
+    # MathLab 课程手册 JSON 根目录（默认指向 frontend/public/mathlab/data/manuals）
+    MATHLAB_MANUALS_ROOT: Optional[str] = None
+
     # 资源URL配置
     # 资源文件的相对路径前缀（数据库存储的是文件名，路径前缀在配置中）
     RESOURCE_BASE_PATH: str = "/uploads/resources"

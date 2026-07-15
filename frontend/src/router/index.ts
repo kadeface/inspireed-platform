@@ -204,10 +204,34 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, role: 'student', title: '个人资料 - InspireEd' },
   },
   {
+    path: '/student/personalized-learning',
+    name: 'StudentPersonalizedLearning',
+    component: () => import('../pages/Student/PersonalizedLearning.vue'),
+    meta: { requiresAuth: true, role: 'student', title: '个性化学习 - InspireEd' },
+  },
+  {
+    path: '/student/self-directed',
+    name: 'StudentSelfDirected',
+    component: () => import('../pages/Student/SelfDirectedLearning.vue'),
+    meta: { requiresAuth: true, role: 'student', title: '自主学习 - InspireEd' },
+  },
+  {
+    path: '/student/self-directed/session/:id',
+    name: 'StudentSelfDirectedSession',
+    component: () => import('../pages/Student/SelfDirectedSession.vue'),
+    meta: { requiresAuth: true, role: 'student', title: '自主学习微课 - InspireEd' },
+  },
+  {
+    path: '/student/knowledge-base',
+    name: 'StudentKnowledgeBase',
+    component: () => import('../pages/Student/KnowledgeBase.vue'),
+    meta: { requiresAuth: true, role: 'student', title: '我的知识库 - InspireEd' },
+  },
+  {
     path: '/student/self-study',
     name: 'StudentSelfStudy',
     component: () => import('../pages/Student/SelfStudy.vue'),
-    meta: { requiresAuth: true, role: 'student', title: '个性化学习 - InspireEd' },
+    meta: { requiresAuth: true, role: 'student', title: '答疑解惑 - InspireEd' },
   },
   {
     path: '/student/self-study/history',
@@ -219,7 +243,7 @@ const routes: RouteRecordRaw[] = [
     path: '/student/self-study/session/:id',
     name: 'StudentSelfStudySession',
     component: () => import('../pages/Student/SelfStudy.vue'),
-    meta: { requiresAuth: true, role: 'student', title: '个性化学习会话 - InspireEd' },
+    meta: { requiresAuth: true, role: 'student', title: '答疑解惑会话 - InspireEd' },
   },
   {
     path: '/student/favorites',

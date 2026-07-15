@@ -27,6 +27,13 @@ class SelfStudyMode(str, enum.Enum):
     COMPLETED_CHECK = "completed_check"
 
 
+class SelfStudyTutorStyle(str, enum.Enum):
+    DEFAULT = "default"
+    SOCRATIC = "socratic"
+    FEYNMAN = "feynman"
+    CONFUCIUS = "confucius"
+
+
 class SelfStudyReadabilityStatus(str, enum.Enum):
     ACCEPTED = "accepted"
 
@@ -88,6 +95,8 @@ class SelfStudySession(Base):
     )
     subject = Column(String(50), nullable=False, default="math")
     grade_band = Column(String(50), nullable=False, default="primary")
+
+    tutor_style = Column(String(50), nullable=False, default=SelfStudyTutorStyle.DEFAULT.value)
 
     original_image_storage_key = Column(String(255), nullable=False)
     revised_image_storage_key = Column(String(255), nullable=True)

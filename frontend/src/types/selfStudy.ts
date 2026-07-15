@@ -21,6 +21,8 @@ export type SelfStudyTurnKind =
 
 export type SelfStudySpeaker = 'student' | 'ai' | 'system'
 
+export type SelfStudyTutorStyle = 'default' | 'socratic' | 'feynman' | 'confucius'
+
 export interface SelfStudyUploadCheckResponse {
   accepted: boolean
   upload_token?: string
@@ -52,6 +54,7 @@ export interface SelfStudySession {
   mode: string
   subject: string
   grade_band: string
+  tutor_style?: SelfStudyTutorStyle
   original_image_url: string
   revised_image_url?: string | null
   problem_text?: string | null

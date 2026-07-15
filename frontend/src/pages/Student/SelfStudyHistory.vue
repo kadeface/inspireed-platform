@@ -3,14 +3,14 @@
     <div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
       <div class="flex items-center justify-between">
         <div>
-          <div class="text-sm text-slate-500">个性化学习伴学</div>
+          <div class="text-sm text-slate-500">答疑解惑</div>
           <h1 class="text-2xl font-bold text-slate-900">我的学习记录</h1>
         </div>
         <button
           class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-white"
           @click="router.push('/student/self-study')"
         >
-          返回个性化学习
+          返回答疑解惑
         </button>
       </div>
 

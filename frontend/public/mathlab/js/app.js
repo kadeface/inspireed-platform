@@ -1977,10 +1977,13 @@
           }
         },
         parallelogram: async () => {
-          await this.forward(50);
-          await this.turn(60);
-          await this.forward(30);
-          await this.turn(120);
+          // 对边相等：相邻两边（50、30）重复两次才能走完周长
+          for (let i = 0; i < 2; i++) {
+            await this.forward(50);
+            await this.turn(60);
+            await this.forward(30);
+            await this.turn(120);
+          }
         },
         equation: async () => { await this.forward(70); },
         nav30: async () => {

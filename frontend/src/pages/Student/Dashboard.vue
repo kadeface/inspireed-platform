@@ -190,7 +190,7 @@
       </div>
 
       <!-- 快捷入口 -->
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <button
           @click="router.push('/student/projects')"
           class="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50 p-6 text-center"
@@ -199,7 +199,7 @@
           <div class="text-sm font-semibold text-gray-900">我的项目</div>
         </button>
         <button
-          @click="router.push('/student/self-study')"
+          @click="router.push('/student/personalized-learning')"
           class="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50 p-6 text-center"
         >
           <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">🎯</div>
@@ -218,13 +218,6 @@
         >
           <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">📊</div>
           <div class="text-sm font-semibold text-gray-900">学习统计</div>
-        </button>
-        <button
-          @click="router.push('/student/learning-paths')"
-          class="group bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border border-white/50 p-6 text-center"
-        >
-          <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform">📚</div>
-          <div class="text-sm font-semibold text-gray-900">知识库</div>
         </button>
       </div>
 

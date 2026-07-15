@@ -44,6 +44,7 @@ class SelfStudyService {
     voice_transcript_raw?: string
     question_text_confirmed: string
     input_mode: 'voice' | 'text'
+    tutor_style?: 'default' | 'socratic' | 'feynman' | 'confucius'
   }): Promise<SelfStudySession> {
     try {
       return await api.post<SelfStudySession>(`${this.basePath}/sessions`, payload)

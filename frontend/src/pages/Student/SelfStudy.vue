@@ -3,8 +3,8 @@
     <div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <div class="text-sm text-slate-500">个性化学习伴学</div>
-          <h1 class="text-2xl font-bold text-slate-900">个性化学习</h1>
+          <div class="text-sm text-slate-500">个性化学习 · 答疑解惑</div>
+          <h1 class="text-2xl font-bold text-slate-900">答疑解惑</h1>
           <p class="mt-1 text-sm text-slate-600">
             上传你已经做完的一道小学数学题，再用语音或文字说明你想检查什么，获得针对你的个性化讲解。
           </p>
@@ -18,12 +18,12 @@
           </button>
           <button
             class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
-            @click="router.push('/student')"
+            @click="router.push('/student/personalized-learning')"
           >
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
-            返回工作台
+            返回个性化学习
           </button>
         </div>
       </div>
@@ -105,6 +105,29 @@
               </p>
             </div>
 
+            <div>
+              <h3 class="text-sm font-semibold text-slate-900">选择助教风格</h3>
+              <p class="mt-1 text-xs text-slate-500">不同教育家会用不同方式陪你检查这道题。</p>
+              <div class="mt-3 grid grid-cols-2 gap-3">
+                <button
+                  v-for="style in tutorStyles"
+                  :key="style.id"
+                  type="button"
+                  class="rounded-xl border p-3 text-left transition-all"
+                  :class="
+                    selectedTutorStyle === style.id
+                      ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20'
+                      : 'border-slate-200 hover:border-emerald-300 hover:bg-slate-50'
+                  "
+                  @click="selectedTutorStyle = style.id"
+                >
+                  <div class="text-2xl">{{ style.icon }}</div>
+                  <div class="mt-1 text-sm font-semibold text-slate-900">{{ style.name }}</div>
+                  <div class="mt-0.5 text-xs text-slate-500 leading-snug">{{ style.description }}</div>
+                </button>
+              </div>
+            </div>
+
             <textarea
               v-model="draftQuestion"
               rows="6"
@@ -135,6 +158,9 @@
                   <h2 class="text-xl font-semibold text-slate-900">当前学习会话</h2>
                   <p class="mt-1 text-sm text-slate-600">
                     状态：{{ phaseLabel(session.session_phase) }}，当前判断：{{ resultLabel(session.result_judgment) }}
+                  </p>
+                  <p class="mt-1 text-xs text-emerald-700">
+                    助教风格：{{ tutorStyleLabel(session.tutor_style) }}
                   </p>
                 </div>
                 <div class="text-sm text-slate-500">
@@ -354,9 +380,14 @@ import { useRoute, useRouter } from 'vue-router'
 
 import selfStudyService from '@/services/selfStudy'
 import SelfStudyDiagram from '@/components/Student/SelfStudyDiagram.vue'
+import {
+  SELF_STUDY_TUTOR_STYLES,
+  getTutorStyleLabel,
+} from '@/data/selfStudyTutorStyles'
 import type {
   SelfStudySession,
   SelfStudySpeaker,
+  SelfStudyTutorStyle,
   SelfStudyTurn,
   SelfStudyTurnKind,
   SelfStudyUploadCheckResponse,
@@ -377,6 +408,8 @@ const uploadSuggestions = ref<string[]>([])
 const pasteHintVisible = ref(false)
 
 const draftQuestion = ref('')
+const selectedTutorStyle = ref<SelfStudyTutorStyle>('default')
+const tutorStyles = SELF_STUDY_TUTOR_STYLES
 const handoffConfusion = ref('')
 const summaryBefore = ref('')
 const summaryAfter = ref('')
@@ -465,6 +498,7 @@ async function handleCreateSession() {
       upload_token: acceptedUpload.value.upload_token,
       question_text_confirmed: draftQuestion.value.trim(),
       input_mode: 'text',
+      tutor_style: selectedTutorStyle.value,
     })
     session.value = created
     await router.replace(`/student/self-study/session/${created.id}`)
@@ -536,6 +570,10 @@ async function handleCompleteSession() {
   } finally {
     submitting.value = false
   }
+}
+
+function tutorStyleLabel(style?: SelfStudyTutorStyle | string | null) {
+  return getTutorStyleLabel(style)
 }
 
 function speakerLabel(speaker: SelfStudySpeaker) {

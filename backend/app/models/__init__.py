@@ -113,6 +113,7 @@ from app.models.self_study import (
     SelfStudyTurn,
     SelfStudyTeacherHandoff,
 )
+from app.models.self_directed import SelfDirectedSession, SelfDirectedSessionStatus
 
 __all__ = [
     "User",
@@ -225,4 +226,6 @@ __all__ = [
     "SelfStudySession",
     "SelfStudyTurn",
     "SelfStudyTeacherHandoff",
+    "SelfDirectedSession",
+    "SelfDirectedSessionStatus",
 ]

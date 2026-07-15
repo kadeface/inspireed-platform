@@ -35,6 +35,9 @@ from app.models.self_study import (
     SelfStudyTurnKind,
 )
 from app.services.ai_settings import AIChannelRuntimeConfig, ai_settings_service
+from app.services.knowledge_ingest import knowledge_ingest_service
+from app.services.knowledge_query import knowledge_query_service
+from app.services.self_study_tutor_styles import get_tutor_role_prompt, normalize_tutor_style
 from app.services.upload import upload_service
 from app.utils.resource_url import filename_to_url, url_to_filename
 
@@ -160,6 +163,7 @@ class SelfStudyService:
         voice_transcript_raw: Optional[str],
         question_text_confirmed: str,
         input_mode: str,
+        tutor_style: str = "default",
     ) -> Dict[str, Any]:
         payload = self.decode_upload_token(upload_token, current_user)
         storage_key = payload["storage_key"]
@@ -170,6 +174,7 @@ class SelfStudyService:
             student_work_text=payload.get("student_work_text_preview"),
             voice_transcript_raw=voice_transcript_raw,
             question_text_confirmed=question_text_confirmed,
+            tutor_style=normalize_tutor_style(tutor_style),
             readability_status=SelfStudyReadabilityStatus.ACCEPTED,
             session_phase=SelfStudySessionPhase.GUIDING,
         )
@@ -459,6 +464,25 @@ class SelfStudyService:
             session.result_judgment = SelfStudyResultJudgment.UNDERSTOOD
         await db.flush()
         loaded_session = await self.get_session(db, session.id, current_user)
+        try:
+            knowledge_ingest_service.ingest_from_self_study_session(
+                current_user.id,
+                session_id=loaded_session.id,
+                summary_before=summary_before,
+                summary_after=summary_after,
+                problem_text=loaded_session.problem_text,
+                student_work_text=loaded_session.student_work_text,
+                result_judgment=loaded_session.result_judgment,
+                primary_error_type=loaded_session.primary_error_type,
+                ai_guidance_summary=self._build_ai_guidance_summary(loaded_session.turns),
+            )
+        except Exception:
+            # Ingest must not block session completion
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "knowledge ingest failed for self-study session %s", loaded_session.id
+            )
         return await self.serialize_session(loaded_session, request, db)
 
     async def get_session(
@@ -656,6 +680,7 @@ class SelfStudyService:
             "mode": session.mode.value if hasattr(session.mode, "value") else str(session.mode),
             "subject": session.subject,
             "grade_band": session.grade_band,
+            "tutor_style": normalize_tutor_style(session.tutor_style),
             "original_image_url": filename_to_url(session.original_image_storage_key, request),
             "revised_image_url": filename_to_url(session.revised_image_storage_key, request)
             if session.revised_image_storage_key
@@ -795,7 +820,17 @@ class SelfStudyService:
         image_paths = [original_path]
         if session.revised_image_storage_key:
             image_paths.append(self._storage_key_to_path(session.revised_image_storage_key))
-        prompt = self._build_guidance_prompt(session, question_text, response_mode)
+        prior_summary = await knowledge_query_service.query_prior_knowledge(
+            db,
+            session.student_id,
+            question_text or session.question_text_confirmed or session.problem_text or "",
+        )
+        prompt = self._build_guidance_prompt(
+            session,
+            question_text,
+            response_mode,
+            prior_summary=prior_summary,
+        )
         fallback = self._mock_guidance(session, response_mode)
         result = await self._call_vision_json(
             prompt=prompt,
@@ -816,9 +851,18 @@ class SelfStudyService:
         image_paths = [original_path]
         if session.revised_image_storage_key:
             image_paths.append(self._storage_key_to_path(session.revised_image_storage_key))
+        prior_summary = await knowledge_query_service.query_prior_knowledge(
+            db,
+            session.student_id,
+            session.question_text_confirmed or session.problem_text or "",
+        )
+        prior_block = prior_summary.strip() if prior_summary else "暂无相关个人笔记。"
         prompt = (
-            "你是一位小学数学老师。请根据学生上传的题目和作答，给出一段面向学生的标准解释。"
-            "要求：解释为什么原来的做法有问题，正确思路是什么，语言简洁。"
+            f"{get_tutor_role_prompt(session.tutor_style)}"
+            f"【学生先前知识】{prior_block}"
+            "请根据学生上传的题目和作答，给出一段面向学生的标准解释。"
+            "要求：解释为什么原来的做法有问题，正确思路是什么，语言简洁，并符合你的助教风格。"
+            "若先前知识相关，可简短呼应学生已有理解，但不要照搬旧笔记。"
             "同时用 Mermaid 画一张简单图示（flowchart TD 或 LR），帮助学生看清数量关系或解题步骤；"
             "节点标签用中文双引号包裹，节点数 3-6 个，不要复杂语法。"
             "只返回 JSON，字段为 content_text(string), diagram_mermaid(string|null)。"
@@ -840,12 +884,20 @@ class SelfStudyService:
         }
 
     def _build_guidance_prompt(
-        self, session: SelfStudySession, question_text: str, response_mode: str
+        self,
+        session: SelfStudySession,
+        question_text: str,
+        response_mode: str,
+        *,
+        prior_summary: str = "",
     ) -> str:
         turn_summary = self._summarize_turns(self._loaded_turns(session))
+        role_prompt = get_tutor_role_prompt(session.tutor_style)
+        prior_block = prior_summary.strip() if prior_summary else "暂无相关个人笔记。"
         return (
-            "你是一位小学数学自学伴学教练。学生上传的是一道已做完的单题图。"
-            "你的目标不是直接给答案，而是帮助学生讲清楚为什么错、为什么改对。"
+            f"{role_prompt}"
+            f"【学生先前知识】{prior_block}"
+            "学生上传的是一道已做完的单题图。"
             "请根据图片与对话，输出 JSON："
             "{"
             "\"result_judgment\":\"incorrect|correct_unexplained|understood\","
@@ -859,6 +911,7 @@ class SelfStudyService:
             "规则：如果学生做对但解释不清楚，用 correct_unexplained 并给一个理解验收问题；"
             "如果学生做错，用 incorrect，并先追问原来怎么想或给一阶提示；"
             "如果学生已经能清楚说明为什么错、为什么改对，用 understood。"
+            "若先前知识相关，可自然呼应学生已有理解，但不要直接复述旧笔记全文。"
             f" 当前模式：{response_mode}。"
             f" 学生确认后的提问：{question_text}。"
             f" 已有会话摘要：{turn_summary or '无'}。"

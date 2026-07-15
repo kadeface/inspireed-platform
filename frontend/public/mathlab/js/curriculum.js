@@ -194,8 +194,8 @@ const CURRICULUM = {
             ],
             sceneConfig: { shape: 'parallelogram', top: 50, side: 30, slant: 20 },
             challenges: ['走平行四边形周长路径', '四段路程 50+30 对应相邻两边'],
-            hint: '前进 50 → 转 60° → 前进 30 → 转 120°，对应平行四边形相邻两边。',
-            starter: { forward: 50, turn: 60, forward2: 30, turn2: 120 },
+            hint: '前进 50 → 转 60° → 前进 30 → 转 120°，再重复一遍（共四边）才能走完周长。',
+            starter: { repeat: 2, forward: 50, turn: 60, forward2: 30, turn2: 120 },
             demo: 'parallelogram'
           }),
           task('p4t13', '任务13：机器人最短路线——优化思想', '优化', SCENE.PATH, {
@@ -1646,11 +1646,15 @@ function buildStarterXml(s, sceneConfig, taskMeta) {
     return buildDualStarterXml(stackA, stackB);
   } else if (s.repeat && s.forward != null && s.turn != null) {
     if (s.speed != null) steps.push(blockSpeed(s.speed));
-    if (s.repeat === 4 && s.turn === 90) {
+    // 正方形：四次等距转向可用 2D 绝对方向展开
+    if (s.repeat === 4 && s.turn === 90 && s.forward2 == null) {
       [0, 90, 180, 270].forEach(deg => steps.push(blockMove2d(deg, s.forward)));
     } else {
-      const inner = `<block type="motion_forward"><value name="D">${numShadow(s.forward)}</value><next><block type="motion_turn_right"><value name="A">${numShadow(s.turn)}</value></block></next></block>`;
-      steps.push(`<block type="control_repeat"><value name="N">${numShadow(s.repeat)}</value><statement name="DO">${inner}</statement>`);
+      // 矩形/平行四边形：重复「边A→转→边B→转」
+      const innerParts = [blockForward(s.forward), blockTurnRight(s.turn)];
+      if (s.forward2 != null) innerParts.push(blockForward(s.forward2));
+      if (s.turn2 != null) innerParts.push(blockTurnRight(s.turn2));
+      steps.push(blockRepeat(s.repeat, chainBlocks(innerParts, 0)));
     }
   } else if (s.move2d) {
     if (s.speed != null) steps.push(blockSpeed(s.speed));

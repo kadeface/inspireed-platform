@@ -59,6 +59,7 @@ class SelfStudyCreateSessionRequest(BaseModel):
     voice_transcript_raw: Optional[str] = None
     question_text_confirmed: str = Field(..., min_length=1, max_length=800)
     input_mode: Literal["voice", "text"] = "voice"
+    tutor_style: Literal["default", "socratic", "feynman", "confucius"] = "default"
 
 
 class SelfStudyAppendTurnRequest(BaseModel):
@@ -92,6 +93,7 @@ class SelfStudySessionResponse(BaseModel):
     mode: str
     subject: str
     grade_band: str
+    tutor_style: str = "default"
     original_image_url: str
     revised_image_url: Optional[str] = None
     problem_text: Optional[str] = None

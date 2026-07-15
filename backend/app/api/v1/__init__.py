@@ -34,6 +34,7 @@ from app.api.v1 import (
     exams,
     favorites,
     import_tasks,
+    knowledge_base,
     learning_paths,
     lessons,
     library_assets,
@@ -45,6 +46,7 @@ from app.api.v1 import (
     review_channel,
     resources,
     reviews,
+    self_directed,
     self_study,
     scores,
     sections,
@@ -122,6 +124,16 @@ api_router.include_router(
     self_study.router,
     prefix="/self-study",
     tags=["学生-自学拍题"],
+)
+api_router.include_router(
+    knowledge_base.router,
+    prefix="/knowledge-base",
+    tags=["学生-知识库"],
+)
+api_router.include_router(
+    self_directed.router,
+    prefix="/self-directed",
+    tags=["学生-自主学习"],
 )
 
 # 角色专用路由

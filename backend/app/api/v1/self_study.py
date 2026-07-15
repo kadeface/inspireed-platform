@@ -97,6 +97,7 @@ async def create_session(
             voice_transcript_raw=payload.voice_transcript_raw,
             question_text_confirmed=payload.question_text_confirmed,
             input_mode=payload.input_mode,
+            tutor_style=payload.tutor_style,
         )
         return SelfStudySessionResponse(**result)
     except SelfStudyServiceError as exc:
