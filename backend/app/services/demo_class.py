@@ -76,14 +76,6 @@ class DemoClassService:
         )
         return result.scalar_one_or_none()
 
-    async def is_demo_classroom(self, db: AsyncSession, classroom: Classroom) -> bool:
-        demo_classroom = await self.resolve_demo_classroom(db)
-        if demo_classroom is not None and classroom.id == demo_classroom.id:
-            return True
-        result = await db.execute(select(School).where(School.id == classroom.school_id))
-        school = result.scalar_one_or_none()
-        return school is not None and school.code == DEMO_SCHOOL_CODE
-
     async def get_status(self, db: AsyncSession) -> dict:
         school = await self.resolve_demo_school(db)
         classroom = await self.resolve_demo_classroom(db)
@@ -253,6 +245,8 @@ class DemoClassService:
             "created_users": created_users,
             "skipped_users": skipped_users,
             "created_memberships": created_memberships,
+            # Always empty here: a non-empty conflict list raises ValueError above
+            # before any writes happen, so a successful return never has conflicts.
             "conflicts": conflicts,
             "message": message,
         }
