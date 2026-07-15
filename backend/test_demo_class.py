@@ -23,7 +23,7 @@ class DemoClassHelpersTests(unittest.TestCase):
         self.assertEqual(demo_display_name(60), "ST60")
 
     def test_email(self) -> None:
-        self.assertEqual(demo_email(1), "st01@demo.inspireed.local")
+        self.assertEqual(demo_email(1), "st01@demo.inspireed.internal")
 
     def test_all_usernames_count_and_bounds(self) -> None:
         names = all_demo_usernames()

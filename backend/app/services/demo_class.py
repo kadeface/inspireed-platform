@@ -18,7 +18,10 @@ DEMO_REGION_NAME = "Demo Region"
 DEMO_GRADE_NAME = "高一"
 DEMO_PASSWORD = "123456"
 DEMO_ACCOUNT_COUNT = 60
-DEMO_EMAIL_DOMAIN = "demo.inspireed.local"
+# NOTE: must NOT use a "*.local" (or other IANA special-use, e.g. *.test/*.invalid)
+# suffix — pydantic's EmailStr (via email-validator) rejects those as reserved,
+# which breaks any endpoint serializing a demo user through UserResponse (e.g. /auth/me).
+DEMO_EMAIL_DOMAIN = "demo.inspireed.internal"
 
 
 def demo_username(n: int) -> str:
