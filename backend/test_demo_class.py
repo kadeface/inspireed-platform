@@ -43,5 +43,24 @@ class DemoClassHelpersTests(unittest.TestCase):
         self.assertGreaterEqual(len(DEMO_PASSWORD), 6)
 
 
+class DemoClassServiceLogicTests(unittest.TestCase):
+    def test_conflict_detection_helper(self) -> None:
+        from app.services.demo_class import classify_existing_user
+
+        # existing is demo-owned when school code DEMO
+        self.assertEqual(
+            classify_existing_user(username="st01", school_code="DEMO"),
+            "owned",
+        )
+        self.assertEqual(
+            classify_existing_user(username="st01", school_code="OTHER"),
+            "conflict",
+        )
+        self.assertEqual(
+            classify_existing_user(username="st01", school_code=None),
+            "conflict",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
