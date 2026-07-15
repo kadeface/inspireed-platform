@@ -62,5 +62,21 @@ class DemoClassServiceLogicTests(unittest.TestCase):
         )
 
 
+class DemoClassPermissionTests(unittest.TestCase):
+    def test_demo_classroom_allowed_without_same_school(self) -> None:
+        from app.services.demo_class import DEMO_SCHOOL_CODE
+        from app.services.permission_service import teacher_may_access_demo_classroom
+
+        self.assertTrue(
+            teacher_may_access_demo_classroom(school_code=DEMO_SCHOOL_CODE)
+        )
+        self.assertFalse(
+            teacher_may_access_demo_classroom(school_code="OTHER")
+        )
+        self.assertFalse(
+            teacher_may_access_demo_classroom(school_code=None)
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

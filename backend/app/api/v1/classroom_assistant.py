@@ -240,7 +240,24 @@ async def get_my_classrooms(
                 deputy_head_teacher_id=classroom.deputy_head_teacher_id,
                 role_in_class=None,
             ))
-    
+
+    # 教师始终可见 Demo Class（无需归属同一学校）
+    role_value = getattr(current_user.role, "value", current_user.role)
+    if role_value == UserRole.TEACHER.value:
+        from app.services.demo_class import DemoClassService
+        demo = await DemoClassService().resolve_demo_classroom(db)
+        if demo is not None and all(c.id != demo.id for c in classrooms):
+            classrooms.append(ClassroomInfo(
+                id=demo.id,
+                name=demo.name,
+                code=demo.code,
+                school_id=demo.school_id,
+                grade_id=demo.grade_id,
+                head_teacher_id=demo.head_teacher_id,
+                deputy_head_teacher_id=demo.deputy_head_teacher_id,
+                role_in_class=None,
+            ))
+
     return classrooms
 
 

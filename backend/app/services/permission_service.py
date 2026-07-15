@@ -2,12 +2,15 @@
 Permission Service for centralized permission checking
 """
 
+from __future__ import annotations
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import (
     Classroom, 
     ClassroomMembership, 
     RoleInClass, 
+    School,
     UserRole, 
     Lesson,
     LessonClassroom, 
@@ -15,6 +18,12 @@ from app.models import (
     ClassSession,
     ClassSessionStatus,
 )
+
+
+def teacher_may_access_demo_classroom(school_code: str | None) -> bool:
+    """Pure helper: whether a school code identifies the Demo Class school."""
+    from app.services.demo_class import DEMO_SCHOOL_CODE
+    return school_code == DEMO_SCHOOL_CODE
 
 
 class PermissionService:
@@ -52,6 +61,12 @@ class PermissionService:
         # Fallback: check school_id
         if teacher.school_id is not None and teacher.school_id == classroom.school_id:
             return True
+        # Demo Class: any teacher/admin/researcher may publish, regardless of school
+        school = await db.get(School, classroom.school_id)
+        if school is not None and teacher_may_access_demo_classroom(school.code):
+            role_value = teacher.role.value if hasattr(teacher.role, "value") else teacher.role
+            if role_value in {UserRole.TEACHER.value, UserRole.ADMIN.value, UserRole.RESEARCHER.value}:
+                return True
         return False
 
     async def can_student_view_lesson(self, db: AsyncSession, student: "User", lesson_id: int) -> bool:

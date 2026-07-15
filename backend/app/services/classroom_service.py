@@ -6,6 +6,7 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Classroom, School, User, UserRole
+from app.services.demo_class import DemoClassService
 
 
 class ClassroomQueryService:
@@ -51,7 +52,10 @@ class ClassroomQueryService:
         if role_value == UserRole.TEACHER.value:
             # Teachers can only see classrooms from their school
             if user.school_id is None:
-                return []  # Teacher not assigned to a school
+                # Teacher not assigned to a school, but Demo Class is still visible
+                return await self._append_demo_classroom(
+                    db, [], is_active=is_active, school_id=school_id
+                )
             query = query.where(Classroom.school_id == user.school_id)
 
         elif role_value == UserRole.DISTRICT_ADMIN.value:
@@ -94,7 +98,35 @@ class ClassroomQueryService:
 
         # Execute query
         result = await db.execute(query.order_by(Classroom.grade_id, Classroom.name))
-        return list(result.scalars().all())
+        classrooms = list(result.scalars().all())
+
+        if role_value == UserRole.TEACHER.value:
+            classrooms = await self._append_demo_classroom(
+                db, classrooms, is_active=is_active, school_id=school_id
+            )
+
+        return classrooms
+
+    async def _append_demo_classroom(
+        self,
+        db: AsyncSession,
+        classrooms: List[Classroom],
+        *,
+        is_active: Optional[bool],
+        school_id: Optional[int],
+    ) -> List[Classroom]:
+        """Ensure teachers always see the Demo Class, regardless of school."""
+        demo = await DemoClassService().resolve_demo_classroom(db)
+        if demo is None:
+            return classrooms
+        if is_active is not None and demo.is_active != is_active:
+            return classrooms
+        if school_id is not None and demo.school_id != school_id:
+            # Explicit school filter that isn't the DEMO school: don't inject
+            return classrooms
+        if any(c.id == demo.id for c in classrooms):
+            return classrooms
+        return list(classrooms) + [demo]
 
     async def get_classroom_by_id(
         self,
