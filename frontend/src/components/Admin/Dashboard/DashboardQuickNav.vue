@@ -55,12 +55,23 @@
       custom-class="bg-white border border-slate-200 nav-card"
       @click="router.push('/admin/settings')"
     />
+    <AdminFunctionCard
+      title="实验班"
+      description="演示账号一键开通与重置"
+      :icon="MagicStick"
+      icon-color="#0EA5E9"
+      icon-bg-color="#F0F9FF"
+      text-color="#1E293B"
+      description-color="#64748B"
+      custom-class="bg-white border border-slate-200 nav-card"
+      @click="router.push('/admin/demo-class')"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { OfficeBuilding, DataLine, TrendCharts, Medal, Setting } from '@element-plus/icons-vue'
+import { OfficeBuilding, DataLine, TrendCharts, Medal, Setting, MagicStick } from '@element-plus/icons-vue'
 import AdminFunctionCard from '../AdminFunctionCard.vue'
 
 const router = useRouter()

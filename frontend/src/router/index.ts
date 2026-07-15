@@ -313,6 +313,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../pages/Admin/SystemSettings.vue'),
     meta: { requiresAuth: true, role: 'admin', title: '系统设置 - InspireEd' },
   },
+  {
+    path: '/admin/demo-class',
+    name: 'AdminDemoClass',
+    component: () => import('../pages/Admin/DemoClass.vue'),
+    meta: { requiresAuth: true, role: 'admin', title: '实验班 - InspireEd' },
+  },
   // TODO: 废弃路由，保留向后兼容，未来版本将移除
   {
     path: '/admin/users',
