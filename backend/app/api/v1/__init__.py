@@ -11,6 +11,7 @@ from app.api.v1 import (
     activities,
     ai_settings,
     admin_dashboard,
+    admin_demo_class,
     admin_organization,
     admin_rooms,
     admin_users,
@@ -144,6 +145,11 @@ api_router.include_router(
     admin_dashboard.router, prefix="/admin/dashboard", tags=["管理员-数据看板"]
 )
 api_router.include_router(admin_users.router, prefix="/admin/users", tags=["管理员-用户管理"])
+api_router.include_router(
+    admin_demo_class.router,
+    prefix="/admin/demo-class",
+    tags=["管理员-实验班"],
+)
 api_router.include_router(
     admin_organization.router, prefix="/admin/organization", tags=["管理员-组织架构"]
 )
