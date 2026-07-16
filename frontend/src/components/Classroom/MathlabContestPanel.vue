@@ -150,7 +150,7 @@
 import { ref, computed, watch } from 'vue'
 import { CellType, type Cell } from '@/types/cell'
 import { mathlabContestService } from '@/services/mathlabContest'
-import { useMathlabContestState } from '@/composables/useMathlabContest'
+import { useMathlabContest } from '@/composables/useMathlabContest'
 import { getCellId as getCellIdUtil } from '@/utils/cellId'
 
 const props = defineProps<{
@@ -159,8 +159,12 @@ const props = defineProps<{
   sessionStatus?: string
 }>()
 
+// refreshActive / refreshLeaderboard live on useMathlabContest(sessionId),
+// not useMathlabContestState() — selecting a classroom sets sessionId and
+// the watcher below would otherwise call undefined.
+const sessionIdRef = computed(() => props.sessionId)
 const { activeContest, leaderboard, loading, error, refreshActive, refreshLeaderboard } =
-  useMathlabContestState()
+  useMathlabContest(sessionIdRef)
 
 const sessionTeaching = computed(
   () => props.sessionStatus === 'teaching' || props.sessionStatus === 'TEACHING'
