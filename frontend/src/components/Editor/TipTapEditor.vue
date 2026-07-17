@@ -201,6 +201,13 @@
         </div>
       </div>
     </Teleport>
+
+    <DocumentPreviewModal
+      v-model="showDocPreview"
+      mode="file"
+      :file-url="previewFileUrl"
+      :title="previewTitle"
+    />
   </div>
 </template>
 
@@ -215,6 +222,7 @@ import { watch, onBeforeUnmount, ref } from 'vue'
 import api from '../../services/api'
 import { getServerBaseUrl } from '@/utils/url'
 import AssetPicker from '@/components/Library/AssetPicker.vue'
+import DocumentPreviewModal from '@/components/Resource/DocumentPreviewModal.vue'
 import type { LibraryAssetSummary } from '@/types/library'
 // Temporarily disabled
 // import Mathematics from '@tiptap/extension-mathematics'
@@ -330,8 +338,33 @@ function normalizeImageUrls(html: string): string {
   return html
 }
 
+// 文档预览模态框（支持PDF/Office文档的「查看」按钮）
+const showDocPreview = ref(false)
+const previewFileUrl = ref<string | null>(null)
+const previewTitle = ref('')
+
+// 判断文件是否支持在预览模态框中查看（PDF/Office文档）
+function isPreviewableDocument(filename: string): boolean {
+  return /\.(pdf|docx?|pptx?|xlsx?)$/i.test(filename)
+}
+
+function onEditorClick(e: MouseEvent) {
+  const btn = (e.target as HTMLElement)?.closest?.('.file-view-btn') as HTMLElement | null
+  if (!btn) return
+  e.preventDefault()
+  e.stopPropagation()
+  const url = btn.getAttribute('data-file-preview-url')
+  if (!url) return
+  previewFileUrl.value = url
+  previewTitle.value = btn.closest('.file-attachment')?.getAttribute('data-file-filename') || '文档预览'
+  showDocPreview.value = true
+}
+
 const editor = useEditor({
   content: normalizeImageUrls(props.content),
+  onCreate: ({ editor }) => {
+    editor.view.dom.addEventListener('click', onEditorClick)
+  },
   extensions: [
     StarterKit.configure({
       codeBlock: false, // Disable default CodeBlock to use CodeBlockLowlight instead
@@ -430,6 +463,12 @@ const editor = useEditor({
     html = html.replace(/data-file-download-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
       const filename = extractFilename(url)
       return `data-file-download-url=${quote}${filename}${quote}`
+    })
+    
+    // 替换查看按钮的data-file-preview-url属性为文件名
+    html = html.replace(/data-file-preview-url\s*=\s*(["'])([^"']+)\1/gi, (match, quote, url) => {
+      const filename = extractFilename(url)
+      return `data-file-preview-url=${quote}${filename}${quote}`
     })
     
     emit('update', html)
@@ -719,7 +758,7 @@ async function handleFileUpload(event: Event) {
 
     // 获取文件图标和类型
     const fileIcon = getFileIcon(originalFilename)
-    const isPDF = originalFilename.toLowerCase().endsWith('.pdf')
+    const previewable = isPreviewableDocument(originalFilename)
     
     // 在编辑器中插入文件下载/查看组件
     // data-file-url存储文件名（用于数据库），href使用完整URL（用于下载）
@@ -732,7 +771,7 @@ async function handleFileUpload(event: Event) {
             <div class="file-size">${formatFileSize(response.file_size)}</div>
           </div>
           <div class="file-actions">
-            ${isPDF ? `<button class="file-view-btn" onclick="window.open('${downloadUrl}', '_blank')">查看</button>` : ''}
+            ${previewable ? `<button type="button" class="file-view-btn" data-file-preview-url="${downloadUrl}">查看</button>` : ''}
             <a href="${downloadUrl}" download="${originalFilename}" class="file-download-btn">下载</a>
           </div>
         </div>
@@ -992,7 +1031,7 @@ async function handleLibraryAssetSelect(asset: LibraryAssetSummary | null) {
               <div class="file-size">PDF文档</div>
             </div>
             <div class="file-actions">
-              <button class="file-view-btn" onclick="window.open('${pdfUrl}', '_blank')">查看</button>
+              <button type="button" class="file-view-btn" data-file-preview-url="${pdfUrl}">查看</button>
               <a href="${pdfUrl}" download="${originalFilename}" class="file-download-btn">下载</a>
             </div>
           </div>
@@ -1004,6 +1043,7 @@ async function handleLibraryAssetSelect(asset: LibraryAssetSummary | null) {
       // data-file-url存储文件名（用于数据库），href使用完整URL（用于下载）
       const downloadUrl = fileUrl
       const fileIcon = getFileIcon(originalFilename)
+      const previewable = isPreviewableDocument(originalFilename)
       const fileHtml = `
         <div class="file-attachment" data-file-url="${filenameForDb}" data-file-filename="${originalFilename}">
           <div class="file-preview-card">
@@ -1013,6 +1053,7 @@ async function handleLibraryAssetSelect(asset: LibraryAssetSummary | null) {
               <div class="file-size">${asset.size_bytes ? formatFileSize(asset.size_bytes) : ''}</div>
             </div>
             <div class="file-actions">
+              ${previewable ? `<button type="button" class="file-view-btn" data-file-preview-url="${downloadUrl}">查看</button>` : ''}
               <a href="${downloadUrl}" download="${originalFilename}" class="file-download-btn">下载</a>
             </div>
           </div>
@@ -1050,6 +1091,7 @@ const vClickOutside = {
 }
 
 onBeforeUnmount(() => {
+  editor.value?.view.dom.removeEventListener('click', onEditorClick)
   editor.value?.destroy()
 })
 </script>
