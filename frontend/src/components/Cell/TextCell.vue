@@ -335,13 +335,22 @@ const tempMarkdown = ref(cellContent.value?.markdown || '')
 
 const sanitizedHtml = computed(() => {
   const content = cellContent.value
-  // 如果内容有 Markdown，优先使用 Markdown 渲染（在非编辑模式下）
+  // 非编辑模式：有 Markdown 时优先用它；但若 HTML 含文件附件卡片，必须用 HTML
+  // （简易 markdown 渲染会把附件剥成纯文本「查看 下载」，导致无法点击预览）
   let html = ''
-  if (content?.markdown && (!props.editable || !isEditing.value)) {
-    // 使用 Markdown 渲染
+  const sourceHtml = content?.html || ''
+  const htmlHasFileAttachment =
+    /class="[^"]*(?:file-attachment|pdf-attachment|file-view-btn)[^"]*"/i.test(sourceHtml) ||
+    /data-(?:file|pdf)-(?:url|preview-url)\s*=/i.test(sourceHtml)
+
+  if (
+    content?.markdown &&
+    !htmlHasFileAttachment &&
+    (!props.editable || !isEditing.value)
+  ) {
     html = markdownToHtml(content.markdown)
   } else {
-    html = content?.html || ''
+    html = sourceHtml
   }
 
   // 过滤占位符文本：在非编辑模式下，移除占位符文本
