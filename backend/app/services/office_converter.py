@@ -86,7 +86,9 @@ class OfficeConverterService:
         try:
             file_ext = Path(file_path).suffix.lower()
 
-            if file_ext == ".docx":
+            if file_ext == ".doc":
+                return await self._convert_doc_to_pdf(file_path, output_path)
+            elif file_ext == ".docx":
                 return await self._convert_docx_to_pdf(file_path, output_path)
             elif file_ext in [".ppt", ".pptx"]:
                 return await self._convert_ppt_to_pdf(file_path, output_path)
@@ -97,6 +99,21 @@ class OfficeConverterService:
 
         except Exception as e:
             return {"success": False, "error": str(e), "pdf_url": None}
+
+    async def _convert_doc_to_pdf(
+        self, doc_path: str, pdf_path: str
+    ) -> Dict[str, Any]:
+        """将DOC转换为PDF（仅LibreOffice）"""
+        try:
+            if await self._has_libreoffice():
+                return await self._convert_with_libreoffice(doc_path, pdf_path)
+            return {
+                "success": False,
+                "error": "DOC转换需要LibreOffice",
+                "pdf_url": None,
+            }
+        except Exception as e:
+            return {"success": False, "error": f"DOC转换失败: {str(e)}", "pdf_url": None}
 
     async def _convert_docx_to_pdf(
         self, docx_path: str, pdf_path: str

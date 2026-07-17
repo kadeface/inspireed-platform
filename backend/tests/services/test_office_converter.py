@@ -67,6 +67,41 @@ async def test_get_converted_pdf_url_uses_cache(resources_dir: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_convert_doc_calls_libreoffice(resources_dir: Path) -> None:
+    src = resources_dir / "legacy.doc"
+    src.write_bytes(b"x")
+    svc = OfficeConverterService()
+    out = resources_dir / "legacy_converted.pdf"
+    with patch.object(svc, "_has_libreoffice", new_callable=AsyncMock, return_value=True):
+        with patch.object(
+            svc,
+            "_convert_with_libreoffice",
+            new_callable=AsyncMock,
+            return_value={
+                "success": True,
+                "error": None,
+                "pdf_url": str(out),
+                "method": "libreoffice",
+            },
+        ) as lo:
+            result = await svc.convert_to_pdf(str(src), str(out))
+    assert result["success"] is True
+    lo.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_convert_xlsx_fails_without_libreoffice(resources_dir: Path) -> None:
+    src = resources_dir / "sheet.xlsx"
+    src.write_bytes(b"x")
+    svc = OfficeConverterService()
+    out = resources_dir / "sheet_converted.pdf"
+    with patch.object(svc, "_has_libreoffice", new_callable=AsyncMock, return_value=False):
+        result = await svc.convert_to_pdf(str(src), str(out))
+    assert result["success"] is False
+    assert "LibreOffice" in result["error"]
+
+
+@pytest.mark.asyncio
 async def test_convert_xlsx_calls_libreoffice(resources_dir: Path) -> None:
     src = resources_dir / "sheet.xlsx"
     src.write_bytes(b"x")

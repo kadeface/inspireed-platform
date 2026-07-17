@@ -81,6 +81,8 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/coverage/
 tests/
+!backend/tests/
+!backend/tests/**
 
 # Storage & Uploads
 backend/storage/resources/*
