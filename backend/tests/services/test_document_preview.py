@@ -52,3 +52,10 @@ async def test_office_conversion_failure(resources_dir: Path) -> None:
         payload = await build_preview_payload(file_ref="a.xlsx")
     assert payload["converted_to_pdf"] is False
     assert payload["conversion_error"]
+
+
+@pytest.mark.asyncio
+async def test_missing_file_office_reports_error(resources_dir: Path) -> None:
+    payload = await build_preview_payload(file_ref="missing.docx")
+    assert payload["converted_to_pdf"] is False
+    assert payload["conversion_error"]

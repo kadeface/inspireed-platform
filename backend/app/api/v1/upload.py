@@ -32,6 +32,10 @@ class UploadResponse(BaseModel):
     filename: str
 
 
+class PreviewRequest(BaseModel):
+    file_url: str
+
+
 @router.post("/", response_model=UploadResponse)
 async def upload_file(
     request: Request,
@@ -68,4 +72,17 @@ async def upload_file(
     except Exception:
         logger.exception("File upload failed for user %s", current_user.id)
         raise HTTPException(500, "文件上传失败")
+
+
+@router.post("/preview")
+async def preview_uploaded_file(
+    body: PreviewRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    from app.services.document_preview import build_preview_payload
+    from app.services.office_converter import resolve_resource_path
+
+    if resolve_resource_path(body.file_url) is None:
+        raise HTTPException(404, "文件不可用或不允许预览")
+    return await build_preview_payload(file_ref=body.file_url)
 
