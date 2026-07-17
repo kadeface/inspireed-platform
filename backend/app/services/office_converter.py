@@ -1,6 +1,9 @@
 """
 Office文档转换服务
 将Office文档转换为PDF以便在浏览器中预览
+
+Document preview (Word/PPT/Excel): install LibreOffice (`libreoffice` or `soffice`
+on PATH). Without it, Office preview fails; users can still download originals.
 """
 
 from __future__ import annotations
