@@ -379,7 +379,7 @@ const previewTitle = ref('')
 
 // 判断文件是否支持在预览模态框中查看（PDF/Office文档）
 function isPreviewableDocument(filename: string): boolean {
-  return /\.(pdf|docx?|pptx?|xlsx?)$/i.test(filename)
+  return /\.(pdf|docx?|pptx?|xlsx?|md|markdown|txt)$/i.test(filename)
 }
 
 function onEditorClick(e: MouseEvent) {

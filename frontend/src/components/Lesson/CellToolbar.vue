@@ -124,6 +124,12 @@ const cellTypes = [
     description: '插图、示意图',
   },
   {
+    type: CellType.REFERENCE_MATERIAL,
+    name: '参考素材',
+    icon: '📎',
+    description: 'PDF / Office / Markdown 文档预览',
+  },
+  {
     type: CellType.INTERACTIVE,
     name: '交互式课件单元',
     icon: '🎮',

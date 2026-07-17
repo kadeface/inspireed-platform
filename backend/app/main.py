@@ -209,6 +209,23 @@ async def serve_static_file(file_path: str, request: Request):
     # 获取文件大小
     file_size = os.path.getsize(file_full_path)
     
+    # HEAD：只返回头，避免 FileResponse 读完整文件导致卡住
+    if request.method == "HEAD":
+        import mimetypes
+
+        media_type = mimetypes.guess_type(file_full_path)[0] or "application/octet-stream"
+        head = Response(status_code=200, media_type=media_type)
+        head.headers["Content-Length"] = str(file_size)
+        head.headers["Accept-Ranges"] = "bytes"
+        head.headers["Cache-Control"] = "public, max-age=31536000"
+        if origin and _is_origin_allowed(origin):
+            _add_cors_headers(head, origin)
+        else:
+            head.headers["Access-Control-Allow-Origin"] = "*"
+            head.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+            head.headers["Access-Control-Expose-Headers"] = "Content-Range, Content-Length, Accept-Ranges"
+        return head
+
     # 检查是否是Range请求（视频流）
     range_header = request.headers.get("range")
     
@@ -269,10 +286,6 @@ async def serve_static_file(file_path: str, request: Request):
         response.headers["Access-Control-Expose-Headers"] = "Content-Range, Content-Length, Accept-Ranges"
 
     response.headers["Cache-Control"] = "public, max-age=31536000"
-
-    # HEAD 请求只返回头信息，不返回 body（避免 405）
-    if request.method == "HEAD":
-        return Response(status_code=response.status_code, headers=dict(response.headers))
 
     return response
 

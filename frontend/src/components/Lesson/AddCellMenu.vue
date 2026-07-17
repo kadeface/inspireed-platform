@@ -104,6 +104,12 @@ const cellTypes = [
     description: '插图、示意图、全宽展示',
   },
   {
+    type: CellType.REFERENCE_MATERIAL,
+    name: '参考素材',
+    icon: '📎',
+    description: 'PDF / Word / PPT / Excel / Markdown 等文档预览',
+  },
+  {
     type: CellType.BROWSER,
     name: '浏览器单元',
     icon: '🌐',

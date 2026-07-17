@@ -9,6 +9,7 @@ on PATH). Without it, Office preview fails; users can still download originals.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import io
 import aiofiles
@@ -27,7 +28,9 @@ from app.core.config import settings
 from app.utils.resource_url import url_to_filename
 
 OFFICE_EXTENSIONS = frozenset({"doc", "docx", "ppt", "pptx", "xls", "xlsx"})
-DIRECT_PREVIEW_EXTENSIONS = frozenset({"pdf", "jpg", "jpeg", "png", "gif", "webp", "svg"})
+DIRECT_PREVIEW_EXTENSIONS = frozenset({
+    "pdf", "jpg", "jpeg", "png", "gif", "webp", "svg", "md", "markdown", "txt",
+})
 
 
 def _resources_root() -> Path:
@@ -73,6 +76,13 @@ class OfficeConverterService:
         self.temp_dir = tempfile.gettempdir()
         self._lo_binary: str | None = None
         self._lo_unavailable: bool = False
+        self._convert_locks: dict[str, asyncio.Lock] = {}
+
+    def _lock_for(self, path: str) -> asyncio.Lock:
+        key = str(Path(path).resolve())
+        if key not in self._convert_locks:
+            self._convert_locks[key] = asyncio.Lock()
+        return self._convert_locks[key]
 
     async def convert_to_pdf(self, file_path: str, output_path: str) -> Dict[str, Any]:
         """
@@ -194,13 +204,20 @@ class OfficeConverterService:
     ) -> Dict[str, Any]:
         """使用LibreOffice转换文档"""
         try:
-            output_dir = os.path.dirname(output_path)
-            lo_binary = getattr(self, "_lo_binary", "libreoffice")
+            output_dir = os.path.dirname(output_path) or "."
+            os.makedirs(output_dir, exist_ok=True)
+            lo_binary = getattr(self, "_lo_binary", None) or "soffice"
 
-            # 使用LibreOffice命令行转换
+            # 独立 UserInstallation，避免并发 soffice 抢同一 profile 导致空成功
+            profile_key = hashlib.md5(os.path.abspath(input_path).encode()).hexdigest()[:12]
+            profile_dir = os.path.join(self.temp_dir, f"lo_profile_{profile_key}")
+            os.makedirs(profile_dir, exist_ok=True)
+            profile_uri = Path(profile_dir).resolve().as_uri()
+
             cmd = [
                 lo_binary,
                 "--headless",
+                f"-env:UserInstallation={profile_uri}",
                 "--convert-to",
                 "pdf",
                 "--outdir",
@@ -214,29 +231,37 @@ class OfficeConverterService:
                 capture_output=True,
                 text=True,
                 timeout=90,
-            )  # 增加到90秒，适应大文件转换
+            )
+
+            input_name = Path(input_path).stem
+            generated_pdf = os.path.join(output_dir, f"{input_name}.pdf")
 
             if result.returncode == 0:
-                # 获取生成的PDF文件名
-                input_name = Path(input_path).stem
-                generated_pdf = os.path.join(output_dir, f"{input_name}.pdf")
+                if os.path.exists(generated_pdf) and os.path.abspath(generated_pdf) != os.path.abspath(
+                    output_path
+                ):
+                    os.replace(generated_pdf, output_path)
 
-                if os.path.exists(generated_pdf) and generated_pdf != output_path:
-                    # 重命名到目标路径
-                    os.rename(generated_pdf, output_path)
+                if os.path.isfile(output_path) and os.path.getsize(output_path) > 0:
+                    return {
+                        "success": True,
+                        "error": None,
+                        "pdf_url": output_path,
+                        "method": "libreoffice",
+                    }
 
-                return {
-                    "success": True,
-                    "error": None,
-                    "pdf_url": output_path,
-                    "method": "libreoffice",
-                }
-            else:
+                detail = (result.stderr or result.stdout or "").strip()
                 return {
                     "success": False,
-                    "error": f"LibreOffice转换失败: {result.stderr}",
+                    "error": f"LibreOffice 未生成 PDF 文件{(': ' + detail) if detail else ''}",
                     "pdf_url": None,
                 }
+
+            return {
+                "success": False,
+                "error": f"LibreOffice转换失败: {result.stderr or result.stdout}",
+                "pdf_url": None,
+            }
 
         except Exception as e:
             return {
@@ -450,16 +475,21 @@ class OfficeConverterService:
                 return None
 
             pdf_path = converted_pdf_path(source)
-            if pdf_path.is_file():
+            if pdf_path.is_file() and pdf_path.stat().st_size > 0:
                 return f"/uploads/resources/{pdf_path.name}"
 
-            result = await self.convert_to_pdf(str(source), str(pdf_path))
+            async with self._lock_for(str(source)):
+                # 另一请求可能已转换完成
+                if pdf_path.is_file() and pdf_path.stat().st_size > 0:
+                    return f"/uploads/resources/{pdf_path.name}"
 
-            if result["success"]:
-                print(f"Office文档转换成功，使用方法: {result.get('method', 'unknown')}")
-                return f"/uploads/resources/{pdf_path.name}"
-            else:
-                print(f"Office文档转换失败: {result['error']}")
+                result = await self.convert_to_pdf(str(source), str(pdf_path))
+
+                if result["success"] and pdf_path.is_file() and pdf_path.stat().st_size > 0:
+                    print(f"Office文档转换成功，使用方法: {result.get('method', 'unknown')}")
+                    return f"/uploads/resources/{pdf_path.name}"
+
+                print(f"Office文档转换失败: {result.get('error') or '输出文件不存在'}")
                 return None
 
         except Exception as e:

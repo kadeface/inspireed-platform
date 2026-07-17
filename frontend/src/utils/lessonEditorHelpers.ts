@@ -91,6 +91,8 @@ export function summarizeCell(cell: Cell, index: number): string | null {
     if (raw) {
       detail = raw.length > 28 ? `${raw.slice(0, 28)}…` : raw
     }
+  } else if (cell.type === CellType.REFERENCE_MATERIAL && (cell as any).content?.title) {
+    detail = String((cell as any).content.title).slice(0, 28)
   } else if (cell.type === CellType.FLOWCHART) {
     detail = '流程设计'
   } else if (cell.type === CellType.SIM) {

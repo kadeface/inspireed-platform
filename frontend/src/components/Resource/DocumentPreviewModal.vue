@@ -74,8 +74,13 @@
             />
           </div>
 
+          <!-- Markdown / 纯文本预览 -->
+          <div v-else-if="displayKind === 'markdown'" class="markdown-container">
+            <MarkdownPreview :content="markdownContent || ''" />
+          </div>
+
           <!-- 不支持在线预览的文件类型 -->
-          <div v-else class="other-file-container">
+          <div v-else-if="displayKind === 'unsupported'" class="other-file-container">
             <div class="other-file-preview">
               <div class="file-icon">
                 <svg class="file-icon-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -103,6 +108,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useDocumentPreview } from '@/composables/useDocumentPreview'
+import MarkdownPreview from '@/components/Common/MarkdownPreview.vue'
 import { getServerBaseUrl } from '@/utils/url'
 
 interface Props {
@@ -120,7 +126,18 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
 
-const { loading, error, info, previewAbsoluteUrl, displayKind, loadFromResource, loadFromLibrary, loadFromFileUrl, reset } = useDocumentPreview()
+const {
+  loading,
+  error,
+  info,
+  markdownContent,
+  previewAbsoluteUrl,
+  displayKind,
+  loadFromResource,
+  loadFromLibrary,
+  loadFromFileUrl,
+  reset,
+} = useDocumentPreview()
 
 const displayTitle = computed(() => props.title || info.value?.title || '文档预览')
 
@@ -128,6 +145,7 @@ const fileIcon = computed(() => {
   const ext = info.value?.file_type
   if (!ext) return '📁'
   if (ext === 'pdf') return '📄'
+  if (['md', 'markdown', 'txt'].includes(ext)) return '📑'
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return '🖼️'
   if (['doc', 'docx'].includes(ext)) return '📝'
   if (['ppt', 'pptx'].includes(ext)) return '📊'
@@ -152,17 +170,17 @@ function loadPreview() {
   }
 }
 
-watch(() => props.modelValue, (isOpen) => {
-  if (isOpen) {
-    loadPreview()
-  } else {
-    reset()
+watch(
+  () =>
+    [props.modelValue, props.mode, props.resourceId, props.assetId, props.fileUrl] as const,
+  ([isOpen]) => {
+    if (isOpen) {
+      loadPreview()
+    } else {
+      reset()
+    }
   }
-})
-
-watch(() => [props.mode, props.resourceId, props.assetId, props.fileUrl], () => {
-  if (props.modelValue) loadPreview()
-})
+)
 
 function handleDownload() {
   if (!downloadUrl.value) return
@@ -354,6 +372,13 @@ function close() {
   align-items: center;
   justify-content: center;
   padding: 1rem;
+}
+
+.markdown-container {
+  flex: 1;
+  overflow: auto;
+  padding: 1.5rem 2rem;
+  background: #fff;
 }
 
 .preview-iframe {

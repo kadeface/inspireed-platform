@@ -120,6 +120,21 @@ export function getDefaultCell(cellType: (typeof CellType)[keyof typeof CellType
         },
         config: { allowFullscreen: true, height: '800px' },
       } as Cell
+    case CellType.REFERENCE_MATERIAL:
+      return {
+        ...baseCell,
+        type: CellType.REFERENCE_MATERIAL,
+        content: {
+          material_id: 0,
+          title: '',
+          summary: '',
+          resource_type: 'document',
+          preview_url: undefined,
+          download_url: undefined,
+          tags: [],
+          is_accessible: true,
+        },
+      } as Cell
     default:
       throw new Error(`Unknown cell type: ${cellType}`)
   }
