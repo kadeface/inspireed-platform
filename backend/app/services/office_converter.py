@@ -34,11 +34,8 @@ def resolve_resource_path(file_ref: str) -> Path | None:
     if not file_ref:
         return None
     if file_ref.startswith(("http://", "https://", "ftp://")):
-        if "/uploads/resources/" not in file_ref:
-            return None
-        name = url_to_filename(file_ref)
-    else:
-        name = url_to_filename(file_ref)
+        return None
+    name = url_to_filename(file_ref)
     if not name or "/" in name or "\\" in name or name in {".", ".."}:
         return None
     root = _resources_root()

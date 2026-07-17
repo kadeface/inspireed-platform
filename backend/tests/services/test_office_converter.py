@@ -48,6 +48,18 @@ def test_reject_external_url(resources_dir: Path) -> None:
     assert resolve_resource_path("https://evil.example/a.docx") is None
 
 
+def test_reject_external_url_with_uploads_path(resources_dir: Path) -> None:
+    f = resources_dir / "a.docx"
+    f.write_bytes(b"x")
+    assert resolve_resource_path("https://evil.example/uploads/resources/a.docx") is None
+
+
+def test_resolve_uploads_prefix_no_leading_slash(resources_dir: Path) -> None:
+    f = resources_dir / "abc.docx"
+    f.write_bytes(b"x")
+    assert resolve_resource_path("uploads/resources/abc.docx") == f.resolve()
+
+
 def test_converted_pdf_path_name(resources_dir: Path) -> None:
     src = resources_dir / "note.docx"
     assert converted_pdf_path(src).name == "note_converted.pdf"

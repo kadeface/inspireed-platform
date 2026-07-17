@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from app.api.deps import get_current_active_user
 from app.core.config import settings
 from app.models.user import User
+from app.services.document_preview import build_preview_payload
+from app.services.office_converter import resolve_resource_path
 from app.services.upload import upload_service
 from app.utils.resource_url import filename_to_url
 
@@ -79,9 +81,6 @@ async def preview_uploaded_file(
     body: PreviewRequest,
     current_user: User = Depends(get_current_active_user),
 ):
-    from app.services.document_preview import build_preview_payload
-    from app.services.office_converter import resolve_resource_path
-
     if resolve_resource_path(body.file_url) is None:
         raise HTTPException(404, "文件不可用或不允许预览")
     return await build_preview_payload(file_ref=body.file_url)
