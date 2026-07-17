@@ -239,6 +239,13 @@
         </button>
       </div>
     </div>
+
+    <DocumentPreviewModal
+      v-model="showDocPreview"
+      mode="file"
+      :file-url="previewFileUrl"
+      :title="previewTitle"
+    />
   </div>
 </template>
 
@@ -248,6 +255,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import type { TextCell as TextCellType } from '../../types/cell'
 import TipTapEditor from '../Editor/TipTapEditor.vue'
 import MarkdownEditor from '../Editor/MarkdownEditor.vue'
+import DocumentPreviewModal from '../Resource/DocumentPreviewModal.vue'
 import DOMPurify from 'dompurify'
 import { getServerBaseUrl } from '@/utils/url'
 import { useFullscreen } from '@/composables/useFullscreen'
@@ -269,6 +277,44 @@ const emit = defineEmits<{
 
 const containerRef = ref<HTMLElement | null>(null)
 const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)
+
+const showDocPreview = ref(false)
+const previewFileUrl = ref<string | null>(null)
+const previewTitle = ref('文档预览')
+
+function absolutizeResourceUrl(url: string, baseURL: string): string {
+  if (!url) return url
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  if (url.startsWith('/') && !url.startsWith('//')) return `${baseURL}${url}`
+  if (/\.(pdf|docx?|xlsx?|pptx?)$/i.test(url)) {
+    return `${baseURL}/uploads/resources/${url}`
+  }
+  return `${baseURL}/${url.startsWith('/') ? url.slice(1) : url}`
+}
+
+function onCellClick(e: MouseEvent) {
+  const btn = (e.target as HTMLElement | null)?.closest?.('.file-view-btn') as HTMLElement | null
+  if (!btn || !containerRef.value?.contains(btn)) return
+  e.preventDefault()
+  e.stopPropagation()
+
+  let url =
+    btn.getAttribute('data-file-preview-url') ||
+    ''
+  if (!url) {
+    const onclick = btn.getAttribute('onclick') || ''
+    const m = onclick.match(/window\.open\(['"]([^'"]+)['"]/)
+    if (m) url = m[1]
+  }
+  if (!url) return
+
+  previewFileUrl.value = absolutizeResourceUrl(url, getServerBaseUrl())
+  previewTitle.value =
+    btn.closest('.file-attachment')?.getAttribute('data-file-filename') ||
+    btn.closest('.file-preview-card')?.querySelector('.file-filename, .pdf-filename')?.textContent?.trim() ||
+    '文档预览'
+  showDocPreview.value = true
+}
 
 // 安全访问 content（某些旧数据可能缺少 content）
 const cellContent = computed(() => props.cell?.content ?? { html: '', markdown: undefined, editorMode: undefined as 'html' | 'markdown' | undefined })
@@ -590,22 +636,25 @@ const sanitizedHtml = computed(() => {
     return match
   })
 
-  // 处理文件查看按钮的onclick
-  html = html.replace(
-    /<button[^>]*class="file-view-btn"[^>]*onclick="window\.open\('([^']+)'[^)]*\)"[^>]*>/gi,
-    (match, url) => {
-      let newUrl = url
-      if (url.startsWith('/') && !url.startsWith('//')) {
-        newUrl = `${baseURL}${url}`
-      } else if (!url.startsWith('http') && !url.startsWith('//')) {
-        newUrl = `${baseURL}/${url.startsWith('/') ? url.slice(1) : url}`
-      }
-      if (newUrl !== url) {
-        return match.replace(/window\.open\('([^']+)'/gi, `window.open('${newUrl}'`)
-      }
-      return match
-    }
-  )
+  // 将旧版 onclick=window.open 的查看按钮转为 data-file-preview-url（由 DocumentPreviewModal 处理）
+  html = html.replace(/<button([^>]*)>/gi, (match, attrs) => {
+    if (!/\bfile-view-btn\b/.test(attrs)) return match
+    if (/\bdata-file-preview-url\s*=/.test(attrs)) return match
+    const onclickMatch =
+      attrs.match(/onclick\s*=\s*"window\.open\(\s*['"]([^'"]+)['"][^"]*"/i) ||
+      attrs.match(/onclick\s*=\s*'window\.open\(\s*["']([^"']+)["'][^']*'/i)
+    if (!onclickMatch) return match
+    const newUrl = absolutizeResourceUrl(onclickMatch[1], baseURL)
+    let newAttrs = String(attrs).replace(/\s*onclick\s*=\s*(["'])[\s\S]*?\1/gi, '')
+    if (!/\btype\s*=/.test(newAttrs)) newAttrs += ' type="button"'
+    return `<button${newAttrs} data-file-preview-url="${newUrl}">`
+  })
+
+  // 规范化 data-file-preview-url（相对路径 / 裸文件名 → 绝对 URL）
+  html = html.replace(/data-file-preview-url\s*=\s*(["'])([^"']+)\1/gi, (_match, quote, url) => {
+    const newUrl = absolutizeResourceUrl(url, baseURL)
+    return `data-file-preview-url=${quote}${newUrl}${quote}`
+  })
 
   // 处理文件下载链接：将相对路径转换为完整URL
   html = html.replace(
@@ -679,6 +728,9 @@ const sanitizedHtml = computed(() => {
       'id',
       'data-file-url',
       'data-file-filename',
+      'data-file-preview-url',
+      'data-pdf-url',
+      'type',
       'onclick',
       'download',
     ],
@@ -1170,6 +1222,8 @@ onMounted(async () => {
     // 等待DOM渲染完成后再添加事件监听
     await nextTick()
 
+    containerRef.value?.addEventListener('click', onCellClick, true)
+
     // 在组件挂载后，为所有图片添加错误监听
     const cellId = props.cell?.id
     if (cellId) {
@@ -1187,6 +1241,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  containerRef.value?.removeEventListener('click', onCellClick, true)
+
   const cellId = props.cell?.id
   if (cellId) {
     const cellElement = document.querySelector(`[data-cell-id="${cellId}"]`)
