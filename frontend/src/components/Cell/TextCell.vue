@@ -335,20 +335,22 @@ const tempMarkdown = ref(cellContent.value?.markdown || '')
 
 const sanitizedHtml = computed(() => {
   const content = cellContent.value
-  // 非编辑模式：有 Markdown 时优先用它；但若 HTML 含文件附件卡片，必须用 HTML
-  // （简易 markdown 渲染会把附件剥成纯文本「查看 下载」，导致无法点击预览）
+  // 仅在明确为 markdown 编辑模式时用 markdown 渲染。
+  // 若 HTML 含文件附件卡片，必须用 HTML（简易 markdown 会把附件剥成纯文本「查看 下载」）。
   let html = ''
   const sourceHtml = content?.html || ''
   const htmlHasFileAttachment =
     /class="[^"]*(?:file-attachment|pdf-attachment|file-view-btn)[^"]*"/i.test(sourceHtml) ||
     /data-(?:file|pdf)-(?:url|preview-url)\s*=/i.test(sourceHtml)
 
-  if (
-    content?.markdown &&
+  const useMarkdown =
+    content?.editorMode === 'markdown' &&
+    !!content?.markdown &&
     !htmlHasFileAttachment &&
     (!props.editable || !isEditing.value)
-  ) {
-    html = markdownToHtml(content.markdown)
+
+  if (useMarkdown) {
+    html = markdownToHtml(content.markdown!)
   } else {
     html = sourceHtml
   }
