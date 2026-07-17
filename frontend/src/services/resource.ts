@@ -229,7 +229,9 @@ export const resourceService = {
     converted_to_pdf?: boolean
     conversion_error?: string
   }> {
-    const response = await api.get(`/resources/${resourceId}/preview`)
+    const response = await api.get(`/resources/${resourceId}/preview`, {
+      timeout: 150000,
+    })
     return response
   }
 }

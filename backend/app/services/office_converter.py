@@ -72,6 +72,7 @@ class OfficeConverterService:
     def __init__(self):
         self.temp_dir = tempfile.gettempdir()
         self._lo_binary: str | None = None
+        self._lo_unavailable: bool = False
 
     async def convert_to_pdf(self, file_path: str, output_path: str) -> Dict[str, Any]:
         """
@@ -119,28 +120,28 @@ class OfficeConverterService:
     async def _convert_docx_to_pdf(
         self, docx_path: str, pdf_path: str
     ) -> Dict[str, Any]:
-        """将DOCX转换为PDF"""
+        """将DOCX转换为PDF（仅 LibreOffice；避免无 LO 时同步内容提取卡死事件循环）"""
         try:
-            # 方法1: 使用LibreOffice命令行工具（推荐）
             if await self._has_libreoffice():
                 return await self._convert_with_libreoffice(docx_path, pdf_path)
-
-            # 方法2: 使用python-docx提取内容并生成简化PDF
-            return await self._convert_docx_content_to_pdf(docx_path, pdf_path)
-
+            return {
+                "success": False,
+                "error": "预览需要安装 LibreOffice（libreoffice/soffice 在 PATH 中）",
+                "pdf_url": None,
+            }
         except Exception as e:
             return {"success": False, "error": f"DOCX转换失败: {str(e)}", "pdf_url": None}
 
     async def _convert_ppt_to_pdf(self, ppt_path: str, pdf_path: str) -> Dict[str, Any]:
-        """将PPT/PPTX转换为PDF"""
+        """将PPT/PPTX转换为PDF（仅 LibreOffice）"""
         try:
-            # 方法1: 使用LibreOffice命令行工具（推荐）
             if await self._has_libreoffice():
                 return await self._convert_with_libreoffice(ppt_path, pdf_path)
-
-            # 方法2: 使用python-pptx提取内容并生成简化PDF
-            return await self._convert_ppt_content_to_pdf(ppt_path, pdf_path)
-
+            return {
+                "success": False,
+                "error": "预览需要安装 LibreOffice（libreoffice/soffice 在 PATH 中）",
+                "pdf_url": None,
+            }
         except Exception as e:
             return {"success": False, "error": f"PPT转换失败: {str(e)}", "pdf_url": None}
 
@@ -160,10 +161,17 @@ class OfficeConverterService:
             return {"success": False, "error": f"Excel转换失败: {str(e)}", "pdf_url": None}
 
     async def _has_libreoffice(self) -> bool:
-        """检查是否安装了LibreOffice"""
+        """检查是否安装了LibreOffice（失败结果会缓存，避免反复探测拖慢请求）"""
         if self._lo_binary:
             return True
+        if getattr(self, "_lo_unavailable", False):
+            return False
+
+        import shutil
+
         for binary in ("libreoffice", "soffice"):
+            if not shutil.which(binary):
+                continue
             try:
                 result = await asyncio.to_thread(
                     subprocess.run,
@@ -177,6 +185,8 @@ class OfficeConverterService:
                     return True
             except Exception:
                 continue
+
+        self._lo_unavailable = True
         return False
 
     async def _convert_with_libreoffice(
