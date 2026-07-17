@@ -8,6 +8,7 @@ on PATH). Without it, Office preview fails; users can still download originals.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import io
 import aiofiles
@@ -164,7 +165,8 @@ class OfficeConverterService:
             return True
         for binary in ("libreoffice", "soffice"):
             try:
-                result = subprocess.run(
+                result = await asyncio.to_thread(
+                    subprocess.run,
                     [binary, "--version"],
                     capture_output=True,
                     text=True,
@@ -196,8 +198,12 @@ class OfficeConverterService:
                 input_path,
             ]
 
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=90
+            result = await asyncio.to_thread(
+                subprocess.run,
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=90,
             )  # 增加到90秒，适应大文件转换
 
             if result.returncode == 0:

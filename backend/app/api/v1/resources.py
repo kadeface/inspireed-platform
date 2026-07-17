@@ -414,7 +414,7 @@ async def get_resource_preview(
         raise HTTPException(404, "Resource not found")
 
     payload = await build_preview_payload(
-        file_ref=cast(str, resource.file_url),
+        file_ref=url_to_filename(cast(str, resource.file_url)),
         title=cast(Optional[str], resource.title),
         file_size=cast(Optional[int], resource.file_size),
         page_count=cast(Optional[int], resource.page_count),
