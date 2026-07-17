@@ -11,6 +11,7 @@ from app.services.office_converter import (
     resolve_resource_path,
     converted_pdf_path,
 )
+from app.utils.resource_url import url_to_filename
 
 
 @pytest.fixture()
@@ -52,6 +53,13 @@ def test_reject_external_url_with_uploads_path(resources_dir: Path) -> None:
     f = resources_dir / "a.docx"
     f.write_bytes(b"x")
     assert resolve_resource_path("https://evil.example/uploads/resources/a.docx") is None
+
+
+def test_basename_from_absolute_url_still_resolves(resources_dir: Path) -> None:
+    (resources_dir / "a.docx").write_bytes(b"x")
+    ref = url_to_filename("http://evil.example/uploads/resources/a.docx")
+    assert ref == "a.docx"
+    assert resolve_resource_path(ref) is not None
 
 
 def test_resolve_uploads_prefix_no_leading_slash(resources_dir: Path) -> None:
