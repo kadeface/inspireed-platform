@@ -20,7 +20,7 @@ from app.schemas.resource import (
 )
 from app.schemas.library_asset import LibraryAssetSummary
 from app.services.upload import upload_service
-from app.services.office_converter import office_converter_service
+from app.services.document_preview import build_preview_payload
 from app.api.deps import get_current_user, get_current_admin
 from app.utils.resource_url import filename_to_url, url_to_filename
 
@@ -411,39 +411,11 @@ async def get_resource_preview(
     if not resource:
         raise HTTPException(404, "Resource not found")
 
-    # 检查文件类型
-    file_ext = (
-        cast(str, resource.file_url).split(".")[-1].lower() if cast(Optional[str], resource.file_url) else ""
+    payload = await build_preview_payload(
+        file_ref=cast(str, resource.file_url),
+        title=cast(Optional[str], resource.title),
+        file_size=cast(Optional[int], resource.file_size),
+        page_count=cast(Optional[int], resource.page_count),
+        extra={"resource_id": resource.id},
     )
-
-    preview_info = {
-        "resource_id": resource.id,
-        "title": resource.title,
-        "file_url": resource.file_url,
-        "file_type": file_ext,
-        "file_size": resource.file_size,
-        "page_count": resource.page_count,
-        "can_preview_directly": file_ext in ["pdf", "jpg", "jpeg", "png", "gif", "webp", "svg"],
-        "preview_url": resource.file_url,
-        "converted_to_pdf": False,
-        "conversion_error": None,
-    }
-
-    # 如果是Office文档，尝试获取转换后的PDF
-    if file_ext in ["docx", "doc", "pptx", "ppt"]:
-        try:
-            converted_pdf_url = await office_converter_service.get_converted_pdf_url(
-                cast(str, resource.file_url)
-            )
-            if converted_pdf_url:
-                preview_info["preview_url"] = converted_pdf_url
-                preview_info["converted_to_pdf"] = True
-                preview_info["conversion_method"] = "auto_conversion"
-            else:
-                preview_info["converted_to_pdf"] = False
-                preview_info["conversion_error"] = "无法转换文档为PDF格式，请使用其他预览方式"
-        except Exception as e:
-            preview_info["converted_to_pdf"] = False
-            preview_info["conversion_error"] = f"转换过程中出现错误: {str(e)}"
-
-    return preview_info
+    return payload
