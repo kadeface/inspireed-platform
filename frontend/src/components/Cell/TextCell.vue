@@ -251,7 +251,7 @@
 
 <script setup lang="ts">
 /* eslint-disable vue/no-mutating-props */
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, provide } from 'vue'
 import type { TextCell as TextCellType } from '../../types/cell'
 import TipTapEditor from '../Editor/TipTapEditor.vue'
 import MarkdownEditor from '../Editor/MarkdownEditor.vue'
@@ -274,6 +274,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   update: [cell: TextCellType]
 }>()
+
+provide('textCellId', computed(() => props.cell?.id))
 
 const containerRef = ref<HTMLElement | null>(null)
 const { isFullscreen, toggleFullscreen } = useFullscreen(containerRef)

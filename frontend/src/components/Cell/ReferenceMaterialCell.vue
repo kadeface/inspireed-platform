@@ -43,7 +43,7 @@
         <button
           type="button"
           class="reference-button primary"
-          :disabled="!previewUrl"
+          :disabled="!previewUrl && !downloadUrl"
           @click="handlePreview"
         >
           预览素材
@@ -62,6 +62,13 @@
         暂无可用的预览或下载链接。
       </p>
     </div>
+
+    <DocumentPreviewModal
+      v-model="showDocPreview"
+      mode="file"
+      :file-url="docPreviewFileUrl"
+      :title="safeTitle"
+    />
 
     <transition name="fade">
       <div
@@ -104,6 +111,7 @@
 import { computed, ref } from 'vue'
 import type { ReferenceMaterialCell } from '@/types/cell'
 import { ResourceType, getResourceTypeIcon, getResourceTypeName } from '@/types/resource'
+import DocumentPreviewModal from '@/components/Resource/DocumentPreviewModal.vue'
 
 interface Props {
   cell: ReferenceMaterialCell
@@ -135,6 +143,11 @@ function sanitizeUrl(url?: string | null): string | null {
     return `${window.location.origin}${trimmed}`
   }
 
+  // 裸文件名 → 本站资源路径
+  if (/\.(pdf|docx?|xlsx?|pptx?|png|jpe?g|gif|webp|svg)$/i.test(trimmed)) {
+    return `${window.location.origin}/uploads/resources/${trimmed}`
+  }
+
   return null
 }
 
@@ -142,6 +155,8 @@ const rawPreviewUrl = computed(() => sanitizeUrl(props.cell.content.preview_url)
 const previewUrl = computed(() => rawPreviewUrl.value || sanitizeUrl(props.cell.content.download_url))
 const downloadUrl = computed(() => sanitizeUrl(props.cell.content.download_url) || sanitizeUrl(props.cell.content.preview_url))
 const showPreview = ref(false)
+const showDocPreview = ref(false)
+const docPreviewFileUrl = ref<string | null>(null)
 
 const resolvedType = computed(() => {
   const candidate = props.cell.content.resource_type as ResourceType
@@ -184,12 +199,30 @@ function openInNewTab(url: string | null) {
   window.open(url, '_blank', 'noopener')
 }
 
+function isDocumentPreviewUrl(url: string | null): boolean {
+  if (!url) return false
+  return /\.(pdf|docx?|pptx?|xlsx?)(?:[?#]|$)/i.test(url)
+}
+
 function handlePreview() {
-  if (!previewUrl.value) return
+  const url = previewUrl.value || downloadUrl.value
+  if (!url) return
+
+  // Office / PDF → 统一文档预览（LibreOffice→PDF）
+  if (
+    resolvedType.value === ResourceType.PDF ||
+    resolvedType.value === ResourceType.DOCUMENT ||
+    isDocumentPreviewUrl(url)
+  ) {
+    docPreviewFileUrl.value = url
+    showDocPreview.value = true
+    return
+  }
+
   if (canEmbedPreview.value) {
     showPreview.value = true
   } else {
-    openInNewTab(previewUrl.value)
+    openInNewTab(url)
   }
 }
 
@@ -205,7 +238,7 @@ const canEmbedPreview = computed(() => {
 
 const embedUrl = computed(() => {
   if (!rawPreviewUrl.value) return ''
-  if (rawPreviewUrl.value.endsWith('.pdf')) {
+  if (/\.pdf(?:[?#]|$)/i.test(rawPreviewUrl.value)) {
     return `${rawPreviewUrl.value}#toolbar=0`
   }
   return rawPreviewUrl.value

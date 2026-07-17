@@ -218,7 +218,7 @@ import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
-import { watch, onBeforeUnmount, ref } from 'vue'
+import { watch, onBeforeUnmount, ref, inject, unref, type ComputedRef, type Ref } from 'vue'
 import api from '../../services/api'
 import { getServerBaseUrl } from '@/utils/url'
 import AssetPicker from '@/components/Library/AssetPicker.vue'
@@ -240,6 +240,40 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   update: [html: string]
 }>()
+
+type InsertDocFn = (
+  payload: {
+    title: string
+    fileUrl: string
+    fileSize?: number
+    resourceType?: string
+    summary?: string
+  },
+  afterCellId?: string | null
+) => number | null
+
+const insertDocumentAsReferenceMaterial = inject<InsertDocFn | undefined>(
+  'insertDocumentAsReferenceMaterial',
+  undefined
+)
+const textCellId = inject<ComputedRef<string> | Ref<string> | string | undefined>('textCellId', undefined)
+
+function resolveTextCellId(): string | null {
+  if (textCellId == null) return null
+  const v = unref(textCellId)
+  return v != null ? String(v) : null
+}
+
+function tryInsertAsReferenceMaterial(payload: {
+  title: string
+  fileUrl: string
+  fileSize?: number
+  resourceType?: string
+}): boolean {
+  if (!insertDocumentAsReferenceMaterial) return false
+  insertDocumentAsReferenceMaterial(payload, resolveTextCellId())
+  return true
+}
 
 // 标准化HTML内容中的图片URL（将IP地址替换为当前服务器地址）
 function normalizeImageUrls(html: string): string {
@@ -756,12 +790,27 @@ async function handleFileUpload(event: Event) {
       ? fileUrl  // 已经是完整URL，直接使用
       : `${getServerBaseUrl()}/uploads/resources/${filenameForDb}`
 
+    // 文档类：插入独立「参考素材」Cell（教案编辑器内），不再嵌进正文
+    if (isPreviewableDocument(originalFilename)) {
+      const resourceType = /\.pdf$/i.test(originalFilename) ? 'pdf' : 'document'
+      if (
+        tryInsertAsReferenceMaterial({
+          title: originalFilename,
+          fileUrl: downloadUrl,
+          fileSize: response.file_size,
+          resourceType,
+        })
+      ) {
+        uploadProgress.value = 100
+        return
+      }
+    }
+
     // 获取文件图标和类型
     const fileIcon = getFileIcon(originalFilename)
     const previewable = isPreviewableDocument(originalFilename)
     
-    // 在编辑器中插入文件下载/查看组件
-    // data-file-url存储文件名（用于数据库），href使用完整URL（用于下载）
+    // 回退：非教案上下文或非文档类型，仍插入正文附件卡片
     const fileHtml = `
       <div class="file-attachment" data-file-url="${filenameForDb}" data-file-filename="${originalFilename}">
         <div class="file-preview-card">
@@ -1018,9 +1067,24 @@ async function handleLibraryAssetSelect(asset: LibraryAssetSummary | null) {
         </div>
       `
       editor.value.chain().focus().insertContent(videoHtml).run()
-    } else if (asset.asset_type === 'pdf') {
-      // PDF资源：插入PDF查看/下载组件
-      // data-pdf-url存储文件名（用于数据库），href使用完整URL（用于查看/下载）
+    } else if (
+      asset.asset_type === 'pdf' ||
+      asset.asset_type === 'document' ||
+      isPreviewableDocument(originalFilename)
+    ) {
+      const resourceType = asset.asset_type === 'pdf' || /\.pdf$/i.test(originalFilename) ? 'pdf' : 'document'
+      if (
+        tryInsertAsReferenceMaterial({
+          title: originalFilename,
+          fileUrl: fileUrl || `${getServerBaseUrl()}/uploads/resources/${filenameForDb}`,
+          fileSize: asset.size_bytes,
+          resourceType,
+        })
+      ) {
+        showLibraryPicker.value = false
+        return
+      }
+      // 无教案注入时回退到正文卡片
       const pdfUrl = fileUrl
       const pdfHtml = `
         <div class="file-attachment pdf-attachment" data-pdf-url="${filenameForDb}" data-file-filename="${originalFilename}">

@@ -381,7 +381,7 @@ function showToast(type: 'success' | 'error' | 'warning', message: string) {
 const { sections, activeSectionIndex, editingTabId, editingTabNameRef, handleSectionUpdate, handleSectionDelete, handleAddSection: _handleAddSection, handleTabDblClick, initTabsSortable, destroySortable } = useLessonEditorSections(tabsContainerRef)
 const handleAddSection = () => _handleAddSection(showToast)
 function initSortable() { /* 大环节模式下由 SectionContainer 负责，cell 级 Sortable 已禁用 */ }
-const { createReferenceMaterialCell, scrollToNewCell, handleAddCellToEnd, handleAddCellInSection, handleAddCellAt, insertReferenceMaterial, handleCellUpdate, handleDeleteCell, handleMoveUp, handleMoveDown } = useLessonEditorCells(sections, activeSectionIndex, cellListRef, showToast)
+const { createReferenceMaterialCell, scrollToNewCell, handleAddCellToEnd, handleAddCellInSection, handleAddCellAt, insertReferenceMaterial, insertDocumentAsReferenceMaterial, handleCellUpdate, handleDeleteCell, handleMoveUp, handleMoveDown } = useLessonEditorCells(sections, activeSectionIndex, cellListRef, showToast)
 const { saveStatus, lastSavedAt, hasUnsavedChanges, isSavingOnUnmount, handleManualSave, handleBack, formatSaveTime, saveOnUnmount } = useLessonEditorSave(sections, lessonTitle, isPreviewMode, showToast)
 const { currentSessionId, providedSessionRef, providedSessionId, handleSessionChanged } = useLessonEditorSession(teacherControlPanelRef, isPreviewMode, showClassroomPanel)
 
@@ -448,6 +448,7 @@ provide(
   'currentLessonId',
   computed(() => currentLesson.value?.id)
 )
+provide('insertDocumentAsReferenceMaterial', insertDocumentAsReferenceMaterial)
 
 // 判断是否可以进入授课模式（只有已发布的教案才能进入授课模式）
 const canEnterPreviewMode = computed(() => {

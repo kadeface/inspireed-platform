@@ -341,6 +341,86 @@ export function useLessonEditorCells(
     return sections.value.reduce((a, s) => a + (s.cells?.length || 0), 0) - 1
   }
 
+  /**
+   * TipTap 上传/选择文档后：插入「参考素材」Cell，而不是嵌进正文。
+   * afterCellId：插在该文本 Cell 后面；缺省则插到当前活动大环节末尾。
+   */
+  function insertDocumentAsReferenceMaterial(
+    payload: {
+      title: string
+      fileUrl: string
+      fileSize?: number
+      resourceType?: string
+      summary?: string
+    },
+    afterCellId?: string | null
+  ): number | null {
+    const resourceType =
+      payload.resourceType ||
+      (/\.pdf$/i.test(payload.title) || /\.pdf(?:[?#]|$)/i.test(payload.fileUrl)
+        ? 'pdf'
+        : 'document')
+
+    const material: LessonRelatedMaterial = {
+      id: -Date.now(),
+      title: payload.title,
+      summary:
+        payload.summary ||
+        (payload.fileSize
+          ? `上传文档 · ${(payload.fileSize / 1024).toFixed(1)} KB`
+          : '教案内上传的文档素材'),
+      resource_type: resourceType,
+      preview_url: payload.fileUrl,
+      download_url: payload.fileUrl,
+      is_accessible: true,
+      tags: ['上传文档'],
+      updated_at: new Date().toISOString(),
+    }
+
+    // Prefer active section; fall back to first section with cells / teaching
+    let sectionIndex = activeSectionIndex.value
+    if (sectionIndex < 0 || sectionIndex >= sections.value.length) {
+      sectionIndex = Math.max(
+        0,
+        sections.value.findIndex((s) => s.order === 1)
+      )
+    }
+    if (sectionIndex < 0 || !sections.value[sectionIndex]) {
+      showToast('error', '无法插入参考素材：请先选择大环节')
+      return null
+    }
+
+    const section = sections.value[sectionIndex]
+    if (!section.cells) section.cells = []
+
+    let insertAt = section.cells.length
+    if (afterCellId) {
+      // Search all sections for the text cell
+      for (let si = 0; si < sections.value.length; si++) {
+        const arr = sections.value[si].cells ?? []
+        const idx = arr.findIndex((c) => String(c.id) === String(afterCellId))
+        if (idx >= 0) {
+          sectionIndex = si
+          insertAt = idx + 1
+          break
+        }
+      }
+    }
+
+    const target = sections.value[sectionIndex]
+    if (!target.cells) target.cells = []
+    const newCell = createReferenceMaterialCell(material, insertAt)
+    target.cells.splice(insertAt, 0, newCell)
+    renumberCellsGloballyInSections(sections.value)
+    showToast('success', `已添加参考素材：${payload.title}`)
+
+    const previousCellsCount = sections.value
+      .slice(0, sectionIndex)
+      .reduce((c, s) => c + (s.cells?.length || 0), 0)
+    nextTick(() => scrollToNewCell(previousCellsCount + insertAt))
+    return previousCellsCount + insertAt
+  }
+
   function handleCellUpdate(updatedCell: Cell) {
     for (let i = 0; i < sections.value.length; i++) {
       const arr = sections.value[i].cells ?? []
@@ -398,6 +478,7 @@ export function useLessonEditorCells(
     handleAddCellInSection,
     handleAddCellAt,
     insertReferenceMaterial,
+    insertDocumentAsReferenceMaterial,
     handleCellUpdate,
     handleDeleteCell,
     handleMoveUp,
