@@ -3,6 +3,8 @@ Office文档转换服务
 将Office文档转换为PDF以便在浏览器中预览
 """
 
+from __future__ import annotations
+
 import os
 import io
 import aiofiles
@@ -17,12 +19,58 @@ import PyPDF2
 from PIL import Image
 import fitz  # PyMuPDF
 
+from app.core.config import settings
+from app.utils.resource_url import url_to_filename
+
+OFFICE_EXTENSIONS = frozenset({"doc", "docx", "ppt", "pptx", "xls", "xlsx"})
+DIRECT_PREVIEW_EXTENSIONS = frozenset({"pdf", "jpg", "jpeg", "png", "gif", "webp", "svg"})
+
+
+def _resources_root() -> Path:
+    return Path(settings.UPLOAD_DIR).resolve() / "resources"
+
+
+def resolve_resource_path(file_ref: str) -> Path | None:
+    if not file_ref:
+        return None
+    if file_ref.startswith(("http://", "https://", "ftp://")):
+        if "/uploads/resources/" not in file_ref:
+            return None
+        name = url_to_filename(file_ref)
+    else:
+        name = url_to_filename(file_ref)
+    if not name or "/" in name or "\\" in name or name in {".", ".."}:
+        return None
+    root = _resources_root()
+    candidate = (root / name).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    if not candidate.is_file():
+        return None
+    return candidate
+
+
+def converted_pdf_path(source: Path) -> Path:
+    return source.with_name(f"{source.stem}_converted.pdf")
+
+
+def delete_converted_pdf(file_ref: str) -> None:
+    source = resolve_resource_path(file_ref)
+    if source is None:
+        return
+    pdf_path = converted_pdf_path(source)
+    if pdf_path.is_file():
+        pdf_path.unlink()
+
 
 class OfficeConverterService:
     """Office文档转换服务"""
 
     def __init__(self):
         self.temp_dir = tempfile.gettempdir()
+        self._lo_binary: str | None = None
 
     async def convert_to_pdf(self, file_path: str, output_path: str) -> Dict[str, Any]:
         """
@@ -42,6 +90,8 @@ class OfficeConverterService:
                 return await self._convert_docx_to_pdf(file_path, output_path)
             elif file_ext in [".ppt", ".pptx"]:
                 return await self._convert_ppt_to_pdf(file_path, output_path)
+            elif file_ext in [".xls", ".xlsx"]:
+                return await self._convert_excel_to_pdf(file_path, output_path)
             else:
                 raise ValueError(f"不支持的文档格式: {file_ext}")
 
@@ -76,15 +126,39 @@ class OfficeConverterService:
         except Exception as e:
             return {"success": False, "error": f"PPT转换失败: {str(e)}", "pdf_url": None}
 
+    async def _convert_excel_to_pdf(
+        self, excel_path: str, pdf_path: str
+    ) -> Dict[str, Any]:
+        """将XLS/XLSX转换为PDF（仅LibreOffice）"""
+        try:
+            if await self._has_libreoffice():
+                return await self._convert_with_libreoffice(excel_path, pdf_path)
+            return {
+                "success": False,
+                "error": "Excel转换需要LibreOffice",
+                "pdf_url": None,
+            }
+        except Exception as e:
+            return {"success": False, "error": f"Excel转换失败: {str(e)}", "pdf_url": None}
+
     async def _has_libreoffice(self) -> bool:
         """检查是否安装了LibreOffice"""
-        try:
-            result = subprocess.run(
-                ["libreoffice", "--version"], capture_output=True, text=True, timeout=5
-            )
-            return result.returncode == 0
-        except:
-            return False
+        if self._lo_binary:
+            return True
+        for binary in ("libreoffice", "soffice"):
+            try:
+                result = subprocess.run(
+                    [binary, "--version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    self._lo_binary = binary
+                    return True
+            except Exception:
+                continue
+        return False
 
     async def _convert_with_libreoffice(
         self, input_path: str, output_path: str
@@ -92,10 +166,11 @@ class OfficeConverterService:
         """使用LibreOffice转换文档"""
         try:
             output_dir = os.path.dirname(output_path)
+            lo_binary = getattr(self, "_lo_binary", "libreoffice")
 
             # 使用LibreOffice命令行转换
             cmd = [
-                "libreoffice",
+                lo_binary,
                 "--headless",
                 "--convert-to",
                 "pdf",
@@ -331,34 +406,25 @@ class OfficeConverterService:
         获取Office文档的转换PDF URL
 
         Args:
-            original_file_url: 原始文件URL
+            original_file_url: 原始文件URL或文件名
 
         Returns:
             转换后的PDF URL，如果转换失败则返回None
         """
         try:
-            # 从URL提取文件路径
-            if not original_file_url.startswith("/uploads/resources/"):
+            source = resolve_resource_path(original_file_url)
+            if source is None:
                 return None
 
-            # 构建文件路径
-            file_path = original_file_url.replace(
-                "/uploads/resources/", "storage/resources/"
-            )
-            if not os.path.exists(file_path):
-                return None
+            pdf_path = converted_pdf_path(source)
+            if pdf_path.is_file():
+                return f"/uploads/resources/{pdf_path.name}"
 
-            # 检查是否已经转换过
-            pdf_path = file_path.rsplit(".", 1)[0] + "_converted.pdf"
-            if os.path.exists(pdf_path):
-                return pdf_path.replace("storage/resources/", "/uploads/resources/")
-
-            # 执行转换
-            result = await self.convert_to_pdf(file_path, pdf_path)
+            result = await self.convert_to_pdf(str(source), str(pdf_path))
 
             if result["success"]:
                 print(f"Office文档转换成功，使用方法: {result.get('method', 'unknown')}")
-                return pdf_path.replace("storage/resources/", "/uploads/resources/")
+                return f"/uploads/resources/{pdf_path.name}"
             else:
                 print(f"Office文档转换失败: {result['error']}")
                 return None
