@@ -23,6 +23,7 @@ from app.schemas.library_asset import (
     LibraryAssetCreateVersionRequest,
 )
 from app.services.upload import upload_service
+from app.services.document_preview import build_preview_payload
 from app.api.deps import get_current_user
 from app.utils.resource_url import url_to_filename, filename_to_url
 from fastapi import Request
@@ -187,6 +188,50 @@ async def get_library_asset(
     # 转换URL为完整URL
     asset_dict = LibraryAssetDetail.model_validate(asset).model_dump()
     return LibraryAssetDetail(**_convert_asset_urls(asset_dict, request))
+
+
+@router.get("/{asset_id}/preview")
+async def get_library_asset_preview(
+    asset_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取资源库资产预览信息，包括Office文档的PDF转换版本"""
+    _check_library_access(current_user)
+
+    asset = await db.get(LibraryAsset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="资源库资产不存在")
+
+    # 校验归属学校（管理员和教研员可以访问所有学校的资源）
+    user_role = cast(UserRole, current_user.role)
+    if user_role not in {UserRole.ADMIN, UserRole.RESEARCHER}:
+        asset_school_id = cast(int, asset.school_id)
+        user_school_id = cast(int, current_user.school_id)
+        if asset_school_id != user_school_id:
+            raise HTTPException(status_code=403, detail="无权访问其他学校的资源")
+
+    # 可见性校验：教师只能访问自己上传的或全校可见的
+    user_id = cast(int, current_user.id)
+    asset_owner_id = cast(int, asset.owner_user_id)
+    asset_visibility = cast(str, asset.visibility)
+
+    if user_role == UserRole.TEACHER:
+        if asset_owner_id != user_id and asset_visibility != "school":
+            raise HTTPException(status_code=403, detail="无权访问此资源")
+
+    file_ref_raw = cast(Optional[str], asset.public_url or asset.storage_key)
+    if not file_ref_raw:
+        raise HTTPException(status_code=404, detail="资源文件不存在")
+
+    file_ref = url_to_filename(file_ref_raw)
+    return await build_preview_payload(
+        file_ref=file_ref,
+        title=cast(Optional[str], asset.title),
+        file_size=cast(Optional[int], asset.size_bytes),
+        page_count=cast(Optional[int], asset.page_count),
+        extra={"asset_id": asset.id},
+    )
 
 
 @router.post("/", response_model=LibraryAssetUploadResponse)

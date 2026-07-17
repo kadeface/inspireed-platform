@@ -21,6 +21,7 @@ from app.schemas.resource import (
 from app.schemas.library_asset import LibraryAssetSummary
 from app.services.upload import upload_service
 from app.services.document_preview import build_preview_payload
+from app.services.office_converter import delete_converted_pdf
 from app.api.deps import get_current_user, get_current_admin
 from app.utils.resource_url import filename_to_url, url_to_filename
 
@@ -352,9 +353,10 @@ async def delete_resource(
             400, f"Cannot delete resource: {lessons_count} lesson(s) are referencing it"
         )
 
-    # 删除文件
+    # 删除文件及转换缓存
     file_url = cast(Optional[str], resource.file_url)
     if file_url:
+        delete_converted_pdf(url_to_filename(file_url))
         await upload_service.delete_file(file_url)
 
     # 删除资源记录
