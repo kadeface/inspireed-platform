@@ -59,16 +59,19 @@
             <p class="loading-hint">如果是Office文档，首次预览可能需要较长时间进行格式转换，请耐心等待</p>
           </div>
 
-          <div v-else-if="error" class="error-container">
+          <div v-else-if="error || conversionFailed" class="error-container">
             <svg class="error-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p class="error-message">{{ error }}</p>
-            <button @click="loadResource" class="retry-btn">重试</button>
+            <p class="error-message">{{ error || previewInfo?.conversion_error }}</p>
+            <div class="error-actions">
+              <button @click="conversionFailed ? retryConversion() : loadResource()" class="retry-btn">重试</button>
+              <button @click="handleDownload" class="retry-btn retry-btn-secondary">下载原文件</button>
+            </div>
           </div>
 
-          <!-- PDF预览 -->
-          <div v-else-if="fileType === 'pdf'" class="pdf-container">
+          <!-- PDF预览（含Office转换后的PDF） -->
+          <div v-else-if="effectiveFileType === 'pdf'" class="pdf-container">
             <iframe
               :src="previewUrl"
               class="preview-iframe"
@@ -86,136 +89,6 @@
               @load="handleImageLoad"
               @error="handleImageError"
             />
-          </div>
-
-          <!-- Office文档预览 -->
-          <div v-else-if="fileType === 'office'" class="office-container">
-            <div class="office-preview">
-              <!-- 预览选项标签页 -->
-              <div class="preview-tabs">
-                <button 
-                  @click="activePreviewTab = 'info'"
-                  :class="['tab-btn', { active: activePreviewTab === 'info' }]"
-                >
-                  文件信息
-                </button>
-                <button 
-                  @click="activePreviewTab = 'online'"
-                  :class="['tab-btn', { active: activePreviewTab === 'online' }]"
-                >
-                  在线预览
-                </button>
-              </div>
-
-              <!-- 文件信息标签页 -->
-              <div v-if="activePreviewTab === 'info'" class="tab-content">
-                <div class="office-icon">
-                  <svg class="office-icon-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <h3 class="office-title">{{ resource?.title }}</h3>
-                <p class="office-description">
-                  {{ getOfficeDescription() }}
-                </p>
-                <div class="office-actions">
-                  <button @click="handleDownload" class="office-btn">
-                    <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    下载文件
-                  </button>
-                  <button v-if="canCreateLesson" @click="handleCreateLesson" class="office-btn btn-primary">
-                    <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    创建教案
-                  </button>
-                </div>
-              </div>
-
-              <!-- 在线预览标签页 -->
-              <div v-if="activePreviewTab === 'online'" class="tab-content">
-                <div class="online-preview-options">
-                  <!-- 转换后的PDF预览 -->
-                  <div v-if="previewInfo?.converted_to_pdf" class="preview-method">
-                    <h4 class="method-title">PDF预览</h4>
-                    <p class="method-description">
-                      已自动转换为PDF格式，可直接在浏览器中预览
-                    </p>
-                    <button @click="openConvertedPDF" class="preview-btn primary">
-                      <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      查看PDF版本
-                    </button>
-                  </div>
-
-                  <!-- 转换失败提示 -->
-                  <div v-else-if="previewInfo?.conversion_error" class="preview-method error">
-                    <h4 class="method-title">PDF转换失败</h4>
-                    <p class="method-description">
-                      {{ previewInfo.conversion_error }}
-                    </p>
-                    <div class="error-actions">
-                      <button @click="retryConversion" class="preview-btn">
-                        <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        重试转换
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- 推荐预览方式 -->
-                  <div class="preview-method recommended">
-                    <h4 class="method-title">推荐预览方式</h4>
-                    <p class="method-description">
-                      为了获得最佳的预览效果，建议使用以下方式查看文档
-                    </p>
-                  </div>
-
-                  <div class="preview-method">
-                    <h4 class="method-title">Microsoft Office Online</h4>
-                    <p class="method-description">
-                      使用Microsoft Office Online查看文档，支持编辑和协作
-                    </p>
-                    <button @click="openOfficeOnline" class="preview-btn">
-                      <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      在Office Online中打开
-                    </button>
-                  </div>
-
-                  <div class="preview-method">
-                    <h4 class="method-title">Google Docs Viewer</h4>
-                    <p class="method-description">
-                      使用Google文档查看器预览文档内容
-                    </p>
-                    <button @click="openGoogleViewer" class="preview-btn">
-                      <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
-                      </svg>
-                      在Google Viewer中打开
-                    </button>
-                  </div>
-
-                  <div class="preview-method">
-                    <h4 class="method-title">本地应用</h4>
-                    <p class="method-description">
-                      下载文件并在本地Office应用中打开
-                    </p>
-                    <button @click="handleDownload" class="preview-btn">
-                      <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      下载并在本地打开
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           <!-- 其他文件类型 -->
@@ -243,7 +116,7 @@
         </div>
 
         <!-- 底部工具栏 -->
-        <div v-if="!isLoading && !error" class="modal-footer">
+        <div v-if="!isLoading && !error && !conversionFailed" class="modal-footer">
           <div class="footer-left">
             <span v-if="resource?.page_count" class="page-info">
               共 {{ resource.page_count }} 页
@@ -295,7 +168,6 @@ const resource = ref<Resource | null>(null)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const isDownloading = ref(false)
-const activePreviewTab = ref('info')
 
 // 文件扩展名
 const fileExtension = computed(() => {
@@ -312,6 +184,17 @@ const fileType = computed(() => {
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'image'
   if (['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'].includes(ext)) return 'office'
   return 'other'
+})
+
+// 转换后按PDF展示（Office成功转换后不再使用外部在线Viewer）
+const effectiveFileType = computed(() => {
+  if (previewInfo.value?.converted_to_pdf) return 'pdf'
+  return fileType.value
+})
+
+// 转换失败：仅提示错误+下载，不再兜底外部Viewer
+const conversionFailed = computed(() => {
+  return !!previewInfo.value?.conversion_error && !previewInfo.value?.converted_to_pdf
 })
 
 // 文件图标
@@ -382,21 +265,6 @@ async function loadResource() {
   }
 }
 
-// 获取Office文档描述
-function getOfficeDescription() {
-  const ext = fileExtension.value
-  if (['doc', 'docx'].includes(ext)) {
-    return 'Microsoft Word 文档，建议下载后在本地查看'
-  }
-  if (['ppt', 'pptx'].includes(ext)) {
-    return 'Microsoft PowerPoint 演示文稿，建议下载后在本地查看'
-  }
-  if (['xls', 'xlsx'].includes(ext)) {
-    return 'Microsoft Excel 电子表格，建议下载后在本地查看'
-  }
-  return 'Office 文档，建议下载后在本地查看'
-}
-
 // iframe 加载完成
 function handleIframeLoad() {
   console.log('PDF loaded successfully')
@@ -441,37 +309,6 @@ function handleCreateLesson() {
   if (!props.resourceId) return
   emit('create-lesson', props.resourceId)
   close()
-}
-
-// 打开Microsoft Office Online
-function openOfficeOnline() {
-  if (!previewUrl.value) return
-  
-  // Microsoft Office Online URL格式
-  const officeOnlineUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl.value)}`
-  window.open(officeOnlineUrl, '_blank')
-}
-
-// 打开转换后的PDF
-function openConvertedPDF() {
-  if (!previewInfo.value?.preview_url) return
-  
-  let url = previewInfo.value.preview_url
-  if (url.startsWith('/uploads/')) {
-    const baseURL = getServerBaseUrl()
-    url = `${baseURL}${url}`
-  }
-  
-  window.open(url, '_blank')
-}
-
-// 打开Google Docs Viewer
-function openGoogleViewer() {
-  if (!previewUrl.value) return
-  
-  // Google Docs Viewer URL格式
-  const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(previewUrl.value)}&embedded=true`
-  window.open(googleViewerUrl, '_blank')
 }
 
 // 重试转换
@@ -649,6 +486,11 @@ function close() {
   text-align: center;
 }
 
+.error-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
 .retry-btn {
   padding: 0.5rem 1rem;
   background: #3b82f6;
@@ -657,6 +499,12 @@ function close() {
   border-radius: 0.375rem;
   cursor: pointer;
   font-size: 0.875rem;
+}
+
+.retry-btn-secondary {
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
 }
 
 .pdf-container,
@@ -683,7 +531,6 @@ function close() {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-.office-container,
 .other-file-container {
   flex: 1;
   display: flex;
@@ -692,130 +539,11 @@ function close() {
   padding: 2rem;
 }
 
-/* 预览标签页样式 */
-.preview-tabs {
-  display: flex;
-  border-bottom: 1px solid #e5e7eb;
-  margin-bottom: 1.5rem;
-}
-
-.tab-btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  background: none;
-  color: #6b7280;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.15s ease;
-}
-
-.tab-btn:hover {
-  color: #374151;
-  background: #f9fafb;
-}
-
-.tab-btn.active {
-  color: #3b82f6;
-  border-bottom-color: #3b82f6;
-}
-
-.tab-content {
-  text-align: center;
-}
-
-/* 在线预览选项样式 */
-.online-preview-options {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-.preview-method {
-  padding: 1.5rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  background: #f9fafb;
-  text-align: left;
-}
-
-.preview-method.error {
-  border-color: #fca5a5;
-  background: #fef2f2;
-}
-
-.preview-method.error .method-title {
-  color: #dc2626;
-}
-
-.preview-method.recommended {
-  border-color: #10b981;
-  background: #f0fdf4;
-}
-
-.preview-method.recommended .method-title {
-  color: #059669;
-}
-
-.error-actions {
-  margin-top: 1rem;
-}
-
-.method-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 0.5rem;
-}
-
-.method-description {
-  color: #6b7280;
-  font-size: 0.875rem;
-  margin: 0 0 1rem;
-  line-height: 1.5;
-}
-
-.preview-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  background: white;
-  color: #374151;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.preview-btn:hover {
-  background: #f9fafb;
-  border-color: #9ca3af;
-}
-
-.preview-btn.primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: white;
-}
-
-.preview-btn.primary:hover {
-  background: #2563eb;
-  border-color: #2563eb;
-}
-
-.office-preview,
 .other-file-preview {
   text-align: center;
   max-width: 400px;
 }
 
-.office-icon,
 .file-icon {
   display: flex;
   align-items: center;
@@ -827,14 +555,12 @@ function close() {
   border-radius: 50%;
 }
 
-.office-icon-svg,
 .file-icon-svg {
   width: 2rem;
   height: 2rem;
   color: #6b7280;
 }
 
-.office-title,
 .file-title {
   font-size: 1.25rem;
   font-weight: 600;
@@ -842,21 +568,18 @@ function close() {
   margin: 0 0 0.5rem;
 }
 
-.office-description,
 .file-description {
   color: #6b7280;
   margin: 0 0 1.5rem;
   line-height: 1.5;
 }
 
-.office-actions,
 .file-actions {
   display: flex;
   gap: 0.75rem;
   justify-content: center;
 }
 
-.office-btn,
 .file-btn {
   display: flex;
   align-items: center;
@@ -872,23 +595,9 @@ function close() {
   transition: all 0.15s ease;
 }
 
-.office-btn:hover,
 .file-btn:hover {
   background: #f9fafb;
   border-color: #9ca3af;
-}
-
-.office-btn.btn-primary,
-.file-btn.btn-primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: white;
-}
-
-.office-btn.btn-primary:hover,
-.file-btn.btn-primary:hover {
-  background: #2563eb;
-  border-color: #2563eb;
 }
 
 .modal-footer {
