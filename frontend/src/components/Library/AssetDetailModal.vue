@@ -75,8 +75,27 @@
               v-else-if="asset.asset_type === 'pdf' || asset.asset_type === 'document'"
               class="h-[420px] bg-white overflow-auto"
             >
+              <div v-if="previewLoading" class="flex flex-col items-center justify-center h-full gap-2">
+                <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-sm text-gray-600">正在加载预览，Office文档首次转换可能较久...</p>
+              </div>
+              <div v-else-if="previewError" class="flex flex-col items-center justify-center h-full gap-3 p-4 text-center">
+                <p class="text-sm text-red-600">{{ previewError }}</p>
+                <a
+                  :href="previewUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  下载原文件
+                </a>
+              </div>
               <iframe
-                :src="previewUrl"
+                v-else-if="previewAbsoluteUrl"
+                :src="previewAbsoluteUrl"
                 class="w-full h-full border-0"
               />
             </div>
@@ -498,8 +517,27 @@
               v-else-if="asset?.asset_type === 'pdf' || asset?.asset_type === 'document'"
               class="w-full min-h-full bg-white"
             >
+              <div v-if="previewLoading" class="flex flex-col items-center justify-center min-h-screen gap-2">
+                <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-sm text-gray-600">正在加载预览，Office文档首次转换可能较久...</p>
+              </div>
+              <div v-else-if="previewError" class="flex flex-col items-center justify-center min-h-screen gap-3 p-4 text-center">
+                <p class="text-sm text-red-600">{{ previewError }}</p>
+                <a
+                  :href="previewUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  下载原文件
+                </a>
+              </div>
               <iframe
-                :src="previewUrl"
+                v-else-if="previewAbsoluteUrl"
+                :src="previewAbsoluteUrl"
                 class="w-full h-full border-0 min-h-screen"
               />
             </div>
@@ -547,6 +585,7 @@ import type { LibraryAssetDetail, LibraryAssetUpdateRequest } from '@/types/libr
 import type { Subject, Grade } from '@/types/curriculum'
 import { getAssetTypeName, getVisibilityName, formatFileSize } from '@/types/library'
 import { getServerBaseUrl } from '@/utils/url'
+import { useDocumentPreview } from '@/composables/useDocumentPreview'
 
 interface Props {
   isOpen: boolean
@@ -586,6 +625,18 @@ const versions = ref<Array<{
   created_at: string
 }>>([])
 const loadingVersions = ref(false)
+
+// PDF / 文档预览：转换后的 PDF 由 useDocumentPreview 提供
+const {
+  loading: previewLoading,
+  error: previewError,
+  previewAbsoluteUrl,
+  loadFromLibrary,
+} = useDocumentPreview()
+
+const isDocPreviewAsset = computed(() => {
+  return asset.value?.asset_type === 'pdf' || asset.value?.asset_type === 'document'
+})
 
 // 编辑表单数据
 const editForm = ref<{
@@ -686,6 +737,17 @@ watch(() => props.assetId, async (newId) => {
     }
   }
 }, { immediate: true })
+
+// PDF / 文档类型资源：加载转换后的预览（Office 文档转 PDF）
+watch(
+  () => asset.value?.id,
+  async (id) => {
+    if (!id) return
+    if (isDocPreviewAsset.value) {
+      await loadFromLibrary(id)
+    }
+  },
+)
 
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
