@@ -192,9 +192,11 @@ const effectiveFileType = computed(() => {
   return fileType.value
 })
 
-// 转换失败：仅提示错误+下载，不再兜底外部Viewer
+// 转换失败：仅 Office 类型提示错误+下载，非 Office 走 other-file 面板
 const conversionFailed = computed(() => {
-  return !!previewInfo.value?.conversion_error && !previewInfo.value?.converted_to_pdf
+  return fileType.value === 'office'
+    && !!previewInfo.value?.conversion_error
+    && !previewInfo.value?.converted_to_pdf
 })
 
 // 文件图标

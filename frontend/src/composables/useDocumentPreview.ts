@@ -29,7 +29,12 @@ export function useDocumentPreview() {
     try {
       const data = await loader()
       info.value = data
-      if (data.conversion_error && !data.converted_to_pdf && !data.can_preview_directly) {
+      if (
+        data.conversion_error &&
+        !data.converted_to_pdf &&
+        !data.can_preview_directly &&
+        ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'].includes(data.file_type)
+      ) {
         error.value = data.conversion_error
       }
     } catch (e: any) {
