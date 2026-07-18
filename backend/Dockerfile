@@ -16,11 +16,17 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
      echo "deb http://mirrors.aliyun.com/debian/ bullseye-updates main" >> /etc/apt/sources.list) || true
 
 # 安装系统依赖（添加超时和重试机制）
+# LibreOffice 用于文档在线预览（Word/PPT/Excel -> PDF）；仅装所需组件以控制镜像体积
 RUN apt-get update --fix-missing && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     gcc \
     postgresql-client \
     libpq-dev \
+    libreoffice-writer \
+    libreoffice-impress \
+    libreoffice-calc \
+    fonts-liberation \
+    fonts-wqy-zenhei \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
