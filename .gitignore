@@ -43,7 +43,9 @@ dist-ssr/
 *.swo
 *~
 .DS_Store
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 .claude/
 .cloudstudio/
 .codebuddy/
@@ -113,13 +115,18 @@ Thumbs.db
 Desktop.ini
 
 # Documentation
-docs/
+# Design-process docs stay local only (superpowers / plans / design / *design* / *prd*).
+# Most of docs/ is ignored; only naming conventions + templates may be committed.
+docs/*
 docs/_build/
 site/
 
 # Documentation Files (exclude from git)
-# Allow docs/plans/ for design documents
-!docs/plans/
+# Project naming conventions (adopted standard)
+!docs/NAMING_CONVENTIONS.md
+# Reusable naming scaffold for new projects
+!docs/templates/
+!docs/templates/**
 docs/_build/
 *_SUMMARY.md
 *_GUIDE.md
