@@ -44,7 +44,7 @@ class AssistantRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=400)
     topic: Optional[str] = Field(
         None,
-        description="助手主题，例如 pdca、lesson_plan、qa、study_support",
+        description="助手主题，例如 pdca、lesson_plan、qa、study_support、course_design",
     )
     lesson_id: Optional[int] = Field(
         None, ge=1, description="关联的课程/教案 ID（可选）"
