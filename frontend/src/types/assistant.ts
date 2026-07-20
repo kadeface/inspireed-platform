@@ -1,11 +1,16 @@
 import type { QuestionStats } from './question'
 import type { SubjectGroupStatistics } from './subjectGroup'
 
-export type AssistantTopic = 'pdca' | 'lesson_plan' | 'qa' | 'study_support'
+export type AssistantTopic =
+  | 'pdca'
+  | 'lesson_plan'
+  | 'qa'
+  | 'study_support'
+  | 'course_design'
 
 export type TeacherAssistantTopic = Extract<
   AssistantTopic,
-  'pdca' | 'lesson_plan' | 'qa'
+  'pdca' | 'lesson_plan' | 'qa' | 'course_design'
 >
 
 export interface AssistantLessonSnapshot {
