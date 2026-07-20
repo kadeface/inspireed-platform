@@ -100,4 +100,16 @@ describe('courseDesignSkill parse', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.raw).toBe('不是JSON')
   })
+
+  it('rejects JSON with empty teacher_lesson_plan object', () => {
+    const raw = JSON.stringify({
+      core_understanding: '核心理解',
+      teacher_lesson_plan: {},
+      student_worksheet: { body_markdown: '学习单' },
+      scaffold_cards: { below: 'a', at: 'b', above: 'c' },
+      observation_rubric: { items: [] },
+    })
+    const result = parseCourseDesignPackage(raw)
+    expect(result.ok).toBe(false)
+  })
 })

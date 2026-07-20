@@ -160,20 +160,40 @@ function extractJsonObject(answer: string): unknown {
   return JSON.parse(candidate)
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
 function isPackage(value: unknown): value is CourseDesignPackage {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
-  return (
-    typeof v.core_understanding === 'string' &&
-    typeof v.teacher_lesson_plan === 'object' &&
-    v.teacher_lesson_plan !== null &&
-    typeof v.student_worksheet === 'object' &&
-    v.student_worksheet !== null &&
-    typeof v.scaffold_cards === 'object' &&
-    v.scaffold_cards !== null &&
-    typeof v.observation_rubric === 'object' &&
-    v.observation_rubric !== null
-  )
+  if (typeof v.core_understanding !== 'string') return false
+
+  const plan = v.teacher_lesson_plan
+  if (!plan || typeof plan !== 'object') return false
+  const p = plan as Record<string, unknown>
+  if (!isStringArray(p.objectives)) return false
+  if (!Array.isArray(p.timeline)) return false
+  if (!Array.isArray(p.misconceptions)) return false
+  if (typeof p.formative_check !== 'string') return false
+  if (typeof p.body_markdown !== 'string') return false
+
+  const worksheet = v.student_worksheet
+  if (!worksheet || typeof worksheet !== 'object') return false
+  if (typeof (worksheet as Record<string, unknown>).body_markdown !== 'string') return false
+
+  const cards = v.scaffold_cards
+  if (!cards || typeof cards !== 'object') return false
+  const c = cards as Record<string, unknown>
+  if (typeof c.below !== 'string' || typeof c.at !== 'string' || typeof c.above !== 'string') {
+    return false
+  }
+
+  const rubric = v.observation_rubric
+  if (!rubric || typeof rubric !== 'object') return false
+  if (!Array.isArray((rubric as Record<string, unknown>).items)) return false
+
+  return true
 }
 
 export function parseCourseDesignPackage(answer: string): ParseCourseDesignResult {
@@ -192,10 +212,10 @@ export function formatCourseDesignTabMarkdown(
 ): string {
   if (tab === 'teacher_lesson_plan') {
     const plan = pkg.teacher_lesson_plan
-    const timeline = plan.timeline
+    const timeline = (plan.timeline ?? [])
       .map((t) => `- ${t.minutes}分钟：${t.activity}`)
       .join('\n')
-    const misc = plan.misconceptions
+    const misc = (plan.misconceptions ?? [])
       .map(
         (m) =>
           `| ${m.symptom} | ${m.cause} | ${m.teacher_probe} |`
@@ -203,7 +223,7 @@ export function formatCourseDesignTabMarkdown(
       .join('\n')
     return [
       `## 核心理解\n${pkg.core_understanding}`,
-      `## 目标\n${plan.objectives.map((o) => `- ${o}`).join('\n')}`,
+      `## 目标\n${(plan.objectives ?? []).map((o) => `- ${o}`).join('\n')}`,
       `## 流程\n${timeline}`,
       `## 易错×原因×追问\n| 表现 | 原因 | 追问 |\n|---|---|---|\n${misc}`,
       `## 当堂检测\n${plan.formative_check}`,
@@ -220,7 +240,7 @@ export function formatCourseDesignTabMarkdown(
       `## 高于当前水平\n${pkg.scaffold_cards.above}`,
     ].join('\n\n')
   }
-  const items = pkg.observation_rubric.items
+  const items = (pkg.observation_rubric.items ?? [])
     .map((i) => `- **证据**：${i.evidence}\n  - 看起来像：${i.looks_like}`)
     .join('\n')
   return `## 课堂观察（对齐：${pkg.core_understanding}）\n${items}`

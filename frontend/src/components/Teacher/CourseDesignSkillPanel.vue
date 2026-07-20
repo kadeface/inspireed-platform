@@ -88,6 +88,7 @@
       >
         写回 Skill
       </button>
+      <p v-if="trimNotice" class="text-xs text-amber-700">{{ trimNotice }}</p>
       <ul v-if="patches.length" class="space-y-2 text-xs text-gray-700">
         <li v-for="p in patches" :key="p.id" class="flex items-start justify-between gap-2 rounded-lg bg-white px-3 py-2 border border-gray-100">
           <span>{{ p.text }}</span>
@@ -143,6 +144,7 @@ const activeTab = ref<CourseDesignTabId>('teacher_lesson_plan')
 const feedbackText = ref('')
 const patches = ref<CourseDesignSkillPatch[]>([])
 const copyHint = ref('')
+const trimNotice = ref('')
 
 const tabs: Array<{ id: CourseDesignTabId; label: string }> = [
   { id: 'teacher_lesson_plan', label: '教师教案' },
@@ -209,10 +211,20 @@ async function copyCurrent() {
 }
 
 function handleWriteBack() {
+  const text = feedbackText.value.trim()
+  if (!text) return
+  const beforeCount = patches.value.length
+  const beforeChars = patches.value.reduce((sum, p) => sum + p.text.length, 0)
   patches.value = addCourseDesignPatch(
-    feedbackText.value,
+    text,
     form.topic_title.trim() || undefined
   )
   feedbackText.value = ''
+  const afterChars = patches.value.reduce((sum, p) => sum + p.text.length, 0)
+  const trimmed =
+    patches.value.length < beforeCount + 1 || afterChars < beforeChars + text.length
+  trimNotice.value = trimmed
+    ? '已达存储上限，较早的规则已被自动丢弃。'
+    : ''
 }
 </script>
