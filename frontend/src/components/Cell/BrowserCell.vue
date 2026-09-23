@@ -141,14 +141,14 @@
         </div>
       </div>
 
-      <!-- 只读：可选内嵌预览（教师开启 embed 时） -->
+      <!-- 只读：可选内嵌预览（教师开启 embed 时）。内嵌可见时不显示上方链接卡片，避免和 iframe 重复 -->
       <div v-if="!editable && shouldShowEmbed" class="browser-embed-section">
         <p class="browser-embed-login-hint">
-          下方为只读预览，无法登录或下载；请使用上方「在外部页面打开」。
+          内嵌为只读预览，无法登录或下载。
         </p>
         <div class="browser-embed-wrap">
           <iframe
-            :src="displayUrl"
+            :src="embedSrc"
             class="browser-embed-iframe"
             title="浏览器单元预览"
             :sandbox="iframeSandbox"
@@ -265,7 +265,7 @@ import type { BrowserCell } from '../../types/cell'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useExternalBrowser } from '@/composables/useExternalBrowser'
 import { useToast } from '@/composables/useToast'
-import { resolveBrowserOpenMode } from '@/utils/browserExternalHosts'
+import { embedIframeSrc, resolveBrowserOpenMode } from '@/utils/browserExternalHosts'
 import { buildLessonReturnPath } from '@/utils/lessonTeachingMode'
 import QRCode from 'qrcode'
 
@@ -318,6 +318,8 @@ const displayUrl = computed(() => {
   return url && isValidUrl(url) ? url : null
 })
 
+const embedSrc = computed(() => (displayUrl.value ? embedIframeSrc(displayUrl.value) : ''))
+
 const displayContent = computed(() => {
   return props.editable ? localContent.value : (props.cell.content || {} as BrowserCell['content'])
 })
@@ -344,15 +346,16 @@ const effectiveLessonId = computed((): string | number => {
   return 'lesson'
 })
 
-const shouldShowExternalCard = computed(() => {
-  if (!displayUrl.value || props.editable) return false
-  return true
-})
-
 const shouldShowEmbed = computed(() => {
   if (props.editable || !displayUrl.value) return false
   if (resolvedOpenMode.value !== 'embed') return false
   return embedState.value !== 'fallback'
+})
+
+const shouldShowExternalCard = computed(() => {
+  if (!displayUrl.value || props.editable) return false
+  // 内嵌预览已经在播时，链接卡片和 iframe 会叠成两块内容
+  return !shouldShowEmbed.value
 })
 
 const shouldShowLinkMode = computed(() => {

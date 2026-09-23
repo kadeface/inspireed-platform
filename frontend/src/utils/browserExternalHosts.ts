@@ -33,6 +33,25 @@ export function isExternalPreferredUrl(url: string): boolean {
   }
 }
 
+/**
+ * Bilibili 外链播放器在未写 autoplay 时会直接开播。
+ * 内嵌预览补上 autoplay=0，等用户点播放器里的播放按钮。
+ * 已显式带 autoplay 的地址保持原样。
+ */
+export function embedIframeSrc(url: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return url
+  }
+  if (parsed.hostname.toLowerCase() !== 'player.bilibili.com') return url
+  if (!parsed.searchParams.has('autoplay')) {
+    parsed.searchParams.set('autoplay', '0')
+  }
+  return parsed.toString()
+}
+
 export type BrowserOpenMode = 'auto' | 'external' | 'embed'
 
 /** auto：默认外部打开；仅当教师显式 embed 时才内嵌 */
