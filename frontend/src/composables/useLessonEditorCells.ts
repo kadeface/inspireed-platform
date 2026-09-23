@@ -10,6 +10,7 @@ import type { LessonRelatedMaterial } from '../types/lesson'
 import type { SectionInContent } from '../types/section'
 import { getCellTypeName } from '../utils/lessonEditorHelpers'
 import { renumberCellsGloballyInSections } from '../utils/lessonContent'
+import { scrollToInsertedCell } from '../utils/scrollToInsertedCell'
 import { useLessonStore } from '../store/lesson'
 
 export function getDefaultCell(cellType: (typeof CellType)[keyof typeof CellType], order: number): Cell {
@@ -175,15 +176,14 @@ export function useLessonEditorCells(
 ) {
   const lessonStore = useLessonStore()
 
-  function scrollToNewCell(index: number) {
-    const el = cellListRef.value
-    if (!el) return
-    const target = el.querySelector(`[data-cell-index="${index}"]`) as HTMLElement | null
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
-      target.classList.add('ring-2', 'ring-blue-400', 'ring-opacity-75')
-      setTimeout(() => target.classList?.remove('ring-2', 'ring-blue-400', 'ring-opacity-75'), 2000)
-    }
+  function scrollToNewCell(cellIdOrIndex: string | number) {
+    nextTick(() => {
+      const root = cellListRef.value ?? document
+      if (scrollToInsertedCell(cellIdOrIndex, root)) return
+      if (root !== document && scrollToInsertedCell(cellIdOrIndex)) return
+      // 大环节用 cell 数量做 key，插入后会整段重挂，多等一帧再找
+      requestAnimationFrame(() => scrollToInsertedCell(cellIdOrIndex))
+    })
   }
 
   function handleAddCellToEnd(cellType: CellTypeValue) {
@@ -219,13 +219,11 @@ export function useLessonEditorCells(
     const idx = (activeSec.cells?.length ?? 0)
     const newCell = getDefaultCell(cellType, idx)
     if (!activeSec.cells) activeSec.cells = []
+    if (activeSec.is_collapsed) activeSec.is_collapsed = false
     activeSec.cells.push(newCell)
     renumberCellsGloballyInSections(sections.value)
     showToast('success', `已添加${getCellTypeName(cellType)}`)
-    const previousCellsCount = sections.value
-      .slice(0, activeSectionIndex.value)
-      .reduce((c, s) => c + (s.cells?.length || 0), 0)
-    nextTick(() => scrollToNewCell(previousCellsCount + idx))
+    scrollToNewCell(newCell.id)
   }
 
   function handleAddCellInSection(sectionIndex: number, indexInSection: number, cellType: CellTypeValue) {
@@ -315,13 +313,12 @@ export function useLessonEditorCells(
       }
       
       // 重新赋值以触发响应式更新
+      if (sec.is_collapsed) sec.is_collapsed = false
       sec.cells = currentCells
       renumberCellsGloballyInSections(sections.value)
       
       showToast('success', `已添加${getCellTypeName(cellType)}`)
-      const globalIndex =
-        sections.value.slice(0, sectionIndex).reduce((a, s) => a + (s.cells?.length || 0), 0) + safeIndex
-      nextTick(() => scrollToNewCell(globalIndex))
+      scrollToNewCell(newCell.id)
     } catch (error) {
       console.error('添加模块时出错:', error, {
         sectionIndex,
@@ -425,6 +422,7 @@ export function useLessonEditorCells(
     const target = sections.value[sectionIndex]
     if (!target.cells) target.cells = []
     const newCell = createReferenceMaterialCell(material, insertAt)
+    if (target.is_collapsed) target.is_collapsed = false
     target.cells.splice(insertAt, 0, newCell)
     renumberCellsGloballyInSections(sections.value)
     showToast('success', `已添加参考素材：${payload.title}`)
@@ -432,7 +430,7 @@ export function useLessonEditorCells(
     const previousCellsCount = sections.value
       .slice(0, sectionIndex)
       .reduce((c, s) => c + (s.cells?.length || 0), 0)
-    nextTick(() => scrollToNewCell(previousCellsCount + insertAt))
+    scrollToNewCell(newCell.id)
     return previousCellsCount + insertAt
   }
 

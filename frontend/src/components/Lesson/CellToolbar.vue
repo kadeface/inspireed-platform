@@ -2,7 +2,7 @@
   <div
     ref="rootRef"
     :class="[
-      'bg-white border-r border-gray-200 transition-all duration-300',
+      'bg-white border-r border-gray-200 transition-all duration-300 min-h-0',
       collapsed ? 'w-16' : 'w-64',
     ]"
   >

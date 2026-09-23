@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col">
+  <div class="h-screen overflow-hidden bg-gray-50 flex flex-col">
     <!-- 顶部工具栏 -->
     <LessonEditorToolbar
       :lesson-title="lessonTitle"
@@ -731,8 +731,7 @@ function handleAiInsert(content: string) {
   ;(newCell.content as any).html = html
   teaching.cells.push(newCell)
   showToast('success', 'AI 建议已插入到教案末尾')
-  const globalIndex = sections.value.reduce((a, s) => a + (s.cells?.length || 0), 0) - 1
-  nextTick(() => scrollToNewCell(globalIndex))
+  scrollToNewCell(newCell.id)
 }
 
 // 页面加载

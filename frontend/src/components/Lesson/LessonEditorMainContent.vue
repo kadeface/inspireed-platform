@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-1 overflow-hidden">
+  <div class="flex min-h-0 flex-1 overflow-hidden">
     <!-- 左侧：Cell 工具箱 -->
     <CellToolbar
       v-if="!isPreviewMode && !isFullscreenPreview"
@@ -37,7 +37,7 @@
     </Teleport>
 
     <!-- 中间：编辑区 -->
-    <main v-if="!isFullscreenPreview" class="flex-1 overflow-y-auto bg-gray-50 pb-24 lg:pb-0">
+    <main v-if="!isFullscreenPreview" class="min-h-0 flex-1 overflow-y-auto bg-gray-50 pb-24 lg:pb-0">
       <div
         :class="[
           isPreviewMode
