@@ -33,7 +33,9 @@
         this.lastP = p;
         const px = simRef.getPxPerCm();
         s.wheelAngle += Math.abs(this.cm) * px * 0.06 * Math.sign(this.cm || 1) * (p - prevP);
-        s.elapsed += this.dur * (p - prevP) / 1000;
+        const dtSec = this.dur * (p - prevP) / 1000;
+        s.elapsed += dtSec;
+        s.graphTime = (s.graphTime || 0) + dtSec;
         if (p > 0.01 && p - prevP > 0.0001) simRef.pushTrailPoint(robot, s.x, s.y);
         simRef.sampleMotion(robot);
         simRef.syncPrimaryStats?.(robot);
@@ -89,9 +91,12 @@
       step(dt, simRef) {
         this.elapsed += dt;
         if (this.robot) {
-          this.robot.state.elapsed += dt / 1000;
+          const dtSec = dt / 1000;
+          this.robot.state.elapsed += dtSec;
+          this.robot.state.graphTime = (this.robot.state.graphTime || 0) + dtSec;
           if (this.robot.stats) this.robot.stats.totalTime = this.robot.state.elapsed;
           simRef.syncPrimaryStats?.(this.robot);
+          simRef.sampleMotion?.(this.robot);
         }
         return this.elapsed >= this.ms;
       }
@@ -110,9 +115,12 @@
       step(dt, simRef) {
         this.elapsed += dt;
         if (this.robot) {
-          this.robot.state.elapsed += dt / 1000;
+          const dtSec = dt / 1000;
+          this.robot.state.elapsed += dtSec;
+          this.robot.state.graphTime = (this.robot.state.graphTime || 0) + dtSec;
           if (this.robot.stats) this.robot.stats.totalTime = this.robot.state.elapsed;
           simRef.syncPrimaryStats?.(this.robot);
+          simRef.sampleMotion?.(this.robot);
         }
         const dist = simRef.robotDistanceCm(this.robot, this.otherRobot);
         if (dist <= this.epsilonCm) return true;

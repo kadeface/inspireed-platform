@@ -13,6 +13,9 @@ export interface MathlabSimulation {
   topics: string[]
 }
 
+/** 改静态资源后递增，避免教案 iframe 继续用旧的 index.html */
+const MATHLAB_EMBED_VERSION = '30'
+
 export const MATHLAB_DEFAULT_CONFIG = {
   width: 1320,
   height: 820,
@@ -56,6 +59,7 @@ export function getMathlabEmbedUrl(
       : taskIdOrOptions || {}
 
   const params = new URLSearchParams()
+  params.set('v', MATHLAB_EMBED_VERSION)
   if (opts.taskId) params.set('task', opts.taskId)
   if (opts.mode === 'contest') params.set('mode', 'contest')
   if (opts.sessionId != null) params.set('sessionId', String(opts.sessionId))

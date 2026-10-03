@@ -844,7 +844,7 @@ const CURRICULUM = {
             },
             starter: { travelParallel: [], autoMeet: true },
             demo: 'travelChase',
-            hint: '双车同向追及：A 槽写慢车前进、B 槽写快车前进，从 s-t 图读交点时刻。'
+            hint: 'A 槽慢车、B 槽快车各自设速度再前进。两车同时开动，快车在行驶中追上慢车。'
           })
         ]
       }
@@ -1618,7 +1618,16 @@ function buildStarterXml(s, sceneConfig, taskMeta) {
     if (s.autoMeet !== false && sceneConfig) {
       if (travelSubtype === 'chase') {
         const d = travelChaseDistances(sceneConfig);
-        a = d.da; b = d.db;
+        const robots = sceneConfig?.robots || [];
+        const vA = robots.find(r => r.id === 'A')?.speed;
+        const vB = robots.find(r => r.id === 'B')?.speed;
+        const stackA = [];
+        const stackB = [];
+        if (vA != null) stackA.push(blockSpeedRobot('A', vA));
+        if (vB != null) stackB.push(blockSpeedRobot('B', vB));
+        stackA.push(blockForwardRobot('A', d.da ?? 0));
+        stackB.push(blockForwardRobot('B', d.db ?? 0));
+        return buildDualStarterXml(stackA, stackB);
       } else if (travelSubtype === 'meet') {
         const d = travelMeetDistances(sceneConfig);
         a = d.da; b = d.db;

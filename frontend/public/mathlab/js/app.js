@@ -18,6 +18,7 @@
     renderMode: 'car',
     viewport: { offsetX: 0, offsetY: 0, scale: 1 },
     taskMode: 'regular',
+    motionGraphsOn: true,
     travelSamples: [],
     motionSamples: [],
     robots: [],
@@ -58,6 +59,10 @@
     },
 
     init() {
+      try {
+        const saved = localStorage.getItem('mathlabShowMotionGraphs');
+        if (saved === '0') this.motionGraphsOn = false;
+      } catch (_) { /* 保持默认显示 */ }
       this.canvas = document.getElementById('canvas');
       this.ctx = this.canvas.getContext('2d');
       this.robots = [
@@ -76,11 +81,11 @@
       if (typeof MotionClock !== 'undefined') MotionClock.attach(this);
       document.getElementById('inpSpeed').addEventListener('input', e => {
         const v = parseFloat(e.target.value) || 10;
-        if (this.taskMode === 'travel') {
-          this.robots.forEach(r => { r.state.speed = v; });
-        } else {
-          this.state.speed = v;
+        if (this.taskMode === 'travel' || this.taskMode === 'curveTravel') {
+          // 双车各自用场景里的速度，不能收成同一个速度，否则追及会变成前车停着等
+          return;
         }
+        this.state.speed = v;
       });
       if (typeof ViewShell !== 'undefined') ViewShell.init(this);
       this.draw();
@@ -283,6 +288,7 @@
         s.dist = 0;
         s.wheelAngle = 0;
         s.elapsed = 0;
+        s.graphTime = 0;
         r.stats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
         this.resetRobotPen(r);
         this.seedTrailAt(r, s.x, s.y);
@@ -363,6 +369,7 @@
         r.state.startY = y;
         r.state.dist = 0;
         r.state.elapsed = 0;
+        r.state.graphTime = 0;
         r.stats = { totalDist: 0, totalTime: 0, turns: [], waits: 0 };
         this.resetRobotPen(r);
         this.seedTrailAt(r, x, y);
@@ -637,7 +644,15 @@
       const a = this.getRobot('A');
       const b = this.getRobot('B');
       if (!a || !b) return;
-      this.travelSamples = [{ t: 0, sA: this.trackPositionCm(a), sB: this.trackPositionCm(b) }];
+      this.travelSamples = [{ t: 0, sA: this.trackPositionCm(a), sB: this.trackPositionCm(b), vA: 0, vB: 0 }];
+    },
+
+    _pacedSpeed(robot, sNow, lastS, dt) {
+      if (!(dt > 0.015) || Math.abs(sNow - lastS) < 0.02) return 0;
+      const raw = Math.abs((sNow - lastS) / dt);
+      const set = robot?.state?.speed || 0;
+      if (set > 0 && Math.abs(raw - set) < Math.max(1.5, set * 0.35)) return set;
+      return Math.round(raw * 10) / 10;
     },
 
     sampleTravel() {
@@ -649,29 +664,66 @@
       const sA = this.trackPositionCm(a);
       const sB = this.trackPositionCm(b);
       const last = this.travelSamples[this.travelSamples.length - 1];
-      if (last && last.t === t && last.sA === sA && last.sB === sB) return;
-      this.travelSamples.push({ t, sA, sB });
-      if (this.travelSamples.length > 600) this.travelSamples.shift();
+      const dt = last ? t - last.t : 0;
+      const vA = last ? this._pacedSpeed(a, sA, last.sA, dt) : 0;
+      const vB = last ? this._pacedSpeed(b, sB, last.sB, dt) : 0;
+      if (last && last.t === t && last.sA === sA && last.sB === sB && last.vA === vA && last.vB === vB) return;
+      this.travelSamples.push({ t, sA, sB, vA, vB });
+      this.travelSamples = this._keepWholeGraph(this.travelSamples);
     },
 
     seedMotionSample() {
       if (this.taskMode === 'travel') return;
       const v = this.state.speed ?? 10;
-      this.motionSamples = [{ t: 0, s: 0, v }];
+      this.stRefSpeed = v > 0 ? v : 10;
+      this.motionSamples = [{ t: 0, s: 0, v: 0 }];
     },
 
     sampleMotion(robotOrId) {
       if (this.taskMode === 'travel') return;
       const robot = this.resolveRobot(robotOrId);
       if (!robot) return;
-      const stats = robot.stats || runStats;
-      const t = stats.totalTime ?? robot.state.elapsed ?? 0;
-      const s = stats.totalDist ?? robot.state.dist ?? 0;
-      const v = robot.state.speed ?? 10;
+      const sState = robot.state;
+      // 只记行驶时间：原地转弯不增加 t，避免速度没变却画出水平段
+      const t = sState.graphTime || 0;
+      const s = sState.dist || 0;
       const last = this.motionSamples[this.motionSamples.length - 1];
+      let v = sState.speed ?? 10;
+      if (last) {
+        if (s > last.s + 0.01) v = sState.speed ?? 10;
+        else if (t > last.t + 0.01) v = 0;
+        else v = last.v;
+      }
       if (last && last.t === t && last.s === s && last.v === v) return;
       this.motionSamples.push({ t, s, v });
-      if (this.motionSamples.length > 600) this.motionSamples.shift();
+      this.motionSamples = this._keepWholeGraph(this.motionSamples);
+    },
+
+    /** 点数太多时均匀抽稀，始终留下起点和当前点，避免只剩后半段 */
+    _keepWholeGraph(samples, limit = 900) {
+      if (samples.length <= limit) return samples;
+      const last = samples.length - 1;
+      const keep = Math.floor(limit * 0.6);
+      const kept = [samples[0]];
+      const step = last / (keep - 1);
+      for (let i = 1; i < keep - 1; i++) kept.push(samples[Math.round(i * step)]);
+      kept.push(samples[last]);
+      return kept;
+    },
+
+    /** 纵轴按参考速度锁定，匀速时屏幕上的倾角不随路程变长而改变 */
+    _liveStAxes(pts, stCfg) {
+      const last = pts.length ? pts[pts.length - 1] : null;
+      const refV = Math.max(1, this.stRefSpeed || last?.v || this.state.speed || 10);
+      if (stCfg.tMaxSec || stCfg.sMaxCm) {
+        const tMax = stCfg.tMaxSec || Math.max(10, (last?.t || 0) + 2);
+        const sHi = stCfg.sMaxCm || Math.max(50, ...pts.map(p => p.s || 0), 0) + 10;
+        return { tMax, sHi };
+      }
+      const tNeed = Math.max(8, (last?.t || 0) * 1.2);
+      const sNeed = Math.max((last?.s || 0) * 1.15, refV * 8);
+      const tMax = Math.max(tNeed, sNeed / refV);
+      return { tMax, sHi: refV * tMax };
     },
 
     async moveByDelta(dx, dy, cm, endAngle, robotOrId) {
@@ -1555,6 +1607,15 @@
       ctx.fillText(runStats.totalTime.toFixed(1) + 's', cx - 14, cy + r + 14);
     },
 
+    _drawGraphTip(ctx, x, y, color) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    },
+
     _drawGraphPanelBg(ctx, w, h) {
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = '#0f172a';
@@ -1637,12 +1698,8 @@
       const canvas = document.getElementById('travelGraphCanvas');
       if (!wrap || !canvas) return false;
       const stCfg = this.sceneConfig?.stGraph || {};
-      const travelMode = (this.taskMode === 'travel' || this.taskMode === 'curveTravel') && stCfg.enabled !== false;
-      const motionMode = !travelMode && stCfg.enabled
-        && (this.scene === SCENE.CALC || this.scene === SCENE.TIME || this.scene === SCENE.FUNCTION);
-      const enabled = travelMode || motionMode;
-      wrap.hidden = !enabled;
-      if (!enabled) return false;
+      const travelMode = this.taskMode === 'travel' || this.taskMode === 'curveTravel';
+      wrap.hidden = false;
       const ctx = canvas.getContext('2d');
       const w = canvas.width;
       const h = canvas.height;
@@ -1676,16 +1733,18 @@
         };
         drawLine('sA', '#22d3ee');
         if (stCfg.showBoth !== false) drawLine('sB', '#f97316');
+        const tip = this.travelSamples[this.travelSamples.length - 1];
+        if (tip) this._drawGraphTip(ctx, mapX(tip.t || 0), mapY(tip.sA || 0), '#22d3ee');
         ctx.fillStyle = '#22d3ee';
         ctx.fillText('A', w - 68, 18);
         ctx.fillStyle = '#f97316';
         ctx.fillText('B', w - 48, 18);
       } else {
         const pts = this.motionSamples;
-        const last = pts.length ? pts[pts.length - 1] : null;
-        tMax = stCfg.tMaxSec || Math.max(10, (last?.t || 0) + 2);
+        const axes = this._liveStAxes(pts, stCfg);
+        tMax = axes.tMax;
         const sLo = 0;
-        const sHi = stCfg.sMaxCm || Math.max(50, ...(pts.map(p => p.s)), 0) + 10;
+        const sHi = axes.sHi;
         const sSpan = Math.max(sHi - sLo, 1);
         mapX = t => 36 + (Math.max(0, t) / tMax) * (w - 48);
         mapY = s => (h - 28) - ((s - sLo) / sSpan) * (h - 40);
@@ -1700,6 +1759,8 @@
             else ctx.lineTo(x, y);
           });
           ctx.stroke();
+          const tip = pts[pts.length - 1];
+          this._drawGraphTip(ctx, mapX(tip.t), mapY(tip.s), '#22d3ee');
         }
         this.drawSecantLine(ctx, mapX, mapY, overlay, pts);
       }
@@ -1715,33 +1776,70 @@
       const canvas = document.getElementById('velocityGraphCanvas');
       if (!wrap || !canvas) return false;
       const vtCfg = this.sceneConfig?.vtGraph || {};
-      const enabled = vtCfg.enabled && (this.scene === SCENE.CALC || this.scene === SCENE.TIME);
-      wrap.hidden = !enabled;
-      if (!enabled) return false;
+      const travelMode = this.taskMode === 'travel' || this.taskMode === 'curveTravel';
+      wrap.hidden = false;
       const ctx = canvas.getContext('2d');
       const w = canvas.width;
       const h = canvas.height;
       this._drawGraphPanelBg(ctx, w, h);
-      const pts = this.motionSamples;
-      const last = pts.length ? pts[pts.length - 1] : null;
-      const tMax = vtCfg.tMaxSec || Math.max(10, (last?.t || 0) + 2);
-      const vMax = vtCfg.vMax || Math.max(15, ...(pts.map(p => p.v)), 0) + 2;
-      const mapX = t => 36 + (Math.max(0, t) / tMax) * (w - 48);
-      const mapY = v => (h - 28) - (Math.max(0, v) / vMax) * (h - 40);
-      if (pts.length) {
-        ctx.strokeStyle = '#f97316';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        pts.forEach((p, i) => {
-          const x = mapX(p.t);
-          const y = mapY(p.v);
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
+      const stCfg = this.sceneConfig?.stGraph || {};
+      let tMax;
+      let vMax;
+      const mapXBase = tmax => t => 36 + (Math.max(0, t) / tmax) * (w - 48);
+      if (travelMode) {
+        const pts = this.travelSamples;
+        const last = pts.length ? pts[pts.length - 1] : null;
+        tMax = stCfg.tMaxSec || vtCfg.tMaxSec || Math.max(10, (last?.t || 0) + 2);
+        const vVals = pts.flatMap(p => [p.vA, p.vB]).filter(v => v != null);
+        vMax = vtCfg.vMax || Math.max(15, ...(vVals.length ? vVals : [0]), 0) + 2;
+        const mapX = mapXBase(tMax);
+        const mapY = v => (h - 28) - (Math.max(0, v) / vMax) * (h - 40);
+        const drawLine = (key, color) => {
+          if (!pts.length) return;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          pts.forEach((p, i) => {
+            const x = mapX(p.t || 0);
+            const y = mapY(p[key] || 0);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+        };
+        drawLine('vA', '#22d3ee');
+        drawLine('vB', '#f97316');
+        const tip = pts[pts.length - 1];
+        if (tip) this._drawGraphTip(ctx, mapX(tip.t || 0), mapY(tip.vA || 0), '#22d3ee');
+        ctx.fillStyle = '#22d3ee';
+        ctx.fillText('A', w - 68, 18);
+        ctx.fillStyle = '#f97316';
+        ctx.fillText('B', w - 48, 18);
+      } else {
+        const pts = this.motionSamples;
+        const axes = this._liveStAxes(pts, stCfg.tMaxSec ? { tMaxSec: vtCfg.tMaxSec || stCfg.tMaxSec } : {});
+        tMax = vtCfg.tMaxSec || axes.tMax;
+        const vVals = pts.map(p => p.v).filter(v => v != null);
+        vMax = vtCfg.vMax || Math.max(15, ...(vVals.length ? vVals : [0]), 0) + 2;
+        const mapX = mapXBase(tMax);
+        const mapY = v => (h - 28) - (Math.max(0, v) / vMax) * (h - 40);
+        if (pts.length) {
+          ctx.strokeStyle = '#f97316';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          pts.forEach((p, i) => {
+            const x = mapX(p.t);
+            const y = mapY(p.v || 0);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+          const tip = pts[pts.length - 1];
+          this._drawGraphTip(ctx, mapX(tip.t), mapY(tip.v || 0), '#f97316');
+        }
+        const overlay = this.sceneConfig?.calcOverlay;
+        this.drawRiemannRects(ctx, mapX, mapY, overlay, pts, vMax);
       }
-      const overlay = this.sceneConfig?.calcOverlay;
-      this.drawRiemannRects(ctx, mapX, mapY, overlay, pts, vMax);
       ctx.fillStyle = '#cbd5e1';
       ctx.font = '11px sans-serif';
       ctx.fillText('t (s)', w - 34, h - 10);
@@ -1750,9 +1848,13 @@
     },
 
     drawMotionGraphs() {
+      const stack = document.getElementById('graphStack');
+      if (this.motionGraphsOn === false) {
+        if (stack) stack.hidden = true;
+        return;
+      }
       const stOn = this.drawStGraphPanel();
       const vtOn = this.drawVelocityGraph();
-      const stack = document.getElementById('graphStack');
       if (stack) stack.hidden = !stOn && !vtOn;
     },
 
@@ -2120,6 +2222,10 @@
           );
         },
         travelChase: async () => {
+          const robots = this.sceneConfig?.robots || [];
+          robots.forEach(def => {
+            if (def.speed != null) this.setSpeed(def.speed, def.id);
+          });
           const d = typeof travelChaseDistances === 'function'
             ? travelChaseDistances(this.sceneConfig)
             : { da: 54, db: 94 };
@@ -2216,7 +2322,7 @@
         { type: 'event_start', message0: '启动时', nextStatement: true, colour: 120, hat: 'cap' },
         { type: 'event_start_dual', message0: '当程序开始时（双车并行）',
           message1: 'A 程序 %1', args1: [{ type: 'input_statement', name: 'STACK_A' }],
-          message2: 'B 程序 %2', args2: [{ type: 'input_statement', name: 'STACK_B' }],
+          message2: 'B 程序 %1', args2: [{ type: 'input_statement', name: 'STACK_B' }],
           colour: 120, hat: 'cap' },
         { type: 'motion_move_2d', message0: '向角度 %1 ° 移动 %2 厘米', args0: [
             { type: 'input_value', name: 'ANGLE', check: 'Number' },
@@ -3017,7 +3123,11 @@
     }
     sim.lastAnalysis = null;
     loadTaskProps();
-    blocklyApp.loadStarter(task);
+    try {
+      blocklyApp.loadStarter(task);
+    } catch (e) {
+      console.error('示例程序加载失败', e);
+    }
     if (window.MathJax?.typesetPromise) MathJax.typesetPromise();
     if (typeof ViewShell !== 'undefined') ViewShell.setTaskSummary(task.title);
     setStatus('已加载：' + task.title);
@@ -3117,9 +3227,7 @@
       }
     }
     const speed = parseFloat(document.getElementById('inpSpeed').value) || 10;
-    if (sim.taskMode === 'travel' || sim.taskMode === 'curveTravel') {
-      sim.robots.forEach(r => { r.state.speed = speed; });
-    } else {
+    if (sim.taskMode !== 'travel' && sim.taskMode !== 'curveTravel') {
       sim.state.speed = speed;
     }
     try {
@@ -3160,9 +3268,7 @@
     }
     sim.reset();
     const speed = parseFloat(document.getElementById('inpSpeed').value) || 10;
-    if (sim.taskMode === 'travel' || sim.taskMode === 'curveTravel') {
-      sim.robots.forEach(r => { r.state.speed = speed; });
-    } else {
+    if (sim.taskMode !== 'travel' && sim.taskMode !== 'curveTravel') {
       sim.state.speed = speed;
     }
     try {
@@ -3254,6 +3360,18 @@
     });
   }
 
+  function bindMotionGraphSwitch() {
+    const chk = document.getElementById('chkMotionGraphs');
+    if (!chk) return;
+    chk.checked = sim.motionGraphsOn !== false;
+    chk.addEventListener('change', () => {
+      sim.motionGraphsOn = chk.checked;
+      try { localStorage.setItem('mathlabShowMotionGraphs', chk.checked ? '1' : '0'); } catch (_) { /* ignore */ }
+      sim.draw();
+    });
+    sim.draw();
+  }
+
   function init() {
     sim.init();
     window.__mathlabSim = sim;
@@ -3273,6 +3391,7 @@
     bindRunKeyboardShortcuts();
     document.getElementById('btnStart').onclick = startDemo;
     document.getElementById('btnReset').onclick = () => { sim.reset(); updateRunControls(); setStatus('已重置'); };
+    bindMotionGraphSwitch();
     updateRunControls();
     document.getElementById('btnLoadStarter').onclick = () => {
       if (currentTask) blocklyApp.loadStarter(currentTask);
