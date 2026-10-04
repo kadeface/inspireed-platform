@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50">
     <DashboardHeader
       title="我的收藏"
       subtitle="您收藏的课程"
@@ -12,9 +12,9 @@
       <div class="flex items-center justify-between mb-6">
         <button
           @click="router.back()"
-          class="flex items-center text-gray-600 hover:text-gray-900"
+          class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
         >
-          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
           返回
@@ -22,7 +22,7 @@
       </div>
 
       <div v-if="loading" class="text-center py-12">
-        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
         <p class="mt-4 text-gray-600">加载中...</p>
       </div>
 
@@ -36,7 +36,7 @@
         <p class="text-sm text-gray-500 mt-2">浏览课程并点击收藏按钮添加到这里</p>
         <button
           @click="router.push('/student')"
-          class="mt-6 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          class="mt-6 inline-flex h-9 items-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600"
         >
           去浏览课程
         </button>
@@ -51,7 +51,7 @@
           <div
             v-for="fav in favorites"
             :key="fav.id"
-            class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow relative group"
+            class="relative group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg transition-all hover:shadow-xl"
           >
             <!-- 取消收藏按钮 -->
             <button
@@ -65,7 +65,7 @@
 
             <!-- 课程封面 -->
             <div
-              class="h-40 bg-gradient-to-br from-pink-500 to-rose-600 rounded-t-lg flex items-center justify-center cursor-pointer"
+              class="h-40 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 rounded-t-xl flex items-center justify-center cursor-pointer"
               @click="viewLesson(fav.lesson_id)"
             >
               <svg class="w-16 h-16 text-white opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,7 +99,7 @@
               </div>
 
               <button
-                class="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                class="inline-flex h-9 w-full items-center justify-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600"
                 @click="viewLesson(fav.lesson_id)"
               >
                 开始学习

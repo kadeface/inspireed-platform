@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="modal-content bg-white rounded-lg shadow-xl p-5 w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div class="modal-content max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
       <h2 class="text-xl font-bold mb-3">
         {{ course ? '编辑课程' : '创建课程' }}
       </h2>
@@ -14,7 +14,7 @@
             </label>
             <select
               v-model="formData.subject_id"
-              class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               :class="{ 'border-orange-300': course && !hasSubject }"
               :disabled="course && hasSubject"
               required
@@ -36,7 +36,7 @@
             </label>
             <select
               v-model="formData.grade_id"
-              class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               :class="{ 'border-orange-300': course && originalGradeId && formData.grade_id !== originalGradeId }"
               required
             >
@@ -81,7 +81,7 @@
             <input
               v-model="formData.name"
               type="text"
-              class="flex-1 px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="flex-1 px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               placeholder="例如：一年级数学"
               required
             />
@@ -89,7 +89,7 @@
               v-if="!course && formData.subject_id && formData.grade_id"
               type="button"
               @click="autoGenerateName"
-              class="px-3 py-1.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg whitespace-nowrap"
+              class="whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
             >
               自动生成
             </button>
@@ -124,14 +124,14 @@
                 <input
                   v-model="formData.code"
                   type="text"
-                  class="flex-1 px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="flex-1 px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   placeholder="例如：grade1-math"
                 />
                 <button
                   v-if="!course && formData.subject_id && formData.grade_id"
                   type="button"
                   @click="autoGenerateCode"
-                  class="px-3 py-1.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg whitespace-nowrap"
+                  class="whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                 >
                   自动生成
                 </button>
@@ -145,7 +145,7 @@
               </label>
               <textarea
                 v-model="formData.description"
-                class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 rows="2"
                 placeholder="课程简介..."
               ></textarea>
@@ -159,7 +159,7 @@
               <input
                 v-model.number="formData.display_order"
                 type="number"
-                class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full px-3 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 min="0"
               />
             </div>
@@ -183,13 +183,13 @@
           <button
             type="button"
             @click="$emit('close')"
-            class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
           >
             取消
           </button>
           <button
             type="submit"
-            class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            class="inline-flex h-9 items-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600"
           >
             {{ course ? '保存' : '创建' }}
           </button>

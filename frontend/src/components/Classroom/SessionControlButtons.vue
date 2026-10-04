@@ -116,10 +116,10 @@ defineEmits<{
 }
 
 .btn {
-  padding: 0.55rem 1rem;
-  border-radius: 0.625rem;
+  padding: 0 0.75rem;
+  border-radius: 0.75rem;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 500;
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -127,7 +127,7 @@ defineEmits<{
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  min-height: 36px;
+  height: 36px;
   letter-spacing: 0.01em;
 }
 
@@ -137,16 +137,14 @@ defineEmits<{
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
-  border-color: #1d4ed8;
+  background: linear-gradient(to right, #10b981, #14b8a6);
+  border-color: transparent;
   color: white;
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.22);
+  box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 10px 16px rgba(37, 99, 235, 0.3);
+  background: linear-gradient(to right, #059669, #0d9488);
 }
 
 .btn-danger {
@@ -160,11 +158,6 @@ defineEmits<{
   background: #fef2f2;
   border-color: #fca5a5;
   color: #991b1b;
-}
-
-.btn-danger:active:not(:disabled),
-.btn-primary:active:not(:disabled) {
-  transform: translateY(0);
 }
 
 .btn-disabled-hint {

@@ -14,7 +14,7 @@
         class="duration-value"
         data-testid="session-duration-value"
         :class="{
-          'text-blue-600': !isWarning && !isDanger,
+          'text-slate-800': !isWarning && !isDanger,
           'text-orange-600': isWarning && !isDanger,
           'text-red-600': isDanger
         }"
@@ -84,11 +84,15 @@ const formattedRemaining = computed(() => {
 .duration-info {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.375rem 0.75rem;
-  background: #f9fafb;
-  border-radius: 0.375rem;
+  gap: 0.375rem;
+  height: 36px;
+  padding: 0 0.75rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
   font-size: 0.875rem;
+  color: #334155;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .duration-icon {
@@ -103,13 +107,13 @@ const formattedRemaining = computed(() => {
 
 .duration-value {
   font-weight: 600;
-  font-family: monospace;
-  font-size: 0.9375rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875rem;
 }
 
 .duration-remaining {
-  color: #6b7280;
-  font-size: 0.8125rem;
+  color: #475569;
+  font-size: 0.875rem;
 }
 
 .duration-warning {

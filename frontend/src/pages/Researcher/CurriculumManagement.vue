@@ -1,10 +1,10 @@
 <template>
-  <div class="curriculum-management p-6">
+  <div class="curriculum-management min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50 p-6">
     <div class="header mb-6">
       <div class="flex items-center gap-4 mb-2">
         <router-link
           to="/researcher"
-          class="flex items-center gap-2 px-6 py-2.5 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 font-medium transition-all"
+          class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -18,26 +18,26 @@
 
     <!-- Statistics -->
     <div class="grid grid-cols-4 gap-4 mb-6">
-      <div class="bg-white p-4 rounded-lg shadow">
-        <div class="text-sm text-gray-600">学科总数</div>
-        <div class="text-2xl font-bold text-blue-600">{{ curriculumTree?.total_subjects || 0 }}</div>
+      <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div class="text-sm text-slate-500">学科总数</div>
+        <div class="text-2xl font-bold text-slate-900">{{ curriculumTree?.total_subjects || 0 }}</div>
       </div>
-      <div class="bg-white p-4 rounded-lg shadow">
-        <div class="text-sm text-gray-600">年级总数</div>
-        <div class="text-2xl font-bold text-green-600">{{ curriculumTree?.total_grades || 0 }}</div>
+      <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div class="text-sm text-slate-500">年级总数</div>
+        <div class="text-2xl font-bold text-slate-900">{{ curriculumTree?.total_grades || 0 }}</div>
       </div>
-      <div class="bg-white p-4 rounded-lg shadow">
-        <div class="text-sm text-gray-600">课程总数</div>
-        <div class="text-2xl font-bold text-purple-600">{{ curriculumTree?.total_courses || 0 }}</div>
+      <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div class="text-sm text-slate-500">课程总数</div>
+        <div class="text-2xl font-bold text-slate-900">{{ curriculumTree?.total_courses || 0 }}</div>
       </div>
-      <div class="bg-white p-4 rounded-lg shadow">
-        <div class="text-sm text-gray-600">教案总数</div>
-        <div class="text-2xl font-bold text-orange-600">{{ curriculumTree?.total_lessons || 0 }}</div>
+      <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div class="text-sm text-slate-500">教案总数</div>
+        <div class="text-2xl font-bold text-emerald-700">{{ curriculumTree?.total_lessons || 0 }}</div>
       </div>
     </div>
 
     <!-- Main Content -->
-    <div class="bg-white rounded-lg shadow p-6">
+    <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-xl font-semibold">课程体系树</h2>
         <div class="flex gap-2">
@@ -52,13 +52,13 @@
           </label>
           <button
             @click="openUploadModal"
-            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-emerald-700 shadow-sm ring-1 ring-inset ring-emerald-200 transition-all hover:bg-emerald-50 hover:ring-emerald-300"
           >
             📤 上传资源
           </button>
           <button
             @click="openImportChaptersModal"
-            class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="!dataLoaded"
             :class="{ 'opacity-50 cursor-not-allowed': !dataLoaded }"
           >
@@ -66,13 +66,13 @@
           </button>
           <button
             @click="openExportImportModal"
-            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
           >
             📋 导出导入
           </button>
           <button
             @click="openCourseModal"
-            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            class="inline-flex h-9 items-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-3 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="!dataLoaded"
             :class="{ 'opacity-50 cursor-not-allowed': !dataLoaded }"
           >
@@ -94,7 +94,7 @@
           class="subject-node mb-4"
         >
           <div 
-            class="subject-header flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+            class="subject-header flex cursor-pointer items-center justify-between rounded-xl bg-slate-50 p-3 hover:bg-slate-100"
             :class="{ 'opacity-50': !subject.is_active }"
             @click="toggleSubject(subject.id)"
           >
@@ -107,7 +107,7 @@
               <button
                 v-if="subject.lesson_count > 0"
                 @click.stop="toggleSubjectLessons(subject.id)"
-                class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200"
+                class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
                 title="展开/收起教案"
               >
                 {{ expandedSubjectLessons.has(subject.id) ? '▼' : '▶' }} 教案
@@ -117,7 +117,7 @@
               <button
                 @click="toggleSubjectStatus(subject)"
                 class="px-3 py-1 text-sm rounded"
-                :class="subject.is_active ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'"
+                :class="subject.is_active ? 'rounded-xl bg-red-50 text-red-600 ring-1 ring-inset ring-red-200 hover:bg-red-100' : 'rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100'"
               >
                 {{ subject.is_active ? '禁用' : '启用' }}
               </button>
@@ -141,7 +141,7 @@
               class="grade-node mb-3"
             >
               <div 
-                class="grade-header flex items-center justify-between p-2 bg-blue-50 rounded cursor-pointer hover:bg-blue-100"
+                class="grade-header flex cursor-pointer items-center justify-between rounded-xl bg-slate-50 p-2 hover:bg-slate-100"
                 :class="{ 'opacity-50': !grade.is_active }"
                 @click="toggleGrade(subject.id, grade.id)"
               >
@@ -153,7 +153,7 @@
                   <button
                     v-if="grade.lesson_count > 0"
                     @click.stop="toggleGradeLessons(subject.id, grade.id)"
-                    class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200"
+                    class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
                     title="展开/收起教案"
                   >
                     {{ expandedGradeLessons.has(`${subject.id}-${grade.id}`) ? '▼' : '▶' }} 教案
@@ -163,7 +163,7 @@
                   <button
                     @click="toggleGradeStatus(grade)"
                     class="px-2 py-1 text-sm rounded"
-                    :class="grade.is_active ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'"
+                    :class="grade.is_active ? 'rounded-xl bg-red-50 text-red-600 ring-1 ring-inset ring-red-200 hover:bg-red-100' : 'rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100'"
                   >
                     {{ grade.is_active ? '禁用' : '启用' }}
                   </button>
@@ -189,7 +189,7 @@
                 >
                   <!-- Course Header -->
                   <div 
-                    class="flex items-center justify-between p-2 bg-green-50 rounded hover:bg-green-100 cursor-pointer"
+                    class="flex cursor-pointer items-center justify-between rounded-xl bg-emerald-50/70 p-2 hover:bg-emerald-50"
                     :class="{ 'opacity-50': !course.is_active }"
                     @click="toggleCourse(course.id)"
                   >
@@ -203,12 +203,12 @@
                       <button
                         v-if="course.lesson_count > 0"
                         @click.stop="toggleCourseLessons(course.id)"
-                        class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200"
+                        class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
                         title="展开/收起教案"
                       >
                         {{ expandedCourseLessons.has(course.id) ? '▼' : '▶' }} 教案
                       </button>
-                      <span v-if="courseChapters.has(course.id)" class="text-sm text-purple-600">
+                      <span v-if="courseChapters.has(course.id)" class="text-sm text-slate-500">
                         {{ courseChapters.get(course.id)?.length || 0 }} 个章节
                       </span>
                     </div>
@@ -216,20 +216,20 @@
                       <button
                         v-if="course.code"
                         @click="openMergeModal(course)"
-                        class="px-2 py-1 text-sm bg-purple-100 text-purple-600 rounded hover:bg-purple-200"
+                        class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-sm font-medium text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
                         title="合并相同代码的课程"
                       >
                         合并
                       </button>
                       <button
                         @click="editCourse(course, subject, grade)"
-                        class="px-2 py-1 text-sm bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+                        class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-sm font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-50"
                       >
                         编辑
                       </button>
                       <button
                         @click="deleteCourseConfirm(course)"
-                        class="px-2 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200"
+                        class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-sm font-medium text-red-600 ring-1 ring-inset ring-red-200 hover:bg-red-50"
                         :disabled="course.lesson_count > 0"
                         :class="{ 'opacity-50 cursor-not-allowed': course.lesson_count > 0 }"
                       >
@@ -253,7 +253,7 @@
                     <div class="add-chapter-btn-container mb-2">
                       <button
                         @click="openAddChapterModal(course)"
-                        class="add-chapter-btn px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded hover:bg-purple-200 flex items-center gap-1"
+                        class="add-chapter-btn inline-flex h-9 items-center gap-1 rounded-xl bg-white px-3 text-sm font-medium text-emerald-700 shadow-sm ring-1 ring-inset ring-emerald-200 transition-all hover:bg-emerald-50 hover:ring-emerald-300"
                       >
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -264,7 +264,7 @@
                     
                     <!-- Loading State -->
                     <div v-if="loadingChapters.has(course.id)" class="flex items-center gap-2 p-2 text-gray-500">
-                      <div class="animate-spin w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div>
+                      <div class="animate-spin h-4 w-4 rounded-full border-2 border-slate-200 border-t-emerald-500"></div>
                       <span class="text-sm">加载章节中...</span>
                     </div>
                     
@@ -276,23 +276,23 @@
                         class="chapter-container"
                       >
                         <!-- 主章节 -->
-                        <div class="chapter-node flex items-center justify-between gap-2 p-2 bg-purple-50 rounded hover:bg-purple-100">
+                        <div class="chapter-node flex items-center justify-between gap-2 rounded-xl bg-white p-2 ring-1 ring-slate-200 hover:bg-slate-50">
                           <div class="flex items-center gap-2">
                             <button
                               @click.stop="toggleChapterLessons(chapter.id)"
-                              class="text-purple-600 hover:text-purple-800"
+                              class="text-slate-500 hover:text-slate-700"
                               title="展开/收起教案"
                             >
                               <span>{{ expandedLessons.has(chapter.id) ? '▼' : '▶' }}</span>
                             </button>
                             <button
                               @click.stop="toggleChapterResources(chapter.id)"
-                              class="text-purple-600 hover:text-purple-800"
+                              class="text-slate-500 hover:text-slate-700"
                               title="展开/收起资源"
                             >
                               <span>{{ expandedResources.has(chapter.id) ? '▼' : '▶' }}</span>
                             </button>
-                            <span class="text-purple-600">📖</span>
+                            <span>📖</span>
                             <span class="font-medium">{{ chapter.name }}</span>
                             <span v-if="chapter.code" class="text-sm text-gray-500">({{ chapter.code }})</span>
                             <span v-if="chapter.description" class="text-sm text-gray-600">{{ chapter.description }}</span>
@@ -304,28 +304,28 @@
                           <div class="flex gap-1" @click.stop>
                             <button
                               @click="associateLessonToChapter(chapter, course)"
-                              class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200 font-medium"
+                              class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
                               title="关联教案"
                             >
                               📄 关联教案
                             </button>
                             <button
                               @click="uploadResourceToChapter(chapter)"
-                              class="px-2 py-1 text-xs bg-green-100 text-green-600 rounded hover:bg-green-200"
+                              class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-50"
                               title="上传资源"
                             >
                               📎 上传
                             </button>
                             <button
                               @click="editChapter(chapter)"
-                              class="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+                              class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-50"
                               title="编辑章节"
                             >
                               编辑
                             </button>
                             <button
                               @click="deleteChapterConfirm(chapter)"
-                              class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
+                              class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-red-600 ring-1 ring-inset ring-red-200 hover:bg-red-50"
                               title="删除章节"
                             >
                               删除
@@ -360,7 +360,7 @@
                             :key="child.id"
                             class="chapter-container"
                           >
-                            <div class="chapter-node flex items-center justify-between gap-2 p-2 bg-purple-25 rounded hover:bg-purple-75">
+                            <div class="chapter-node flex items-center justify-between gap-2 rounded-xl bg-slate-50 p-2 ring-1 ring-slate-200 hover:bg-white">
                               <div class="flex items-center gap-2">
                                 <button
                                   @click.stop="toggleChapterLessons(child.id)"
@@ -377,7 +377,7 @@
                                   <span>{{ expandedResources.has(child.id) ? '▼' : '▶' }}</span>
                                 </button>
                                 <span class="text-gray-400">└─</span>
-                                <span class="text-purple-500">📄</span>
+                                <span class="text-slate-400">📄</span>
                                 <span class="font-medium">{{ child.name }}</span>
                                 <span v-if="child.code" class="text-sm text-gray-500">({{ child.code }})</span>
                                 <span v-if="child.description" class="text-sm text-gray-600">{{ child.description }}</span>
@@ -389,28 +389,28 @@
                               <div class="flex gap-1" @click.stop>
                                 <button
                                   @click="associateLessonToChapter(child, course)"
-                                  class="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded hover:bg-orange-200 font-medium"
+                                  class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
                                   title="关联教案"
                                 >
                                   📄 关联教案
                                 </button>
                                 <button
                                   @click="uploadResourceToChapter(child)"
-                                  class="px-2 py-1 text-xs bg-green-100 text-green-600 rounded hover:bg-green-200"
+                                  class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-50"
                                   title="上传资源"
                                 >
                                   📎 上传
                                 </button>
                                 <button
                                   @click="editChapter(child)"
-                                  class="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+                                  class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-50"
                                   title="编辑章节"
                                 >
                                   编辑
                                 </button>
                                 <button
                                   @click="deleteChapterConfirm(child)"
-                                  class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
+                                  class="inline-flex items-center rounded-xl bg-white px-2 py-1 text-xs font-medium text-red-600 ring-1 ring-inset ring-red-200 hover:bg-red-50"
                                   title="删除章节"
                                 >
                                   删除
@@ -487,7 +487,7 @@
 
     <!-- Course Export Import Modal -->
     <div v-if="showExportImportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="mx-4 max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-xl">
         <div class="p-6">
           <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold">课程导出导入</h3>

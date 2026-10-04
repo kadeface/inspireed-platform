@@ -37,12 +37,12 @@
           </div>
           
           <!-- 章节信息 -->
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div class="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
             <div class="flex items-center">
-              <span class="text-blue-600 mr-2">📖</span>
+              <span class="mr-2 text-emerald-700">📖</span>
               <div>
-                <h4 class="font-medium text-blue-900">{{ chapter?.name }}</h4>
-                <p class="text-sm text-blue-700">{{ chapter?.description || '暂无描述' }}</p>
+                <h4 class="font-medium text-emerald-900">{{ chapter?.name }}</h4>
+                <p class="text-sm text-emerald-700">{{ chapter?.description || '暂无描述' }}</p>
               </div>
             </div>
           </div>
@@ -54,7 +54,7 @@
               :class="[
                 'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
                 activeTab === 'upload'
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-emerald-500 text-emerald-700'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               ]"
             >
@@ -65,7 +65,7 @@
               :class="[
                 'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
                 activeTab === 'library'
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-emerald-500 text-emerald-700'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               ]"
             >
@@ -86,7 +86,7 @@
               <input
                 v-model="formData.title"
                 type="text"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 placeholder="请输入资源标题"
                 :disabled="loading"
                 required
@@ -101,7 +101,7 @@
               <textarea
                 v-model="formData.description"
                 rows="3"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 placeholder="请输入资源描述"
                 :disabled="loading"
               ></textarea>
@@ -119,7 +119,7 @@
                 :class="[
                   'border-2 border-dashed rounded-lg p-6 text-center transition-colors',
                   isDragging
-                    ? 'border-blue-500 bg-blue-50'
+                    ? 'border-emerald-500 bg-emerald-50'
                     : 'border-gray-300 hover:border-gray-400'
                 ]"
               >
@@ -139,7 +139,7 @@
                     拖拽文件到此处，或
                     <button
                       @click="$refs.fileInput.click()"
-                      class="text-blue-600 hover:text-blue-700 font-medium"
+                      class="font-medium text-emerald-700 hover:text-emerald-800"
                       type="button"
                     >
                       点击选择文件
@@ -184,7 +184,7 @@
               </label>
               <select
                 v-model="formData.resource_type"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 :disabled="loading"
               >
                 <option value="document">文档</option>
@@ -206,7 +206,7 @@
               <input
                 v-model="libraryFormData.title"
                 type="text"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 placeholder="留空则使用资产标题"
                 :disabled="loading"
               />
@@ -219,7 +219,7 @@
               <textarea
                 v-model="libraryFormData.description"
                 rows="2"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 placeholder="留空则使用资产描述"
                 :disabled="loading"
               ></textarea>
@@ -239,7 +239,7 @@
           <button
             @click="handleClose"
             :disabled="loading"
-            class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
           >
             取消
           </button>
@@ -247,7 +247,7 @@
             v-if="activeTab === 'upload'"
             @click="handleSubmit"
             :disabled="!canUpload || loading"
-            class="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="inline-flex h-9 items-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span v-if="loading" class="inline-flex items-center">
               <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -262,7 +262,7 @@
             v-else-if="activeTab === 'library'"
             @click="handleLibrarySubmit"
             :disabled="!canSubmitFromLibrary || loading"
-            class="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="inline-flex h-9 items-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span v-if="loading" class="inline-flex items-center">
               <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">

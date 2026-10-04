@@ -633,9 +633,9 @@ const handleDuty = () => {
 }
 
 .teaching-assistant-fab-container--embedded .fab-button--embedded.fab-button-active {
-  background: rgba(79, 70, 229, 0.12);
-  border-color: rgba(79, 70, 229, 0.35);
-  color: #3730a3;
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #047857;
   box-shadow: none;
 }
 
@@ -786,20 +786,20 @@ const handleDuty = () => {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(to right, #10b981, #14b8a6);
   border: none;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.35);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
   color: white;
 }
 
 .fab-button:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(to right, #059669, #0d9488);
+  box-shadow: 0 10px 15px -3px rgba(5, 150, 105, 0.4);
 }
 
 .fab-button:active {
@@ -807,8 +807,8 @@ const handleDuty = () => {
 }
 
 .fab-button-active {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(to right, #059669, #0f766e);
+  box-shadow: 0 10px 15px -3px rgba(5, 150, 105, 0.4);
 }
 
 .fab-menu {

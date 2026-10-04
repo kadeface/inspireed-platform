@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50">
     <!-- 统一头部 -->
     <DashboardHeader
       title="教研工作台"
@@ -16,18 +16,18 @@
       <!-- 课程体系管理 -->
       <router-link 
         to="/researcher/curriculum"
-        class="quick-link-card bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow"
+        class="quick-link-card rounded-2xl border border-gray-100 bg-white/80 p-6 shadow-lg backdrop-blur-sm transition-all hover:-translate-y-1 hover:shadow-xl"
       >
         <div class="flex items-center mb-4">
           <span class="text-4xl mr-3">📚</span>
           <h2 class="text-xl font-semibold">课程体系管理</h2>
         </div>
         <p class="text-gray-600">管理学科、年级、课程和章节</p>
-        <div class="mt-4 text-blue-600 font-medium">进入管理 →</div>
+        <div class="mt-4 inline-flex items-center rounded-xl px-3 py-1.5 text-sm font-medium text-emerald-700 transition-all hover:bg-emerald-50">进入管理 →</div>
       </router-link>
 
       <!-- 官方资源管理 -->
-      <div class="quick-link-card bg-white rounded-lg shadow-lg p-6 opacity-60">
+      <div class="quick-link-card rounded-2xl border border-gray-100 bg-white/80 p-6 shadow-lg opacity-60">
         <div class="flex items-center mb-4">
           <span class="text-4xl mr-3">📁</span>
           <h2 class="text-xl font-semibold">官方资源管理</h2>
@@ -39,18 +39,18 @@
       <!-- 教研观摩 -->
       <router-link 
         to="/researcher/curriculum"
-        class="quick-link-card bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow"
+        class="quick-link-card rounded-2xl border border-gray-100 bg-white/80 p-6 shadow-lg backdrop-blur-sm transition-all hover:-translate-y-1 hover:shadow-xl"
       >
         <div class="flex items-center mb-4">
           <span class="text-4xl mr-3">👀</span>
           <h2 class="text-xl font-semibold">导入教师教案</h2>
         </div>
         <p class="text-gray-600">导入其他教师编写的教案到系统中</p>
-        <div class="mt-4 text-blue-600 font-medium">进入导入 →</div>
+        <div class="mt-4 inline-flex items-center rounded-xl px-3 py-1.5 text-sm font-medium text-emerald-700 transition-all hover:bg-emerald-50">进入导入 →</div>
       </router-link>
 
       <!-- 数据分析 -->
-      <div class="quick-link-card bg-white rounded-lg shadow-lg p-6 opacity-60">
+      <div class="quick-link-card rounded-2xl border border-gray-100 bg-white/80 p-6 shadow-lg opacity-60">
         <div class="flex items-center mb-4">
           <span class="text-4xl mr-3">📊</span>
           <h2 class="text-xl font-semibold">数据分析</h2>
@@ -61,9 +61,9 @@
     </div>
 
     <!-- 系统说明 -->
-    <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-      <h3 class="text-lg font-semibold text-blue-900 mb-3">教研员职责</h3>
-      <ul class="space-y-2 text-blue-800">
+    <div class="mt-8 rounded-2xl border border-emerald-100 bg-white/80 p-6 shadow-sm">
+      <h3 class="mb-3 text-lg font-semibold text-slate-900">教研员职责</h3>
+      <ul class="space-y-2 text-slate-700">
         <li class="flex items-start">
           <span class="mr-2">✓</span>
           <span>管理课程体系：创建和维护学科、年级、课程结构</span>

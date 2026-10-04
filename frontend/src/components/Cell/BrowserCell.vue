@@ -887,7 +887,7 @@ onBeforeUnmount(() => {
 
 /* 打开按钮 */
 .link-open-btn {
-  @apply flex items-center justify-center gap-2 px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md text-base min-w-[200px];
+  @apply flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium text-base min-w-[200px] shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600;
 }
 
 .link-mode-card.fullscreen-preview .link-open-btn {

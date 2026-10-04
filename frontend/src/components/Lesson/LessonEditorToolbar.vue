@@ -1,12 +1,12 @@
 <template>
-  <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
+  <nav class="sticky top-0 z-30 border-b border-slate-200 bg-white">
     <div class="mx-auto px-3 sm:px-6 lg:px-8">
       <div class="flex flex-col gap-2 py-2 md:h-16 md:flex-row md:items-center md:justify-between md:py-0">
         <!-- 左侧：返回按钮 + 标题 -->
         <div class="flex w-full items-center gap-2 md:flex-1 md:gap-4">
           <button
             @click="$emit('back')"
-            class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-white/80 px-3 py-2 text-sm font-medium text-gray-700 backdrop-blur-sm transition-all hover:bg-white hover:shadow-md md:px-4"
+            :class="ghostButtonClass"
             title="返回教案列表"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -25,7 +25,7 @@
             @input="$emit('update:lessonTitle', ($event.target as HTMLInputElement).value)"
             type="text"
             placeholder="教案标题"
-            class="min-w-0 flex-1 rounded border-none bg-transparent px-2 text-base font-semibold text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 md:max-w-md md:text-lg"
+            class="min-w-0 flex-1 rounded-xl border-none bg-transparent px-2 text-base font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 md:max-w-md md:text-lg"
           />
         </div>
 
@@ -143,12 +143,7 @@
             <button
               @click="$emit('manual-save')"
               :disabled="saveStatus === 'saving'"
-              :class="[
-                'rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap disabled:opacity-50',
-                isPreviewMode
-                  ? 'text-amber-700 bg-amber-50 border border-amber-300 hover:bg-amber-100'
-                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50',
-              ]"
+              :class="isPreviewMode ? previewSaveButtonClass : saveButtonClass"
               :title="isPreviewMode ? '授课模式下无法保存，点击将提示切换到编辑模式' : '保存教案'"
             >
               {{ isPreviewMode ? '保存（需切换模式）' : '保存' }}
@@ -159,7 +154,7 @@
               v-if="currentLesson?.status === 'draft'"
               @click="$emit('publish')"
               :disabled="isSaving"
-              class="whitespace-nowrap rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              :class="primaryButtonClass"
             >
               发布
             </button>
@@ -167,7 +162,7 @@
             <!-- 教案状态提示 -->
             <div
               v-if="isRecentlyUnpublished"
-              class="hidden items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm text-amber-600 lg:flex"
+              class="hidden items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 lg:flex"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -187,7 +182,7 @@
             <button
               type="button"
               @click="$emit('show-ai-assistant')"
-              class="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-[#4C6EF5] to-[#6C8DFF] px-3 py-1.5 text-sm font-medium text-white shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[#BFD0FF] whitespace-nowrap"
+              :class="aiButtonClass"
             >
               <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path
@@ -204,16 +199,11 @@
             <button
               v-if="!isPreviewMode"
               @click="$emit('toggle-compact')"
-              :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
-                compactMode
-                  ? 'bg-purple-600 text-white hover:bg-purple-700'
-                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
-              ]"
+              :class="compactMode ? primaryButtonClass : ghostButtonClass"
               title="紧凑模式：限制长内容的高度，便于浏览教案结构"
             >
               <svg
-                class="w-4 h-4 inline-block mr-1"
+                class="h-4 w-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -232,14 +222,13 @@
             <button
               @click="$emit('toggle-preview')"
               :disabled="!canEnterPreviewMode && !isPreviewMode"
-              :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
+              :class="
                 isPreviewMode
-                  ? 'bg-blue-600 text-white'
+                  ? primaryButtonClass
                   : canEnterPreviewMode
-                    ? 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                    : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed',
-              ]"
+                    ? ghostButtonClass
+                    : disabledButtonClass
+              "
               :title="
                 !canEnterPreviewMode && !isPreviewMode ? '需要先发布教案才能进入授课模式' : ''
               "
@@ -251,7 +240,7 @@
             <button
               @click="$emit('fullscreen-preview')"
               :disabled="false"
-              class="flex items-center gap-2 rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white whitespace-nowrap hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+              :class="ghostButtonClass"
               :title="isPreviewMode ? '全屏预览（授课模式下可用）' : '全屏预览'"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -280,7 +269,7 @@
               type="button"
               @click="$emit('export-lesson')"
               :disabled="exporting"
-              class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white whitespace-nowrap shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              :class="primaryButtonClass"
               title="导出教案为ZIP文件"
             >
               <svg v-if="exporting" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -348,6 +337,24 @@ interface Props {
 }
 
 defineProps<Props>()
+
+const ghostButtonClass =
+  'inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50'
+
+const saveButtonClass =
+  'inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-emerald-700 shadow-sm ring-1 ring-inset ring-emerald-200 transition-all hover:bg-emerald-50 hover:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-50'
+
+const previewSaveButtonClass =
+  'inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-amber-700 shadow-sm ring-1 ring-inset ring-amber-200 transition-all hover:bg-amber-50 hover:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50'
+
+const disabledButtonClass =
+  'inline-flex h-9 shrink-0 cursor-not-allowed items-center gap-1.5 whitespace-nowrap rounded-xl bg-gray-50 px-3 text-sm font-medium text-gray-400 shadow-sm ring-1 ring-inset ring-gray-200'
+
+const primaryButtonClass =
+  'inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-3 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
+
+const aiButtonClass =
+  'inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-violet-700 shadow-sm ring-1 ring-inset ring-violet-200 transition-all hover:bg-violet-50 hover:ring-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:ring-offset-2'
 
 defineEmits<{
   'update:lessonTitle': [value: string]

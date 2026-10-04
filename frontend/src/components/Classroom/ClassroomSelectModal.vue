@@ -383,32 +383,40 @@ function handleConfirm() {
 }
 
 .btn {
-  padding: 0.5rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 0.75rem;
   font-size: 0.875rem;
   font-weight: 500;
-  border-radius: 0.375rem;
+  border-radius: 0.75rem;
   cursor: pointer;
   transition: all 0.2s;
-  border: none;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .btn-cancel {
   background: white;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  color: #334155;
+  border-color: #e2e8f0;
 }
 
 .btn-cancel:hover {
-  background: #f3f4f6;
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 
 .btn-confirm {
-  background: #2563eb;
+  background: linear-gradient(to right, #10b981, #14b8a6);
   color: white;
+  border-color: transparent;
+  box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3);
 }
 
 .btn-confirm:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: linear-gradient(to right, #059669, #0d9488);
 }
 
 .btn-confirm:disabled {

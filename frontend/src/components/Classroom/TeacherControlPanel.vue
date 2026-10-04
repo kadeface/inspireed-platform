@@ -70,7 +70,7 @@
               <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
-              <span class="ml-1 text-xs font-medium">{{ isMultiSelectMode ? '多选' : '单选' }}</span>
+              <span>{{ isMultiSelectMode ? '多选' : '单选' }}</span>
             </button>
           </div>
           <!-- v2.0: 使用子组件显示学生人数 -->
@@ -1899,12 +1899,13 @@ defineExpose({
 }
 
 .module-count-info {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  @apply bg-blue-50 border border-blue-200 rounded-lg;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
   margin-left: 16px;
+  @apply rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm;
 }
 
 .module-count-icon {
@@ -1920,21 +1921,22 @@ defineExpose({
 }
 
 .module-count-value {
-  @apply text-blue-700 font-bold text-base;
+  @apply text-sm font-semibold text-slate-900;
 }
 
 .module-count-label {
-  @apply text-blue-600;
+  @apply text-sm text-slate-700;
   margin-left: 2px;
 }
 
 .duration-info {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  @apply bg-blue-50 border border-blue-200 rounded-lg;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
   margin-left: 16px;
+  @apply rounded-xl border border-slate-200 bg-white text-sm text-slate-700 shadow-sm;
 }
 
 .duration-info.duration-warning {
@@ -1959,11 +1961,11 @@ defineExpose({
 }
 
 .duration-value {
-  @apply font-bold text-base;
+  @apply text-sm font-semibold text-slate-900;
 }
 
 .duration-remaining {
-  @apply text-gray-600 text-xs;
+  @apply text-sm text-slate-600;
 }
 
 /* 关键指标行 - 首页风格卡片 */
@@ -2591,29 +2593,17 @@ defineExpose({
 
 /* 紧凑版模式切换按钮 */
 .mode-toggle-btn-compact {
-  @apply px-2.5 py-1 text-xs font-medium rounded-md transition-all;
-  @apply flex items-center justify-center;
-  @apply border cursor-pointer;
-  @apply disabled:opacity-50 disabled:cursor-not-allowed;
-  @apply shadow-sm;
-  min-width: 60px;
-  height: 28px;
+  @apply inline-flex h-9 items-center justify-center gap-1 rounded-xl px-3 text-sm font-medium shadow-sm transition-all;
+  @apply cursor-pointer disabled:cursor-not-allowed disabled:opacity-50;
+  min-width: 64px;
 }
 
 .mode-toggle-btn-compact.mode-single {
-  @apply bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 hover:border-blue-400;
+  @apply bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50 hover:ring-slate-300;
 }
 
 .mode-toggle-btn-compact.mode-multi {
-  @apply bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100 hover:border-purple-400;
-}
-
-.mode-toggle-btn-compact:hover:not(:disabled) {
-  @apply shadow-md transform scale-105;
-}
-
-.mode-toggle-btn-compact:active:not(:disabled) {
-  @apply transform scale-95;
+  @apply bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 hover:from-emerald-600 hover:to-teal-600;
 }
 
 .header-controls {
@@ -3832,23 +3822,21 @@ defineExpose({
 
 /* 导航按钮样式 */
 .module-nav-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 16px;
-  @apply bg-blue-50 border border-blue-200 rounded-lg;
-  @apply text-blue-700 font-medium text-sm;
+  height: 36px;
+  padding: 0 12px;
+  @apply rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 shadow-sm;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
   flex: 1;
   min-width: 0;
 }
 
 .module-nav-btn:hover:not(:disabled) {
-  @apply bg-blue-100 border-blue-300;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  @apply bg-slate-50 border-slate-300;
 }
 
 .module-nav-btn:active:not(:disabled) {
@@ -5196,15 +5184,20 @@ input[type="checkbox"].checkbox-input {
 .btn-minimal-more,
 .btn-minimal-exit,
 .btn-minimal-enter {
-  padding: 8px 14px;
-  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid #d1d5db;
+  border: 1px solid #e2e8f0;
   background: #fff;
-  color: #374151;
-  transition: background 0.15s ease;
+  color: #334155;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .btn-minimal-more:hover,
@@ -5212,14 +5205,9 @@ input[type="checkbox"].checkbox-input {
   background: #f9fafb;
 }
 
-.btn-minimal-enter {
-  border-color: #93c5fd;
-  color: #1d4ed8;
-  background: #eff6ff;
-}
-
 .btn-minimal-enter:hover {
-  background: #dbeafe;
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 
 .minimal-more-backdrop {
@@ -5840,8 +5828,8 @@ input[type="checkbox"].checkbox-input {
 }
 
 .mode-toggle-btn-compact {
-  min-height: 30px;
-  border-radius: 999px;
+  height: 36px;
+  border-radius: 0.75rem;
 }
 
 .btn-display-mode {
@@ -5881,9 +5869,9 @@ input[type="checkbox"].checkbox-input {
 .btn-minimal-more,
 .btn-minimal-exit,
 .btn-minimal-enter {
-  border-radius: 10px;
-  min-height: 36px;
-  font-weight: 600;
+  border-radius: 12px;
+  height: 36px;
+  font-weight: 500;
 }
 
 .minimal-teaching-current {

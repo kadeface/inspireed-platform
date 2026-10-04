@@ -37,18 +37,18 @@
           </div>
           
           <!-- 说明文字 -->
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div class="mb-6 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
             <div class="flex">
               <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                <svg class="h-5 w-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="ml-3 flex-1">
-                <h4 class="text-sm font-medium text-blue-800 mb-1">
+                <h4 class="mb-1 text-sm font-medium text-emerald-800">
                   导入说明
                 </h4>
-                <ul class="text-sm text-blue-700 space-y-1 list-disc list-inside">
+                <ul class="list-inside list-disc space-y-1 text-sm text-emerald-700">
                   <li>支持 Excel (.xlsx, .xls) 和 CSV (.csv) 格式</li>
                   <li>必需列：名称(name)、编码(code)、显示顺序(display_order)</li>
                   <li>可选列：描述(description)、父章节编码(parent_code)、是否启用(is_active)</li>
@@ -71,12 +71,12 @@
               v-model="searchQuery"
               type="text"
               placeholder="搜索 学科/年级/课程名 或 课程编码..."
-              class="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               :disabled="loading"
             />
             <select
               v-model="selectedCourseId"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               :disabled="loading"
             >
               <option :value="null">请选择课程</option>
@@ -96,7 +96,7 @@
               <input
                 v-model="overwriteExisting"
                 type="checkbox"
-                class="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                class="mr-2 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
               />
               覆盖已有章节（勾选后，同名章节将更新而不是报错）
             </label>
@@ -107,7 +107,7 @@
             <button
               @click="downloadTemplate"
               :disabled="downloading"
-              class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -128,7 +128,7 @@
               :class="[
                 'border-2 border-dashed rounded-lg p-8 text-center transition-colors',
                 isDragging
-                  ? 'border-blue-500 bg-blue-50'
+                  ? 'border-emerald-500 bg-emerald-50'
                   : 'border-gray-300 hover:border-gray-400'
               ]"
             >
@@ -148,7 +148,7 @@
                   拖拽文件到此处，或
                   <button
                     @click="($refs.fileInput as HTMLInputElement | undefined)?.click()"
-                    class="text-blue-600 hover:text-blue-700 font-medium"
+                    class="font-medium text-emerald-700 hover:text-emerald-800"
                   >
                     点击选择文件
                   </button>
@@ -263,14 +263,14 @@
           <button
             @click="handleClose"
             :disabled="loading"
-            class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
           >
             取消
           </button>
           <button
             @click="handleImport"
             :disabled="!canImport || loading"
-            class="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="inline-flex h-9 items-center rounded-xl border border-transparent bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span v-if="loading" class="inline-flex items-center">
               <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">

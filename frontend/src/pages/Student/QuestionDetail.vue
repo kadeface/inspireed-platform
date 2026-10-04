@@ -1,11 +1,11 @@
 <template>
   <div class="question-detail-page min-h-screen bg-gray-50">
     <!-- 顶部导航 -->
-    <div class="bg-white border-b sticky top-0 z-10">
+    <div class="sticky top-0 z-10 border-b border-slate-200 bg-white">
       <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
         <button
           @click="goBack"
-          class="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+          class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
         >
           <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -21,7 +21,7 @@
 
     <!-- 加载状态 -->
     <div v-if="loading" class="max-w-5xl mx-auto px-4 py-12 flex items-center justify-center">
-      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
       <span class="ml-3 text-gray-600">加载中...</span>
     </div>
 
@@ -32,7 +32,7 @@
       <p class="text-gray-500 text-sm mb-4">{{ error }}</p>
       <button
         @click="loadQuestion"
-        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        class="inline-flex h-9 items-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600"
       >
         重试
       </button>
@@ -117,7 +117,7 @@
           <div v-if="isMyQuestion && question.status === QuestionStatus.ANSWERED" class="flex items-center space-x-2">
             <button
               @click="handleResolve"
-              class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              class="inline-flex h-9 items-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600"
             >
               ✓ 标记为已解决
             </button>

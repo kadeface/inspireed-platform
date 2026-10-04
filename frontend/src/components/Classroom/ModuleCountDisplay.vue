@@ -26,12 +26,14 @@ withDefaults(defineProps<Props>(), {
 .module-count-info {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.375rem 0.75rem;
-  background: #eff6ff;
-  border-radius: 0.375rem;
+  gap: 0.375rem;
+  height: 36px;
+  padding: 0 0.75rem;
+  background: #ffffff;
+  border-radius: 0.75rem;
   font-size: 0.875rem;
-  border: 1px solid #bfdbfe;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .module-count-icon {
@@ -45,13 +47,13 @@ withDefaults(defineProps<Props>(), {
 }
 
 .module-count-value {
-  font-weight: 700;
-  font-size: 1rem;
-  color: #2563eb;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #0f172a;
 }
 
 .module-count-label {
-  color: #4b5563;
-  font-size: 0.8125rem;
+  color: #334155;
+  font-size: 0.875rem;
 }
 </style>

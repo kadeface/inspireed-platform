@@ -7,7 +7,7 @@
           <h1 class="text-2xl font-bold text-slate-900">我的学习记录</h1>
         </div>
         <button
-          class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-white"
+          class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
           @click="router.push('/student/self-study')"
         >
           返回答疑解惑

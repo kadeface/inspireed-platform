@@ -824,11 +824,12 @@ watch(() => props.modelValue, (isOpen) => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
+  height: 36px;
+  padding: 0 1rem;
   font-size: 0.875rem;
   font-weight: 500;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -845,21 +846,23 @@ watch(() => props.modelValue, (isOpen) => {
 
 .btn-secondary {
   background: white;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  color: #334155;
+  box-shadow: inset 0 0 0 1px #e2e8f0, 0 1px 2px rgb(0 0 0 / 0.05);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #f9fafb;
+  background: #f8fafc;
+  box-shadow: inset 0 0 0 1px #cbd5e1, 0 1px 2px rgb(0 0 0 / 0.05);
 }
 
 .btn-primary {
-  background: #3b82f6;
+  background: linear-gradient(to right, #10b981, #14b8a6);
   color: white;
+  box-shadow: 0 10px 15px -3px rgb(16 185 129 / 0.3);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #2563eb;
+  background: linear-gradient(to right, #059669, #0d9488);
 }
 
 /* 动画 */

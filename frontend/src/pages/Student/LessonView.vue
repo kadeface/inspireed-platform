@@ -20,7 +20,7 @@
         <p class="text-red-600 mb-4 font-medium">{{ error }}</p>
         <button
           @click="router.back()"
-          class="px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl hover:from-red-600 hover:to-rose-600 font-medium shadow-lg shadow-red-500/30 hover:shadow-xl transition-all transform hover:scale-105"
+          class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
         >
           返回
         </button>
@@ -38,7 +38,7 @@
             class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             @click.self="showFullscreenPrompt = false"
           >
-            <div class="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
+            <div class="bg-white rounded-2xl shadow-xl p-6 max-w-md mx-4">
               <div class="flex items-center gap-4 mb-4">
                 <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
                   <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,13 +53,13 @@
               <div class="flex gap-3">
                 <button
                   @click="toggleFullscreen('fullscreen')"
-                  class="flex-1 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-colors font-medium shadow-lg shadow-emerald-500/30"
+                  class="inline-flex h-9 flex-1 items-center justify-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600"
                 >
                   进入全屏
                 </button>
                 <button
                   @click="showFullscreenPrompt = false"
-                  class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
                 >
                   稍后
                 </button>
@@ -69,14 +69,14 @@
         </Transition>
 
         <!-- 顶部导航栏 -->
-        <header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-10 border-b border-gray-100">
+        <header class="sticky top-0 z-10 border-b border-slate-200 bg-white">
           <div class="px-4 md:px-6 py-3">
             <div class="flex items-center justify-between gap-4">
               <!-- 左侧：返回按钮 + 课程信息 -->
               <div class="flex items-center gap-3 min-w-0 flex-1">
                 <button
                   @click="router.push('/student')"
-                  class="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+                  class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
                   title="返回"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,7 +86,7 @@
                 <div class="min-w-0 flex-1">
                   <!-- 课堂模式标签 -->
                   <div v-if="isInClassroomMode && classroomSession" class="flex items-center gap-2 mb-1">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-xs font-medium">
+                    <span class="inline-flex items-center gap-1 rounded-xl bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
                       🎓 正在上课
                     </span>
                   </div>
@@ -117,18 +117,18 @@
                 <!-- 课堂模式状态组 -->
                 <template v-if="isInClassroomMode && classroomSession">
                   <!-- 同步状态 -->
-                  <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border" :class="isWebSocketConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-600 border-gray-200'">
+                  <div class="flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-medium ring-1 ring-inset" :class="isWebSocketConnected ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-white text-slate-600 ring-slate-200'">
                     <div class="w-1.5 h-1.5 rounded-full" :class="isWebSocketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'"></div>
                     <span class="text-xs font-medium">{{ isWebSocketConnected ? '同步' : '轮询' }}</span>
                   </div>
                   <!-- 进度 -->
-                  <div class="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <div class="flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 ring-1 ring-inset ring-slate-200">
                     <span class="text-xs font-medium text-emerald-600">进度</span>
                   </div>
                   <!-- 退出按钮 -->
                   <button
                     @click="handleExitClassroom"
-                    class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 text-xs font-medium transition-colors flex items-center gap-1.5"
+                    class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-xs font-medium text-red-600 shadow-sm ring-1 ring-inset ring-red-200 transition-all hover:bg-red-50 hover:ring-red-300"
                     title="退出上课"
                   >
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,7 +140,7 @@
                 <!-- 侧边栏切换按钮 -->
                 <button
                   @click="toggleSidebar"
-                  class="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+                  class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
                   :title="sidebarVisible ? '隐藏学习空间' : '显示学习空间'"
                 >
                   <svg 
@@ -260,7 +260,7 @@
               </h2>
               <button
                 @click="showQuestionForm = true"
-                class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/30"
+                class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-3 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -328,10 +328,10 @@
               type="button"
               @click="activeSidebarTab = 'notes'"
               :class="[
-                'rounded-md px-3 py-1.5 text-sm font-medium transition',
+                'inline-flex h-9 items-center rounded-xl px-3 text-sm font-medium transition-all',
                 activeSidebarTab === 'notes'
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
-                  : 'bg-white/80 backdrop-blur-sm text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  : 'bg-white text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 hover:ring-slate-300'
               ]"
             >
               学习笔记
@@ -340,10 +340,10 @@
               type="button"
               @click="activeSidebarTab = 'assistant'"
               :class="[
-                'rounded-md px-3 py-1.5 text-sm font-medium transition flex items-center gap-2',
+                'inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-sm font-medium transition-all',
                 activeSidebarTab === 'assistant'
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
-                  : 'bg-white/80 backdrop-blur-sm text-emerald-600 border border-emerald-300 hover:bg-emerald-50'
+                  ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/30'
+                  : 'bg-white text-violet-700 shadow-sm ring-1 ring-inset ring-violet-200 hover:bg-violet-50 hover:ring-violet-300'
               ]"
             >
               <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

@@ -6,7 +6,7 @@
         class="fixed inset-0 z-50 bg-gray-50 overflow-hidden flex flex-col"
       >
         <!-- 全屏预览顶部栏 -->
-        <header v-if="!slideFullscreen" class="bg-white shadow-sm z-10 flex-shrink-0">
+        <header v-if="!slideFullscreen" class="z-10 flex-shrink-0 border-b border-slate-200 bg-white">
           <div class="px-6 py-4">
             <div class="flex items-center justify-between gap-4 flex-wrap">
               <div class="flex flex-wrap items-center gap-4 min-w-0">
@@ -21,12 +21,7 @@
                 <!-- 幻灯片模式切换 -->
                 <button
                   @click="emit('toggle-slide-mode')"
-                  :class="[
-                    'px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2',
-                    slideMode
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
-                  ]"
+                  :class="slideMode ? primaryButtonClass : ghostButtonClass"
                   title="切换幻灯片模式"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,12 +39,7 @@
                 <button
                   v-if="slideMode"
                   @click="emit('toggle-slide-fullscreen')"
-                  :class="[
-                    'px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2',
-                    slideFullscreen
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
-                  ]"
+                  :class="slideFullscreen ? primaryButtonClass : ghostButtonClass"
                   title="全屏模式"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -66,7 +56,7 @@
                 <!-- 退出全屏按钮 -->
                 <button
                   @click="emit('exit-fullscreen')"
-                  class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                  :class="ghostButtonClass"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -306,6 +296,12 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   teachingInteractiveViewerMode: 'teacher',
 })
+
+const ghostButtonClass =
+  'inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300'
+
+const primaryButtonClass =
+  'inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-3 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600'
 
 const emit = defineEmits<{
   'exit-fullscreen': []

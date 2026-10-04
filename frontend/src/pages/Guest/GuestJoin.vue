@@ -18,7 +18,7 @@
               type="text"
               maxlength="6"
               placeholder="6位接入码"
-              class="w-full px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none uppercase"
+              class="w-full px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none uppercase"
               @keyup.enter="lookupSession"
               autofocus
             />
@@ -31,14 +31,14 @@
           <button
             @click="lookupSession"
             :disabled="accessCode.length < 6 || loading"
-            class="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            class="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {{ loading ? '查找中...' : '进入课堂' }}
           </button>
         </div>
 
         <div class="mt-6 text-center">
-          <router-link to="/login" class="text-sm text-blue-600 hover:underline">
+          <router-link to="/login" class="text-sm text-emerald-700 hover:text-emerald-800 hover:underline">
             已有账号？去登录
           </router-link>
         </div>
@@ -55,8 +55,8 @@
         >
           <div class="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
             <div class="flex items-start gap-4 mb-4">
-              <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                 </svg>
               </div>
@@ -71,14 +71,14 @@
               <button
                 type="button"
                 @click="toggleGuestDocumentFullscreen('fullscreen')"
-                class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                class="inline-flex h-9 flex-1 items-center justify-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-sm font-medium text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-600 hover:to-teal-600"
               >
                 进入全屏
               </button>
               <button
                 type="button"
                 @click="showFullscreenPrompt = false"
-                class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
               >
                 稍后
               </button>
@@ -89,11 +89,11 @@
 
       <div :class="guestCardClass">
         <!-- 顶部信息栏 -->
-        <div class="shrink-0 bg-blue-600 text-white px-6 py-4">
+        <div class="shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-4">
           <div class="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h1 class="text-lg font-bold">{{ sessionInfo.lessonTitle || '课堂观摩' }}</h1>
-              <div class="text-blue-100 text-sm mt-1">
+              <div class="text-emerald-50 text-sm mt-1">
                 {{ sessionInfo.teacherName }} · {{ sessionInfo.classroomName }}
               </div>
             </div>

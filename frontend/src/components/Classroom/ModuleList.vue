@@ -457,28 +457,28 @@ function handleModuleCheckboxChange(cell: Cell, index: number, event: Event) {
 }
 
 .module-nav-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 16px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 0.5rem;
-  color: #1d4ed8;
+  height: 36px;
+  padding: 0 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  color: #334155;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  transition: background 0.15s ease, border-color 0.15s ease;
   flex: 0 0 auto;
   min-width: 7rem;
 }
 
 .module-nav-btn:hover:not(:disabled) {
-  background: #dbeafe;
-  border-color: #93c5fd;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 
 .module-nav-btn:active:not(:disabled) {
