@@ -3,7 +3,7 @@
   <div
     class="text-cell cell-container relative group"
     :data-cell-id="cell.id"
-    :class="{ fullscreen: isFullscreen }"
+    :class="{ fullscreen: isFullscreen, 'image-slide': isImageSlide }"
     ref="containerRef"
   >
     <!-- 全屏按钮 -->
@@ -37,8 +37,9 @@
         v-if="sanitizedHtml"
         class="text-cell-view"
         :class="{
-          'compact-content': compactMode && !isExpanded,
+          'compact-content': compactMode && !isExpanded && !(isFullscreen && isImageSlide),
           'expanded-content': compactMode && isExpanded,
+          'image-stage': isFullscreen && isImageSlide,
         }"
         v-html="sanitizedHtml"
       ></div>
@@ -809,6 +810,17 @@ const sanitizedHtml = computed(() => {
   return sanitized
 })
 
+const isImageSlide = computed(() => {
+  const html = sanitizedHtml.value || ''
+  if (!/<img\b/i.test(html)) return false
+  const text = html
+    .replace(/<img\b[^>]*>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, '')
+  return text.length === 0
+})
+
 // Markdown 转 HTML 的简单实现（用于预览）
 function markdownToHtml(markdown: string): string {
   if (!markdown) return ''
@@ -1369,6 +1381,31 @@ onUnmounted(() => {
 
 .text-cell.fullscreen .text-cell-view {
   @apply p-8 max-w-5xl mx-auto;
+}
+
+/* 纯图片单元全屏：整张图在画面内尽量放大，不裁切 */
+.text-cell.fullscreen.image-slide {
+  @apply flex flex-col overflow-hidden p-0;
+}
+
+.text-cell.fullscreen.image-slide .text-cell-view.image-stage {
+  @apply m-0 flex h-full w-full max-w-none flex-1 items-stretch justify-center p-0;
+  min-height: 0;
+}
+
+.text-cell.fullscreen.image-slide .image-stage :deep(p),
+.text-cell.fullscreen.image-slide .image-stage :deep(figure),
+.text-cell.fullscreen.image-slide .image-stage :deep(div) {
+  display: contents;
+}
+
+.text-cell.fullscreen.image-slide .image-stage :deep(img) {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  object-fit: contain;
 }
 
 .text-cell-view :deep(.file-view-btn),

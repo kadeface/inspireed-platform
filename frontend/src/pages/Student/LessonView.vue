@@ -70,74 +70,50 @@
 
         <!-- 顶部导航栏 -->
         <header class="sticky top-0 z-10 border-b border-slate-200 bg-white">
-          <div class="px-4 md:px-6 py-3">
-            <div class="flex items-center justify-between gap-4">
+          <div class="px-4 md:px-6" :class="isInClassroomMode && classroomSession ? 'py-2.5' : 'py-3'">
+            <div class="flex items-center justify-between gap-3">
               <!-- 左侧：返回按钮 + 课程信息 -->
               <div class="flex items-center gap-3 min-w-0 flex-1">
                 <button
-                  @click="router.push('/student')"
+                  @click="handleHeaderBack"
                   class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
-                  title="返回"
+                  :title="isInClassroomMode && classroomSession ? '退出上课' : '返回'"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                 </button>
-                <div class="min-w-0 flex-1">
-                  <!-- 课堂模式标签 -->
-                  <div v-if="isInClassroomMode && classroomSession" class="flex items-center gap-2 mb-1">
-                    <span class="inline-flex items-center gap-1 rounded-xl bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                      🎓 正在上课
-                    </span>
-                  </div>
-                  <!-- 课程标题 -->
+                <!-- 上课：一行课名。课程名和教师名在悬停提示里 -->
+                <div v-if="isInClassroomMode && classroomSession" class="flex min-w-0 flex-1 items-center gap-2">
+                  <span
+                    class="h-2 w-2 shrink-0 rounded-full"
+                    :class="isWebSocketConnected ? 'bg-emerald-500' : 'bg-amber-400'"
+                    :title="isWebSocketConnected ? '已同步' : '重连中'"
+                  ></span>
+                  <span v-if="!isWebSocketConnected" class="shrink-0 text-xs font-medium text-amber-600">重连中</span>
+                  <h1 class="min-w-0 truncate text-base font-semibold text-slate-900" :title="classroomHeaderTitle">
+                    {{ lesson.title }}
+                  </h1>
+                </div>
+                <div v-else class="min-w-0 flex-1">
                   <h1 class="text-lg md:text-xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent truncate">
                     {{ lesson.title }}
                   </h1>
-                  <!-- 课程信息 -->
                   <div class="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <template v-if="isInClassroomMode && classroomSession">
-                      <span v-if="lesson.course" class="text-xs text-gray-500">{{ lesson.course.name }}</span>
-                      <span v-if="lesson.course && classroomSession.teacherName" class="text-xs text-gray-400">·</span>
-                      <span v-if="classroomSession.teacherName" class="text-xs text-gray-500">
-                        授课教师：<span class="font-medium text-gray-700">{{ classroomSession.teacherName }}</span>
-                      </span>
-                    </template>
-                    <template v-else>
-                      <span v-if="lesson.course" class="text-xs text-gray-500">{{ lesson.course.name }}</span>
-                      <span v-if="lesson.course && lesson.chapter" class="text-xs text-gray-400">/</span>
-                      <span v-if="lesson.chapter" class="text-xs text-gray-500">{{ lesson.chapter.name }}</span>
-                    </template>
+                    <span v-if="lesson.course" class="text-xs text-gray-500">{{ lesson.course.name }}</span>
+                    <span v-if="lesson.course && lesson.chapter" class="text-xs text-gray-400">/</span>
+                    <span v-if="lesson.chapter" class="text-xs text-gray-500">{{ lesson.chapter.name }}</span>
                   </div>
                 </div>
               </div>
-              
-              <!-- 右侧：操作按钮组 -->
+
+              <!-- 右侧：进度 + 学习空间 -->
               <div class="flex items-center gap-2 flex-shrink-0">
-                <!-- 课堂模式状态组 -->
-                <template v-if="isInClassroomMode && classroomSession">
-                  <!-- 同步状态 -->
-                  <div class="flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-medium ring-1 ring-inset" :class="isWebSocketConnected ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-white text-slate-600 ring-slate-200'">
-                    <div class="w-1.5 h-1.5 rounded-full" :class="isWebSocketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'"></div>
-                    <span class="text-xs font-medium">{{ isWebSocketConnected ? '同步' : '轮询' }}</span>
-                  </div>
-                  <!-- 进度 -->
-                  <div class="flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 ring-1 ring-inset ring-slate-200">
-                    <span class="text-xs font-medium text-emerald-600">进度</span>
-                  </div>
-                  <!-- 退出按钮 -->
-                  <button
-                    @click="handleExitClassroom"
-                    class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-xs font-medium text-red-600 shadow-sm ring-1 ring-inset ring-red-200 transition-all hover:bg-red-50 hover:ring-red-300"
-                    title="退出上课"
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    <span>退出</span>
-                  </button>
-                </template>
-                <!-- 侧边栏切换按钮 -->
+                <span
+                  v-if="isInClassroomMode && classroomSession"
+                  class="text-sm font-medium tabular-nums text-emerald-600"
+                  :title="`进度 ${progress}%`"
+                >{{ progress }}%</span>
                 <button
                   @click="toggleSidebar"
                   class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
@@ -164,6 +140,17 @@
                 </button>
               </div>
             </div>
+          </div>
+          <div
+            v-if="isInClassroomMode && classroomSession"
+            class="h-0.5 bg-slate-100"
+            role="progressbar"
+            :aria-valuenow="progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-label="`进度 ${progress}%`"
+          >
+            <div class="h-full bg-emerald-500 transition-[width] duration-300" :style="{ width: `${progress}%` }"></div>
           </div>
         </header>
 
@@ -607,20 +594,30 @@ const lessonContentCells = computed(() => {
   return []
 })
 
-// 处理退出课堂
-async function handleExitClassroom() {
-  if (!classroomSession.value) return
-  
-  if (!confirm('确定要退出上课吗？退出后您将无法继续接收教师的实时同步内容。')) {
-    return
+const classroomHeaderTitle = computed(() => {
+  if (!lesson.value) return ''
+  const meta: string[] = []
+  if (lesson.value.course?.name) meta.push(lesson.value.course.name)
+  if (classroomSession.value?.teacherName) {
+    meta.push(`授课教师：${classroomSession.value.teacherName}`)
   }
-  
-  try {
-    await leaveSession()
-  } catch (error: any) {
-    console.error('❌ 退出上课失败:', error)
-    alert('退出上课失败，请稍后重试')
+  return meta.length ? `${lesson.value.title}\n${meta.join(' · ')}` : lesson.value.title
+})
+
+async function handleHeaderBack() {
+  if (isInClassroomMode.value && classroomSession.value) {
+    if (!confirm('确定要退出上课吗？退出后您将无法继续接收教师的实时同步内容。')) {
+      return
+    }
+    try {
+      await leaveSession()
+    } catch (error: any) {
+      console.error('退出上课失败:', error)
+      alert('退出上课失败，请稍后重试')
+      return
+    }
   }
+  router.push('/student')
 }
 
 // 自动保存定时器
