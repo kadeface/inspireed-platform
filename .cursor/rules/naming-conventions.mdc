@@ -1,0 +1,59 @@
+---
+description: 
+alwaysApply: true
+---
+
+---
+description: 全栈命名惯例（用户级，跨项目）— API/DB/DTO snake_case
+alwaysApply: true
+---
+
+# 命名规范（用户级）
+
+适用于所有项目。若当前仓库有自己的 `docs/NAMING_CONVENTIONS.md`（或等价文档），**以仓库文档为准**；否则按本规则。
+
+脚手架（复制进新仓库）：`~/.cursor/naming-scaffold/`
+
+## 分层
+
+| 层 | 数据字段 / JSON / DTO | 本地变量与函数 | 类型 / 类 / 组件 |
+|----|----------------------|----------------|------------------|
+| 数据库 | `snake_case`；表名**复数** | — | — |
+| 后端 Python | `snake_case` | `snake_case` | `PascalCase` |
+| HTTP API | `snake_case` | — | — |
+| 前端 TS/Vue | 接口字段 `snake_case` | `camelCase` | `PascalCase` |
+
+常量：`UPPER_SNAKE_CASE`。文件：后端 `snake_case.py`；前端组件 `PascalCase.vue`。
+
+## 数据库与枚举（新代码）
+
+- 外键：`{entity}_id`；时刻：`*_at`；日期：`*_date`
+- 布尔：`is_` / `has_` / `*_enabled`
+- 作者字段默认：`created_by` / `updated_by`（不要新发明 `creator_id` 等同义词）
+- 索引：`ix_{table}_{cols}`；唯一：`uq_{table}_{cols}`；外键约束：`fk_`；主键：`pk_`
+- 枚举**存库值**：小写 `snake_case`（如 `in_progress`），禁止 `PREPARING` / kebab
+- PG 枚举**类型名**：带下划线的 `snake_case`（如 `class_session_status`），禁止 `celltype`
+- JSON 列：用语义名（`settings`/`content`/`payload`），新项目统一不加 `_json` 后缀
+
+## 前端要点
+
+```typescript
+// DTO：snake_case —— 本地变量：camelCase
+interface Session { lesson_id: number; created_at: string }
+const currentSession = ref<Session>()
+function loadById(sessionId: number) { /* ... */ }
+```
+
+`types/**`、`services/**` 的请求/响应字段必须与 API 一致（`snake_case`）。
+
+## 新代码禁止
+
+- camelCase 的 API / Schema / TS DTO 字段
+- `serialization_alias`（或同等）把 JSON 输出成 camelCase
+- 双读兼容（`lesson_id || lessonId`）或散落字段 mapper
+- 在无关 PR 里大规模重命名存量代码
+- 同一边界内混用 `snake_case` 与 camelCase
+
+## 存量
+
+旧代码允许暂时不符合；触及文件时**不恶化**。完整收口另开任务，不在本规则里绑定具体模块名。

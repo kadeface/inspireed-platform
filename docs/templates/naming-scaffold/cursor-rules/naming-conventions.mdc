@@ -1,0 +1,25 @@
+---
+description: API/DTO/DB 字段命名冻结与分层惯例（新项目模板）
+alwaysApply: true
+---
+
+# Naming conventions
+
+Canonical docs: `docs/NAMING_CONVENTIONS.md` + `docs/DECISION_DEFAULTS.md`.
+
+## Cheat sheet
+
+- API / DB / DTO fields: `snake_case`
+- Frontend locals/functions: `camelCase`; types/components: `PascalCase`
+- Backend Python locals: `snake_case`; classes: `PascalCase`
+- Tables: plural `snake_case`
+- New enum wire values: lowercase `snake_case`
+- Indexes: `ix_…`; unique: `uq_…`
+
+## Forbidden in new code
+
+- camelCase API/DTO fields
+- camelCase `serialization_alias`
+- Expanding dual-read (`lesson_id || lessonId`) or scattered mappers
+- Inventing synonyms already covered by `DECISION_DEFAULTS.md` (e.g. `creator_id` vs `created_by`)
+- Mass-renaming legacy code in unrelated PRs
