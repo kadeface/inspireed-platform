@@ -370,15 +370,17 @@
               {
                 "id": "A",
                 "label": "慢车",
-                "xCm": 0,
+                "xCm": -40,
                 "yCm": 0,
                 "speed": 8,
-                "color": "#22d3ee"
+                "color": "#22d3ee",
+                "face": 180
               },
               {
                 "id": "B",
                 "label": "快车",
-                "xCm": -40,
+                "xCm": 0,
+                "face": 180,
                 "yCm": 0,
                 "speed": 14,
                 "color": "#f97316"

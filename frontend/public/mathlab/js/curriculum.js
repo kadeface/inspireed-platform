@@ -834,8 +834,8 @@ const CURRICULUM = {
             formulas: [{ title: '追及', tex: '$$t=\\frac{\\Delta s}{v_2-v_1}$$' }],
             sceneConfig: {
               robots: [
-                { id: 'A', label: '慢车', xCm: 0, yCm: 0, speed: 8, color: '#22d3ee' },
-                { id: 'B', label: '快车', xCm: -40, yCm: 0, speed: 14, color: '#f97316' }
+                { id: 'A', label: '慢车', xCm: -40, yCm: 0, speed: 8, color: '#22d3ee', face: 180 },
+                { id: 'B', label: '快车', xCm: 0, yCm: 0, speed: 14, color: '#f97316', face: 180 }
               ],
               trackLengthCm: 120,
               trackAxisDeg: 0,
@@ -844,7 +844,7 @@ const CURRICULUM = {
             },
             starter: { travelParallel: [], autoMeet: true },
             demo: 'travelChase',
-            hint: 'A 槽慢车、B 槽快车各自设速度再前进。两车同时开动，快车在行驶中追上慢车。'
+            hint: '慢车从 (-40, 0) 出发，快车从 (0, 0) 出发，两车朝负方向行驶。A 槽慢车、B 槽快车各自设速度再前进。'
           })
         ]
       }
@@ -1349,8 +1349,8 @@ const CURRICULUM = {
             formulas: [{ title: '追及', tex: '$$t=\\frac{\\Delta s}{v_2-v_1}$$' }],
             sceneConfig: {
               robots: [
-                { id: 'A', label: '慢车', xCm: 0, yCm: 0, speed: 8, color: '#22d3ee' },
-                { id: 'B', label: '快车', xCm: -40, yCm: 0, speed: 14, color: '#f97316' }
+                { id: 'A', label: '慢车', xCm: -40, yCm: 0, speed: 8, color: '#22d3ee', face: 180 },
+                { id: 'B', label: '快车', xCm: 0, yCm: 0, speed: 14, color: '#f97316', face: 180 }
               ],
               trackLengthCm: 120,
               trackAxisDeg: 0,
@@ -1523,15 +1523,16 @@ function travelChaseDistances(cfg) {
   const s0B = b.xCm ?? 0;
   const vA = a.speed ?? 8;
   const vB = b.speed ?? 14;
-  const gap = s0A - s0B;
+  const face = a.face ?? 0;
+  const rad = face * Math.PI / 180;
+  const gap = (s0A - s0B) * Math.cos(rad) + ((a.yCm ?? 0) - (b.yCm ?? 0)) * Math.sin(rad);
   if (gap <= 0 || vB <= vA) return { da: 0, db: 0, tMeet: 0, meetS: s0A };
   const tMeet = gap / (vB - vA);
-  const meetS = s0A + vA * tMeet;
   return {
-    da: Math.round((meetS - s0A) * 100) / 100,
-    db: Math.round((meetS - s0B) * 100) / 100,
+    da: Math.round(vA * tMeet * 100) / 100,
+    db: Math.round(vB * tMeet * 100) / 100,
     tMeet,
-    meetS
+    meetS: Math.round((s0A + Math.cos(rad) * vA * tMeet) * 100) / 100
   };
 }
 
@@ -1586,6 +1587,12 @@ function buildStarterXml(s, sceneConfig, taskMeta) {
   function blockGotoRobot(robot, x, y) {
     return `<block type="motion_goto_robot"><field name="ROBOT">${robot}</field><value name="X">${numShadow(x)}</value><value name="Y">${numShadow(y)}</value>`;
   }
+  function blockSetStartRobot(robot, x, y) {
+    return `<block type="motion_set_start_robot"><field name="ROBOT">${robot}</field><value name="X">${numShadow(x)}</value><value name="Y">${numShadow(y)}</value>`;
+  }
+  function blockSetFaceRobot(robot, deg) {
+    return `<block type="motion_set_face_robot"><field name="ROBOT">${robot}</field><value name="ANGLE">${numShadow(deg)}</value>`;
+  }
   function blockRepeat(n, inner) {
     return `<block type="control_repeat"><value name="N">${numShadow(n)}</value><statement name="DO">${inner}</statement>`;
   }
@@ -1621,8 +1628,16 @@ function buildStarterXml(s, sceneConfig, taskMeta) {
         const robots = sceneConfig?.robots || [];
         const vA = robots.find(r => r.id === 'A')?.speed;
         const vB = robots.find(r => r.id === 'B')?.speed;
-        const stackA = [];
-        const stackB = [];
+        const robotA = robots.find(r => r.id === 'A');
+        const robotB = robots.find(r => r.id === 'B');
+        const stackA = [
+          blockSetStartRobot('A', robotA?.xCm ?? 0, robotA?.yCm ?? 0),
+          blockSetFaceRobot('A', robotA?.face ?? 0)
+        ];
+        const stackB = [
+          blockSetStartRobot('B', robotB?.xCm ?? 0, robotB?.yCm ?? 0),
+          blockSetFaceRobot('B', robotB?.face ?? 0)
+        ];
         if (vA != null) stackA.push(blockSpeedRobot('A', vA));
         if (vB != null) stackB.push(blockSpeedRobot('B', vB));
         stackA.push(blockForwardRobot('A', d.da ?? 0));

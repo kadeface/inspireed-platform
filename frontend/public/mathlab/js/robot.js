@@ -34,6 +34,8 @@
       backward: cm => sim.forward(-(cm || 0), id),
       move2d: (angle, cm) => sim.movePolar(angle, cm, id),
       goto: (x, y) => sim.gotoCm(x, y, id),
+      setStart: (x, y) => sim.setStartCm(x, y, id),
+      setFace: deg => sim.setFaceDeg(deg, id),
       faceAngle: deg => sim.faceAngle(deg, id),
       turn: deg => sim.turn(deg, id),
       turnLeft: deg => sim.turn(-(deg || 0), id),

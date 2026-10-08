@@ -423,6 +423,25 @@
       } else {
         startX = GRID_STEP;
         startY = midY;
+        if ((this.taskMode === 'travel' || this.taskMode === 'curveTravel') && config?.robots?.length) {
+          const xs = config.robots.map(r => Number(r.xCm) || 0);
+          const minX = Math.min(...xs);
+          if (minX < 0) {
+            const maxX = Math.max(...xs);
+            const speeds = config.robots.map(r => Number(r.speed) || 0);
+            const vSlow = Math.min(...speeds);
+            const vFast = Math.max(...speeds);
+            const gap = maxX - minX;
+            const facesLeft = config.robots.some(r => {
+              const face = Number(r.face) || 0;
+              return face > 90 && face < 270;
+            });
+            const travelCm = facesLeft && vFast > vSlow && gap > 0 ? (gap / (vFast - vSlow)) * vFast : 0;
+            const leftCm = -minX + travelCm;
+            const needPx = GRID_STEP + leftCm * PX_PER_CM;
+            startX = snapGrid(Math.min(Math.max(needPx, GRID_STEP), Math.max(GRID_STEP, w - GRID_STEP * 4)));
+          }
+        }
       }
       this.initRobots(startX, startY);
       this.reset();
@@ -750,6 +769,27 @@
       await this.moveByDelta(dx, dy, cm, this.mathAngleToCanvasRad(angleDeg), robotOrId);
     },
 
+    /** 把小车放到赛道坐标，不计入路程。用于追及等问题的初始位置。 */
+    setStartCm(xCm, yCm, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      const px = this.getPxPerCm();
+      const useTrack = (this.taskMode === 'travel' || this.taskMode === 'curveTravel') && this.trackOriginX != null;
+      const ox = useTrack ? this.trackOriginX : robot.state.startX;
+      const oy = useTrack ? this.trackOriginY : robot.state.startY;
+      const x = ox + (Number(xCm) || 0) * px;
+      const y = oy - (Number(yCm) || 0) * px;
+      robot.state.x = x;
+      robot.state.y = y;
+      robot.state.dist = 0;
+      if (robot.stats) robot.stats.totalDist = 0;
+      this.resetRobotPen(robot);
+      this.seedTrailAt(robot, x, y);
+      if (useTrack) this.seedTravelSample();
+      this.draw();
+      this.updateTelemetry();
+    },
+
     /** 二维：移动到相对原点的坐标 (x, y) cm */
     async gotoCm(xCm, yCm, robotOrId) {
       const robot = this.resolveRobot(robotOrId);
@@ -765,6 +805,15 @@
       if (cm < 0.01) return;
       const angleDeg = Math.atan2(-dy, dx) * 180 / Math.PI;
       await this.moveByDelta(dx, dy, cm, this.mathAngleToCanvasRad(angleDeg), robot);
+    },
+
+    /** 直接设定车头朝向，不播放转向。0° 向右，180° 向左。 */
+    setFaceDeg(angleDeg, robotOrId) {
+      const robot = this.resolveRobot(robotOrId);
+      if (!robot) return;
+      robot.state.angle = this.mathAngleToCanvasRad(Number(angleDeg) || 0);
+      this.draw();
+      this.updateTelemetry();
     },
 
     /** 面向坐标系角度（不移动） */
@@ -2383,6 +2432,15 @@
             { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
             { type: 'input_value', name: 'S', check: 'Number' }
           ], previousStatement: true, nextStatement: true, colour: 120 },
+        { type: 'motion_set_face_robot', message0: '小车 %1 初始朝向 %2 °', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'input_value', name: 'ANGLE', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 280 },
+        { type: 'motion_set_start_robot', message0: '小车 %1 初始位置 x %2  y %3 厘米', args0: [
+            { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
+            { type: 'input_value', name: 'X', check: 'Number' },
+            { type: 'input_value', name: 'Y', check: 'Number' }
+          ], previousStatement: true, nextStatement: true, colour: 160 },
         { type: 'motion_goto_robot', message0: '小车 %1 移动到 x %2  y %3 厘米', args0: [
             { type: 'field_dropdown', name: 'ROBOT', options: [['A', 'A'], ['B', 'B']] },
             { type: 'input_value', name: 'X', check: 'Number' },
@@ -2561,6 +2619,16 @@
       gen('motion_speed_robot', b => {
         const robot = b.getFieldValue('ROBOT') || 'A';
         return `__robot${robot}.setSpeed(${J.valueToCode(b, 'S', J.ORDER_NONE) || 10});\n`;
+      });
+      gen('motion_set_face_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        return `await __robot${robot}.setFace(${J.valueToCode(b, 'ANGLE', J.ORDER_NONE) || 0});\n`;
+      });
+      gen('motion_set_start_robot', b => {
+        const robot = b.getFieldValue('ROBOT') || 'A';
+        const x = J.valueToCode(b, 'X', J.ORDER_NONE) || 0;
+        const y = J.valueToCode(b, 'Y', J.ORDER_NONE) || 0;
+        return `__robot${robot}.setStart(${x}, ${y});\n`;
       });
       gen('motion_goto_robot', b => {
         const robot = b.getFieldValue('ROBOT') || 'A';
@@ -2756,6 +2824,15 @@
             <block type="motion_turn_left"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>`;
 
       const dualMotion = `
+            <block type="motion_set_face_robot">
+              <field name="ROBOT">A</field>
+              <value name="ANGLE"><shadow type="math_num"><field name="N">180</field></shadow></value>
+            </block>
+            <block type="motion_set_start_robot">
+              <field name="ROBOT">A</field>
+              <value name="X"><shadow type="math_num"><field name="N">-40</field></shadow></value>
+              <value name="Y"><shadow type="math_num"><field name="N">0</field></shadow></value>
+            </block>
             <block type="motion_forward_robot"><value name="D"><shadow type="math_num"><field name="N">30</field></shadow></value></block>
             <block type="motion_turn_robot"><value name="A"><shadow type="math_num"><field name="N">90</field></shadow></value></block>`;
 
@@ -2942,6 +3019,57 @@
       this.ensureVariableSupport();
     },
 
+    numInput(block, name) {
+      const input = block.getInput(name);
+      const target = input && input.connection && input.connection.targetBlock();
+      if (!target || target.type !== 'math_num') return null;
+      const n = Number(target.getFieldValue('N'));
+      return Number.isFinite(n) ? n : null;
+    },
+
+    /** 初始位置 / 朝向改数字后立刻挪车，不必等点运行。 */
+    applyPoseFromBlocks() {
+      const ws = this.workspace;
+      if (!ws || sim.busy) return;
+      if (sim.taskMode !== 'travel' && sim.taskMode !== 'curveTravel') return;
+      const px = sim.getPxPerCm();
+      const ox = sim.trackOriginX;
+      const oy = sim.trackOriginY;
+      if (ox == null || oy == null || !(px > 0)) return;
+      const near = (a, b) => Math.abs(a - b) < 0.05;
+      (ws.getBlocksByType('motion_set_start_robot', false) || []).forEach(block => {
+        const id = block.getFieldValue('ROBOT') || 'A';
+        const x = this.numInput(block, 'X');
+        const y = this.numInput(block, 'Y');
+        const robot = sim.getRobot(id);
+        if (!robot || x == null || y == null) return;
+        const curX = (robot.state.x - ox) / px;
+        const curY = (oy - robot.state.y) / px;
+        if (near(curX, x) && near(curY, y)) return;
+        sim.setStartCm(x, y, id);
+        robot.state.startX = robot.state.x;
+        robot.state.startY = robot.state.y;
+      });
+      (ws.getBlocksByType('motion_set_face_robot', false) || []).forEach(block => {
+        const id = block.getFieldValue('ROBOT') || 'A';
+        const deg = this.numInput(block, 'ANGLE');
+        const robot = sim.getRobot(id);
+        if (!robot || deg == null) return;
+        const target = sim.mathAngleToCanvasRad(deg);
+        let delta = target - robot.state.angle;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        if (Math.abs(delta) < 0.01) return;
+        sim.setFaceDeg(deg, id);
+        robot.initialAngle = robot.state.angle;
+      });
+    },
+
+    schedulePosePreview() {
+      clearTimeout(this._poseTimer);
+      this._poseTimer = setTimeout(() => this.applyPoseFromBlocks(), 30);
+    },
+
     init() {
       installBlocklyDialogs();
       this.applyBlocklyLocale();
@@ -2958,6 +3086,10 @@
         Blockly.JavaScript.init(this.workspace);
       }
       this.ensureVariableSupport();
+      this.workspace.addChangeListener(e => {
+        if (!e || e.isUiEvent || sim.busy) return;
+        this.schedulePosePreview();
+      });
       window.__blocklyWorkspace = this.workspace;
       window.addEventListener('resize', () => Blockly.svgResize(this.workspace));
     },
@@ -2971,6 +3103,7 @@
       if (!xmlStr) return;
       const xml = Blockly.utils.xml.textToDom(xmlStr);
       Blockly.Xml.domToWorkspace(xml, this.workspace);
+      this.applyPoseFromBlocks();
     }
   };
 
