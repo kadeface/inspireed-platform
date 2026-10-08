@@ -1,12 +1,17 @@
 <template>
   <div
-    class="mb-4 rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-    :class="{ 'overflow-hidden': cell.type !== CellType.FLOWCHART && cell.type !== CellType.WHITEBOARD }"
+    :class="presentation
+      ? 'presentation-cell relative h-full w-full overflow-hidden'
+      : [
+          'mb-4 rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md',
+          { 'overflow-hidden': cell.type !== CellType.FLOWCHART && cell.type !== CellType.WHITEBOARD },
+        ]"
     :data-cell-id="cell.id"
     :data-cell-index="props.index"
   >
-    <div class="flex">
+    <div class="flex h-full">
       <aside
+        v-if="!presentation"
         :class="[
           'flex w-16 sm:w-20 md:w-28 flex-shrink-0 flex-col items-center justify-center gap-1.5 md:gap-2 border-r border-gray-200 px-1.5 sm:px-2 md:px-3 py-3 sm:py-4 md:py-6 text-white',
           stageStyles.bg
@@ -33,9 +38,9 @@
         </div>
       </aside>
 
-      <div class="flex-1 min-w-0">
+      <div :class="presentation ? 'relative h-full w-full min-w-0' : 'flex-1 min-w-0'">
         <div
-          v-if="showHeader"
+          v-if="showHeader && !presentation"
           class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3"
         >
           <div class="flex flex-1 items-center gap-3 min-w-0">
@@ -169,6 +174,8 @@ interface Props {
   lessonId?: number // 教案ID
   /** 交互式课件：教师大屏 / 学生活动（仅 INTERACTIVE 单元使用） */
   interactiveViewerMode?: InteractiveViewerRole
+  /** 授课播放：图片铺满所在画面，并收起环节栏与标题 */
+  presentation?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -178,6 +185,7 @@ const props = withDefaults(defineProps<Props>(), {
   showMoveButtons: false,
   index: 0,
   compactMode: false,
+  presentation: false,
 })
 
 // 🔧 尝试从 provide/inject 获取 sessionId（如果父组件提供了）
@@ -265,6 +273,9 @@ const childCellProps = computed(() => {
   }
   if (props.cell.type === CellType.INTERACTIVE) {
     o.interactiveViewerMode = props.interactiveViewerMode
+  }
+  if (props.presentation) {
+    o.presentation = true
   }
   return o
 })

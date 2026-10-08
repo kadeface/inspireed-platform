@@ -95,20 +95,23 @@
               }"
             />
           </div>
-          <CellContainer
-            :cell="cell"
-            :index="cellOffset + index"
-            :editable="editable"
-            :draggable="editable"
-            :show-move-buttons="editable"
-            :compact-mode="compactMode && editable"
-            :lesson-id="lessonId"
-            :interactive-viewer-mode="interactiveViewerMode"
-            @update="(c) => $emit('cell-update', c)"
-            @delete="(id) => $emit('cell-delete', id)"
-            @move-up="(id) => $emit('cell-move-up', id)"
-            @move-down="(id) => $emit('cell-move-down', id)"
-          />
+          <div :class="presentImages && isPresentationImageCell(cell) ? 'teaching-image-frame' : ''">
+            <CellContainer
+              :cell="cell"
+              :index="cellOffset + index"
+              :editable="editable"
+              :draggable="editable"
+              :show-move-buttons="editable"
+              :compact-mode="compactMode && editable"
+              :lesson-id="lessonId"
+              :interactive-viewer-mode="interactiveViewerMode"
+              :presentation="presentImages && isPresentationImageCell(cell)"
+              @update="(c) => $emit('cell-update', c)"
+              @delete="(id) => $emit('cell-delete', id)"
+              @move-up="(id) => $emit('cell-move-up', id)"
+              @move-down="(id) => $emit('cell-move-down', id)"
+            />
+          </div>
         </template>
         <!-- 末尾添加按钮 -->
         <div v-if="editable" class="add-cell-menu-container">
@@ -131,6 +134,7 @@ import type { SectionInContent } from '../../types/section'
 import AddCellMenu from './AddCellMenu.vue'
 import CellContainer from '../Cell/CellContainer.vue'
 import type { InteractiveViewerRole } from '@/utils/interactiveView'
+import { isPresentationImageCell } from '@/utils/presentationImage'
 
 const props = withDefaults(
   defineProps<{
@@ -144,8 +148,10 @@ const props = withDefaults(
     showHeader?: boolean
     /** 交互式课件教师/学生视图（透传 CellContainer） */
     interactiveViewerMode?: InteractiveViewerRole
+    /** 授课预览：图片单元铺满可视区域 */
+    presentImages?: boolean
   }>(),
-  { cellOffset: 0, editable: true, compactMode: false, showHeader: true }
+  { cellOffset: 0, editable: true, compactMode: false, showHeader: true, presentImages: false }
 )
 
 const emit = defineEmits<{
@@ -211,3 +217,12 @@ function handleDelete() {
   emit('delete-section')
 }
 </script>
+
+<style scoped>
+.teaching-image-frame {
+  position: relative;
+  height: 100cqh;
+  width: 100%;
+  background: #000;
+}
+</style>

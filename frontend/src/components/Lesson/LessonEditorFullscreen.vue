@@ -80,17 +80,22 @@
             <div class="w-full px-4 sm:px-6 lg:px-8 py-6">
               <!-- Cell 列表 -->
               <div v-if="displayCells.length > 0" class="space-y-4 max-w-none">
-                <CellContainer
+                <div
                   v-for="(cell, index) in displayCells"
                   :key="cell.id"
-                  :cell="cell"
-                  :index="Number(index)"
-                  :editable="false"
-                  :draggable="false"
-                  :show-move-buttons="false"
-                  :compact-mode="compactMode"
-                  :interactive-viewer-mode="teachingInteractiveViewerMode"
-                />
+                  :class="isPresentationImageCell(cell) ? 'teaching-image-frame' : ''"
+                >
+                  <CellContainer
+                    :cell="cell"
+                    :index="Number(index)"
+                    :editable="false"
+                    :draggable="false"
+                    :show-move-buttons="false"
+                    :compact-mode="compactMode"
+                    :presentation="isPresentationImageCell(cell)"
+                    :interactive-viewer-mode="teachingInteractiveViewerMode"
+                  />
+                </div>
               </div>
 
               <!-- 空状态 -->
@@ -129,19 +134,21 @@
           >
             <div
               class="flex justify-center relative"
-              :class="slideFullscreen ? 'h-full p-0 overflow-y-auto' : 'p-8 items-center'"
+              :class="slideFullscreen || slideImageFill ? 'h-full p-0 overflow-hidden' : 'p-8 items-center'"
             >
               <Transition name="slide-fade" mode="out-in">
                 <div
                   v-if="currentCell"
                   :key="`slide-${currentCell.id}`"
                   :class="
-                    slideFullscreen
-                      ? 'w-full min-h-full flex items-start justify-center p-8'
-                      : 'w-full max-w-6xl'
+                    slideImageFill
+                      ? 'absolute inset-0'
+                      : slideFullscreen
+                        ? 'w-full min-h-full flex items-start justify-center p-8'
+                        : 'w-full max-w-6xl'
                   "
                 >
-                  <div :class="slideFullscreen ? 'w-full max-w-7xl mx-auto my-auto' : 'w-full'">
+                  <div :class="slideImageFill ? 'h-full w-full' : slideFullscreen ? 'w-full max-w-7xl mx-auto my-auto' : 'w-full'">
                     <CellContainer
                       :cell="currentCell"
                       :index="currentSlideIndex"
@@ -149,6 +156,7 @@
                       :draggable="false"
                       :show-move-buttons="false"
                       :compact-mode="false"
+                      :presentation="slideImageFill"
                       :interactive-viewer-mode="teachingInteractiveViewerMode"
                     />
                   </div>
@@ -274,9 +282,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Cell } from '@/types/cell'
 import type { InteractiveViewerRole } from '@/utils/interactiveView'
 import CellContainer from '@/components/Cell/CellContainer.vue'
+import { isPresentationImageCell } from '@/utils/presentationImage'
 
 interface Props {
   isFullscreenPreview: boolean
@@ -291,11 +301,18 @@ interface Props {
   slideContainerRef: any
   /** 交互课件 iframe 视角（与授课主界面同步） */
   teachingInteractiveViewerMode?: InteractiveViewerRole
+  /** 顶部导播条占位，避免盖住播放画面 */
+  reserveBroadcastBar?: boolean
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   teachingInteractiveViewerMode: 'teacher',
+  reserveBroadcastBar: false,
 })
+
+const slideImageFill = computed(
+  () => props.slideMode && isPresentationImageCell(props.currentCell),
+)
 
 const ghostButtonClass =
   'inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300'
@@ -406,8 +423,16 @@ const emit = defineEmits<{
   @apply max-w-none;
 }
 
-.slide-fullscreen-mode :deep(.cell-container img) {
+.slide-fullscreen-mode :deep(.cell-container:not(.image-cell-presentation):not(.presentation) img) {
   @apply max-h-[70vh] mx-auto;
+}
+
+.teaching-image-frame {
+  position: relative;
+  height: 100%;
+  min-height: calc(100dvh - 4.75rem);
+  width: 100%;
+  background: #000;
 }
 
 /* 浏览器原生全屏模式下的样式 */

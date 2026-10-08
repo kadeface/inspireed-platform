@@ -120,6 +120,7 @@
       :current-slide-index="currentSlideIndex"
       :show-slide-controls="showSlideControls"
       :slide-container-ref="slideContainerRef"
+      :reserve-broadcast-bar="showClassroomPanel"
       @exit-fullscreen="toggleFullscreenPreview"
       @toggle-slide-mode="slideMode = !slideMode"
       @toggle-slide-fullscreen="handleSlideFullscreenToggle"

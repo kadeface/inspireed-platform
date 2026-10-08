@@ -17,8 +17,7 @@
     <Teleport to="body">
       <div
         v-if="isFullscreenPreview && isPreviewMode && showClassroomPanel && currentLesson"
-        class="fixed left-0 right-0 z-[60] max-h-[min(45vh,440px)] overflow-y-auto px-2 sm:px-4 pointer-events-auto"
-        style="top: 5.5rem"
+        class="broadcast-bar-dock pointer-events-none fixed inset-x-0 top-0 z-[60]"
         data-testid="teacher-control-panel-fullscreen-teleport"
       >
         <TeacherClassroomControlPanel
@@ -37,11 +36,16 @@
     </Teleport>
 
     <!-- 中间：编辑区 -->
-    <main v-if="!isFullscreenPreview" class="min-h-0 flex-1 overflow-y-auto bg-gray-50 pb-24 lg:pb-0">
+    <main
+      v-if="!isFullscreenPreview"
+      :class="isPreviewMode
+        ? 'flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-50'
+        : 'min-h-0 flex-1 overflow-y-auto bg-gray-50 pb-24 lg:pb-0'"
+    >
       <div
         :class="[
           isPreviewMode
-            ? 'w-full px-2 py-3 sm:px-3 sm:py-4'
+            ? 'flex min-h-0 w-full flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3'
             : 'w-full px-3 py-4 sm:px-6 sm:py-6 lg:px-8',
         ]"
       >
@@ -82,7 +86,10 @@
         </div>
 
         <!-- Cell 列表 -->
-        <div v-else-if="currentLesson" :class="isPreviewMode ? 'space-y-2' : 'space-y-4'">
+        <div
+          v-else-if="currentLesson"
+          :class="isPreviewMode ? 'flex min-h-0 flex-1 flex-col' : 'space-y-4'"
+        >
           <!-- 封面预览区域（仅在编辑模式下显示） -->
           <div v-if="!isPreviewMode" class="mb-6">
             <div
@@ -149,7 +156,7 @@
           <!-- 课堂控制面板（预览模式下；非全屏 — 全屏时见上方 Teleport） -->
           <div
             v-if="!isFullscreenPreview && isPreviewMode && showClassroomPanel && currentLesson"
-            :class="isPreviewMode ? 'mb-2' : 'mb-6'"
+            class="shrink-0"
           >
             <TeacherClassroomControlPanel
               key="teacher-control-panel-inline"
@@ -201,7 +208,10 @@
           </div>
 
           <!-- 大环节列表 -->
-          <div ref="cellListRef" :class="isPreviewMode ? 'space-y-2' : 'space-y-4'">
+          <div
+            ref="cellListRef"
+            :class="isPreviewMode ? 'teaching-preview-scroll min-h-0 flex-1 space-y-2 overflow-y-auto' : 'space-y-4'"
+          >
             <!-- 编辑模式：标签页导航（可拖拽、可编辑） -->
             <div v-if="!isPreviewMode" class="mb-4">
               <div class="flex items-center gap-2 border-b border-gray-200 overflow-x-auto pb-1 no-scrollbar">
@@ -324,6 +334,7 @@
                   :compact-mode="false"
                   :lesson-id="currentLesson?.id"
                   :show-header="true"
+                  :present-images="true"
                   :interactive-viewer-mode="teachingInteractiveViewerMode"
                   @update:section="(p) => emit('update-section', { index: si, payload: p })"
                   @add-cell="(sectionIndex, indexInSection, cellType) => emit('add-cell-in-section', { sectionIndex, indexInSection, cellType })"
@@ -502,3 +513,13 @@ function setEditingTabRef(el: any, tabId: string) {
   }
 }
 </script>
+
+<style scoped>
+.teaching-preview-scroll {
+  container-type: size;
+}
+
+.broadcast-bar-dock :deep(.teacher-control-panel) {
+  pointer-events: auto;
+}
+</style>

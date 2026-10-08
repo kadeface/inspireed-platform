@@ -293,6 +293,10 @@ export function useClassroomSession(lessonId: number, onDisplayModeChanged?: (mo
           displayVersion.value += 1
         }
 
+        if (hasDisplayModeChanged && onDisplayModeChanged) {
+          onDisplayModeChanged(newDisplayMode === 'fullscreen' ? 'fullscreen' : 'window')
+        }
+
         // 会话状态已更新
       }
     } catch (error) {

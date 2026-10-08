@@ -3,7 +3,7 @@
   <div
     class="text-cell cell-container relative group"
     :data-cell-id="cell.id"
-    :class="{ fullscreen: isFullscreen, 'image-slide': isImageSlide }"
+    :class="{ fullscreen: isFullscreen, 'image-slide': isImageSlide, presentation: presentation && isImageSlide }"
     ref="containerRef"
   >
     <!-- 全屏按钮 -->
@@ -39,7 +39,7 @@
         :class="{
           'compact-content': compactMode && !isExpanded && !(isFullscreen && isImageSlide),
           'expanded-content': compactMode && isExpanded,
-          'image-stage': isFullscreen && isImageSlide,
+          'image-stage': (isFullscreen || presentation) && isImageSlide,
         }"
         v-html="sanitizedHtml"
       ></div>
@@ -265,11 +265,14 @@ interface Props {
   cell: TextCellType
   editable?: boolean
   compactMode?: boolean // 紧凑模式：限制长内容的高度
+  /** 授课播放：纯图片正文铺满所在画面 */
+  presentation?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   editable: false,
   compactMode: false,
+  presentation: false,
 })
 
 const emit = defineEmits<{
@@ -1406,6 +1409,35 @@ onUnmounted(() => {
   max-height: none;
   margin: 0;
   object-fit: contain;
+}
+
+/* 授课播放：纯图片铺满画面 */
+.text-cell.presentation.image-slide {
+  @apply absolute inset-0 z-0 m-0 flex h-full w-full flex-col overflow-hidden rounded-none bg-black p-0 shadow-none;
+}
+
+.text-cell.presentation.image-slide .cell-fullscreen-btn {
+  @apply hidden;
+}
+
+.text-cell.presentation.image-slide .text-cell-view.image-stage {
+  @apply m-0 flex h-full w-full max-w-none flex-1 items-stretch justify-center p-0;
+  min-height: 0;
+}
+
+.text-cell.presentation.image-slide .image-stage :deep(p),
+.text-cell.presentation.image-slide .image-stage :deep(figure),
+.text-cell.presentation.image-slide .image-stage :deep(div) {
+  display: contents;
+}
+
+.text-cell.presentation.image-slide .image-stage :deep(img) {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  object-fit: cover;
 }
 
 .text-cell-view :deep(.file-view-btn),

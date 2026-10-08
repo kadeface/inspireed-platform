@@ -5,8 +5,21 @@
     :class="{ 'panel-fullscreen': isPanelFullscreen, 'minimal-teaching': isMinimalTeachingUi }"
     data-testid="teacher-control-panel"
   >
-    <!-- 极简授课：单行顶栏 + 下方全课预览（由教案页自动滚到当前模块） -->
-    <div v-if="isMinimalTeachingUi" class="minimal-teaching-top">
+    <!-- 极简授课：导播条默认收起，从底部抽屉拉开，不占内容高度 -->
+    <div
+      v-if="isMinimalTeachingUi"
+      class="broadcast-drawer"
+      :class="{ 'is-open': broadcastDrawerOpen }"
+    >
+      <button
+        type="button"
+        class="broadcast-drawer-handle"
+        :aria-expanded="broadcastDrawerOpen"
+        @click="broadcastDrawerOpen = !broadcastDrawerOpen"
+      >
+        {{ broadcastDrawerOpen ? '收起导播' : '导播' }}
+      </button>
+      <div class="minimal-teaching-top">
       <div class="minimal-teaching-nav">
         <button
           type="button"
@@ -42,6 +55,7 @@
           @start="() => handleBeginClass(activeStudents.length)"
           @end="handleEnd"
         />
+      </div>
       </div>
     </div>
 
@@ -954,6 +968,7 @@ const moduleItemRefs = ref<Map<number, HTMLElement>>(new Map())
 /** 极简授课：隐藏模块格与次要信息；「课堂详情」与抽屉关闭成对切换标准布局 */
 const minimalTeachingFocus = ref(false)
 const floatingPanelCollapsed = ref(true)  // 浮动面板折叠状态
+const broadcastDrawerOpen = ref(false)
 
 const minimalMoreDrawerOpen = ref(false)
 /** 课堂详情抽屉分组折叠（路线 A）；打开抽屉时按会话状态重置默认展开 */
@@ -5095,6 +5110,42 @@ input[type="checkbox"].checkbox-input {
 }
 
 /* ---------- 极简授课（含 Teleport 抽屉，使用 :deep 子组件与面板类名） ---------- */
+.broadcast-drawer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80;
+  transform: translateY(calc(100% - 2.25rem));
+  transition: transform 0.22s ease;
+}
+
+.broadcast-drawer.is-open {
+  transform: translateY(0);
+}
+
+.broadcast-drawer .minimal-teaching-top {
+  border-bottom: 0;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.broadcast-drawer-handle {
+  display: block;
+  margin: 0 auto;
+  height: 2.25rem;
+  padding: 0 16px;
+  border: 1px solid #dbe3ef;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
 .minimal-teaching-top {
   display: flex;
   flex-wrap: wrap;
@@ -5104,14 +5155,10 @@ input[type="checkbox"].checkbox-input {
   padding: 12px 16px;
   border-bottom: 1px solid #e5e7eb;
   background: #fff;
-  position: sticky;
-  top: 0;
-  z-index: 40;
 }
 
 .minimal-teaching.panel-fullscreen .minimal-teaching-top {
-  position: sticky;
-  top: 0;
+  position: relative;
 }
 
 .minimal-teaching-nav {

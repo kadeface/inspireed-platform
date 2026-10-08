@@ -30,7 +30,10 @@
     <!-- 主要内容 -->
     <div v-else-if="lesson" class="flex h-screen relative">
       <!-- 左侧：课程内容 -->
-      <div class="flex-1 overflow-y-auto" :class="{ 'transition-all duration-300': true }">
+      <div
+        class="flex-1"
+        :class="teachingImageFill ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'"
+      >
         <!-- 全屏提示弹窗 -->
         <Transition name="fade">
           <div
@@ -46,8 +49,8 @@
                   </svg>
                 </div>
                 <div>
-                  <h3 class="text-lg font-semibold text-gray-900">教师要求进入全屏模式</h3>
-                  <p class="text-sm text-gray-600">点击下方按钮进入全屏，以便更好地集中注意力学习</p>
+                  <h3 class="text-lg font-semibold text-gray-900">进入全屏上课</h3>
+                  <p class="text-sm text-gray-600">点击下方按钮进入全屏。浏览器需要你确认一次，之后也可以在顶栏退出。</p>
                 </div>
               </div>
               <div class="flex gap-3">
@@ -114,6 +117,15 @@
                   class="text-sm font-medium tabular-nums text-emerald-600"
                   :title="`进度 ${progress}%`"
                 >{{ progress }}%</span>
+                <button
+                  v-if="isTeachingSession"
+                  type="button"
+                  @click="isDocumentFullscreen ? toggleFullscreen('window') : toggleFullscreen('fullscreen')"
+                  class="inline-flex h-9 items-center rounded-xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
+                  :title="isDocumentFullscreen ? '退出全屏' : '全屏上课'"
+                >
+                  {{ isDocumentFullscreen ? '退出全屏' : '全屏' }}
+                </button>
                 <button
                   @click="toggleSidebar"
                   class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 transition-all hover:bg-slate-50 hover:ring-slate-300"
@@ -202,25 +214,39 @@
         </div>
 
         <!-- Cell 内容：key 随教师切换模块变化，确保收到 cell_changed 后界面立即刷新 -->
-        <div v-if="filteredCells.length > 0" class="w-full" :key="classroomDisplayKey">
+        <div
+          v-if="filteredCells.length > 0"
+          class="w-full"
+          :class="teachingImageFill ? 'flex min-h-0 flex-1 flex-col' : ''"
+          :key="classroomDisplayKey"
+        >
           <!-- 正常内容显示 -->
-          <div class="space-y-6 px-6">
-            <!-- 🎓 学习科学优化：使用 CellWrapper 组件实现认知脚手架 -->
-            <CellWrapper
-              v-for="(cell, index) in filteredCells"
-              :key="cell.id"
-              :cell="cell"
-              :cellIndex="index"
-              :allCells="lessonContentCells"
-              :completedCellIds="completedCells"
-              @complete="markCellAsCompleted"
-            >
-              <!-- 渲染不同类型的 Cell -->
-              <component
-                :is="getCellComponent(cell.type)"
-                v-bind="lessonViewCellBind(cell)"
-              />
-            </CellWrapper>
+          <div :class="teachingImageStage ? (teachingImageFill ? 'min-h-0 flex-1' : 'space-y-0') : 'space-y-6 px-6'">
+            <template v-for="(cell, index) in filteredCells" :key="cell.id">
+              <div
+                v-if="isTeachingSession && isPresentationImageCell(cell)"
+                class="teaching-image-frame"
+                :class="{ 'h-full': teachingImageFill }"
+              >
+                <component
+                  :is="getCellComponent(cell.type)"
+                  v-bind="lessonViewCellBind(cell)"
+                />
+              </div>
+              <CellWrapper
+                v-else
+                :cell="cell"
+                :cellIndex="index"
+                :allCells="lessonContentCells"
+                :completedCellIds="completedCells"
+                @complete="markCellAsCompleted"
+              >
+                <component
+                  :is="getCellComponent(cell.type)"
+                  v-bind="lessonViewCellBind(cell)"
+                />
+              </CellWrapper>
+            </template>
           </div>
 
           <!-- 空状态 -->
@@ -232,12 +258,12 @@
           </div>
 
           <!-- 评分评论区域 -->
-          <div class="mt-12 mb-8">
+          <div v-if="!teachingImageStage" class="mt-12 mb-8">
             <ReviewSection :lesson-id="lessonId" @updated="handleReviewUpdated" />
           </div>
 
           <!-- 课程问答区域 -->
-          <div class="mt-8 mb-8 border-t border-gray-200 pt-8">
+          <div v-if="!teachingImageStage" class="mt-8 mb-8 border-t border-gray-200 pt-8">
             <div class="flex items-center justify-between mb-6">
               <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
                 <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -443,6 +469,8 @@ import classroomSessionService from '@/services/classroomSession'
 import type { ClassSession } from '@/types/classroomSession'
 import { isContentWithSections, normalizeContentToSections, sectionsToFlatCells } from '@/utils/lessonContent'
 import { createLogger } from '@/utils/logger'
+import { normalizeSessionStatus } from '@/utils/sessionStatus'
+import { isPresentationImageCell } from '@/utils/presentationImage'
 
 const log = createLogger('LessonView')
 const route = useRoute()
@@ -494,6 +522,17 @@ const dbCells = ref<Array<{ id: number; order: number; cell_type: string }>>([])
 // 全屏提示状态
 const showFullscreenPrompt = ref(false)
 const pendingFullscreenMode = ref<'fullscreen' | 'window' | null>(null)
+const isDocumentFullscreen = ref(false)
+const teachingFullscreenOffered = ref(false)
+
+function isBrowserFullscreen() {
+  return !!(
+    document.fullscreenElement ||
+    (document as any).webkitFullscreenElement ||
+    (document as any).mozFullScreenElement ||
+    (document as any).msFullscreenElement
+  )
+}
 
 // 全屏切换函数（用户交互触发）
 async function toggleFullscreen(mode: 'fullscreen' | 'window') {
@@ -537,30 +576,28 @@ async function toggleFullscreen(mode: 'fullscreen' | 'window') {
   }
 }
 
-// 处理WebSocket触发的全屏请求（显示提示）
+// 处理展示模式变化。进入全屏必须由学生点击，浏览器不允许页面自己进入。
 function handleFullscreenRequest(mode: 'fullscreen' | 'window') {
   if (mode === 'fullscreen') {
-    // 显示提示，让用户点击按钮进入全屏
+    if (isBrowserFullscreen()) {
+      showFullscreenPrompt.value = false
+      pendingFullscreenMode.value = null
+      return
+    }
     showFullscreenPrompt.value = true
     pendingFullscreenMode.value = 'fullscreen'
-  } else {
-    // 退出全屏可以直接执行（不需要用户交互）
+    return
+  }
+  // 切回窗口：只在已经全屏时退出，避免连接时的默认 window 关掉上课提示
+  if (isBrowserFullscreen()) {
     toggleFullscreen('window')
   }
 }
 
 // 监听浏览器全屏状态变化（用户按Esc退出时）
 function handleFullscreenChange() {
-  const isCurrentlyFullscreen = !!(
-    document.fullscreenElement ||
-    (document as any).webkitFullscreenElement ||
-    (document as any).mozFullScreenElement ||
-    (document as any).msFullscreenElement
-  )
-  
-  // 如果用户手动退出全屏，但教师端仍设置为全屏模式，可以重新进入全屏
-  // 但为了避免循环，这里只记录状态，不自动重新进入
-  log.debug('全屏状态', isCurrentlyFullscreen ? '全屏' : '窗口')
+  isDocumentFullscreen.value = isBrowserFullscreen()
+  log.debug('全屏状态', isDocumentFullscreen.value ? '全屏' : '窗口')
 }
 
 const {
@@ -575,6 +612,20 @@ const {
   leaveSession,
   updateProgress,  // 🆕 导入进度更新函数
 } = useClassroomSession(lessonId.value, handleFullscreenRequest)
+
+const isTeachingSession = computed(() => {
+  const status = classroomSession.value?.status
+  return !!status && normalizeSessionStatus(status) === 'teaching'
+})
+
+// 进入授课后提示一次全屏。互动课不会自动改 display_mode，学生仍要点一次。
+watch(isTeachingSession, (teaching) => {
+  if (!teaching || teachingFullscreenOffered.value) return
+  teachingFullscreenOffered.value = true
+  if (!isBrowserFullscreen()) {
+    handleFullscreenRequest('fullscreen')
+  }
+})
 
 // 🆕 统一处理 lesson.content：支持 Cell[] 和 LessonContentWithSections 两种格式
 const lessonContentCells = computed(() => {
@@ -731,6 +782,16 @@ const classroomDisplayKey = computed(() => {
   if (!orders || !Array.isArray(orders)) return `v${v}-empty-${id}`
   return `v${v}-${orders.join(',')}-${id}`
 })
+
+const teachingImageStage = computed(() =>
+  isTeachingSession.value &&
+  filteredCells.value.length > 0 &&
+  filteredCells.value.every((cell) => isPresentationImageCell(cell)),
+)
+
+const teachingImageFill = computed(() =>
+  teachingImageStage.value && filteredCells.value.length === 1,
+)
 
 // ========== 旧代码（已废弃）==========
 // 以下代码用于兼容旧的 display_cell_ids 方式，已废弃
@@ -929,6 +990,9 @@ function lessonViewCellBind(cell: { type: string; id?: string | number }) {
   const t = cell.type
   if (t === CellType.INTERACTIVE || t === 'interactive' || t === 'INTERACTIVE') {
     base.interactiveViewerMode = 'student'
+  }
+  if (isTeachingSession.value && isPresentationImageCell(cell)) {
+    base.presentation = true
   }
   return base
 }
@@ -1357,6 +1421,7 @@ onMounted(async () => {
   initDisplayCellIdsWatcher()
   
   // 监听浏览器全屏状态变化
+  handleFullscreenChange()
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
   document.addEventListener('mozfullscreenchange', handleFullscreenChange)
@@ -1446,4 +1511,15 @@ onUnmounted(() => {
 }
 
 /* 🎓 学习科学优化：样式已移至 CellWrapper.vue 组件中 */
+
+.teaching-image-frame {
+  position: relative;
+  height: calc(100dvh - 4.5rem);
+  width: 100%;
+  background: #000;
+}
+
+.teaching-image-frame.h-full {
+  height: 100%;
+}
 </style>

@@ -1,5 +1,8 @@
 <template>
-  <div class="image-cell cell-container rounded-lg border border-gray-100 bg-white p-4">
+  <div
+    class="image-cell cell-container"
+    :class="presentation && !editable ? 'image-cell-presentation' : 'rounded-lg border border-gray-100 bg-white p-4'"
+  >
     <div v-if="editable" class="space-y-4">
       <div
         v-if="!localContent.src"
@@ -84,6 +87,16 @@
       </div>
     </div>
 
+    <div v-else-if="presentation" class="image-fill-screen">
+      <img
+        v-if="displaySrc"
+        :src="displaySrc"
+        :alt="localContent.alt || ''"
+        class="image-fill-screen-img"
+      />
+      <p v-else class="py-8 text-center text-sm text-white/70">暂无图片</p>
+    </div>
+
     <div v-else class="image-cell-view">
       <figure class="mx-auto" :style="figureStyle">
         <img
@@ -117,10 +130,13 @@ import { normalizeResourceUrl } from '../../utils/normalizeResourceUrl'
 interface Props {
   cell: Cell
   editable?: boolean
+  /** 授课播放：图片铺满所在画面 */
+  presentation?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   editable: false,
+  presentation: false,
 })
 
 const emit = defineEmits<{
@@ -265,5 +281,29 @@ async function onFileSelected(ev: Event) {
 <style scoped>
 .image-cell-view img {
   max-height: min(70vh, 720px);
+}
+
+.image-cell-presentation {
+  height: 100%;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+}
+
+.image-fill-screen {
+  height: 100%;
+  width: 100%;
+}
+
+.image-fill-screen-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  border-radius: 0;
+  box-shadow: none;
 }
 </style>
