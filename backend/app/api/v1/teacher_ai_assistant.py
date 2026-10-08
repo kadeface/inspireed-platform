@@ -105,6 +105,14 @@ def _build_context_lines(
     if ctx.lesson_outline:
         context_lines.append(f"教案结构：{ctx.lesson_outline}")
 
+    if ctx.course_design_context:
+        course_context = ctx.course_design_context
+        context_lines.append(
+            "课程设计 Wiki 快照："
+            f"{course_context.snapshot_id}@{course_context.snapshot_version}"
+        )
+        context_lines.append(f"课程设计教学上下文：{course_context.teaching_context}")
+
     return context_lines
 
 

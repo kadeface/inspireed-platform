@@ -20,6 +20,14 @@ class AssistantLessonSnapshot(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class CourseDesignContext(BaseModel):
+    """课程设计 Wiki 教学包快照上下文（受限长度）"""
+
+    snapshot_id: str = Field(..., min_length=1, max_length=120)
+    snapshot_version: str = Field(..., min_length=1, max_length=40)
+    teaching_context: str = Field(..., min_length=2, max_length=12000)
+
+
 class AssistantContext(BaseModel):
     """助手参考的上下文"""
 
@@ -35,6 +43,9 @@ class AssistantContext(BaseModel):
     )
     agent_prompt: Optional[str] = Field(
         None, description="自定义智能体的提示词，用于定义AI的角色和行为"
+    )
+    course_design_context: Optional[CourseDesignContext] = Field(
+        None, description="课程设计 Skill 的 Wiki 教学包快照上下文"
     )
 
 

@@ -1,0 +1,54 @@
+{
+  "bundle_version": "1.0",
+  "package_id": "math-thinking-g3-cycle-remainder",
+  "retrieved_at": "2026-07-21T10:30:00Z",
+  "queries": [
+    {
+      "query_id": "q-core-ideas",
+      "query_text": "三年级 周期 重复组 余数 定位",
+      "top_k": 5,
+      "hits": [
+        {
+          "vault_path": "wiki/concepts/周期结构.md",
+          "chunk_id": "chunk-002",
+          "score": 0.87,
+          "excerpt": "先确定重复的一组及周期起点。",
+          "page_title": "周期结构",
+          "page_type": "concept"
+        },
+        {
+          "vault_path": "wiki/concepts/余数定位.md",
+          "chunk_id": "chunk-001",
+          "score": 0.82,
+          "excerpt": "用余数表示下一周期中的位置。",
+          "page_title": "余数定位",
+          "page_type": "concept"
+        }
+      ]
+    }
+  ],
+  "deduped_pages": [
+    {
+      "vault_path": "wiki/concepts/周期结构.md",
+      "page_title": "周期结构",
+      "page_type": "concept",
+      "hit_count": 1,
+      "best_score": 0.87,
+      "sections_used": ["核心理解"]
+    },
+    {
+      "vault_path": "wiki/concepts/余数定位.md",
+      "page_title": "余数定位",
+      "page_type": "concept",
+      "hit_count": 1,
+      "best_score": 0.82,
+      "sections_used": ["核心理解"]
+    }
+  ],
+  "review": {
+    "status": "approved",
+    "reviewer": "fixture",
+    "reviewed_at": "2026-07-21T10:35:00Z",
+    "notes": null
+  }
+}

@@ -428,87 +428,94 @@ class AIQAService:
 
         # 如果提供了系统提示词（智能体），尝试根据提示词生成更合适的回答
         if system_prompt:
-            # 检查是否是教学设计相关的智能体（扩展关键词匹配）
-            teaching_keywords = ["教学设计", "教学设计师", "课程设计", "教案", "教学方案", "教学深度", "导航系统", "六维教学"]
-            is_teaching_agent = any(keyword in system_prompt for keyword in teaching_keywords)
-            _log_print(f"[MOCK RESPONSE] Is teaching agent: {is_teaching_agent}")
-            
-            if is_teaching_agent:
-                # 检查用户问题是否关于教学设计
-                teaching_user_keywords = ["设计", "教案", "教学", "课文", "课程", "雷雨", "文学", "文本"]
-                is_teaching_question = any(keyword in user_message for keyword in teaching_user_keywords)
-                _log_print(f"[MOCK RESPONSE] Is teaching question: {is_teaching_question}")
-                
-                if is_teaching_question:
-                    answer = """这是一个很好的教学设计问题！让我来帮你设计教学方案：
+            # 课程设计 Skill：要求输出 JSON，mock 也必须返回合法骨架，否则前端解析永远失败
+            is_draft_skill = "草案生成器" in system_prompt
+            is_course_design_skill = "四件套生成器" in system_prompt
 
-## 教学设计方案
+            if is_draft_skill:
+                _log_print("[MOCK RESPONSE] course_design draft skill detected, returning JSON skeleton")
+                answer = '''```json
+{
+  "core_understanding": "（模拟）先确定重复的一组及周期起点，再用完整周期数和余数定位",
+  "inquiry_sequence": [
+    {"task": "圈出重复组", "purpose": "发现周期", "expected_evidence": "学生能指出起点和长度"},
+    {"task": "用除法压缩枚举", "purpose": "建立算式", "expected_evidence": "学生写出除法算式"},
+    {"task": "解释余数含义", "purpose": "深化理解", "expected_evidence": "学生能解释余数为0的情况"}
+  ],
+  "key_misconceptions": [
+    {"symptom": "余数为0时选第一位", "cause": "误解余数含义", "teacher_probe": "余数为0表示还剩几个？"},
+    {"symptom": "把总数当周期长度", "cause": "未识别重复组", "teacher_probe": "一组有几个？"}
+  ],
+  "assessment_evidence": ["能说出周期起点和长度", "能解释余数为0时落在哪"],
+  "time_budget": [
+    {"minutes": 10, "activity": "导入：圈出重复组"},
+    {"minutes": 20, "activity": "探究：用除法定位"},
+    {"minutes": 10, "activity": "迁移与解释"}
+  ],
+  "wiki_alignment": [
+    {"source_id": "wiki-cycle-structure", "use": "周期结构"},
+    {"source_id": "wiki-remainder-position", "use": "余数定位"}
+  ]
+}
+```
 
-### 一、教学目标
-- **知识与技能**：理解课文的核心内容和主题思想
-- **过程与方法**：通过探究式学习，培养学生的分析能力和表达能力
-- **情感态度与价值观**：引导学生深入思考，形成正确的价值观念
-
-### 二、教学重点与难点
-- **教学重点**：理解课文的主要内容和深层含义
-- **教学难点**：引导学生进行深度思考和批判性分析
-
-### 三、教学过程设计
-
-**1. 导入环节（5分钟）**
-- 通过情境导入，激发学生学习兴趣
-- 提出问题，引导学生思考
-
-**2. 探究环节（20分钟）**
-- 学生自主阅读，理解课文内容
-- 小组讨论，分享理解
-- 教师引导，深入分析
-
-**3. 深化环节（10分钟）**
-- 拓展延伸，联系实际
-- 总结提升，形成认知
-
-**4. 评价环节（5分钟）**
-- 学生自我评价
-- 同伴互评
-- 教师点评
-
-### 四、教学评价
-- 形成性评价：观察学生在课堂中的表现
-- 总结性评价：通过作业和测试检验学习效果
-
-### 五、教学反思
-- 记录教学过程中的亮点和不足
-- 为后续教学改进提供参考
-
-**注意**：这是一个模拟回答。要获得更详细和个性化的教学设计方案，请配置有效的AI API密钥。"""
-                else:
-                    # 教学设计智能体但问题不相关
+> **注意**：这是模拟草案，AI 服务暂未连接。请配置有效的 API 密钥后重新生成。'''
+            elif is_course_design_skill:
+                _log_print("[MOCK RESPONSE] course_design package skill detected, returning JSON skeleton")
+                # Echo the confirmed draft fingerprint so frontend consistency checks pass.
+                import re as _re
+                fingerprint_match = (
+                    _re.search(r"草案指纹[：:]\s*([0-9a-fA-F]+)", user_message)
+                    or _re.search(r"指纹\s+([0-9a-fA-F]+)", system_prompt or "")
+                )
+                draft_fingerprint = fingerprint_match.group(1) if fingerprint_match else "mock"
+                _log_print(f"[MOCK RESPONSE] echoing draft_fingerprint={draft_fingerprint}")
+                answer = f'''```json
+{{
+  "core_understanding": "（模拟）先确定重复的一组及周期起点，再用完整周期数和余数定位",
+  "draft_fingerprint": "{draft_fingerprint}",
+  "source_notes": [
+    {{"source_id": "wiki-cycle-structure", "use": "周期结构"}},
+    {{"source_id": "wiki-remainder-position", "use": "余数定位"}}
+  ],
+  "quality_evidence": {{"draft_evidence": "能说出周期起点和长度", "artifact_evidence": "学生口头解释商与余数"}},
+  "teacher_lesson_plan": {{
+    "objectives": ["理解周期与余数的关系", "能用除法定位第n项"],
+    "timeline": [
+      {{"minutes": 10, "activity": "导入：圈出重复组"}},
+      {{"minutes": 20, "activity": "探究：用除法压缩枚举"}},
+      {{"minutes": 10, "activity": "迁移：解释余数为0"}}
+    ],
+    "misconceptions": [
+      {{"symptom": "余数为0时选第一位", "cause": "误解余数含义", "teacher_probe": "余数为0表示还剩几个？"}},
+      {{"symptom": "把总数当周期长度", "cause": "未识别重复组", "teacher_probe": "一组有几个？"}}
+    ],
+    "formative_check": "口头解释：第13项在哪？余数为0时怎么定位？",
+    "body_markdown": "## 教案（模拟）\\n\\n本课为 mock 回答，AI 服务暂未连接。\\n\\n**注意**：请配置有效的 AI API 密钥后重新生成。"
+  }},
+  "student_worksheet": {{"body_markdown": "## 学习单（模拟）\\n\\n请圈出重复组，写出算式，解释余数含义。"}},
+  "scaffold_cards": {{
+    "below": "先数出一组有几个，用铅笔标出重复组",
+    "at": "写出除法算式：总数 ÷ 周期长度 = 商……余数",
+    "above": "余数为0时，第n项落在哪？用自己的话解释"
+  }},
+  "observation_rubric": {{
+    "items": [
+      {{"evidence": "能指出周期起点和长度", "looks_like": "学生圈出重复组并说明"}},
+      {{"evidence": "能解释余数为0", "looks_like": "学生说出落在上一个周期末位"}}
+    ]
+  }}
+}}
+```'''
+            else:
+                teaching_keywords = ["教学设计", "教学设计师", "课程设计", "教案", "教学方案", "教学深度", "导航系统", "六维教学"]
+                is_teaching_agent = any(keyword in system_prompt for keyword in teaching_keywords)
+                if is_teaching_agent:
                     answer = """作为课程设计专家，我专注于帮助教师进行教学设计。
 
-您的问题似乎不是关于教学设计的。如果您需要：
-- **教学设计**：我可以帮您设计完整的教学方案
-- **教案优化**：我可以分析现有教案并提供改进建议
-- **教学活动设计**：我可以设计各种教学活动
-
-请告诉我您具体需要什么帮助，我会为您提供专业的教学设计建议。
-
 **注意**：这是一个模拟回答。要获得更详细和个性化的建议，请配置有效的AI API密钥。"""
-            else:
-                # 其他类型的智能体，使用通用回答
-                answer = f"""根据您的智能体设定，我来为您提供建议：
-
-**问题分析**：
-您的问题需要从专业角度进行分析和解答。
-
-**建议方案**：
-1. 理解问题的核心要点
-2. 提供专业的解决方案
-3. 给出具体的实施建议
-
-**注意事项**：
-- 请根据实际情况调整方案
-- 如有疑问，可以继续提问
+                else:
+                    answer = """根据您的智能体设定，我来为您提供建议。
 
 **注意**：这是一个模拟回答。要获得更详细和个性化的建议，请配置有效的AI API密钥。"""
         else:

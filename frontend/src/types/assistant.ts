@@ -20,6 +20,12 @@ export interface AssistantLessonSnapshot {
   updated_at?: string
 }
 
+export interface CourseDesignContextPayload {
+  snapshot_id: string
+  snapshot_version: string
+  teaching_context: string
+}
+
 export interface AssistantContextPayload {
   lesson_summary?: Record<string, number>
   question_stats?: QuestionStats
@@ -28,6 +34,7 @@ export interface AssistantContextPayload {
   lesson_outline?: string
   progress?: number
   agent_prompt?: string
+  course_design_context?: CourseDesignContextPayload
 }
 
 export interface AssistantRequest {
