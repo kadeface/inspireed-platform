@@ -1434,10 +1434,11 @@ onUnmounted(() => {
 .text-cell.presentation.image-slide .image-stage :deep(img) {
   width: 100%;
   height: 100%;
-  max-width: none;
-  max-height: none;
+  max-width: 100%;
+  max-height: 100%;
   margin: 0;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 
 .text-cell-view :deep(.file-view-btn),

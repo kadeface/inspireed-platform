@@ -284,8 +284,11 @@ async function onFileSelected(ev: Event) {
 }
 
 .image-cell-presentation {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   width: 100%;
+  min-height: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -293,16 +296,23 @@ async function onFileSelected(ev: Event) {
 }
 
 .image-fill-screen {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
   height: 100%;
   width: 100%;
+  min-height: 0;
 }
 
 .image-fill-screen-img {
   display: block;
   width: 100%;
   height: 100%;
-  max-height: none;
-  object-fit: cover;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
   border-radius: 0;
   box-shadow: none;
 }

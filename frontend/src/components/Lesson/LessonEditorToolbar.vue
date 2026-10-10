@@ -236,12 +236,12 @@
               {{ isPreviewMode ? '编辑模式' : '授课模式' }}
             </button>
 
-            <!-- 全屏预览按钮 -->
+            <!-- 全屏预览只在编辑教案时使用 -->
             <button
               @click="$emit('fullscreen-preview')"
-              :disabled="false"
-              :class="ghostButtonClass"
-              :title="isPreviewMode ? '全屏预览（授课模式下可用）' : '全屏预览'"
+              :disabled="isPreviewMode"
+              :class="isPreviewMode ? disabledButtonClass : ghostButtonClass"
+              :title="isPreviewMode ? '全屏预览仅在编辑模式下可用' : '全屏预览'"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

@@ -2,7 +2,7 @@
  * 教案编辑器 - 导航与视图：全屏预览、预览/编辑模式切换、导出
  */
 
-import { ref, type Ref } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import { useLessonStore } from '../store/lesson'
 import courseExportService from '../services/courseExport'
 
@@ -15,10 +15,16 @@ export function useLessonEditorNav(
   const exporting = ref(false)
 
   function toggleFullscreenPreview() {
+    if (!isFullscreenPreview.value && isPreviewMode.value) return
     isFullscreenPreview.value = !isFullscreenPreview.value
-    if (isFullscreenPreview.value) document.body.style.overflow = 'hidden'
-    else document.body.style.overflow = ''
+    document.body.style.overflow = isFullscreenPreview.value ? 'hidden' : ''
   }
+
+  watch(isPreviewMode, (teaching) => {
+    if (!teaching || !isFullscreenPreview.value) return
+    isFullscreenPreview.value = false
+    document.body.style.overflow = ''
+  })
 
   function handleTogglePreviewMode() {
     if (isPreviewMode.value) {

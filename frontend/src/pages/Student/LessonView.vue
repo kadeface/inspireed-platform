@@ -71,8 +71,19 @@
           </div>
         </Transition>
 
-        <!-- 顶部导航栏 -->
-        <header class="sticky top-0 z-10 border-b border-slate-200 bg-white">
+        <div
+          v-if="isTeachingSession && teachingHeaderOpen"
+          class="fixed inset-y-0 left-0 z-30"
+          :style="teachingHeaderInset"
+          @click="teachingHeaderOpen = false"
+        />
+
+        <!-- 顶部导航栏。授课时收成顶栏抽屉，避免挡住学习内容 -->
+        <header
+          class="border-b border-slate-200 bg-white"
+          :class="isTeachingSession ? ['teaching-top-drawer', { 'is-open': teachingHeaderOpen }] : 'sticky top-0 z-10'"
+          :style="teachingHeaderInset"
+        >
           <div class="px-4 md:px-6" :class="isInClassroomMode && classroomSession ? 'py-2.5' : 'py-3'">
             <div class="flex items-center justify-between gap-3">
               <!-- 左侧：返回按钮 + 课程信息 -->
@@ -164,6 +175,22 @@
           >
             <div class="h-full bg-emerald-500 transition-[width] duration-300" :style="{ width: `${progress}%` }"></div>
           </div>
+          <button
+            v-if="isTeachingSession"
+            type="button"
+            class="teaching-header-handle"
+            :title="teachingHeaderOpen ? '收起顶栏' : '显示顶栏'"
+            :aria-expanded="teachingHeaderOpen"
+            @click.stop="teachingHeaderOpen = !teachingHeaderOpen"
+          >
+            <svg class="h-3.5 w-3.5 transition-transform" :class="teachingHeaderOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+            <span
+              v-if="!isWebSocketConnected"
+              class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-400"
+            />
+          </button>
         </header>
 
         <!-- 课程描述 -->
@@ -221,12 +248,12 @@
           :key="classroomDisplayKey"
         >
           <!-- 正常内容显示 -->
-          <div :class="teachingImageStage ? (teachingImageFill ? 'min-h-0 flex-1' : 'space-y-0') : 'space-y-6 px-6'">
+          <div :class="teachingImageStage ? (teachingImageFill ? 'flex min-h-0 flex-1 flex-col' : 'space-y-0') : 'space-y-6 px-6'">
             <template v-for="(cell, index) in filteredCells" :key="cell.id">
               <div
                 v-if="isTeachingSession && isPresentationImageCell(cell)"
                 class="teaching-image-frame"
-                :class="{ 'h-full': teachingImageFill }"
+                :class="{ 'is-fill': teachingImageFill }"
               >
                 <component
                   :is="getCellComponent(cell.type)"
@@ -471,6 +498,7 @@ import { isContentWithSections, normalizeContentToSections, sectionsToFlatCells 
 import { createLogger } from '@/utils/logger'
 import { normalizeSessionStatus } from '@/utils/sessionStatus'
 import { isPresentationImageCell } from '@/utils/presentationImage'
+import { classroomDisplayProgress } from '@/utils/classroomProgress'
 
 const log = createLogger('LessonView')
 const route = useRoute()
@@ -618,6 +646,14 @@ const isTeachingSession = computed(() => {
   return !!status && normalizeSessionStatus(status) === 'teaching'
 })
 
+const teachingHeaderOpen = ref(false)
+
+const teachingHeaderInset = computed(() => {
+  if (!isTeachingSession.value) return undefined
+  const sidebarTakesSpace = sidebarVisible.value && !isMobile.value
+  return { right: sidebarTakesSpace ? '24rem' : '0px' }
+})
+
 // 进入授课后提示一次全屏。互动课不会自动改 display_mode，学生仍要点一次。
 watch(isTeachingSession, (teaching) => {
   if (!teaching || teachingFullscreenOffered.value) return
@@ -685,16 +721,13 @@ const progress = computed(() => {
     return 0
   }
   
-  // 🆕 在课堂模式下，进度基于教师勾选的模块数（display_cell_orders）
+  // 授课时一次只展示当前模块，进度按它在整课中的位置算
   if (isInClassroomMode.value && classroomSession.value?.settings) {
     const settings = classroomSession.value.settings as any
     const displayOrders = settings?.display_cell_orders
-    
+
     if (displayOrders && Array.isArray(displayOrders)) {
-      const checkedModules = displayOrders.length
-      const totalModules = cells.length
-      const progressValue = Math.round((checkedModules / totalModules) * 100)
-      return progressValue
+      return classroomDisplayProgress(cells, displayOrders)
     }
   }
   
@@ -1197,11 +1230,10 @@ watch(
     const oldOrdersStr = JSON.stringify(oldOrders || [])
     
     if (newOrdersStr !== oldOrdersStr && Array.isArray(newOrders)) {
-      // 更新学生进度
-      // 计算已勾选的模块数（用 lessonContentCells 兼容 content 数组 / sections 两种格式）
-      const checkedModules = newOrders.length
-      const totalModules = lessonContentCells.value?.length || 1
-      const progressPercentage = Math.round((checkedModules / totalModules) * 100)
+      const progressPercentage = classroomDisplayProgress(
+        lessonContentCells.value || [],
+        newOrders,
+      )
       
       // 将 orders 转换为 cellIds（用于 updateProgress）
       const completedCellIds: number[] = []
@@ -1519,7 +1551,57 @@ onUnmounted(() => {
   background: #000;
 }
 
-.teaching-image-frame.h-full {
+/* 单张图片铺满顶栏以下的区域，高度跟真实顶栏走，避免按视口估算后被 overflow 裁掉 */
+.teaching-image-frame.is-fill {
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  height: auto;
+  min-height: 0;
+}
+
+.teaching-image-frame.is-fill :deep(.cell-container) {
+  flex: 1 1 auto;
+  min-height: 0;
   height: 100%;
+}
+
+.teaching-top-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  transform: translateY(-100%);
+  transition: transform 0.2s ease;
+}
+
+.teaching-top-drawer.is-open {
+  transform: translateY(0);
+}
+
+.teaching-top-drawer:not(.is-open) {
+  pointer-events: none;
+}
+
+.teaching-header-handle {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  z-index: 1;
+  display: flex;
+  height: 1.25rem;
+  width: 3.5rem;
+  transform: translateX(-50%);
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 0 0.5rem 0.5rem;
+  background: rgba(255, 255, 255, 0.96);
+  color: #64748b;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), inset 0 0 0 1px #e2e8f0;
+}
+
+.teaching-header-handle:hover {
+  color: #334155;
 }
 </style>
