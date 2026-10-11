@@ -112,12 +112,9 @@
             </svg>
             <div class="link-info">
               <h3 class="link-title">{{ displayContent.title || '网站链接' }}</h3>
-              <p class="link-url">{{ displayUrl }}</p>
+              <p class="link-url" :title="displayUrl">{{ displayUrl }}</p>
             </div>
           </div>
-          <p class="external-open-hint">
-            登录、下载等操作请在外部页面完成；本页将保持打开，完成后可切回继续听课。
-          </p>
           <div class="qr-code-section">
             <img
               v-if="qrCodeDataUrl"
@@ -175,7 +172,7 @@
             </svg>
             <div class="link-info">
               <h3 class="link-title">网站链接</h3>
-              <p class="link-url">{{ displayUrl }}</p>
+              <p class="link-url" :title="displayUrl">{{ displayUrl }}</p>
             </div>
           </div>
 
@@ -475,7 +472,7 @@ function openManagedExternal() {
     return
   }
 
-  toast.info('已在外部窗口打开，底部可点击「继续听课」返回授课页', '浏览器单元')
+  toast.info('已在新标签页打开', '浏览器单元')
 }
 
 // 编辑模式：在新窗口预览
@@ -777,10 +774,6 @@ onBeforeUnmount(() => {
   @apply mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800;
 }
 
-.external-open-hint {
-  @apply max-w-md text-center text-sm text-gray-600;
-}
-
 .external-mode-card {
   @apply mb-4 border-cyan-200;
 }
@@ -811,35 +804,35 @@ onBeforeUnmount(() => {
 }
 
 .link-header {
-  @apply flex flex-col items-center gap-3;
+  @apply flex w-full min-w-0 flex-row items-start gap-3 text-left;
 }
 
 .link-icon {
-  @apply w-12 h-12 text-blue-600;
+  @apply mt-0.5 h-8 w-8 shrink-0 text-blue-600;
 }
 
 .link-mode-card.fullscreen-preview .link-icon {
-  @apply w-16 h-16;
+  @apply h-10 w-10;
 }
 
 .link-info {
-  @apply flex flex-col items-center gap-2;
+  @apply flex min-w-0 flex-1 flex-col items-start gap-1;
 }
 
 .link-title {
-  @apply text-lg font-semibold text-gray-900;
+  @apply text-base font-semibold text-gray-900;
 }
 
 .link-mode-card.fullscreen-preview .link-title {
-  @apply text-xl;
+  @apply text-lg;
 }
 
 .link-url {
-  @apply text-sm text-blue-600 break-all max-w-md;
+  @apply w-full text-sm leading-5 text-slate-500 break-all line-clamp-2;
 }
 
 .link-mode-card.fullscreen-preview .link-url {
-  @apply text-base;
+  @apply text-base leading-6;
 }
 
 /* 二维码区域 */

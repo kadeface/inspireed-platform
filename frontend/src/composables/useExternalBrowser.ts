@@ -18,25 +18,18 @@ export interface ExternalBrowserSession {
 
 const activeSession = ref<ExternalBrowserSession | null>(null)
 
-export function buildWindowName(lessonId: string | number, cellId: string | number): string {
-  return `inspireed_ext_${lessonId}_${cellId}`
+/** 同一节课的外链共用一个标签，避免每打开一个网页就多一个标签。 */
+export function buildWindowName(lessonId: string | number, _cellId?: string | number): string {
+  return `inspireed_ext_${lessonId}`
 }
 
-export function buildExternalBrowserPageUrl(options: {
-  url: string
-  lessonId: string | number
-  cellId: string | number
-  title?: string
-  returnUrl?: string
-}): string {
-  const params = new URLSearchParams()
-  params.set('url', options.url)
-  params.set('lessonId', String(options.lessonId))
-  params.set('cellId', String(options.cellId))
-  if (options.title?.trim()) params.set('title', options.title.trim())
-  if (options.returnUrl?.trim()) params.set('returnUrl', options.returnUrl.trim())
-  const base = typeof window !== 'undefined' ? window.location.origin : ''
-  return `${base}/external-browser?${params.toString()}`
+function isOpenableHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
 }
 
 function persist(session: ExternalBrowserSession | null) {
@@ -70,7 +63,7 @@ export type OpenExternalOptions = {
   lessonId: string | number
   cellId: string | number
   title?: string
-  /** 授课页完整路径，用于外部窗口「继续听课」 */
+  /** 授课页完整路径，外部窗口切回时使用 */
   returnUrl?: string
 }
 
@@ -100,7 +93,10 @@ function notifyLessonWindow(
 
 export function useExternalBrowser() {
   function openExternal(url: string, options: OpenExternalOptions): OpenExternalResult {
-    if (!url?.trim()) return { ok: false, reason: 'invalid_url' }
+    const target = url?.trim() ?? ''
+    // 必须顶层打开。套进本站 iframe 后，对方站点的登录 cookie（SameSite=Lax）
+    // 不会随跨站嵌入发送，依赖作者身份的按钮（如飞象「教师大屏」）不会出现。
+    if (!isOpenableHttpUrl(target)) return { ok: false, reason: 'invalid_url' }
 
     const windowName = buildWindowName(options.lessonId, options.cellId)
     const returnUrl = options.returnUrl?.trim() || defaultLessonReturnUrl(options.lessonId)
@@ -111,22 +107,14 @@ export function useExternalBrowser() {
       /* ignored */
     }
 
-    const wrapperUrl = buildExternalBrowserPageUrl({
-      url,
-      lessonId: options.lessonId,
-      cellId: options.cellId,
-      title: options.title,
-      returnUrl,
-    })
-
-    const win = window.open(wrapperUrl, windowName)
+    const win = window.open(target, windowName)
 
     if (!win) {
       return { ok: false, reason: 'blocked' }
     }
 
     const session: ExternalBrowserSession = {
-      url,
+      url: target,
       title: options.title?.trim() || '外部网页',
       windowName,
       lessonId: options.lessonId,
@@ -144,15 +132,7 @@ export function useExternalBrowser() {
     const session = activeSession.value
     if (!session) return false
 
-    const wrapperUrl = buildExternalBrowserPageUrl({
-      url: session.url,
-      lessonId: session.lessonId,
-      cellId: session.cellId,
-      title: session.title,
-      returnUrl: session.returnUrl,
-    })
-
-    const win = window.open(wrapperUrl, session.windowName)
+    const win = window.open(session.url, session.windowName)
     if (!win) return false
 
     try {

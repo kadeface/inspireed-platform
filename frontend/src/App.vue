@@ -1,7 +1,8 @@
 <template>
   <router-view />
+  <LessonExternalReturnDock />
 </template>
 
 <script setup lang="ts">
-// InspireEd 主应用
+import LessonExternalReturnDock from '@/components/Cell/LessonExternalReturnDock.vue'
 </script>
