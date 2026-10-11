@@ -3,16 +3,22 @@
 提供交互数据上报、分析查询、看板数据等接口
 """
 
+import json
+import re
 from typing import Any, Optional
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
+from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models.courseware import CoursewareInteraction
+from app.models.courseware import CoursewareInteraction, InteractiveCollectSubmission
+from app.models.user import User, UserRole
+from app.services.interactive_collect import payload_is_too_large, student_label_from_payload
 
 router = APIRouter()
 
@@ -244,3 +250,99 @@ async def get_courseware_dashboard(
         "daily_trend": daily_trend,
         "top_coursewares": top_coursewares,
     }
+
+
+# ==================== 数据收集（页面 POST 到提交地址） ====================
+
+
+_COLLECT_KEY = re.compile(r"^[A-Za-z0-9-]{8,64}$")
+_BOARD_ROLES = {
+    UserRole.TEACHER,
+    UserRole.ADMIN,
+    UserRole.SCHOOL_ADMIN,
+    UserRole.DISTRICT_ADMIN,
+    UserRole.RESEARCHER,
+}
+_COLLECT_CORS = {"Access-Control-Allow-Origin": "*"}
+
+
+class CollectSubmissionOut(BaseModel):
+    id: int
+    student_label: str
+    payload: dict
+    created_at: datetime
+
+
+def _require_collect_key(collect_key: str) -> str:
+    key = collect_key.strip()
+    if not _COLLECT_KEY.fullmatch(key):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="收集地址无效")
+    return key
+
+
+async def _read_collect_payload(request: Request) -> dict:
+    content_type = request.headers.get("content-type", "")
+    if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        form = await request.form()
+        data = {key: value for key, value in form.items() if isinstance(value, str)}
+    else:
+        raw = await request.body()
+        if not raw:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="缺少提交内容")
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="提交内容不是 JSON") from exc
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="提交内容须为对象")
+    if payload_is_too_large(data):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="提交内容过大")
+    return data
+
+
+@router.post("/collect/{collect_key}/submit")
+async def submit_collect(
+    collect_key: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """页面把结果 POST 到此地址。不要求登录，收集钥匙即入口。"""
+    key = _require_collect_key(collect_key)
+    payload = await _read_collect_payload(request)
+    row = InteractiveCollectSubmission(
+        collect_key=key,
+        student_label=student_label_from_payload(payload),
+        payload=payload,
+        created_at=datetime.utcnow(),
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return JSONResponse({"status": "ok", "id": row.id}, headers=_COLLECT_CORS)
+
+
+@router.get("/collect/{collect_key}/submissions", response_model=list[CollectSubmissionOut])
+async def list_collect_submissions(
+    collect_key: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """教师查看本单元收到的提交。"""
+    if current_user.role not in _BOARD_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="只有教师可以查看提交")
+    key = _require_collect_key(collect_key)
+    result = await db.execute(
+        select(InteractiveCollectSubmission)
+        .where(InteractiveCollectSubmission.collect_key == key)
+        .order_by(InteractiveCollectSubmission.created_at.desc())
+        .limit(100)
+    )
+    return [
+        CollectSubmissionOut(
+            id=row.id,
+            student_label=row.student_label,
+            payload=row.payload or {},
+            created_at=row.created_at,
+        )
+        for row in result.scalars().all()
+    ]

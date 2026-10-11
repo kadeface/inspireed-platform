@@ -68,3 +68,18 @@ class CoursewareInteraction(Base):
 Index("idx_cw_courseware_created", CoursewareInteraction.courseware_id, CoursewareInteraction.created_at)
 Index("idx_cw_lesson_created", CoursewareInteraction.lesson_id, CoursewareInteraction.created_at)
 Index("idx_cw_student_created", CoursewareInteraction.student_id, CoursewareInteraction.created_at)
+
+
+class InteractiveCollectSubmission(Base):
+    """交互课件数据收集：页面按约定字段 POST 过来的一条提交。"""
+
+    __tablename__ = "interactive_collect_submissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    collect_key = Column(String(64), nullable=False, index=True, comment="单元收集钥匙")
+    student_label = Column(String(100), nullable=False, default="未署名")
+    payload = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    def __repr__(self) -> str:
+        return f"<InteractiveCollectSubmission(collect_key={self.collect_key}, student_label={self.student_label})>"

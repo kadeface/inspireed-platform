@@ -2,6 +2,7 @@
  * 课件交互数据 API Service
  */
 import axios from 'axios'
+import api from './api'
 
 const BASE = '/api/v1/courseware'
 
@@ -101,4 +102,16 @@ export const coursewareService = {
     const res = await axios.get(`${BASE}/analytics/student/${studentId}`, { params: { days } })
     return res.data
   },
+
+  /** 教师读取数据收集提交 */
+  async listCollectSubmissions(collectKey: string): Promise<CollectSubmission[]> {
+    return api.get<CollectSubmission[]>(`/courseware/collect/${collectKey}/submissions`)
+  },
+}
+
+export interface CollectSubmission {
+  id: number
+  student_label: string
+  payload: Record<string, unknown>
+  created_at: string
 }

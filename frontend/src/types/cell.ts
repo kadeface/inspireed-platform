@@ -292,6 +292,8 @@ export interface InteractiveCellContent {
   description?: string             // 课件描述
   thumbnail?: string               // 缩略图URL
   feixiang_url?: string            // 飞象老师AI课件链接
+  /** 数据收集钥匙。页面把 JSON POST 到 /api/v1/courseware/collect/{collect_key}/submit */
+  collect_key?: string
 }
 
 export interface InteractiveCell extends CellBase {

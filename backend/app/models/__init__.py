@@ -114,6 +114,7 @@ from app.models.self_study import (
     SelfStudyTeacherHandoff,
 )
 from app.models.self_directed import SelfDirectedSession, SelfDirectedSessionStatus
+from app.models.courseware import InteractiveCollectSubmission
 
 __all__ = [
     "User",
@@ -228,4 +229,5 @@ __all__ = [
     "SelfStudyTeacherHandoff",
     "SelfDirectedSession",
     "SelfDirectedSessionStatus",
+    "InteractiveCollectSubmission",
 ]
