@@ -535,6 +535,7 @@
                 v-for="lesson in lessonStore.lessons"
                 :key="lesson.id"
                 :lesson="lesson"
+                :live-classroom-names="liveClassroomNamesFor(lesson.id)"
                 @edit="handleEdit"
                 @edit-published="handleEditPublished"
                 @duplicate="handleDuplicate"
@@ -740,9 +741,18 @@ import { lessonService } from '@/services/lesson'
 import curriculumService from '@/services/curriculum'
 import { getSubjectGroupStatistics } from '@/services/subjectGroup'
 import { authService } from '@/services/auth'
+import classroomSessionService from '@/services/classroomSession'
+import { groupLiveClassroomsByLesson } from '@/utils/teacherLiveSessions'
 import { getRoleDisplayName } from '@/types/user'
 import type { QuestionStats } from '@/types/question'
 import type { SubjectGroupStatistics } from '@/types/subjectGroup'
+
+const liveClassroomsByLessonId = ref<Record<number, string[]>>({})
+
+function liveClassroomNamesFor(lessonId: number): string[] {
+  const names = liveClassroomsByLessonId.value?.[lessonId]
+  return Array.isArray(names) ? names : []
+}
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -990,17 +1000,29 @@ const totalPages = computed(() => {
 })
 
 // 加载教案列表
+async function loadLiveSessions() {
+  try {
+    const sessions = await classroomSessionService.listTeacherLiveSessions()
+    liveClassroomsByLessonId.value = groupLiveClassroomsByLesson(sessions)
+  } catch (error) {
+    console.warn('加载正在上课的课例失败:', error)
+  }
+}
+
 async function loadLessons() {
   try {
-    await lessonStore.loadLessons({
-      page: lessonStore.currentPage,
-      page_size: lessonStore.pageSize,
-      status: currentStatus.value || undefined,
-      search: searchQuery.value || undefined,
-      grade_id: selectedGrade.value || undefined,
-      chapter_id: selectedChapterId.value || undefined,
-      creator_only: true, // 我的教案：只显示当前用户创建的教案
-    })
+    await Promise.all([
+      lessonStore.loadLessons({
+        page: lessonStore.currentPage,
+        page_size: lessonStore.pageSize,
+        status: currentStatus.value || undefined,
+        search: searchQuery.value || undefined,
+        grade_id: selectedGrade.value || undefined,
+        chapter_id: selectedChapterId.value || undefined,
+        creator_only: true, // 我的教案：只显示当前用户创建的教案
+      }),
+      loadLiveSessions(),
+    ])
   } catch (error: any) {
     showToast('error', error.message || '加载教案列表失败')
   }

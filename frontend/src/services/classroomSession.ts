@@ -112,10 +112,12 @@ export const classroomSessionService = {
         throw new Error(`创建会话失败：${formattedErrors}`)
       }
       
-      // 如果错误信息是对象，尝试提取关键信息
-      if (typeof errorDetail === 'object') {
+      // 冲突详情是对象时仍保留 response，调用方要读 existing_session_id
+      if (typeof errorDetail === 'object' && errorDetail !== null) {
         const errorMessage = errorDetail.message || JSON.stringify(errorDetail)
-        throw new Error(`创建会话失败：${errorMessage}`)
+        const newError = new Error(`创建会话失败：${errorMessage}`)
+        ;(newError as any).response = error.response
+        throw newError
       }
       
       // 对于字符串错误（如"已有活跃会话"），保留原始错误以便调用者可以访问 response
@@ -235,6 +237,22 @@ export const classroomSessionService = {
       console.error('Get student active sessions error:', error)
       throw error
     }
+  },
+
+  /**
+   * 当前教师正在上课的会话
+   */
+  async listTeacherLiveSessions(): Promise<
+    Array<{ id: number; lesson_id: number; classroom_id: number; classroom_name?: string | null }>
+  > {
+    const response = await api.get('/classroom-sessions/teacher/live-sessions')
+    const sessions = Array.isArray(response) ? response : []
+    return sessions.map((session: any) => ({
+      id: session.id,
+      lesson_id: session.lesson_id,
+      classroom_id: session.classroom_id,
+      classroom_name: session.classroom_name ?? null,
+    }))
   },
 
   /**

@@ -63,6 +63,16 @@
           {{ statusLabel }}
         </span>
       </div>
+
+      <div v-if="liveClassroomLabel" class="absolute bottom-3 left-3 right-3">
+        <span
+          class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-rose-500/95 px-2.5 py-1 text-xs font-semibold text-white shadow-lg"
+          :title="`正在上课 · ${liveClassroomLabel}`"
+        >
+          <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-white"></span>
+          <span class="truncate">正在上课 · {{ liveClassroomLabel }}</span>
+        </span>
+      </div>
     </div>
 
     <!-- 内容区域 -->
@@ -314,10 +324,18 @@ import { lessonService } from '../../services/lesson'
 interface Props {
   lesson: Lesson
   showActions?: boolean
+  liveClassroomNames?: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showActions: true,
+  liveClassroomNames: () => [],
+})
+
+const liveClassroomLabel = computed(() => {
+  const names = props.liveClassroomNames
+  if (!Array.isArray(names)) return ''
+  return names.filter(Boolean).join('、')
 })
 
 // 图片加载错误状态

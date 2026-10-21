@@ -23,6 +23,7 @@ __all__ = [
     "StartSessionRequest",
     "SessionStatistics",
     "StudentPendingSessionResponse",
+    "TeacherLiveSessionResponse",
     "GuestAccessToggleRequest",
     "GuestSessionInfoResponse",
     "DisplayModeUpdateRequest",
@@ -186,6 +187,16 @@ class SessionStatistics(BaseModel):
 
 
 # ========== 学生待开始课堂 Schemas ==========
+
+
+class TeacherLiveSessionResponse(BaseModel):
+    """教师正在上课的会话，供课例卡片展示班级。"""
+
+    id: int
+    lesson_id: int
+    classroom_id: int
+    classroom_name: Optional[str] = None
+    status: ClassSessionStatus
 
 
 class StudentPendingSessionResponse(BaseModel):

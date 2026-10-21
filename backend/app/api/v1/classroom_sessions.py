@@ -2,7 +2,7 @@
 课堂会话 API
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional, cast
 import json
 import logging
@@ -24,6 +24,11 @@ from app.models.cell import Cell
 from app.models.organization import Classroom
 from app.models.classroom_assistant import ClassroomMembership
 from app.core.classroom_utils import get_user_classroom_ids, check_user_in_classroom
+from app.services.active_session_conflict import (
+    STUDENT_PREPARING_VISIBLE,
+    STUDENT_TEACHING_VISIBLE,
+    active_session_conflict_detail,
+)
 from app.utils.lesson_content_flat import (
     build_json_cells_by_effective_order,
     guest_flat_order_sequence,
@@ -42,6 +47,7 @@ from app.schemas.classroom_session import (
     EndSessionRequest,
     SessionStatistics,
     StudentPendingSessionResponse,
+    TeacherLiveSessionResponse,
     GuestAccessToggleRequest,
     GuestSessionInfoResponse,
     DisplayModeUpdateRequest,
@@ -374,7 +380,7 @@ async def create_class_session(
     if existing_session:
         raise HTTPException(
             status_code=400,
-            detail=f"该班级已有活跃的课堂会话（ID: {existing_session.id}），请先结束或使用现有会话",
+            detail=active_session_conflict_detail(existing_session.id),
         )
 
     # 创建会话
@@ -414,6 +420,23 @@ async def create_class_session(
             exc,
         )
         # 与部分唯一索引 uq_active_session_lesson_classroom 或 lesson_classrooms 冲突
+        existing_after_conflict = await db.execute(
+            select(ClassSession).where(
+                and_(
+                    ClassSession.lesson_id == lesson_id,
+                    ClassSession.classroom_id == data.classroom_id,
+                    ClassSession.status.in_(
+                        [ClassSessionStatus.PREPARING, ClassSessionStatus.TEACHING]
+                    ),
+                )
+            )
+        )
+        blocking_session = existing_after_conflict.scalar_one_or_none()
+        if blocking_session is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=active_session_conflict_detail(blocking_session.id),
+            ) from exc
         raise HTTPException(
             status_code=409,
             detail="无法创建课堂：该教案与班级下已有未结束的会话，或数据冲突。请先结束现有会话后重试。",
@@ -509,6 +532,38 @@ async def get_class_session(
     }
 
     return response_dict
+
+
+@router.get("/teacher/live-sessions", response_model=List[TeacherLiveSessionResponse])
+async def list_teacher_live_sessions(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """当前教师正在上课的会话（含班级名）。"""
+
+    if cast(UserRole, current_user.role) != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="只有教师可以查看正在上课的课例")
+
+    result = await db.execute(
+        select(ClassSession)
+        .where(
+            ClassSession.teacher_id == current_user.id,
+            ClassSession.status == ClassSessionStatus.TEACHING,
+        )
+        .options(selectinload(ClassSession.classroom))
+        .order_by(ClassSession.actual_start.desc().nulls_last(), ClassSession.id.desc())
+    )
+    sessions = result.scalars().all()
+    return [
+        TeacherLiveSessionResponse(
+            id=session.id,
+            lesson_id=session.lesson_id,
+            classroom_id=session.classroom_id,
+            classroom_name=session.classroom.name if session.classroom else None,
+            status=session.status,
+        )
+        for session in sessions
+    ]
 
 
 @router.get("/lessons/{lesson_id}/sessions", response_model=List[ClassSessionResponse])
@@ -1235,8 +1290,7 @@ async def get_student_pending_sessions(
         logger.info(f"学生 {current_user.id} 没有分配到任何班级，返回空列表")
         return []
 
-    # 计算48小时前的时间点
-    cutoff_time = datetime.utcnow() - timedelta(hours=48)
+    cutoff_time = datetime.utcnow() - STUDENT_PREPARING_VISIBLE
 
     # 查询学生所在班级的最近48小时内的pending状态会话
     query = (
@@ -1304,8 +1358,7 @@ async def get_student_active_sessions(
         # 如果学生没有分配班级，返回空列表
         return []
 
-    # 计算40分钟前的时间点（一节课的标准时长）
-    cutoff_time = datetime.utcnow() - timedelta(minutes=40)
+    cutoff_time = datetime.utcnow() - STUDENT_TEACHING_VISIBLE
 
     # 查询学生所在班级的active状态会话
     # 只返回最近40分钟内开始的会话

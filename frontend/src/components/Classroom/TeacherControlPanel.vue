@@ -5,6 +5,14 @@
     :class="{ 'panel-fullscreen': isPanelFullscreen, 'minimal-teaching': isMinimalTeachingUi }"
     data-testid="teacher-control-panel"
   >
+    <UnfinishedSessionChoice
+      v-if="showUnfinishedSessionChoice"
+      :sessions="unfinishedSessionChoices || []"
+      :classroom-names="classroomNameById"
+      :loading="loading"
+      @continue="continueUnfinishedSession"
+      @end="endUnfinishedSession"
+    />
     <!-- 极简授课：导播条默认收起，从底部抽屉拉开，不占内容高度 -->
     <div
       v-if="isMinimalTeachingUi"
@@ -156,13 +164,6 @@
       </div>
     </div>
     
-    <!-- PENDING 状态：等待学生加入提示区域 -->
-    <WaitingForStudentsBanner
-      v-if="session && !isMinimalTeachingUi"
-      :session-status="session.status"
-      :active-count="activeStudents.length"
-    />
-
     <!-- 访客观摩开关 -->
     <GuestAccessToggle
       v-if="session && !isMinimalTeachingUi"
@@ -422,10 +423,6 @@
               </span>
             </div>
             <div class="minimal-more-group-body minimal-more-group-body--tight minimal-more-group-body--pinned-scroll">
-              <WaitingForStudentsBanner
-                :session-status="session.status"
-                :active-count="activeStudents.length"
-              />
               <GuestAccessToggle
                 :session-id="session.id"
                 :guest-access-enabled="session.guest_access_enabled || session.guestAccessEnabled || false"
@@ -779,6 +776,7 @@ import { useLessonStore } from '../../store/lesson'
 // 4. 服务
 // ============================================================================
 import classroomSessionService from '../../services/classroomSession'
+import { isHiddenFromStudents } from '@/utils/activeSessionConflict'
 import activityService from '../../services/activity'
 
 // ============================================================================
@@ -787,8 +785,8 @@ import activityService from '../../services/activity'
 import SessionDurationDisplay from './SessionDurationDisplay.vue'
 import StudentCountDisplay from './StudentCountDisplay.vue'
 import SessionControlButtons from './SessionControlButtons.vue'
+import UnfinishedSessionChoice from './UnfinishedSessionChoice.vue'
 import ModuleCountDisplay from './ModuleCountDisplay.vue'
-import WaitingForStudentsBanner from './WaitingForStudentsBanner.vue'
 import JoinedStudentsList from './JoinedStudentsList.vue'
 import GuestAccessToggle from './GuestAccessToggle.vue'
 import ModuleList from './ModuleList.vue'
@@ -913,12 +911,14 @@ const sessionManager = useSessionManager({
     durationTimer.stopDurationTimer()
     wsManager?.disconnect()
     activeStudents.value = []
+    void sessionManager.refreshUnfinishedSessionChoices()
   },
 })
 
 // 必须立即解构，供后续 composables 使用（避免 TDZ）
 const {
   session,
+  unfinishedSessionChoices,
   loading,
   showClassroomSelectModal,
   selectedClassroomId,
@@ -930,6 +930,10 @@ const {
   statusClass,
   currentDisplayMode,
   handleCreateSession,
+  rememberUnfinishedSession,
+  refreshUnfinishedSessionChoices,
+  continueUnfinishedSession,
+  endUnfinishedSession,
   handleClassroomSelectConfirm,
   handleClassroomSelectCancel,
   handleBeginClass,
@@ -939,6 +943,19 @@ const {
   handleEndActivity,
   restoreSessionById,
 } = sessionManager
+
+const showUnfinishedSessionChoice = computed(() => {
+  const choices = unfinishedSessionChoices.value
+  return !session.value && Array.isArray(choices) && choices.length > 0
+})
+
+const classroomNameById = computed(() => {
+  const names: Record<number, string> = {}
+  for (const room of availableClassrooms.value || []) {
+    if (room?.id != null && room.name) names[room.id] = room.name
+  }
+  return names
+})
 
 /** 切换窗口/全屏展示：写入会话 settings 并广播给学生端 / 观摩端 */
 async function handleToggleDisplayMode() {
@@ -1720,6 +1737,16 @@ async function tryRestoreSessionFromProps() {
   const sid = props.restoreSessionId
   if (sid == null || sid <= 0 || session.value?.id === sid) return
 
+  try {
+    const loaded = await classroomSessionService.getSession(sid)
+    if (loaded?.id && isHiddenFromStudents(loaded)) {
+      rememberUnfinishedSession(loaded)
+      return
+    }
+  } catch (error) {
+    console.warn('读取要恢复的课堂失败:', error)
+  }
+
   const ok = await restoreSessionById(sid)
   if (!ok) return
 
@@ -1751,6 +1778,9 @@ onMounted(async () => {
 
   if (props.restoreSessionId != null && props.restoreSessionId > 0) {
     await tryRestoreSessionFromProps()
+  }
+  if (!session.value) {
+    await refreshUnfinishedSessionChoices()
   }
 })
 
