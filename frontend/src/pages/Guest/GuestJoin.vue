@@ -88,41 +88,71 @@
       </Transition>
 
       <div :class="guestCardClass">
-        <!-- 顶部信息栏 -->
-        <div class="shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-4">
-          <div class="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h1 class="text-lg font-bold">{{ sessionInfo.lessonTitle || '课堂观摩' }}</h1>
-              <div class="text-emerald-50 text-sm mt-1">
+        <!-- 顶部信息栏：窄屏收成一行，把高度留给教师播出内容 -->
+        <div
+          class="shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
+          :class="isGuestNarrow ? 'px-3 py-2' : 'px-6 py-4'"
+        >
+          <div
+            class="flex items-center justify-between"
+            :class="isGuestNarrow ? 'gap-2' : 'flex-wrap gap-3'"
+          >
+            <div class="min-w-0 flex-1">
+              <h1
+                class="truncate"
+                :class="isGuestNarrow ? 'text-sm font-semibold leading-tight' : 'text-lg font-bold'"
+                :title="sessionInfo.lessonTitle || '课堂观摩'"
+              >
+                {{ sessionInfo.lessonTitle || '课堂观摩' }}
+              </h1>
+              <div
+                class="truncate text-emerald-50"
+                :class="isGuestNarrow ? 'text-[11px] leading-tight' : 'mt-1 text-sm'"
+              >
                 {{ sessionInfo.teacherName }} · {{ sessionInfo.classroomName }}
               </div>
             </div>
-            <div class="flex items-center gap-3 flex-wrap justify-end">
+            <div
+              class="flex shrink-0 items-center justify-end"
+              :class="isGuestNarrow ? 'gap-1' : 'flex-wrap gap-3'"
+            >
               <span
-                class="px-2 py-1 text-xs rounded-full"
-                :class="
+                v-if="guestFocusTeacher"
+                class="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-medium"
+              >
+                只读
+              </span>
+              <span
+                class="rounded-full"
+                :class="[
+                  isGuestNarrow ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs',
                   sessionInfo.status === 'teaching'
                     ? 'bg-green-500'
                     : sessionInfo.status === 'ended'
                       ? 'bg-gray-500'
-                      : 'bg-yellow-500'
-                "
+                      : 'bg-yellow-500',
+                ]"
               >
                 {{
                   sessionInfo.status === 'teaching'
-                    ? '上课中'
+                    ? (isGuestNarrow ? '上课' : '上课中')
                     : sessionInfo.status === 'ended'
-                      ? '已结束'
-                      : '准备中'
+                      ? (isGuestNarrow ? '结束' : '已结束')
+                      : (isGuestNarrow ? '准备' : '准备中')
                 }}
               </span>
               <button
                 v-if="sessionInfo.status === 'teaching'"
                 type="button"
                 @click="toggleGuestLessonScope"
-                class="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25 transition-colors"
+                class="rounded-lg bg-white/15 font-medium text-white transition-colors hover:bg-white/25"
+                :class="isGuestNarrow ? 'px-1.5 py-1 text-[11px]' : 'px-3 py-1.5 text-sm'"
               >
-                {{ guestViewAll ? '仅看播出' : '查看全课' }}
+                {{
+                  guestViewAll
+                    ? (isGuestNarrow ? '播出' : '仅看播出')
+                    : (isGuestNarrow ? '全课' : '查看全课')
+                }}
               </button>
               <button
                 type="button"
@@ -131,14 +161,20 @@
                     ? toggleGuestDocumentFullscreen('window')
                     : toggleGuestDocumentFullscreen('fullscreen')
                 "
-                class="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25 transition-colors"
+                class="rounded-lg bg-white/15 font-medium text-white transition-colors hover:bg-white/25"
+                :class="isGuestNarrow ? 'px-1.5 py-1 text-[11px]' : 'px-3 py-1.5 text-sm'"
               >
-                {{ isDocumentFullscreen ? '退出全屏' : '全屏观摩' }}
+                {{
+                  isDocumentFullscreen
+                    ? (isGuestNarrow ? '窗口' : '退出全屏')
+                    : (isGuestNarrow ? '全屏' : '全屏观摩')
+                }}
               </button>
               <button
                 type="button"
                 @click="exitGuest"
-                class="text-blue-100 hover:text-white text-sm underline"
+                class="text-blue-100 underline hover:text-white"
+                :class="isGuestNarrow ? 'px-1 text-[11px]' : 'text-sm'"
               >
                 退出
               </button>
@@ -146,9 +182,11 @@
           </div>
         </div>
 
-        <!-- 访客提示：默认一行 + 可展开说明，避免长文抢占阅读区 -->
+        <!-- 访客提示：窄屏播出态收起，避免说明文字压过教师内容 -->
         <div
-          class="shrink-0 border-b border-slate-200/90 bg-slate-50/95 px-6 py-2"
+          v-if="!guestFocusTeacher"
+          class="shrink-0 border-b border-slate-200/90 bg-slate-50/95"
+          :class="isGuestNarrow ? 'px-3 py-1.5' : 'px-6 py-2'"
         >
           <div class="flex items-start gap-2.5">
             <span
@@ -157,19 +195,28 @@
               只读
             </span>
             <div class="min-w-0 flex-1">
-              <p class="text-sm leading-snug text-slate-800">
+              <p
+                class="leading-snug text-slate-800"
+                :class="isGuestNarrow ? 'text-xs' : 'text-sm'"
+              >
                 <template v-if="sessionInfo.status === 'preparing'">
-                  课前预览：下方为全课正文。开始上课后默认只显示教师播出内容，可随时点顶部「查看全课」。无法提交活动或参与互动。
+                  <template v-if="isGuestNarrow">课前预览全课，无法参与互动。</template>
+                  <template v-else>
+                    课前预览：下方为全课正文。开始上课后默认只显示教师播出内容，可随时点顶部「查看全课」。无法提交活动或参与互动。
+                  </template>
                 </template>
                 <template v-else-if="guestViewAll">
-                  正在查看全课正文；教师当前播出模块以浅蓝边框标示。无法提交活动或参与互动。
+                  <template v-if="isGuestNarrow">全课正文，浅蓝边框为教师正在播出。</template>
+                  <template v-else>
+                    正在查看全课正文；教师当前播出模块以浅蓝边框标示。无法提交活动或参与互动。
+                  </template>
                 </template>
                 <template v-else>
                   访客观摩：无法提交活动或参与互动。
                 </template>
               </p>
               <details
-                v-if="sessionInfo.status === 'teaching' && !guestViewAll"
+                v-if="!isGuestNarrow && sessionInfo.status === 'teaching' && !guestViewAll"
                 class="group mt-1"
               >
                 <summary
@@ -188,7 +235,7 @@
                 </p>
               </details>
               <details
-                v-else-if="sessionInfo.status === 'preparing'"
+                v-else-if="!isGuestNarrow && sessionInfo.status === 'preparing'"
                 class="group mt-1"
               >
                 <summary
@@ -207,7 +254,7 @@
                 </p>
               </details>
               <details
-                v-else-if="sessionInfo.status === 'teaching' && guestViewAll"
+                v-else-if="!isGuestNarrow && sessionInfo.status === 'teaching' && guestViewAll"
                 class="group mt-1"
               >
                 <summary
@@ -231,33 +278,41 @@
 
         <!-- Cell 内容区域 -->
         <div :class="guestContentAreaClass">
-          <div v-if="cellsLoading" class="text-center py-12 text-gray-400">
+          <div
+            v-if="cellsLoading"
+            class="py-12 text-center text-gray-400"
+            :class="isGuestNarrow ? 'flex flex-1 items-center justify-center' : ''"
+          >
             加载课堂内容中...
           </div>
 
-          <div v-else-if="cells.length === 0" class="text-center py-12 text-gray-400">
-            <div class="text-4xl mb-4">📚</div>
+          <div
+            v-else-if="cells.length === 0"
+            class="py-12 text-center text-gray-400"
+            :class="isGuestNarrow ? 'flex flex-1 flex-col items-center justify-center' : ''"
+          >
+            <div class="mb-4 text-4xl">📚</div>
             <p v-if="sessionInfo.status === 'ended'">课堂已结束</p>
             <p v-else-if="sessionInfo.status === 'teaching'">等待教师展示内容...</p>
             <p v-else>课堂尚未开始，请稍候</p>
           </div>
 
-          <div v-else class="space-y-6">
+          <div v-else :class="guestCellsStackClass">
             <div
               v-for="cell in cells"
               :key="guestCellKey(cell)"
               :data-cell-id="cell.id"
-              class="border border-gray-200 rounded-xl p-5 transition-all"
-              :class="{ 'ring-2 ring-blue-400 bg-blue-50/30': isGuestCurrentCell(cell) }"
+              :class="guestCellFrameClass(cell)"
             >
-              <div class="flex items-center gap-2 mb-3">
-                <span class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600 font-mono">
+              <div v-if="!guestFocusTeacher" class="mb-3 flex items-center gap-2">
+                <span class="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-600">
                   {{ cell.cell_type }}
                 </span>
                 <span v-if="cell.title" class="text-sm font-medium text-gray-700">
                   {{ cell.title }}
                 </span>
               </div>
+              <div :class="guestCellBodyClass(cell)">
 
               <!-- TEXT cell：与 TextCell 一致支持 html / markdown / json 纯文本兜底 -->
               <div
@@ -315,15 +370,20 @@
                 :lesson-id="sessionInfo?.lessonId"
               />
 
-              <!-- IMAGE cell：与学生端一致，显示图片 -->
+              <!-- IMAGE cell：窄屏单张播出时铺满剩余画面 -->
               <ImageCell
                 v-else-if="cell.cell_type === 'IMAGE'"
                 :cell="guestImageCell(cell)"
+                :presentation="guestStageFill && isGuestPresentationImage(cell)"
+                :class="guestStageFill && isGuestPresentationImage(cell) ? 'min-h-0 flex-1' : ''"
               />
 
               <!-- SIM cell：与学生端一致只读展示仿真 -->
               <div v-else-if="cell.cell_type === 'SIM'" class="space-y-2">
-                <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <div
+                  v-if="!guestFocusTeacher"
+                  class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                >
                   访客可观摩仿真演示，无法参与课堂竞赛或提交成绩。
                 </div>
                 <SimCell
@@ -358,7 +418,10 @@
 
               <!-- ACTIVITY cell — 访客只读：可看题干与选项，不可作答 -->
               <div v-else-if="cell.cell_type === 'ACTIVITY'" class="rounded-lg border border-gray-200 bg-gray-50/80 p-4 text-sm">
-                <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <div
+                  v-if="!guestFocusTeacher"
+                  class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                >
                   访客仅可浏览题目，不能作答或提交。
                 </div>
                 <div v-if="!cell.content" class="text-gray-500">暂无活动详情</div>
@@ -462,17 +525,29 @@
               <div v-else class="text-gray-500 text-sm">
                 {{ cell.cell_type }} 内容
               </div>
+              </div>
             </div>
 
             <!-- 全课目录统计：放在正文下方，默认折叠，避免长列表遮挡投屏内容 -->
             <details
               v-if="lessonOutline.length > 0"
-              class="guest-lesson-outline rounded-lg border border-slate-200 bg-slate-50 text-slate-600"
+              class="guest-lesson-outline border border-slate-200 bg-slate-50 text-slate-600"
+              :class="guestStageFill ? 'shrink-0 rounded-none border-x-0 border-b-0' : 'rounded-lg'"
             >
               <summary
-                class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-left text-xs text-slate-700 hover:bg-slate-100/90 rounded-lg [&::-webkit-details-marker]:hidden"
+                class="flex cursor-pointer list-none items-center justify-between gap-3 text-left text-xs text-slate-700 hover:bg-slate-100/90 [&::-webkit-details-marker]:hidden"
+                :class="guestStageFill ? 'rounded-none px-3 py-2' : 'rounded-lg px-4 py-2.5'"
               >
-                <span>
+                <span v-if="isGuestNarrow">
+                  <template v-if="guestShowFullLesson">
+                    全课 <strong class="text-slate-900">{{ lessonOutline.length }}</strong> 个模块
+                  </template>
+                  <template v-else-if="undisplayedLessonModules.length > 0">
+                    教师播出 · 另有 <strong class="text-slate-900">{{ undisplayedLessonModules.length }}</strong> 个未投屏
+                  </template>
+                  <template v-else>教师播出 · 已全部投屏</template>
+                </span>
+                <span v-else>
                   全课 <strong class="text-slate-900">{{ lessonOutline.length }}</strong> 个模块（与导播台一致）
                   <template v-if="guestShowFullLesson">
                     · 正文区已展示全课内容
@@ -537,6 +612,7 @@ import {
 } from '@/types/cell'
 import { markdownToHtml } from '@/utils/lessonEditorHelpers'
 import { appendInteractiveViewToUrl } from '@/utils/interactiveView'
+import { isPresentationImageCell } from '@/utils/presentationImage'
 import {
   clearGuestAccessCode,
   readGuestAccessCode,
@@ -637,6 +713,59 @@ watch(
   },
 )
 
+/** 手机竖屏：播出内容铺满，顶栏和说明收短 */
+const GUEST_NARROW_QUERY = '(max-width: 639px)'
+const isGuestNarrow = ref(
+  typeof window !== 'undefined' && window.matchMedia(GUEST_NARROW_QUERY).matches,
+)
+let guestNarrowMedia: MediaQueryList | null = null
+
+function syncGuestNarrow() {
+  isGuestNarrow.value = window.matchMedia(GUEST_NARROW_QUERY).matches
+}
+
+/** 上课中的默认播出视图（不是课前预览，也不是「查看全课」） */
+const guestFocusTeacher = computed(
+  () => isGuestNarrow.value && !!sessionInfo.value && !guestShowFullLesson.value,
+)
+
+function isGuestPresentationImage(cell: Record<string, any>) {
+  return isPresentationImageCell({
+    type: cell?.cell_type,
+    content: cell?.content,
+  })
+}
+
+/** 窄屏且当前只播出一张图片（或纯图片正文）时，图片占满剩余视口 */
+const guestStageFill = computed(() => {
+  if (!guestFocusTeacher.value || cells.value.length !== 1) return false
+  return isGuestPresentationImage(cells.value[0])
+})
+
+const guestCellsStackClass = computed(() => {
+  if (guestStageFill.value) return 'flex h-full min-h-0 flex-1 flex-col'
+  if (guestFocusTeacher.value) return 'space-y-3'
+  return 'space-y-6'
+})
+
+function guestCellFrameClass(cell: Record<string, any>) {
+  if (guestStageFill.value && isGuestPresentationImage(cell)) {
+    return 'guest-focus-cell flex min-h-0 flex-1 flex-col'
+  }
+  if (guestFocusTeacher.value) return 'guest-focus-cell'
+  const ring = isGuestCurrentCell(cell) ? ' ring-2 ring-blue-400 bg-blue-50/30' : ''
+  const pad = isGuestNarrow.value ? 'p-3' : 'p-5'
+  return `border border-gray-200 rounded-xl ${pad} transition-all${ring}`
+}
+
+function guestCellBodyClass(cell: Record<string, any>) {
+  if (guestStageFill.value && isGuestPresentationImage(cell)) {
+    return 'flex min-h-0 flex-1 flex-col'
+  }
+  if (guestFocusTeacher.value && !isGuestPresentationImage(cell)) return 'px-3 py-3'
+  return ''
+}
+
 /** 浏览器原生全屏（含 webkit/moz/ms 前缀）— 用于观摩页铺满视口 */
 const isDocumentFullscreen = ref(false)
 
@@ -656,26 +785,39 @@ const guestRootLayoutClass = computed(() => {
   if (isDocumentFullscreen.value) {
     return 'fixed inset-0 z-[1] flex flex-col overflow-hidden bg-slate-100'
   }
+  if (isGuestNarrow.value) {
+    return 'flex h-[100dvh] flex-col overflow-hidden bg-white'
+  }
   return 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4'
 })
 
 const guestShellClass = computed(() => {
-  if (isDocumentFullscreen.value) {
+  if (isDocumentFullscreen.value || isGuestNarrow.value) {
     return 'relative flex min-h-0 w-full max-w-none flex-1 flex-col'
   }
   return 'relative w-full max-w-4xl'
 })
 
 const guestCardClass = computed(() => {
-  if (isDocumentFullscreen.value) {
+  if (isDocumentFullscreen.value || isGuestNarrow.value) {
     return 'flex min-h-0 flex-1 flex-col overflow-hidden bg-white shadow-none'
   }
   return 'overflow-hidden rounded-2xl bg-white shadow-xl'
 })
 
 const guestContentAreaClass = computed(() => {
+  if (guestStageFill.value) {
+    return 'flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50 p-0'
+  }
   if (isDocumentFullscreen.value) {
-    return 'min-h-0 flex-1 overflow-y-auto p-6'
+    return isGuestNarrow.value
+      ? 'min-h-0 flex-1 overflow-y-auto bg-slate-50 px-3 py-3'
+      : 'min-h-0 flex-1 overflow-y-auto p-6'
+  }
+  if (isGuestNarrow.value) {
+    return guestFocusTeacher.value
+      ? 'min-h-0 flex-1 overflow-y-auto bg-slate-50 p-0'
+      : 'min-h-0 flex-1 overflow-y-auto px-3 py-3'
   }
   return 'p-6'
 })
@@ -763,6 +905,10 @@ function applyServerDisplayMode(raw: unknown) {
 }
 
 onMounted(() => {
+  guestNarrowMedia = window.matchMedia(GUEST_NARROW_QUERY)
+  syncGuestNarrow()
+  guestNarrowMedia.addEventListener('change', syncGuestNarrow)
+
   document.addEventListener('fullscreenchange', onDocumentFullscreenChange)
   document.addEventListener('webkitfullscreenchange', onDocumentFullscreenChange)
   document.addEventListener('mozfullscreenchange', onDocumentFullscreenChange)
@@ -781,6 +927,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  guestNarrowMedia?.removeEventListener('change', syncGuestNarrow)
+  guestNarrowMedia = null
   document.removeEventListener('fullscreenchange', onDocumentFullscreenChange)
   document.removeEventListener('webkitfullscreenchange', onDocumentFullscreenChange)
   document.removeEventListener('mozfullscreenchange', onDocumentFullscreenChange)
@@ -1131,5 +1279,30 @@ function guestIsSubjectiveItem(type: string | undefined) {
 }
 .guest-lesson-outline[open] > summary .guest-outline-toggle::after {
   content: '收起';
+}
+
+/* 窄屏播出：去掉图片单元自带留白，浅底居中，避免黑边抢画面 */
+.guest-focus-cell :deep(.image-cell) {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.guest-focus-cell :deep(.image-cell-view img) {
+  max-height: min(78dvh, 920px);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.guest-focus-cell :deep(.image-cell-presentation) {
+  background: #f8fafc;
+}
+
+.guest-focus-cell :deep(.prose img) {
+  width: 100%;
+  height: auto;
+  max-height: min(78dvh, 920px);
+  object-fit: contain;
 }
 </style>

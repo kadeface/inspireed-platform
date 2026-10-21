@@ -223,6 +223,16 @@ function handleDelete() {
   position: relative;
   height: 100cqh;
   width: 100%;
-  background: #000;
+  background: transparent;
+}
+
+/* 比例对不上时留白跟白卡片融在一起，不再露出图片单元的黑底 */
+.teaching-image-frame :deep(.image-cell-presentation),
+.teaching-image-frame :deep(.text-cell.presentation.image-slide) {
+  background: transparent;
+}
+
+.teaching-image-frame :deep(.image-fill-screen p) {
+  color: rgb(107 114 128);
 }
 </style>

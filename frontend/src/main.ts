@@ -28,6 +28,14 @@ if (import.meta.env.DEV) {
   window.addEventListener(
     'error',
     (ev: ErrorEvent) => {
+      // 捕获阶段也会收到图片、样式等资源加载失败。它们没有 message，不应当作脚本异常。
+      const target = ev.target
+      if (target instanceof Element) {
+        if (target.tagName !== 'SCRIPT') return
+        const src = target instanceof HTMLScriptElement ? target.src : ''
+        showDevGlobalError(`[全局 error]\n脚本加载失败\n${src}`)
+        return
+      }
       showDevGlobalError(
         '[全局 error]\n' +
           (ev.message || '') +
