@@ -29,3 +29,12 @@ export function clearGuestAccessCode() {
     /* ignored */
   }
 }
+
+export function buildGuestJoinUrl(origin: string, code: string): string {
+  const base = origin.trim().replace(/\/+$/, '')
+  const normalized = code.trim().toUpperCase()
+  if (!base || !normalized) {
+    throw new Error('guest join url requires origin and code')
+  }
+  return `${base}/guest?code=${encodeURIComponent(normalized)}`
+}
