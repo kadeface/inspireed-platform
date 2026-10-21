@@ -17,7 +17,7 @@
                 教学共创
               </p>
               <h2 class="mt-1 text-xl font-bold text-gray-900">
-                AI 教案助理
+                AI 助理
               </h2>
               <p class="mt-1 text-sm text-gray-600">
                 根据当前教案结构，生成教学目标、活动设计与优化建议。
@@ -405,6 +405,16 @@ const aiResourceCategories: AiResourceCategory[] = [
     name: 'AI工具大全',
     resources: [
       { name: 'AI-Bot', url: 'https://ai-bot.cn' },
+    ],
+  },
+  {
+    name: '智能体',
+    resources: [
+      { name: 'WorkBuddy', url: 'https://www.workbuddy.cn/' },
+      { name: 'ZCode', url: 'https://zcode.z.ai/cn' },
+      { name: '扣子', url: 'https://www.coze.cn/' },
+      { name: '文心智能体', url: 'https://agents.baidu.com/' },
+      { name: '小米 MiMo', url: 'https://mimo.xiaomimimo.com/desktop/' },
     ],
   },
   {

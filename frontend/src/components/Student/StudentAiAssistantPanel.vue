@@ -357,6 +357,16 @@ const aiResourceCategories: AiResourceCategory[] = [
     ],
   },
   {
+    name: '智能体',
+    resources: [
+      { name: 'WorkBuddy', url: 'https://www.workbuddy.cn/', icon: 'https://www.workbuddy.cn/favicon.ico' },
+      { name: 'ZCode', url: 'https://zcode.z.ai/cn', icon: 'https://zcode.z.ai/favicon.ico' },
+      { name: '扣子', url: 'https://www.coze.cn/', icon: 'https://www.coze.cn/favicon.ico' },
+      { name: '文心智能体', url: 'https://agents.baidu.com/', icon: 'https://agents.baidu.com/favicon.ico' },
+      { name: '小米 MiMo', url: 'https://mimo.xiaomimimo.com/desktop/', icon: 'https://mimo.xiaomimimo.com/favicon.ico' },
+    ],
+  },
+  {
     name: '知识库',
     resources: [
       { name: 'IMA', url: 'https://ima.qq.com/', icon: 'https://ima.qq.com/favicon.ico' },
