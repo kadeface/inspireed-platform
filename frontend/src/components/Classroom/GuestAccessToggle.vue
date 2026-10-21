@@ -24,31 +24,87 @@
     </div>
 
     <div v-if="isEnabled && accessCode" class="mt-3 p-3 bg-blue-50 rounded-lg">
-      <div class="text-xs text-gray-500 mb-1">访客接入码</div>
-      <div class="flex items-center gap-2">
-        <span class="text-2xl font-mono font-bold tracking-widest text-blue-700">
-          {{ accessCode }}
-        </span>
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <div class="text-xs text-gray-500 mb-1">访客接入码</div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-2xl font-mono font-bold tracking-widest text-blue-700 break-all">
+              {{ accessCode }}
+            </span>
+            <button
+              @click="copyCode"
+              class="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              {{ copied ? '已复制' : '复制' }}
+            </button>
+          </div>
+          <div class="text-xs text-gray-500 mt-1">
+            访客人数: {{ guestCount }}
+          </div>
+          <div class="text-xs text-gray-400 mt-1">
+            访客可通过此接入码只读观摩课堂内容，无法提交活动
+          </div>
+        </div>
         <button
-          @click="copyCode"
-          class="text-xs text-blue-600 hover:text-blue-800 underline"
+          v-if="qrDataUrl"
+          type="button"
+          class="shrink-0 text-center"
+          @click="showLargeQr = true"
         >
-          {{ copied ? '已复制' : '复制' }}
+          <img
+            :src="qrDataUrl"
+            width="88"
+            height="88"
+            alt="访客观摩二维码"
+            class="h-[88px] w-[88px] rounded bg-white"
+          />
+          <span class="mt-1 block text-[11px] leading-4 text-blue-600">点击放大</span>
         </button>
       </div>
-      <div class="text-xs text-gray-500 mt-1">
-        访客人数: {{ guestCount }}
-      </div>
-      <div class="text-xs text-gray-400 mt-1">
-        访客可通过此接入码只读观摩课堂内容，无法提交活动
-      </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="showLargeQr && qrDataUrl"
+        class="fixed inset-0 flex items-center justify-center bg-black/80 p-4"
+        style="z-index: 10100"
+        @click.self="showLargeQr = false"
+      >
+        <div
+          class="relative w-full max-w-xl rounded-2xl bg-white p-8 shadow-2xl"
+          role="dialog"
+          aria-modal="true"
+          aria-label="访客观摩二维码"
+        >
+          <button
+            type="button"
+            class="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            aria-label="关闭"
+            @click="showLargeQr = false"
+          >
+            ×
+          </button>
+          <img
+            :src="qrDataUrl"
+            alt="扫码进入访客观摩"
+            class="mx-auto bg-white p-2"
+            style="width: min(420px, 70vw); height: min(420px, 70vw)"
+          />
+          <p class="mt-4 text-center text-lg font-semibold text-gray-900">扫码进入访客观摩</p>
+          <p class="mt-1 text-center font-mono text-2xl font-bold tracking-widest text-blue-700">
+            {{ accessCode }}
+          </p>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import QRCode from 'qrcode'
 import classroomSessionService from '@/services/classroomSession'
+import { buildGuestJoinUrl } from '@/utils/guestSession'
 
 const props = defineProps<{
   sessionId: number
@@ -63,9 +119,54 @@ const emit = defineEmits<{
 
 const loading = ref(false)
 const copied = ref(false)
+const qrDataUrl = ref<string | null>(null)
+const showLargeQr = ref(false)
 
 const isEnabled = computed(() => props.guestAccessEnabled)
 const accessCode = computed(() => props.guestAccessCode)
+
+const joinUrl = computed(() => {
+  if (!isEnabled.value || !accessCode.value) return null
+  try {
+    return buildGuestJoinUrl(window.location.origin, accessCode.value)
+  } catch {
+    return null
+  }
+})
+
+watch(
+  joinUrl,
+  async (url) => {
+    showLargeQr.value = false
+    if (!url) {
+      qrDataUrl.value = null
+      return
+    }
+    try {
+      qrDataUrl.value = await QRCode.toDataURL(url, {
+        width: 420,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' },
+      })
+    } catch {
+      qrDataUrl.value = null
+    }
+  },
+  { immediate: true },
+)
+
+function onEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') showLargeQr.value = false
+}
+
+watch(showLargeQr, (open) => {
+  if (open) window.addEventListener('keydown', onEscape)
+  else window.removeEventListener('keydown', onEscape)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onEscape)
+})
 
 async function toggle() {
   loading.value = true
