@@ -101,10 +101,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
+import api from '@/services/api'
 import classroomSessionService from '@/services/classroomSession'
-import { buildGuestJoinUrl } from '@/utils/guestSession'
+import { buildGuestJoinUrl, guestJoinOrigin } from '@/utils/guestSession'
 
 const props = defineProps<{
   sessionId: number
@@ -121,14 +122,40 @@ const loading = ref(false)
 const copied = ref(false)
 const qrDataUrl = ref<string | null>(null)
 const showLargeQr = ref(false)
+const lanHost = ref<string | null>(null)
+const lanHostReady = ref(false)
 
 const isEnabled = computed(() => props.guestAccessEnabled)
 const accessCode = computed(() => props.guestAccessCode)
 
+function pageIsLoopback(): boolean {
+  const host = window.location.hostname
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+}
+
+onMounted(async () => {
+  if (!pageIsLoopback()) {
+    lanHostReady.value = true
+    return
+  }
+  try {
+    const data = await api.get<{ lan_host: string | null }>('/system/lan-host')
+    lanHost.value = data.lan_host
+  } catch {
+    lanHost.value = null
+  } finally {
+    lanHostReady.value = true
+  }
+})
+
 const joinUrl = computed(() => {
   if (!isEnabled.value || !accessCode.value) return null
+  if (pageIsLoopback() && !lanHostReady.value) return null
   try {
-    return buildGuestJoinUrl(window.location.origin, accessCode.value)
+    return buildGuestJoinUrl(
+      guestJoinOrigin(window.location.origin, lanHost.value),
+      accessCode.value,
+    )
   } catch {
     return null
   }

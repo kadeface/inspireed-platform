@@ -36,6 +36,7 @@ from app.api.v1 import (
     favorites,
     import_tasks,
     knowledge_base,
+    lan_host,
     learning_paths,
     lessons,
     library_assets,
@@ -231,3 +232,4 @@ api_router.include_router(
 api_router.include_router(
     courseware.router, prefix="/courseware", tags=["创AI-课件交互"]
 )
+api_router.include_router(lan_host.router, prefix="/system", tags=["系统"])

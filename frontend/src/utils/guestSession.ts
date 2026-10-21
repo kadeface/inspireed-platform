@@ -30,6 +30,24 @@ export function clearGuestAccessCode() {
   }
 }
 
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
+
+/** 教师用回环地址打开时，改成手机能访问的局域网 IP；已是域名或局域网 IP 时不动。 */
+export function guestJoinOrigin(pageOrigin: string, lanHost: string | null | undefined): string {
+  const trimmed = pageOrigin.trim()
+  let url: URL
+  try {
+    url = new URL(trimmed)
+  } catch {
+    return trimmed.replace(/\/+$/, '')
+  }
+  const host = lanHost?.trim()
+  if (host && LOOPBACK_HOSTS.has(url.hostname)) {
+    url.hostname = host
+  }
+  return url.origin
+}
+
 export function buildGuestJoinUrl(origin: string, code: string): string {
   const base = origin.trim().replace(/\/+$/, '')
   const normalized = code.trim().toUpperCase()
