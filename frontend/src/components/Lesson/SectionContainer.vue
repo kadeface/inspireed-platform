@@ -106,6 +106,7 @@
               :lesson-id="lessonId"
               :interactive-viewer-mode="interactiveViewerMode"
               :presentation="presentImages && isPresentationImageCell(cell)"
+              :show-stage-rail="!presentImages"
               @update="(c) => $emit('cell-update', c)"
               @delete="(id) => $emit('cell-delete', id)"
               @move-up="(id) => $emit('cell-move-up', id)"
@@ -221,15 +222,37 @@ function handleDelete() {
 <style scoped>
 .teaching-image-frame {
   position: relative;
-  height: 100cqh;
+  height: auto;
   width: 100%;
   background: transparent;
 }
 
-/* 比例对不上时留白跟白卡片融在一起，不再露出图片单元的黑底 */
+/* 按授课区宽度铺开，高度跟图片比例走，不再缩进扁框里留出两侧空白 */
+.teaching-image-frame :deep(.presentation-cell),
+.teaching-image-frame :deep(.h-full),
 .teaching-image-frame :deep(.image-cell-presentation),
-.teaching-image-frame :deep(.text-cell.presentation.image-slide) {
+.teaching-image-frame :deep(.image-fill-screen),
+.teaching-image-frame :deep(.text-cell.presentation.image-slide),
+.teaching-image-frame :deep(.text-cell.presentation.image-slide .image-stage) {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
   background: transparent;
+}
+
+.teaching-image-frame :deep(.text-cell.presentation.image-slide) {
+  position: relative;
+  inset: auto;
+}
+
+.teaching-image-frame :deep(img.image-fill-screen-img),
+.teaching-image-frame :deep(.text-cell.presentation.image-slide img) {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: none;
+  object-fit: contain;
 }
 
 .teaching-image-frame :deep(.image-fill-screen p) {

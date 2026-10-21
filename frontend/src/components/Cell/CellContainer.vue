@@ -11,7 +11,7 @@
   >
     <div class="flex h-full">
       <aside
-        v-if="!presentation"
+        v-if="!presentation && showStageRail"
         :class="[
           'flex w-16 sm:w-20 md:w-28 flex-shrink-0 flex-col items-center justify-center gap-1.5 md:gap-2 border-r border-gray-200 px-1.5 sm:px-2 md:px-3 py-3 sm:py-4 md:py-6 text-white',
           stageStyles.bg
@@ -176,6 +176,8 @@ interface Props {
   interactiveViewerMode?: InteractiveViewerRole
   /** 授课播放：图片铺满所在画面，并收起环节栏与标题 */
   presentation?: boolean
+  /** 授课预览里收起左侧环节色条，正文仍显示 */
+  showStageRail?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -186,6 +188,7 @@ const props = withDefaults(defineProps<Props>(), {
   index: 0,
   compactMode: false,
   presentation: false,
+  showStageRail: true,
 })
 
 // 🔧 尝试从 provide/inject 获取 sessionId（如果父组件提供了）
